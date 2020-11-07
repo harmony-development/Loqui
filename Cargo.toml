@@ -1,0 +1,32 @@
+[package]
+name = "icy_matrix"
+version = "0.1.0"
+authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
+edition = "2018"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = "thin"
+panic = "abort"
+
+[dependencies]
+iced = { path = "../iced", features = ["tokio", "image"] }
+iced_native = { path = "../iced/native" }
+iced_futures = { path = "../iced/futures" }
+
+ruma = { git = "https://github.com/ruma/ruma/", features = ["client-api"], branch = "main" }
+ruma-client = { git = "https://github.com/ruma/ruma/", branch = "main" }
+assign = "1.1.0"
+
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5"
+
+tokio = { version = "0.2", features = ["rt-core", "parking_lot", "time", "fs"] }
+indexmap = "1.6.0"
+open = "1.4.0"
+uuid = { version = "0.8.1", features = ["v4"] }
+chrono = "0.4.19"
+log = "0.4.11"
+simplelog = "0.8.0"
