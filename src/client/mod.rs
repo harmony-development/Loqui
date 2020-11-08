@@ -1,7 +1,7 @@
 use assign::assign;
 pub use room::{Room, Rooms};
 use ruma::{
-    api::client::r0::media::get_content,
+    api::client::r0::media::{create_content, get_content},
     api::{
         client::r0::{
             context::get_context,
@@ -273,9 +273,12 @@ impl Client {
         &self.rooms
     }
 
-    /// Removes a room from the stored rooms.
     pub fn remove_room(&mut self, room_id: &RoomId) {
         self.rooms.remove(room_id);
+    }
+
+    pub fn has_room(&self, room_id: &RoomId) -> bool {
+        self.rooms.contains_key(room_id)
     }
 
     pub fn get_room(&self, room_id: &RoomId) -> Option<&Room> {
@@ -306,6 +309,17 @@ impl Client {
             ))
             .await?)
         .map(|response| response.file)
+    }
+
+    pub async fn send_content(inner: InnerClient, data: Vec<u8>) -> Result<Uri, ClientError> {
+        let content_url = inner
+            .request(create_content::Request::new(data))
+            .await?
+            .content_uri;
+
+        content_url
+            .parse::<Uri>()
+            .map_err(|err| ClientError::URLParse(content_url, err))
     }
 
     pub async fn send_typing(

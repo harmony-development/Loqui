@@ -15,6 +15,7 @@ panic = "abort"
 iced = { path = "../iced", features = ["tokio", "image"] }
 iced_native = { path = "../iced/native" }
 iced_futures = { path = "../iced/futures" }
+nfd2 = "0.2.3"
 
 ruma = { git = "https://github.com/ruma/ruma/", features = ["client-api"], branch = "main" }
 ruma-client = { git = "https://github.com/ruma/ruma/", branch = "main" }

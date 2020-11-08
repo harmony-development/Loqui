@@ -8,7 +8,7 @@ use ruma::{
         AnyMessageEventContent, AnyRoomEvent, AnyStateEventContent, AnySyncMessageEvent,
         AnySyncRoomEvent, AnySyncStateEvent, SyncMessageEvent, Unsigned,
     },
-    EventId, RoomVersionId, UserId,
+    EventId, RoomVersionId, UInt, UserId,
 };
 use std::{convert::TryFrom, time::SystemTime};
 use uuid::Uuid;
@@ -240,8 +240,23 @@ impl TimelineEvent {
             if let AnyMessageEventContent::RoomMessage(content) = content {
                 return match content {
                     MessageEventContent::Image(image) => {
-                        let content_url = image.url.unwrap_or_default();
-                        image.info.map(|i| i.thumbnail_url.unwrap_or(content_url))
+                        let content_url = image.url;
+                        image.info.map(|i| {
+                            let thumbnail_url = i.thumbnail_url;
+                            // TODO: check if thumbnail is below a size limit?
+                            // Look at the spec
+                            let content_size = i.size;
+                            thumbnail_url.unwrap_or_else(|| {
+                                if let Some(url) = content_url {
+                                    if let Some(size) = content_size {
+                                        if size < UInt::from(1000_u32 * 1000) {
+                                            return url;
+                                        }
+                                    }
+                                }
+                                String::new()
+                            })
+                        })
                     }
                     MessageEventContent::Video(video) => {
                         video.info.map(|i| i.thumbnail_url.unwrap_or_default())

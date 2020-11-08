@@ -23,7 +23,7 @@ use ruma::{
     presence::PresenceState,
     EventId, RoomId,
 };
-use std::{collections::HashMap, hash::Hash, hash::Hasher, time::Duration};
+use std::{collections::HashMap, hash::Hash, hash::Hasher, path::PathBuf, time::Duration};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -625,21 +625,73 @@ impl MainScreen {
                     )
                 };
             }
-            Message::SendFile => {}
+            Message::SendFile => {
+                /*
+                TODO: Investigate implementing a file picker widget for iced
+                   (we just put it in as an overlay)
+                TODO: actually implement this
+                    1. Detect what type of file this is (and create a thumbnail if it's a video / image)
+                    2. Upload the file to matrix (and the thumbnail if there is one)
+                    3. Hardlink the source to our cache (or copy if FS doesn't support)
+                        - this is so that even if the user deletes the file it will be in our cache
+                        - (and we won't need to download it again)
+                    4. Create `MessageEventContent::Image(ImageMessageEventContent {...});` for each file
+                        - set `body` field to whatever is in `self.message`?,
+                        - use the MXC URL(s) we got when we uploaded our file(s)
+                    5. Send the message(s)!
+                */
+                let file_select = tokio::task::spawn_blocking(
+                    || -> Result<Vec<PathBuf>, nfd2::error::NFDError> {
+                        let paths = match nfd2::dialog_multiple().open()? {
+                            nfd2::Response::Cancel => vec![],
+                            nfd2::Response::Okay(path) => vec![path],
+                            nfd2::Response::OkayMultiple(paths) => paths,
+                        }
+                        .into_iter()
+                        // Filter directories out
+                        // TODO: implement sending all files in a directory
+                        .filter(|path| !path.is_dir())
+                        .collect::<Vec<_>>();
+
+                        Ok(paths)
+                    },
+                );
+
+                // placeholder
+                return Command::perform(file_select, |result| {
+                    match result {
+                        Ok(file_picker_result) => {
+                            if let Ok(paths) = file_picker_result {
+                                println!("User selected paths: {:?}", paths);
+                            }
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Error occured while processing file picker task result: {}",
+                                err
+                            );
+                        }
+                    }
+                    super::Message::Nothing
+                });
+            }
             Message::SendMessage => {
                 if !self.message.is_empty() {
                     let content =
                         MessageEventContent::text_plain(self.message.drain(..).collect::<String>());
-                    if let Some((inner, room_id)) = self
-                        .current_room_id
-                        .clone()
-                        .map(|id| (self.client.inner(), id))
-                    {
+                    if let Some(Some((inner, room_id))) = self.current_room_id.clone().map(|id| {
+                        if self.client.has_room(&id) {
+                            Some((self.client.inner(), id))
+                        } else {
+                            None
+                        }
+                    }) {
                         scroll_to_bottom(self, room_id.clone());
                         self.prev_scroll_perc = 1.0;
                         self.event_history_state.scroll_to_bottom();
                         let transaction_id = Uuid::new_v4();
-                        // HACK: This unwrap *should* be safe
+                        // This unwrap is safe since we check if the room exists beforehand
+                        // TODO: check if we actually need to check if a room exists beforehand
                         self.client.get_room_mut(&room_id).unwrap().add_event(
                             TimelineEvent::new_unacked_message(content.clone(), transaction_id),
                         );
