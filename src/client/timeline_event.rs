@@ -8,7 +8,7 @@ use ruma::{
         AnyMessageEventContent, AnyRoomEvent, AnyStateEventContent, AnySyncMessageEvent,
         AnySyncRoomEvent, AnySyncStateEvent, SyncMessageEvent, Unsigned,
     },
-    EventId, RoomVersionId, UInt, UserId,
+    EventId, RoomVersionId, UserId,
 };
 use std::{convert::TryFrom, time::SystemTime};
 use uuid::Uuid;
@@ -205,12 +205,7 @@ impl TimelineEvent {
                     MessageEventContent::Image(_) => Some(ContentType::Image),
                     MessageEventContent::Video(_) => Some(ContentType::Video),
                     MessageEventContent::Audio(_) => Some(ContentType::Audio),
-                    MessageEventContent::File(file) => Some(ContentType::Other {
-                        mimetype: file
-                            .info
-                            .map(|i| i.mimetype.unwrap_or_default())
-                            .unwrap_or_default(),
-                    }),
+                    MessageEventContent::File(_) => Some(ContentType::Other),
                     _ => None,
                 };
             }
@@ -235,32 +230,41 @@ impl TimelineEvent {
         None
     }
 
+    pub fn content_size(&self) -> Option<usize> {
+        if let Some(content) = self.message_content() {
+            if let AnyMessageEventContent::RoomMessage(content) = content {
+                return match content {
+                    MessageEventContent::Image(image) => {
+                        image.info.map(|i| i.size.map(|s| u64::from(s) as usize))
+                    }
+                    MessageEventContent::Video(video) => {
+                        video.info.map(|i| i.size.map(|s| u64::from(s) as usize))
+                    }
+                    MessageEventContent::Audio(audio) => {
+                        audio.info.map(|i| i.size.map(|s| u64::from(s) as usize))
+                    }
+                    MessageEventContent::File(file) => {
+                        file.info.map(|i| i.size.map(|s| u64::from(s) as usize))
+                    }
+                    _ => None,
+                }
+                .flatten();
+            }
+        }
+        None
+    }
+
     pub fn thumbnail_url(&self) -> Option<Uri> {
         if let Some(content) = self.message_content() {
             if let AnyMessageEventContent::RoomMessage(content) = content {
                 return match content {
                     MessageEventContent::Image(image) => {
-                        let content_url = image.url;
-                        image.info.map(|i| {
-                            let thumbnail_url = i.thumbnail_url;
-                            // TODO: check if thumbnail is below a size limit?
-                            // Look at the spec
-                            let content_size = i.size;
-                            thumbnail_url.unwrap_or_else(|| {
-                                if let Some(url) = content_url {
-                                    if let Some(size) = content_size {
-                                        if size < UInt::from(1000_u32 * 1000) {
-                                            return url;
-                                        }
-                                    }
-                                }
-                                String::new()
-                            })
-                        })
+                        image.info.map(|i| i.thumbnail_url).flatten()
                     }
                     MessageEventContent::Video(video) => {
-                        video.info.map(|i| i.thumbnail_url.unwrap_or_default())
+                        video.info.map(|i| i.thumbnail_url).flatten()
                     }
+                    MessageEventContent::File(file) => file.info.map(|i| i.thumbnail_url).flatten(),
                     _ => None,
                 }
                 .map(|u| u.parse::<Uri>().map_or_else(|_| None, Some))

@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 pub use iced::image::Handle as ImageHandle;
@@ -21,6 +22,19 @@ pub fn make_content_folder(content_url: &Uri) -> PathBuf {
         content_url.authority().unwrap().as_str().replace('.', "_")
     );
     PathBuf::from(server_media_dir)
+}
+
+pub fn infer_mimetype(data: &[u8]) -> String {
+    infer::get(&data)
+        .map(|filetype| filetype.mime_type().to_string())
+        .unwrap_or_else(|| String::from("application/octet-stream"))
+}
+
+pub fn get_filename(path: impl AsRef<Path>) -> String {
+    path.as_ref()
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| String::from("unknown"))
 }
 
 pub fn get_in_memory(handle: &ImageHandle) -> &[u8] {
@@ -74,11 +88,11 @@ pub enum ContentType {
     Image,
     Audio,
     Video,
-    Other { mimetype: String },
+    Other,
 }
 
 impl ContentType {
-    pub fn new(mimetype: String) -> Self {
+    pub fn new(mimetype: &str) -> Self {
         use ContentType::*;
 
         if let Some(filetype) = mimetype.split('/').next() {
@@ -86,15 +100,15 @@ impl ContentType {
                 "image" => Image,
                 "audio" => Audio,
                 "video" => Video,
-                _ => Other { mimetype },
+                _ => Other,
             };
         }
-        Other { mimetype }
+        Other
     }
 }
 
-impl From<String> for ContentType {
-    fn from(other: String) -> Self {
+impl From<&str> for ContentType {
+    fn from(other: &str) -> Self {
         ContentType::new(other)
     }
 }

@@ -311,9 +311,14 @@ impl Client {
         .map(|response| response.file)
     }
 
-    pub async fn send_content(inner: InnerClient, data: Vec<u8>) -> Result<Uri, ClientError> {
+    pub async fn send_content(
+        inner: InnerClient,
+        data: Vec<u8>,
+        content_type: Option<String>,
+        filename: Option<String>,
+    ) -> Result<Uri, ClientError> {
         let content_url = inner
-            .request(create_content::Request::new(data))
+            .request(assign!(create_content::Request::new(data), { content_type: content_type.as_deref(), filename: filename.as_deref() }))
             .await?
             .content_uri;
 
@@ -371,12 +376,33 @@ impl Client {
             .map_err(ClientError::Internal)
     }
 
+    fn download_thumbnail_for_event(tevent: &TimelineEvent) -> Option<(bool, Uri)> {
+        if let Some(thumbnail_url) = tevent.thumbnail_url() {
+            if make_content_path(&thumbnail_url).exists() {
+                Some((true, thumbnail_url))
+            } else {
+                Some((false, thumbnail_url))
+            }
+        } else if let (Some(content_size), Some(content_url)) =
+            (tevent.content_size(), tevent.content_url())
+        {
+            if make_content_path(&content_url).exists() {
+                Some((true, content_url))
+            } else if content_size < 1000 * 1000 {
+                Some((false, content_url))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn process_events_around_response(
         &mut self,
         response: get_context::Response,
-    ) -> (Vec<Uri>, Vec<Uri>) {
-        let mut download_urls = vec![];
-        let mut read_urls = vec![];
+    ) -> Vec<(bool, Uri)> {
+        let mut thumbnails = vec![];
 
         let get_context::Response {
             events_before,
@@ -415,28 +441,20 @@ impl Client {
                 if let Some(room) = self.get_room_mut(&room_id) {
                     let events_before = convert_to_timeline_event(events_before);
                     let events_after = convert_to_timeline_event(events_after);
-                    for ev in events_after.iter().chain(events_before.iter()) {
-                        if let Some(content_url) = ev.thumbnail_url() {
-                            if make_content_path(&content_url).exists() {
-                                read_urls.push(content_url)
-                            } else {
-                                download_urls.push(content_url);
-                            }
-                        }
-                    }
+                    thumbnails = events_after
+                        .iter()
+                        .chain(events_before.iter())
+                        .flat_map(|tevent| Client::download_thumbnail_for_event(tevent))
+                        .collect::<Vec<_>>();
                     room.add_chunk_of_events(events_before, events_after, &event_id);
                 }
             }
         }
-        (download_urls, read_urls)
+        thumbnails
     }
 
-    pub fn process_sync_response(
-        &mut self,
-        response: sync_events::Response,
-    ) -> (Vec<Uri>, Vec<Uri>) {
-        let mut download_urls = vec![];
-        let mut read_urls = vec![];
+    pub fn process_sync_response(&mut self, response: sync_events::Response) -> Vec<(bool, Uri)> {
+        let mut thumbnails = vec![];
 
         for (room_id, joined_room) in response.rooms.join {
             let room = self.get_room_mut_or_create(room_id);
@@ -500,13 +518,10 @@ impl Client {
                 let tevent = TimelineEvent::new(event);
                 room.ack_event(&tevent);
                 room.redact_event(&tevent);
-                if let Some(content_url) = tevent.thumbnail_url() {
-                    if make_content_path(&content_url).exists() {
-                        read_urls.push(content_url)
-                    } else {
-                        download_urls.push(content_url);
-                    }
+                if let Some(thumbnail_data) = Client::download_thumbnail_for_event(&tevent) {
+                    thumbnails.push(thumbnail_data);
                 }
+
                 room.add_event(tevent);
             }
         }
@@ -515,7 +530,7 @@ impl Client {
         }
 
         self.next_batch = Some(response.next_batch);
-        (download_urls, read_urls)
+        thumbnails
     }
 }
 
@@ -531,6 +546,8 @@ pub enum ClientError {
     AlreadyLoggedIn,
     /// Not all required login information was provided.
     MissingLoginInfo,
+    /// Custom error
+    Custom(String),
 }
 
 impl From<ruma_client::Error<ruma::api::client::Error>> for ClientError {
@@ -604,6 +621,7 @@ impl Display for ClientError {
             ClientError::MissingLoginInfo => {
                 write!(fmt, "Missing required login information, can't login.")
             }
+            ClientError::Custom(msg) => write!(fmt, "{}", msg),
         }
     }
 }

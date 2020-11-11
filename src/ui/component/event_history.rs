@@ -31,6 +31,7 @@ pub fn build_event_history<'a>(
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
         .on_scroll(Message::MessageHistoryScrolled)
+        .snap_to_bottom(true)
         .width(Length::Fill)
         .height(Length::Fill)
         .style(theme)
@@ -154,11 +155,19 @@ pub fn build_event_history<'a>(
             let is_thumbnail = matches!(content_type, ContentType::Image);
             let does_content_exist = make_content_path(&content_url).exists();
 
-            if let Some(thumbnail_image) = timeline_event
-                .thumbnail_url()
-                .map(|thumbnail_url| thumbnail_store.get_thumbnail(&thumbnail_url))
-                .unwrap_or(None)
-                .map(|handle| Image::new(handle.clone()).width(Length::Fill))
+            if let Some(thumbnail_image) = {
+                if is_thumbnail {
+                    Some(content_url.clone())
+                } else {
+                    timeline_event.thumbnail_url()
+                }
+            }
+            .map(|thumbnail_url| {
+                thumbnail_store
+                    .get_thumbnail(&thumbnail_url)
+                    .map(|handle| Image::new(handle.clone()).width(Length::Fill))
+            })
+            .flatten()
             {
                 if does_content_exist {
                     message_body_widgets.push(create_button(

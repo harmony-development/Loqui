@@ -1,7 +1,6 @@
 use crate::{
     client::{
-        media::ThumbnailStore,
-        media::{make_content_folder, make_content_path, ImageHandle},
+        media::{self, ContentType, ImageHandle, ThumbnailStore},
         Client, ClientError, TimelineEvent,
     },
     ui::{
@@ -14,12 +13,26 @@ use iced::{
     Length, Row, Space, Subscription, Text, TextInput,
 };
 use iced_futures::BoxStream;
+use image::GenericImageView;
 use ruma::{
     api::{
         client::r0::{context::get_context, message::send_message_event, sync::sync_events},
         exports::http::Uri,
     },
-    events::{room::message::MessageEventContent, AnyMessageEventContent},
+    events::room::message::FileMessageEventContent,
+    events::room::message::VideoInfo,
+    events::room::message::VideoMessageEventContent,
+    events::room::ThumbnailInfo,
+    events::{
+        room::{
+            message::{
+                AudioInfo, AudioMessageEventContent, FileInfo, ImageMessageEventContent,
+                MessageEventContent,
+            },
+            ImageInfo,
+        },
+        AnyMessageEventContent,
+    },
     presence::PresenceState,
     EventId, RoomId,
 };
@@ -28,9 +41,14 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    SendMessage {
+        content: Vec<MessageEventContent>,
+        room_id: RoomId,
+    },
     /// Sent when the user wants to send a message.
-    SendMessage,
-    SendFile,
+    SendMessageComposer(RoomId),
+    /// Sent when the user wants to send a file.
+    SendFile(RoomId),
     /// Sent when user makes a change to the message they are composing.
     MessageChanged(String),
     ScrollToBottom,
@@ -42,7 +60,7 @@ pub enum Message {
     /// Sent when the user selects a different room.
     RoomChanged(RoomId),
     /// Sent when the user scrolls the message history.
-    MessageHistoryScrolled(f32),
+    MessageHistoryScrolled(f32, f32),
     /// Sent when the user clicks the logout button.
     LogoutInitiated,
     LogoutConfirmation(bool),
@@ -81,9 +99,6 @@ pub struct MainScreen {
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
     current_room_id: Option<RoomId>,
     looking_at_event: HashMap<RoomId, usize>,
-    /// The previous scrolled percentage of the message history list.
-    /// Used to check if it's fine to request older / newer events from the server.
-    prev_scroll_perc: f32,
     // TODO: move client to `ScreenManager` as an `Option` so we can keep the client between screens
     client: Client,
     /// The message the user is currently typing.
@@ -108,7 +123,6 @@ impl MainScreen {
             logging_out: None,
             current_room_id: None,
             looking_at_event: Default::default(),
-            prev_scroll_perc: 0.0,
             message: Default::default(),
             thumbnail_store: ThumbnailStore::new(),
         }
@@ -191,9 +205,8 @@ impl MainScreen {
 
         let rooms = self.client.rooms();
 
-        if rooms.len() != self.rooms_buts_state.len() {
-            self.rooms_buts_state = vec![Default::default(); rooms.len()];
-        }
+        self.rooms_buts_state
+            .resize(rooms.len(), Default::default());
 
         let room_list = build_room_list(
             rooms,
@@ -235,7 +248,7 @@ impl MainScreen {
                 .padding(12)
                 .size(16)
                 .style(DarkTextInput)
-                .on_submit(Message::SendMessage);
+                .on_submit(Message::SendMessageComposer(room_id.clone()));
 
                 let current_user_id = self.client.current_user_id();
                 let room_disp_len = room.displayable_events().len();
@@ -288,7 +301,7 @@ impl MainScreen {
                 let send_file_button =
                     Button::new(&mut self.send_file_but_state, Text::new("↑").size(28))
                         .style(DarkButton)
-                        .on_press(Message::SendFile);
+                        .on_press(Message::SendFile(room_id.clone()));
 
                 let mut bottom_area_widgets = vec![
                     send_file_button.into(),
@@ -417,8 +430,8 @@ impl MainScreen {
 
                     match download_result {
                         Ok(raw_data) => {
-                            let path = make_content_path(&content_url);
-                            let server_media_dir = make_content_folder(&content_url);
+                            let path = media::make_content_path(&content_url);
+                            let server_media_dir = media::make_content_folder(&content_url);
                             tokio::fs::create_dir_all(server_media_dir).await?;
                             tokio::fs::write(path, raw_data.as_slice())
                                 .await
@@ -446,7 +459,7 @@ impl MainScreen {
                     (
                         async {
                             Ok(ImageHandle::from_memory(
-                                tokio::fs::read(make_content_path(&thumbnail_url)).await?,
+                                tokio::fs::read(media::make_content_path(&thumbnail_url)).await?,
                             ))
                         }
                         .await,
@@ -478,8 +491,8 @@ impl MainScreen {
         }
 
         match msg {
-            Message::MessageHistoryScrolled(scroll_perc) => {
-                if scroll_perc < 0.01 && scroll_perc <= self.prev_scroll_perc {
+            Message::MessageHistoryScrolled(scroll_perc, prev_scroll_perc) => {
+                if scroll_perc < 0.01 && scroll_perc <= prev_scroll_perc {
                     if let Some((Some(disp), Some(looking_at_event))) =
                         self.current_room_id.clone().map(|id| {
                             (
@@ -507,12 +520,11 @@ impl MainScreen {
                                 let inner = self.client.inner();
                                 let room_id = room_id.clone();
                                 let event_id = event.id().clone();
-                                self.prev_scroll_perc = scroll_perc;
                                 return make_get_events_around_command(inner, room_id, event_id);
                             }
                         }
                     }
-                } else if scroll_perc > 0.99 && scroll_perc >= self.prev_scroll_perc {
+                } else if scroll_perc > 0.99 && scroll_perc >= prev_scroll_perc {
                     if let Some((Some(disp), Some(looking_at_event))) =
                         self.current_room_id.clone().map(|id| {
                             (
@@ -530,8 +542,6 @@ impl MainScreen {
                         }
                     }
                 }
-
-                self.prev_scroll_perc = scroll_perc;
             }
             Message::LogoutInitiated => {
                 self.logging_out = Some(false);
@@ -565,7 +575,6 @@ impl MainScreen {
             Message::ScrollToBottom => {
                 if let Some(room_id) = self.current_room_id.clone() {
                     scroll_to_bottom(self, room_id);
-                    self.prev_scroll_perc = 1.0;
                     self.event_history_state.scroll_to_bottom();
                 }
             }
@@ -583,35 +592,34 @@ impl MainScreen {
                     }
                     Err(err) => super::Message::MatrixError(Box::new(err)),
                 };
-                let path = make_content_path(&content_url);
-                return if path.exists() {
-                    Command::perform(async move { Ok(path) }, process_path_result)
+                let content_path = media::make_content_path(&content_url);
+                return if content_path.exists() {
+                    Command::perform(async move { Ok(content_path) }, process_path_result)
                 } else {
                     let inner = self.client.inner();
                     Command::perform(
                         async move {
-                            let download_result =
-                                Client::download_content(inner, content_url.clone()).await;
-
-                            match download_result {
+                            match Client::download_content(inner, content_url.clone()).await {
                                 Ok(raw_data) => {
-                                    let path = make_content_path(&content_url);
-                                    let server_media_dir = make_content_folder(&content_url);
+                                    let server_media_dir = media::make_content_folder(&content_url);
                                     tokio::fs::create_dir_all(server_media_dir).await?;
-                                    tokio::fs::write(&path, raw_data.as_slice()).await?;
-                                    Ok(if is_thumbnail {
-                                        Some((path, content_url, raw_data))
-                                    } else {
-                                        None
-                                    })
+                                    tokio::fs::write(&content_path, raw_data.as_slice()).await?;
+                                    Ok((
+                                        content_path,
+                                        if is_thumbnail {
+                                            Some((content_url, raw_data))
+                                        } else {
+                                            None
+                                        },
+                                    ))
                                 }
                                 Err(err) => Err(err),
                             }
                         },
                         |result| match result {
-                            Ok(data) => {
-                                if let Some((path, content_url, raw_data)) = data {
-                                    open::that_in_background(path);
+                            Ok((content_path, thumbnail)) => {
+                                open::that_in_background(content_path);
+                                if let Some((content_url, raw_data)) = thumbnail {
                                     super::Message::MainScreen(Message::DownloadedThumbnail {
                                         thumbnail_url: content_url,
                                         thumbnail: ImageHandle::from_memory(raw_data),
@@ -625,70 +633,278 @@ impl MainScreen {
                     )
                 };
             }
-            Message::SendFile => {
-                /*
-                TODO: Investigate implementing a file picker widget for iced
-                   (we just put it in as an overlay)
-                TODO: actually implement this
-                    1. Detect what type of file this is (and create a thumbnail if it's a video / image)
-                    2. Upload the file to matrix (and the thumbnail if there is one)
-                    3. Hardlink the source to our cache (or copy if FS doesn't support)
-                        - this is so that even if the user deletes the file it will be in our cache
-                        - (and we won't need to download it again)
-                    4. Create `MessageEventContent::Image(ImageMessageEventContent {...});` for each file
-                        - set `body` field to whatever is in `self.message`?,
-                        - use the MXC URL(s) we got when we uploaded our file(s)
-                    5. Send the message(s)!
-                */
-                let file_select = tokio::task::spawn_blocking(
-                    || -> Result<Vec<PathBuf>, nfd2::error::NFDError> {
-                        let paths = match nfd2::dialog_multiple().open()? {
+            Message::SendMessageComposer(room_id) => {
+                if !self.message.is_empty() {
+                    let content =
+                        MessageEventContent::text_plain(self.message.drain(..).collect::<String>());
+                    scroll_to_bottom(self, room_id.clone());
+                    self.event_history_state.scroll_to_bottom();
+                    return Command::perform(
+                        async move { (content, room_id) },
+                        |(content, room_id)| {
+                            super::Message::MainScreen(Message::SendMessage {
+                                content: vec![content],
+                                room_id,
+                            })
+                        },
+                    );
+                }
+            }
+            Message::SendFile(room_id) => {
+                let file_select_task =
+                    tokio::task::spawn_blocking(|| -> Result<Vec<PathBuf>, ClientError> {
+                        let paths = match nfd2::dialog_multiple()
+                            .open()
+                            .map_err(|e| ClientError::Custom(e.to_string()))?
+                        {
                             nfd2::Response::Cancel => vec![],
                             nfd2::Response::Okay(path) => vec![path],
                             nfd2::Response::OkayMultiple(paths) => paths,
                         }
                         .into_iter()
-                        // Filter directories out
-                        // TODO: implement sending all files in a directory
                         .filter(|path| !path.is_dir())
-                        .collect::<Vec<_>>();
+                        .collect();
 
                         Ok(paths)
-                    },
-                );
+                    });
 
-                // placeholder
-                return Command::perform(file_select, |result| {
-                    match result {
-                        Ok(file_picker_result) => {
-                            if let Ok(paths) = file_picker_result {
-                                println!("User selected paths: {:?}", paths);
+                let inner = self.client.inner();
+
+                return Command::perform(
+                    async move {
+                        let paths = file_select_task
+                            .await
+                            .map_err(|e| ClientError::Custom(e.to_string()))??;
+                        let mut content_urls_to_send = Vec::with_capacity(paths.len());
+
+                        for path in paths {
+                            match tokio::fs::read(&path).await {
+                                Ok(data) => {
+                                    let file_mimetype = media::infer_mimetype(&data);
+                                    let filesize = data.len();
+                                    let filename = media::get_filename(&path);
+
+                                    // TODO: implement video thumbnailing
+                                    let (thumbnail, image_info) = if let ContentType::Image =
+                                        ContentType::new(&file_mimetype)
+                                    {
+                                        if let Ok(image) = image::load_from_memory(&data) {
+                                            let image_width = image.width();
+                                            let image_height = image.height();
+                                            let image_dimensions =
+                                                Some((image_height, image_width));
+                                            let thumbnail_scale = ((1000 * 1000) / filesize) as u32;
+
+                                            if thumbnail_scale <= 1 {
+                                                let new_width = image_width * thumbnail_scale;
+                                                let new_height = image_height * thumbnail_scale;
+
+                                                let thumbnail =
+                                                    image.thumbnail(new_width, new_height);
+                                                let thumbnail_height = thumbnail.height();
+                                                let thumbnail_width = thumbnail.width();
+                                                let thumbnail_raw = thumbnail.to_bytes();
+                                                let thumbnail_size = thumbnail_raw.len();
+
+                                                let send_result = Client::send_content(
+                                                    inner.clone(),
+                                                    thumbnail_raw,
+                                                    Some(file_mimetype.clone()),
+                                                    Some(format!("thumbnail_{}", filename)),
+                                                )
+                                                .await;
+
+                                                match send_result {
+                                                    Ok(thumbnail_url) => (
+                                                        Some((
+                                                            thumbnail_url,
+                                                            thumbnail_size,
+                                                            thumbnail_height,
+                                                            thumbnail_width,
+                                                        )),
+                                                        image_dimensions,
+                                                    ),
+                                                    Err(err) => {
+                                                        log::error!("An error occured while uploading a thumbnail: {}", err);
+                                                        (None, image_dimensions)
+                                                    }
+                                                }
+                                            } else {
+                                                (None, image_dimensions)
+                                            }
+                                        } else {
+                                            (None, None)
+                                        }
+                                    } else {
+                                        (None, None)
+                                    };
+
+                                    let send_result = Client::send_content(
+                                        inner.clone(),
+                                        data,
+                                        Some(file_mimetype.clone()),
+                                        Some(filename.clone()),
+                                    )
+                                    .await;
+
+                                    match send_result {
+                                        Ok(content_url) => {
+                                            if let Err(err) = tokio::fs::create_dir_all(
+                                                media::make_content_folder(&content_url),
+                                            )
+                                            .await
+                                            {
+                                                log::warn!("An IO error occured while trying to create a folder to hard link a file you tried to upload: {}", err);
+                                            }
+                                            if let Err(err) = tokio::fs::hard_link(
+                                                &path,
+                                                media::make_content_path(&content_url),
+                                            )
+                                            .await
+                                            {
+                                                log::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
+                                            }
+                                            content_urls_to_send.push((
+                                                content_url,
+                                                filename,
+                                                file_mimetype,
+                                                filesize,
+                                                thumbnail,
+                                                image_info,
+                                            ));
+                                        }
+                                        Err(err) => {
+                                            log::error!(
+                                                "An error occured while trying to upload a file: {}",
+                                                err
+                                            );
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    log::error!(
+                                        "An IO error occured while trying to upload a file: {}",
+                                        err
+                                    );
+                                }
                             }
                         }
-                        Err(err) => {
-                            log::error!(
-                                "Error occured while processing file picker task result: {}",
-                                err
-                            );
+                        Ok((content_urls_to_send, room_id))
+                    },
+                    |result| match result {
+                        Ok((content_urls_to_send, room_id)) => {
+                            super::Message::MainScreen(Message::SendMessage {
+                                content: content_urls_to_send
+                                    .into_iter()
+                                    .map(
+                                        |(
+                                            url,
+                                            filename,
+                                            file_mimetype,
+                                            filesize,
+                                            thumbnail,
+                                            image_dimensions,
+                                        )| {
+                                            let (thumbnail_url, thumbnail_info) =
+                                                if let Some((url, size, h, w)) = thumbnail {
+                                                    (
+                                                        Some(url.to_string()),
+                                                        Some(Box::new(ThumbnailInfo {
+                                                            height: Some(ruma::UInt::from(h)),
+                                                            width: Some(ruma::UInt::from(w)),
+                                                            mimetype: Some(file_mimetype.clone()),
+                                                            size: ruma::UInt::new(size as u64),
+                                                        })),
+                                                    )
+                                                } else {
+                                                    (None, None)
+                                                };
+
+                                            println!("thumbnail_url: {:?}", thumbnail_url);
+
+                                            let body = filename;
+                                            let mimetype = Some(file_mimetype.clone());
+                                            let url = Some(url.to_string());
+
+                                            match ContentType::new(&file_mimetype) {
+                                                ContentType::Image => MessageEventContent::Image(
+                                                    ImageMessageEventContent {
+                                                        body,
+                                                        info: Some(Box::new(ImageInfo {
+                                                            mimetype,
+                                                            height: image_dimensions
+                                                                .map(|(h, _)| ruma::UInt::from(h)),
+                                                            width: image_dimensions
+                                                                .map(|(_, w)| ruma::UInt::from(w)),
+                                                            size: ruma::UInt::new(filesize as u64),
+                                                            thumbnail_info,
+                                                            thumbnail_url,
+                                                            thumbnail_file: None,
+                                                        })),
+                                                        url,
+                                                        file: None,
+                                                    },
+                                                ),
+                                                ContentType::Audio => MessageEventContent::Audio(
+                                                    AudioMessageEventContent {
+                                                        body,
+                                                        info: Some(Box::new(AudioInfo {
+                                                            duration: None,
+                                                            mimetype,
+                                                            size: ruma::UInt::new(filesize as u64),
+                                                        })),
+                                                        url,
+                                                        file: None,
+                                                    },
+                                                ),
+                                                ContentType::Video => MessageEventContent::Video(
+                                                    VideoMessageEventContent {
+                                                        body,
+                                                        info: Some(Box::new(VideoInfo {
+                                                            mimetype,
+                                                            height: None,
+                                                            width: None,
+                                                            duration: None,
+                                                            size: ruma::UInt::new(filesize as u64),
+                                                            thumbnail_info,
+                                                            thumbnail_url,
+                                                            thumbnail_file: None,
+                                                        })),
+                                                        url,
+                                                        file: None,
+                                                    },
+                                                ),
+                                                ContentType::Other => MessageEventContent::File(
+                                                    FileMessageEventContent {
+                                                        body: body.clone(),
+                                                        filename: Some(body),
+                                                        info: Some(Box::new(FileInfo {
+                                                            mimetype,
+                                                            size: ruma::UInt::new(filesize as u64),
+                                                            thumbnail_info,
+                                                            thumbnail_url,
+                                                            thumbnail_file: None,
+                                                        })),
+                                                        url,
+                                                        file: None,
+                                                    },
+                                                ),
+                                            }
+                                        },
+                                    )
+                                    .collect(),
+                                room_id,
+                            })
                         }
-                    }
-                    super::Message::Nothing
-                });
+                        Err(err) => super::Message::MatrixError(Box::new(err)),
+                    },
+                );
             }
-            Message::SendMessage => {
-                if !self.message.is_empty() {
-                    let content =
-                        MessageEventContent::text_plain(self.message.drain(..).collect::<String>());
-                    if let Some(Some((inner, room_id))) = self.current_room_id.clone().map(|id| {
-                        if self.client.has_room(&id) {
-                            Some((self.client.inner(), id))
-                        } else {
-                            None
-                        }
-                    }) {
-                        scroll_to_bottom(self, room_id.clone());
-                        self.prev_scroll_perc = 1.0;
-                        self.event_history_state.scroll_to_bottom();
+            Message::SendMessage { content, room_id } => {
+                let mut commands = Vec::with_capacity(content.len());
+                for content in content {
+                    if self.client.has_room(&room_id) {
+                        let inner = self.client.inner();
                         let transaction_id = Uuid::new_v4();
                         // This unwrap is safe since we check if the room exists beforehand
                         // TODO: check if we actually need to check if a room exists beforehand
@@ -696,26 +912,30 @@ impl MainScreen {
                             TimelineEvent::new_unacked_message(content.clone(), transaction_id),
                         );
                         let content = AnyMessageEventContent::RoomMessage(content);
-                        return Command::perform(
-                            async move {
-                                (
-                                    Client::send_message(
-                                        inner,
-                                        content,
-                                        room_id.clone(),
+                        commands.push(Command::perform(
+                            {
+                                let room_id = room_id.clone();
+                                async move {
+                                    (
+                                        Client::send_message(
+                                            inner,
+                                            content,
+                                            room_id.clone(),
+                                            transaction_id,
+                                        )
+                                        .await,
                                         transaction_id,
+                                        room_id,
                                     )
-                                    .await,
-                                    transaction_id,
-                                    room_id,
-                                )
+                                }
                             },
                             |(result, transaction_id, room_id)| {
                                 process_send_message_result(result, transaction_id, room_id)
                             },
-                        );
+                        ));
                     }
                 }
+                return Command::batch(commands);
             }
             Message::RetrySendMessage {
                 retry_after,
@@ -751,7 +971,7 @@ impl MainScreen {
                 );
             }
             Message::MatrixSyncResponse(response) => {
-                let (download_urls, read_urls) = self.client.process_sync_response(*response);
+                let thumbnail_urls = self.client.process_sync_response(*response);
 
                 for (room_id, disp) in self
                     .client
@@ -772,31 +992,28 @@ impl MainScreen {
                     *self.looking_at_event.get_mut(&room_id).unwrap() = disp.saturating_sub(1);
                 }
 
-                return Command::batch(
-                    download_urls
-                        .into_iter()
-                        .map(|url| make_download_content_com(self.client.inner(), url))
-                        .chain(
-                            read_urls
-                                .into_iter()
-                                .map(|url| make_read_thumbnail_com(url)),
-                        ),
-                );
+                return Command::batch(thumbnail_urls.into_iter().map(
+                    |(is_in_cache, thumbnail_url)| {
+                        if is_in_cache {
+                            make_read_thumbnail_com(thumbnail_url)
+                        } else {
+                            make_download_content_com(self.client.inner(), thumbnail_url)
+                        }
+                    },
+                ));
             }
             Message::MatrixGetEventsAroundResponse(response) => {
-                let (download_urls, read_urls) =
-                    self.client.process_events_around_response(*response);
+                let thumbnail_urls = self.client.process_events_around_response(*response);
 
-                return Command::batch(
-                    download_urls
-                        .into_iter()
-                        .map(|url| make_download_content_com(self.client.inner(), url))
-                        .chain(
-                            read_urls
-                                .into_iter()
-                                .map(|url| make_read_thumbnail_com(url)),
-                        ),
-                );
+                return Command::batch(thumbnail_urls.into_iter().map(
+                    |(is_in_cache, thumbnail_url)| {
+                        if is_in_cache {
+                            make_read_thumbnail_com(thumbnail_url)
+                        } else {
+                            make_download_content_com(self.client.inner(), thumbnail_url)
+                        }
+                    },
+                ));
             }
             Message::RoomChanged(new_room_id) => {
                 if let (Some(disp), Some(disp_at)) = (
@@ -807,7 +1024,6 @@ impl MainScreen {
                 ) {
                     if *disp_at >= disp.saturating_sub(SHOWN_MSGS_LIMIT) {
                         *disp_at = disp.saturating_sub(1);
-                        self.prev_scroll_perc = 1.0;
                         self.event_history_state.scroll_to_bottom();
                     }
                 }
