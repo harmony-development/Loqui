@@ -3,14 +3,13 @@
 It aims to be lightweight with a good out-of-the-box experience and a small amount of customization. Currently very WIP.
 
 ## Current features
-- Text-only message sending
+- Plain-text message and file sending
 - Receiving messages and media, can show thumbnails (does not support location messages)
 - Show state changes (kicks / bans, room title changes etc.)
 - Change rooms (the ones you joined to)
 - Remembers login
 
 ## Planned features (not ordered)
-- Sending files
 - Multiline message composer
 - Play audio / video and show images in app 
 - HTML rendering for messages (need widget for iced)
