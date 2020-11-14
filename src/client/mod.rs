@@ -37,8 +37,6 @@ use std::{
 pub use timeline_event::TimelineEvent;
 use uuid::Uuid;
 
-use self::media::make_content_path;
-
 pub mod media;
 pub mod room;
 pub mod timeline_event;
@@ -376,28 +374,6 @@ impl Client {
             .map_err(ClientError::Internal)
     }
 
-    fn download_thumbnail_for_event(tevent: &TimelineEvent) -> Option<(bool, Uri)> {
-        if let Some(thumbnail_url) = tevent.thumbnail_url() {
-            if make_content_path(&thumbnail_url).exists() {
-                Some((true, thumbnail_url))
-            } else {
-                Some((false, thumbnail_url))
-            }
-        } else if let (Some(content_size), Some(content_url)) =
-            (tevent.content_size(), tevent.content_url())
-        {
-            if make_content_path(&content_url).exists() {
-                Some((true, content_url))
-            } else if content_size < 1000 * 1000 {
-                Some((false, content_url))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
     pub fn process_events_around_response(
         &mut self,
         response: get_context::Response,
@@ -444,7 +420,7 @@ impl Client {
                     thumbnails = events_after
                         .iter()
                         .chain(events_before.iter())
-                        .flat_map(|tevent| Client::download_thumbnail_for_event(tevent))
+                        .flat_map(|tevent| tevent.download_or_read_thumbnail())
                         .collect::<Vec<_>>();
                     room.add_chunk_of_events(events_before, events_after, &event_id);
                 }
@@ -500,8 +476,13 @@ impl Client {
                     AnySyncStateEvent::RoomMember(member_state) => {
                         let membership_change = member_state.membership_change();
                         room.update_member(
-                            member_state.prev_content.map(|c| c.displayname),
+                            member_state.prev_content.map(|c| c.displayname).flatten(),
                             member_state.content.displayname,
+                            member_state
+                                .content
+                                .avatar_url
+                                .map(|u| u.parse::<Uri>().map_or(None, Some))
+                                .flatten(),
                             membership_change,
                             member_state.sender,
                         );
@@ -518,7 +499,7 @@ impl Client {
                 let tevent = TimelineEvent::new(event);
                 room.ack_event(&tevent);
                 room.redact_event(&tevent);
-                if let Some(thumbnail_data) = Client::download_thumbnail_for_event(&tevent) {
+                if let Some(thumbnail_data) = tevent.download_or_read_thumbnail() {
                     thumbnails.push(thumbnail_data);
                 }
 

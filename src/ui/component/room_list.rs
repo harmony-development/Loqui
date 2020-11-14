@@ -26,18 +26,21 @@ pub fn build_room_list<'a, Message: Clone + 'a>(
         .spacing(8)
         .padding(4);
 
+    let is_current_room = |room_id: &RoomId| {
+        if let Some(id) = current_room_id {
+            if room_id == id {
+                return true;
+            }
+        }
+        false
+    };
+
     for ((room_id, room), button_state) in rooms.into_iter().zip(buttons_state.iter_mut()) {
         let mut but = Button::new(button_state, Text::new(room.get_display_name()))
             .width(Length::Fill)
             .style(DarkButton);
 
-        let mut is_current_room = false;
-        if let Some(id) = current_room_id {
-            if room_id == id {
-                is_current_room = true;
-            }
-        }
-        if !is_current_room {
+        if !is_current_room(room_id) {
             but = but.on_press(on_button_press(room_id.clone()));
         }
 

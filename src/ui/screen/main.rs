@@ -34,7 +34,7 @@ use ruma::{
         AnyMessageEventContent,
     },
     presence::PresenceState,
-    EventId, RoomId,
+    RoomId,
 };
 use std::{collections::HashMap, hash::Hash, hash::Hasher, path::PathBuf, time::Duration};
 use uuid::Uuid;
@@ -353,16 +353,13 @@ impl MainScreen {
                     .size(35)
                     .color(Color::from_rgb(0.5, 0.5, 0.5)),
             )
+            .width(Length::Fill)
+            .height(Length::Fill)
             .center_x()
             .center_y()
             .style(BrightContainer);
 
-            screen_widgets.push(
-                in_no_room_warning
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .into(),
-            );
+            screen_widgets.push(in_no_room_warning.into());
         }
 
         Row::with_children(screen_widgets)
@@ -403,77 +400,73 @@ impl MainScreen {
             }
         }
 
-        fn make_get_events_around_command(
-            inner: ruma_client::Client,
-            room_id: RoomId,
-            event_id: EventId,
+        fn make_thumbnail_commands(
+            client: &Client,
+            thumbnail_urls: Vec<(bool, Uri)>,
         ) -> Command<super::Message> {
-            Command::perform(
-                Client::get_events_around(inner, room_id, event_id),
-                |result| match result {
-                    Ok(response) => super::Message::MainScreen(
-                        Message::MatrixGetEventsAroundResponse(Box::new(response)),
-                    ),
-                    Err(err) => super::Message::MatrixError(Box::new(err)),
-                },
-            )
-        }
+            return Command::batch(thumbnail_urls.into_iter().map(
+                |(is_in_cache, thumbnail_url)| {
+                    if is_in_cache {
+                        Command::perform(
+                            async move {
+                                (
+                                    async {
+                                        Ok(ImageHandle::from_memory(
+                                            tokio::fs::read(media::make_content_path(
+                                                &thumbnail_url,
+                                            ))
+                                            .await?,
+                                        ))
+                                    }
+                                    .await,
+                                    thumbnail_url,
+                                )
+                            },
+                            |(result, thumbnail_url)| match result {
+                                Ok(thumbnail) => {
+                                    super::Message::MainScreen(Message::DownloadedThumbnail {
+                                        thumbnail,
+                                        thumbnail_url,
+                                    })
+                                }
+                                Err(err) => super::Message::MatrixError(Box::new(err)),
+                            },
+                        )
+                    } else {
+                        let inner = client.inner();
 
-        fn make_download_content_com(
-            inner: ruma_client::Client,
-            content_url: Uri,
-        ) -> Command<super::Message> {
-            Command::perform(
-                async move {
-                    let download_result =
-                        Client::download_content(inner, content_url.clone()).await;
+                        Command::perform(
+                            async move {
+                                let download_result =
+                                    Client::download_content(inner, thumbnail_url.clone()).await;
 
-                    match download_result {
-                        Ok(raw_data) => {
-                            let path = media::make_content_path(&content_url);
-                            let server_media_dir = media::make_content_folder(&content_url);
-                            tokio::fs::create_dir_all(server_media_dir).await?;
-                            tokio::fs::write(path, raw_data.as_slice())
-                                .await
-                                .map(|_| (content_url, raw_data))
-                                .map_err(|e| e.into())
-                        }
-                        Err(err) => Err(err),
+                                match download_result {
+                                    Ok(raw_data) => {
+                                        let path = media::make_content_path(&thumbnail_url);
+                                        let server_media_dir =
+                                            media::make_content_folder(&thumbnail_url);
+                                        tokio::fs::create_dir_all(server_media_dir).await?;
+                                        tokio::fs::write(path, raw_data.as_slice())
+                                            .await
+                                            .map(|_| (thumbnail_url, raw_data))
+                                            .map_err(|e| e.into())
+                                    }
+                                    Err(err) => Err(err),
+                                }
+                            },
+                            |result| match result {
+                                Ok((thumbnail_url, raw_data)) => {
+                                    super::Message::MainScreen(Message::DownloadedThumbnail {
+                                        thumbnail_url,
+                                        thumbnail: ImageHandle::from_memory(raw_data),
+                                    })
+                                }
+                                Err(err) => super::Message::MatrixError(Box::new(err)),
+                            },
+                        )
                     }
                 },
-                |result| match result {
-                    Ok((content_url, raw_data)) => {
-                        super::Message::MainScreen(Message::DownloadedThumbnail {
-                            thumbnail_url: content_url,
-                            thumbnail: ImageHandle::from_memory(raw_data),
-                        })
-                    }
-                    Err(err) => super::Message::MatrixError(Box::new(err)),
-                },
-            )
-        }
-
-        fn make_read_thumbnail_com(thumbnail_url: Uri) -> Command<super::Message> {
-            Command::perform(
-                async move {
-                    (
-                        async {
-                            Ok(ImageHandle::from_memory(
-                                tokio::fs::read(media::make_content_path(&thumbnail_url)).await?,
-                            ))
-                        }
-                        .await,
-                        thumbnail_url,
-                    )
-                },
-                |(result, thumbnail_url)| match result {
-                    Ok(thumbnail) => super::Message::MainScreen(Message::DownloadedThumbnail {
-                        thumbnail,
-                        thumbnail_url,
-                    }),
-                    Err(err) => super::Message::MatrixError(Box::new(err)),
-                },
-            )
+            ));
         }
 
         fn scroll_to_bottom(screen: &mut MainScreen, room_id: RoomId) {
@@ -520,7 +513,17 @@ impl MainScreen {
                                 let inner = self.client.inner();
                                 let room_id = room_id.clone();
                                 let event_id = event.id().clone();
-                                return make_get_events_around_command(inner, room_id, event_id);
+                                return Command::perform(
+                                    Client::get_events_around(inner, room_id, event_id),
+                                    |result| match result {
+                                        Ok(response) => super::Message::MainScreen(
+                                            Message::MatrixGetEventsAroundResponse(Box::new(
+                                                response,
+                                            )),
+                                        ),
+                                        Err(err) => super::Message::MatrixError(Box::new(err)),
+                                    },
+                                );
                             }
                         }
                     }
@@ -689,20 +692,17 @@ impl MainScreen {
                                         ContentType::new(&file_mimetype)
                                     {
                                         if let Ok(image) = image::load_from_memory(&data) {
-                                            let image_width = image.width();
-                                            let image_height = image.height();
-                                            let image_dimensions =
-                                                Some((image_height, image_width));
+                                            let image_dimensions = image.dimensions(); // (w, h)
                                             let thumbnail_scale = ((1000 * 1000) / filesize) as u32;
 
                                             if thumbnail_scale <= 1 {
-                                                let new_width = image_width * thumbnail_scale;
-                                                let new_height = image_height * thumbnail_scale;
+                                                let new_width =
+                                                    image_dimensions.0 * thumbnail_scale;
+                                                let new_height =
+                                                    image_dimensions.1 * thumbnail_scale;
 
                                                 let thumbnail =
                                                     image.thumbnail(new_width, new_height);
-                                                let thumbnail_height = thumbnail.height();
-                                                let thumbnail_width = thumbnail.width();
                                                 let thumbnail_raw = thumbnail.to_bytes();
                                                 let thumbnail_size = thumbnail_raw.len();
 
@@ -719,18 +719,18 @@ impl MainScreen {
                                                         Some((
                                                             thumbnail_url,
                                                             thumbnail_size,
-                                                            thumbnail_height,
-                                                            thumbnail_width,
+                                                            thumbnail.height(),
+                                                            thumbnail.width(),
                                                         )),
-                                                        image_dimensions,
+                                                        Some(image_dimensions),
                                                     ),
                                                     Err(err) => {
                                                         log::error!("An error occured while uploading a thumbnail: {}", err);
-                                                        (None, image_dimensions)
+                                                        (None, Some(image_dimensions))
                                                     }
                                                 }
                                             } else {
-                                                (None, image_dimensions)
+                                                (None, Some(image_dimensions))
                                             }
                                         } else {
                                             (None, None)
@@ -833,9 +833,9 @@ impl MainScreen {
                                                         info: Some(Box::new(ImageInfo {
                                                             mimetype,
                                                             height: image_dimensions
-                                                                .map(|(h, _)| ruma::UInt::from(h)),
+                                                                .map(|(_, h)| ruma::UInt::from(h)),
                                                             width: image_dimensions
-                                                                .map(|(_, w)| ruma::UInt::from(w)),
+                                                                .map(|(w, _)| ruma::UInt::from(w)),
                                                             size: ruma::UInt::new(filesize as u64),
                                                             thumbnail_info,
                                                             thumbnail_url,
@@ -992,28 +992,12 @@ impl MainScreen {
                     *self.looking_at_event.get_mut(&room_id).unwrap() = disp.saturating_sub(1);
                 }
 
-                return Command::batch(thumbnail_urls.into_iter().map(
-                    |(is_in_cache, thumbnail_url)| {
-                        if is_in_cache {
-                            make_read_thumbnail_com(thumbnail_url)
-                        } else {
-                            make_download_content_com(self.client.inner(), thumbnail_url)
-                        }
-                    },
-                ));
+                return make_thumbnail_commands(&self.client, thumbnail_urls);
             }
             Message::MatrixGetEventsAroundResponse(response) => {
                 let thumbnail_urls = self.client.process_events_around_response(*response);
 
-                return Command::batch(thumbnail_urls.into_iter().map(
-                    |(is_in_cache, thumbnail_url)| {
-                        if is_in_cache {
-                            make_read_thumbnail_com(thumbnail_url)
-                        } else {
-                            make_download_content_com(self.client.inner(), thumbnail_url)
-                        }
-                    },
-                ));
+                return make_thumbnail_commands(&self.client, thumbnail_urls);
             }
             Message::RoomChanged(new_room_id) => {
                 if let (Some(disp), Some(disp_at)) = (

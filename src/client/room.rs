@@ -1,6 +1,7 @@
 use super::timeline_event::TimelineEvent;
 use ruma::{
-    events::room::member::MembershipChange, EventId, RoomAliasId, RoomId, RoomVersionId, UserId,
+    api::exports::http::Uri, events::room::member::MembershipChange, EventId, RoomAliasId, RoomId,
+    RoomVersionId, UserId,
 };
 use std::{
     collections::HashMap,
@@ -10,6 +11,7 @@ use std::{
 pub type Members = HashMap<UserId, Member>;
 
 pub struct Member {
+    avatar_url: Option<Uri>,
     display_name: Option<String>,
     display_user: bool,
     typing_received: Option<Duration>,
@@ -18,6 +20,7 @@ pub struct Member {
 impl Default for Member {
     fn default() -> Self {
         Self {
+            avatar_url: None,
             display_name: None,
             display_user: true,
             typing_received: None,
@@ -30,24 +33,36 @@ impl Member {
         Self::default()
     }
 
+    pub fn avatar_url(&self) -> Option<&Uri> {
+        self.avatar_url.as_ref()
+    }
+
     pub fn display_name(&self) -> Option<&str> {
         self.display_name.as_deref()
+    }
+
+    pub fn display(&self) -> bool {
+        self.display_user
     }
 
     pub fn is_typing(&self) -> bool {
         self.typing_received.is_some()
     }
 
+    pub fn set_avatar_url(&mut self, new_avatar_url: Option<Uri>) {
+        self.avatar_url = new_avatar_url;
+    }
+
     pub fn set_display_name(&mut self, new_display_name: Option<String>) {
         self.display_name = new_display_name;
     }
 
-    pub fn set_display(&mut self, display: bool) {
-        self.display_user = display;
+    pub fn set_display(&mut self, new_display: bool) {
+        self.display_user = new_display;
     }
 
-    pub fn set_typing(&mut self, typing_recieved: Option<Duration>) {
-        self.typing_received = typing_recieved;
+    pub fn set_typing(&mut self, new_typing_recieved: Option<Duration>) {
+        self.typing_received = new_typing_recieved;
     }
 }
 
@@ -198,66 +213,71 @@ impl Room {
 
     pub fn update_member(
         &mut self,
-        prev_displayname: Option<Option<String>>,
+        prev_displayname: Option<String>,
         displayname: Option<String>,
+        avatar_url: Option<Uri>,
         membership_change: MembershipChange,
         user_id: UserId,
     ) {
-        self.members
+        let member = self
+            .members
             .entry(user_id.clone())
-            .and_modify(|member| member.set_display_name(displayname.clone()))
+            .and_modify(|member| {
+                member.set_display_name(displayname.clone());
+                member.set_avatar_url(avatar_url.clone());
+            })
             .or_insert_with(move || {
                 let mut new_member = Member::new();
                 new_member.set_display_name(displayname);
+                new_member.set_avatar_url(avatar_url);
                 new_member
             });
 
-        if let MembershipChange::Left = membership_change {
-            for ids in self.display_name_to_user_id.values_mut() {
-                if let Some(index) = ids.iter().position(|id| id == &user_id) {
-                    ids.remove(index);
-                }
-            }
-
-            if let Some(member) = self.get_member_mut(&user_id) {
-                member.set_display(false);
-            }
-        } else if let MembershipChange::Joined = membership_change {
-            // This unwrap is safe since we add a member if they don't exist beforehand
-            if let Some(name) = self.members.get(&user_id).unwrap().display_name() {
-                let ids = self
-                    .display_name_to_user_id
-                    .entry(name.to_string())
-                    .or_insert_with(|| vec![user_id.clone()]);
-
-                if !ids.contains(&user_id) {
-                    ids.push(user_id.clone());
-                }
-            }
-
-            if let Some(member) = self.get_member_mut(&user_id) {
-                member.set_display(true);
-            }
-        } else if let MembershipChange::ProfileChanged {
-            displayname_changed,
-            avatar_url_changed: _,
-        } = membership_change
-        {
-            if displayname_changed {
-                if let Some(Some(name)) = prev_displayname {
-                    if let Some(ids) = self.display_name_to_user_id.get_mut(&name) {
+        match membership_change {
+            MembershipChange::Left
+            | MembershipChange::Banned
+            | MembershipChange::Kicked
+            | MembershipChange::KickedAndBanned => {
+                if let Some(name) = member.display_name() {
+                    if let Some(ids) = self.display_name_to_user_id.get_mut(name) {
                         if let Some(index) = ids.iter().position(|id| id == &user_id) {
                             ids.remove(index);
                         }
                     }
                 }
-                // This unwrap is safe since we add a member if they don't exist beforehand
-                if let Some(name) = self.members.get(&user_id).unwrap().display_name() {
-                    if let Some(ids) = self.display_name_to_user_id.get_mut(name) {
-                        ids.push(user_id);
+                member.set_display(false);
+            }
+            MembershipChange::Joined | MembershipChange::Unbanned => {
+                if let Some(name) = member.display_name() {
+                    let ids = self
+                        .display_name_to_user_id
+                        .entry(name.to_string())
+                        .or_default();
+
+                    ids.push(user_id.clone());
+                }
+                member.set_display(true);
+            }
+            MembershipChange::ProfileChanged {
+                displayname_changed,
+                avatar_url_changed: _,
+            } => {
+                if displayname_changed {
+                    if let Some(name) = prev_displayname {
+                        if let Some(ids) = self.display_name_to_user_id.get_mut(&name) {
+                            if let Some(index) = ids.iter().position(|id| id == &user_id) {
+                                ids.remove(index);
+                            }
+                        }
+                    }
+                    if let Some(name) = member.display_name() {
+                        if let Some(ids) = self.display_name_to_user_id.get_mut(name) {
+                            ids.push(user_id);
+                        }
                     }
                 }
             }
+            _ => {}
         }
     }
 
