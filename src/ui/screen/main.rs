@@ -9,8 +9,8 @@ use crate::{
     },
 };
 use iced::{
-    button, scrollable, text_input, Align, Button, Color, Column, Command, Container, Element,
-    Length, Row, Space, Subscription, Text, TextInput,
+    button, pick_list, scrollable, text_input, Align, Button, Color, Column, Command, Container,
+    Element, Length, PickList, Row, Space, Subscription, Text, TextInput,
 };
 use iced_futures::BoxStream;
 use image::GenericImageView;
@@ -62,7 +62,7 @@ pub enum Message {
     /// Sent when the user scrolls the message history.
     MessageHistoryScrolled(f32, f32),
     /// Sent when the user clicks the logout button.
-    LogoutInitiated,
+    SelectedMenuOption(String),
     LogoutConfirmation(bool),
     /// Sent when a `main::Message::SendMessage` message returns a `LimitExceeded` error.
     /// This is used to retry sending a message. The duration is
@@ -89,7 +89,7 @@ pub struct MainScreen {
     rooms_list_state: scrollable::State,
     rooms_buts_state: Vec<button::State>,
     content_open_buts_state: Vec<button::State>,
-    logout_but_state: button::State,
+    menu_state: pick_list::State<String>,
     logout_approve_but_state: button::State,
     logout_cancel_but_state: button::State,
 
@@ -117,7 +117,7 @@ impl MainScreen {
             rooms_list_state: Default::default(),
             rooms_buts_state: Default::default(),
             content_open_buts_state: vec![Default::default(); SHOWN_MSGS_LIMIT],
-            logout_but_state: Default::default(),
+            menu_state: Default::default(),
             logout_approve_but_state: Default::default(),
             logout_cancel_but_state: Default::default(),
             logging_out: None,
@@ -217,19 +217,20 @@ impl MainScreen {
             theme,
         );
 
-        let logout = Button::new(&mut self.logout_but_state, Text::new("Logout").size(16))
-            .width(Length::Fill)
-            .on_press(Message::LogoutInitiated)
-            .style(DarkButton);
+        let username = self.client.current_user_id().localpart().to_string();
+        let menu = PickList::new(
+            &mut self.menu_state,
+            vec![
+                username.clone(),
+                "Join Room".to_string(),
+                "Logout".to_string(),
+            ],
+            Some(username),
+            Message::SelectedMenuOption,
+        )
+        .style(theme);
 
-        let user_name = Text::new(self.client.current_user_id().localpart())
-            .size(16)
-            .width(Length::Fill);
-        let user_area =
-            Row::with_children(vec![logout.into(), user_name.into()]).align_items(Align::Center);
-
-        let rooms_area =
-            Column::with_children(vec![room_list, user_area.width(Length::Fill).into()]);
+        let rooms_area = Column::with_children(vec![room_list, menu.width(Length::Fill).into()]);
 
         let mut screen_widgets = vec![Container::new(rooms_area)
             .width(Length::Units(250))
@@ -560,9 +561,14 @@ impl MainScreen {
                     }
                 }
             }
-            Message::LogoutInitiated => {
-                self.logging_out = Some(false);
-            }
+            Message::SelectedMenuOption(option) => match option.as_str() {
+                "Logout" => {
+                    self.logging_out = Some(false);
+                }
+                "Join Room" => println!("aaaaaa"),
+                u if u == self.client.current_user_id().localpart() => println!("bbbbbbbb"),
+                _ => unreachable!(),
+            },
             Message::LogoutConfirmation(confirmation) => {
                 if confirmation {
                     self.logging_out = Some(true);
@@ -1083,8 +1089,6 @@ where
 
     fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
         use iced_futures::futures::TryStreamExt;
-
-        println!("subbing");
 
         Box::pin(
             self.client

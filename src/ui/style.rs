@@ -1,5 +1,6 @@
 use iced::{
-    button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input, Color,
+    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
+    text_input, Color,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -181,6 +182,15 @@ impl From<Theme> for Box<dyn checkbox::StyleSheet> {
     }
 }
 
+impl From<Theme> for Box<dyn pick_list::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        match theme {
+            Theme::Light => Default::default(),
+            Theme::Dark => dark::PickList.into(),
+        }
+    }
+}
+
 impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
         match theme {
@@ -258,8 +268,8 @@ mod light {
 
 mod dark {
     use iced::{
-        button, checkbox, container, progress_bar, radio, rule, scrollable, slider, text_input,
-        Color,
+        button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
+        text_input, Color,
     };
 
     const DARK_BG: Color = Color::from_rgb(
@@ -632,6 +642,37 @@ mod dark {
                 }
                 .into(),
                 ..self.active(is_checked)
+            }
+        }
+    }
+
+    pub struct PickList;
+
+    impl pick_list::StyleSheet for PickList {
+        fn menu(&self) -> pick_list::Menu {
+            pick_list::Menu {
+                background: BRIGHT_BG.into(),
+                text_color: Color::WHITE,
+                selected_background: ACCENT.into(),
+                selected_text_color: Color::WHITE,
+                border_width: 0,
+                ..pick_list::Menu::default()
+            }
+        }
+
+        fn active(&self) -> pick_list::Style {
+            pick_list::Style {
+                background: DARK_BG.into(),
+                text_color: Color::WHITE,
+                border_width: 0,
+                ..pick_list::Style::default()
+            }
+        }
+
+        fn hovered(&self) -> pick_list::Style {
+            pick_list::Style {
+                background: ACCENT.into(),
+                ..self.active()
             }
         }
     }

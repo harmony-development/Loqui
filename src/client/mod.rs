@@ -6,6 +6,7 @@ use ruma::{
         client::r0::{
             context::get_context,
             filter::{FilterDefinition, LazyLoadOptions, RoomEventFilter, RoomFilter},
+            membership::join_room_by_id_or_alias,
             message::send_message_event,
             session::logout,
             sync::sync_events,
@@ -289,6 +290,16 @@ impl Client {
 
     pub fn get_room_mut_or_create(&mut self, room_id: RoomId) -> &mut Room {
         self.rooms.entry(room_id).or_insert_with(Room::new)
+    }
+
+    pub async fn join_room(
+        inner: InnerClient,
+        room_id_or_alias: ruma::RoomIdOrAliasId,
+    ) -> Result<join_room_by_id_or_alias::Response, ClientError> {
+        inner
+            .request(join_room_by_id_or_alias::Request::new(&room_id_or_alias))
+            .await
+            .map_err(|e| e.into())
     }
 
     pub async fn download_content(
