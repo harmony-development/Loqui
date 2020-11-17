@@ -412,9 +412,17 @@ impl MainScreen {
                                 (
                                     async {
                                         Ok(ImageHandle::from_memory(
-                                            tokio::fs::read(media::make_content_path(
-                                                &thumbnail_url,
-                                            ))
+                                            tokio::fs::read(
+                                                media::make_content_path(&thumbnail_url)
+                                                    .map_or_else(
+                                                        || {
+                                                            Err(ClientError::Custom(String::from(
+                                                                "Could not make content path",
+                                                            )))
+                                                        },
+                                                        |p| Ok(p),
+                                                    )?,
+                                            )
                                             .await?,
                                         ))
                                     }
@@ -442,14 +450,20 @@ impl MainScreen {
 
                                 match download_result {
                                     Ok(raw_data) => {
-                                        let path = media::make_content_path(&thumbnail_url);
-                                        let server_media_dir =
-                                            media::make_content_folder(&thumbnail_url);
-                                        tokio::fs::create_dir_all(server_media_dir).await?;
-                                        tokio::fs::write(path, raw_data.as_slice())
-                                            .await
-                                            .map(|_| (thumbnail_url, raw_data))
-                                            .map_err(|e| e.into())
+                                        if let (Some(content_path), Some(server_media_dir)) = (
+                                            media::make_content_path(&thumbnail_url),
+                                            media::make_content_folder(&thumbnail_url),
+                                        ) {
+                                            tokio::fs::create_dir_all(server_media_dir).await?;
+                                            tokio::fs::write(content_path, raw_data.as_slice())
+                                                .await
+                                                .map(|_| (thumbnail_url, raw_data))
+                                                .map_err(|e| e.into())
+                                        } else {
+                                            Err(ClientError::Custom(String::from(
+                                                "Could not make content path or server media path",
+                                            )))
+                                        }
                                     }
                                     Err(err) => Err(err),
                                 }
@@ -595,46 +609,53 @@ impl MainScreen {
                     }
                     Err(err) => super::Message::MatrixError(Box::new(err)),
                 };
-                let content_path = media::make_content_path(&content_url);
-                return if content_path.exists() {
-                    Command::perform(async move { Ok(content_path) }, process_path_result)
-                } else {
-                    let inner = self.client.inner();
-                    Command::perform(
-                        async move {
-                            match Client::download_content(inner, content_url.clone()).await {
-                                Ok(raw_data) => {
-                                    let server_media_dir = media::make_content_folder(&content_url);
-                                    tokio::fs::create_dir_all(server_media_dir).await?;
-                                    tokio::fs::write(&content_path, raw_data.as_slice()).await?;
-                                    Ok((
-                                        content_path,
-                                        if is_thumbnail {
-                                            Some((content_url, raw_data))
+                if let Some(content_path) = media::make_content_path(&content_url) {
+                    return if content_path.exists() {
+                        Command::perform(async move { Ok(content_path) }, process_path_result)
+                    } else {
+                        let inner = self.client.inner();
+                        Command::perform(
+                            async move {
+                                match Client::download_content(inner, content_url.clone()).await {
+                                    Ok(raw_data) => {
+                                        if let Some(server_media_dir) =
+                                            media::make_content_folder(&content_url)
+                                        {
+                                            tokio::fs::create_dir_all(server_media_dir).await?;
+                                            tokio::fs::write(&content_path, raw_data.as_slice())
+                                                .await?;
+                                            Ok((
+                                                content_path,
+                                                if is_thumbnail {
+                                                    Some((content_url, raw_data))
+                                                } else {
+                                                    None
+                                                },
+                                            ))
                                         } else {
-                                            None
-                                        },
-                                    ))
+                                            Err(ClientError::Custom(String::from("Could not make media path: media doesnt come from any server")))
+                                        }
+                                    }
+                                    Err(err) => Err(err),
                                 }
-                                Err(err) => Err(err),
-                            }
-                        },
-                        |result| match result {
-                            Ok((content_path, thumbnail)) => {
-                                open::that_in_background(content_path);
-                                if let Some((content_url, raw_data)) = thumbnail {
-                                    super::Message::MainScreen(Message::DownloadedThumbnail {
-                                        thumbnail_url: content_url,
-                                        thumbnail: ImageHandle::from_memory(raw_data),
-                                    })
-                                } else {
-                                    super::Message::Nothing
+                            },
+                            |result| match result {
+                                Ok((content_path, thumbnail)) => {
+                                    open::that_in_background(content_path);
+                                    if let Some((content_url, raw_data)) = thumbnail {
+                                        super::Message::MainScreen(Message::DownloadedThumbnail {
+                                            thumbnail_url: content_url,
+                                            thumbnail: ImageHandle::from_memory(raw_data),
+                                        })
+                                    } else {
+                                        super::Message::Nothing
+                                    }
                                 }
-                            }
-                            Err(err) => super::Message::MatrixError(Box::new(err)),
-                        },
-                    )
-                };
+                                Err(err) => super::Message::MatrixError(Box::new(err)),
+                            },
+                        )
+                    };
+                }
             }
             Message::SendMessageComposer(room_id) => {
                 if !self.message.is_empty() {
@@ -749,20 +770,24 @@ impl MainScreen {
 
                                     match send_result {
                                         Ok(content_url) => {
-                                            if let Err(err) = tokio::fs::create_dir_all(
-                                                media::make_content_folder(&content_url),
-                                            )
-                                            .await
+                                            if let Some(server_media_dir) =
+                                                media::make_content_folder(&content_url)
                                             {
-                                                log::warn!("An IO error occured while trying to create a folder to hard link a file you tried to upload: {}", err);
+                                                if let Err(err) =
+                                                    tokio::fs::create_dir_all(server_media_dir)
+                                                        .await
+                                                {
+                                                    log::warn!("An IO error occured while trying to create a folder to hard link a file you tried to upload: {}", err);
+                                                }
                                             }
-                                            if let Err(err) = tokio::fs::hard_link(
-                                                &path,
-                                                media::make_content_path(&content_url),
-                                            )
-                                            .await
+                                            if let Some(content_path) =
+                                                media::make_content_path(&content_url)
                                             {
-                                                log::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
+                                                if let Err(err) =
+                                                    tokio::fs::hard_link(&path, content_path).await
+                                                {
+                                                    log::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
+                                                }
                                             }
                                             content_urls_to_send.push((
                                                 content_url,
@@ -819,8 +844,6 @@ impl MainScreen {
                                                 } else {
                                                     (None, None)
                                                 };
-
-                                            println!("thumbnail_url: {:?}", thumbnail_url);
 
                                             let body = filename;
                                             let mimetype = Some(file_mimetype.clone());
@@ -1060,6 +1083,8 @@ where
 
     fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
         use iced_futures::futures::TryStreamExt;
+
+        println!("subbing");
 
         Box::pin(
             self.client

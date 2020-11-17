@@ -1,4 +1,4 @@
-use super::{media::make_content_path, media::ContentType, room::Room};
+use super::{media::content_exists, media::ContentType, room::Room};
 use ruma::{
     api::exports::http::Uri,
     events::{
@@ -123,7 +123,7 @@ impl TimelineEvent {
                                         &member_state.content.displayname,
                                     ) {
                                         msg = format!(
-                                            "changed their display name from {} to {}",
+                                            "changed their display name from \"{}\" to \"{}\"",
                                             prev_display_name, cur_display_name
                                         );
                                         if avatar_url_changed {
@@ -277,7 +277,7 @@ impl TimelineEvent {
     pub fn download_or_read_thumbnail(&self) -> Option<(bool, Uri)> {
         if let Some(thumbnail_url) = self.thumbnail_url() {
             Some((
-                if make_content_path(&thumbnail_url).exists() {
+                if content_exists(&thumbnail_url) {
                     true
                 } else {
                     false
@@ -287,7 +287,7 @@ impl TimelineEvent {
         } else if let (Some(ContentType::Image), Some(content_size), Some(content_url)) =
             (self.content_type(), self.content_size(), self.content_url())
         {
-            if make_content_path(&content_url).exists() {
+            if content_exists(&content_url) {
                 Some((true, content_url))
             } else if content_size < 1000 * 1000 {
                 Some((false, content_url))

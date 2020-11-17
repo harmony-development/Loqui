@@ -1,7 +1,7 @@
 use crate::{
     client::{
         media::ContentType,
-        media::{make_content_path, ThumbnailStore},
+        media::{content_exists, ThumbnailStore},
         Room,
     },
     ui::{
@@ -15,7 +15,7 @@ use iced::{
     Scrollable, Space, Text,
 };
 use ruma::{api::exports::http::Uri, UserId};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32; // for only one half
 
@@ -51,15 +51,21 @@ pub fn build_event_history<'a>(
         return event_history.into();
     };
     let mut last_sender = None;
-    // This unwrap should be safe enough
-    let mut last_minute = last_timestamp.elapsed().unwrap().as_secs() / 60;
+    let mut last_minute = last_timestamp
+        .elapsed()
+        .unwrap_or_else(|_| Instant::now().elapsed())
+        .as_secs()
+        / 60;
     let mut message_group = vec![];
 
     for (timeline_event, media_open_button_state) in displayable_events
         .iter()
         .zip(content_open_buttons.iter_mut())
     {
-        let cur_timestamp = timeline_event.origin_server_timestamp().elapsed().unwrap();
+        let cur_timestamp = timeline_event
+            .origin_server_timestamp()
+            .elapsed()
+            .unwrap_or_else(|_| Instant::now().elapsed());
         let id_to_use = if !timeline_event.is_ack() {
             current_user_id
         } else {
@@ -91,8 +97,9 @@ pub fn build_event_history<'a>(
         }
 
         if !is_sender_different {
-            // These unwraps should be safe enough
-            let time = last_timestamp.elapsed().unwrap();
+            let time = last_timestamp
+                .elapsed()
+                .unwrap_or_else(|_| Instant::now().elapsed());
             if !message_group.is_empty()
                 && time.checked_sub(cur_timestamp).unwrap_or_default() > Duration::from_secs(60 * 5)
             {
@@ -153,7 +160,7 @@ pub fn build_event_history<'a>(
             };
 
             let is_thumbnail = matches!(content_type, ContentType::Image);
-            let does_content_exist = make_content_path(&content_url).exists();
+            let does_content_exist = content_exists(&content_url);
 
             if let Some(thumbnail_image) = {
                 if is_thumbnail {

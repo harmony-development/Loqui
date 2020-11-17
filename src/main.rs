@@ -26,6 +26,14 @@ pub fn main() {
     let mut settings = if let Ok(Ok(session)) =
         std::fs::read_to_string(client::SESSION_ID_PATH).map(|s| toml::from_str(&s))
     {
+        use std::os::unix::fs::PermissionsExt;
+
+        if let Err(err) = std::fs::set_permissions(
+            client::SESSION_ID_PATH,
+            std::fs::Permissions::from_mode(0o600),
+        ) {
+            log::error!("Could not set permissions of session file: {}", err);
+        }
         Settings::with_flags(Some(StartupFlag::UseSession(session)))
     } else {
         Settings::default()

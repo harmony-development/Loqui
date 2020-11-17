@@ -6,22 +6,36 @@ use iced_native::image::Data;
 use indexmap::IndexMap;
 use ruma::api::exports::http::Uri;
 
-pub fn make_content_path(content_url: &Uri) -> PathBuf {
-    make_content_folder(content_url).join(make_content_filename(content_url))
+pub fn make_content_path(content_url: &Uri) -> Option<PathBuf> {
+    make_content_folder(content_url)
+        .map(|f| make_content_filename(content_url).map(|ff| f.join(ff)))
+        .flatten()
 }
 
-pub fn make_content_filename(content_url: &Uri) -> PathBuf {
-    let filename = content_url.path()[1..].to_string();
-    PathBuf::from(filename)
+pub fn make_content_filename(content_url: &Uri) -> Option<PathBuf> {
+    if !content_url.path().is_empty() {
+        let filename = content_url.path()[1..].to_string();
+        Some(PathBuf::from(filename))
+    } else {
+        None
+    }
 }
 
-pub fn make_content_folder(content_url: &Uri) -> PathBuf {
+pub fn make_content_folder(content_url: &Uri) -> Option<PathBuf> {
     let server_media_dir = format!(
         "{}content/{}",
         crate::data_dir!(),
-        content_url.authority().unwrap().as_str().replace('.', "_")
+        content_url
+            .authority()
+            .map(|a| a.as_str().replace('.', "_"))?
     );
-    PathBuf::from(server_media_dir)
+    Some(PathBuf::from(server_media_dir))
+}
+
+pub fn content_exists(content_url: &Uri) -> bool {
+    make_content_path(content_url)
+        .map(|p| p.exists())
+        .unwrap_or(false)
 }
 
 pub fn infer_mimetype(data: &[u8]) -> String {

@@ -295,18 +295,26 @@ impl Client {
         inner: InnerClient,
         content_url: Uri,
     ) -> Result<Vec<u8>, ClientError> {
-        Ok(inner
-            .request(get_content::Request::new(
-                content_url.path().trim_matches('/'),
-                content_url
-                    .authority()
-                    .unwrap()
-                    .as_str()
-                    .try_into()
-                    .unwrap(),
-            ))
-            .await?)
-        .map(|response| response.file)
+        if let (Some(server_address), Some(content_id)) = (
+            content_url
+                .authority()
+                .map(|a| a.as_str().try_into().map_or(None, Some))
+                .flatten(),
+            if content_url.path().is_empty() {
+                None
+            } else {
+                Some(content_url.path().trim_matches('/'))
+            },
+        ) {
+            inner
+                .request(get_content::Request::new(content_id, server_address))
+                .await
+                .map_or_else(|err| Err(err.into()), |response| Ok(response.file))
+        } else {
+            Err(ClientError::Custom(String::from(
+                "Could not make server address or content ID",
+            )))
+        }
     }
 
     pub async fn send_content(
