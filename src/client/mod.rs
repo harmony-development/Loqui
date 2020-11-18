@@ -20,8 +20,8 @@ use ruma::{
     events::{
         room::{aliases::AliasesEventContent, canonical_alias::CanonicalAliasEventContent},
         typing::TypingEventContent,
-        AnyEphemeralRoomEventContent, AnyMessageEventContent, AnyRoomEvent, AnySyncStateEvent,
-        SyncStateEvent,
+        AnyEphemeralRoomEventContent, AnyMessageEventContent, AnyRoomEvent, AnySyncRoomEvent,
+        AnySyncStateEvent, SyncStateEvent,
     },
     presence::PresenceState,
     DeviceId, EventId, Raw, RoomId, UserId,
@@ -292,6 +292,29 @@ impl Client {
         self.rooms.entry(room_id).or_insert_with(Room::new)
     }
 
+    pub fn rooms_queued_events(
+        &self,
+    ) -> Vec<(RoomId, Vec<(Uuid, AnySyncRoomEvent, Option<Duration>)>)> {
+        self.rooms
+            .iter()
+            .map(|(id, room)| {
+                (
+                    id.clone(),
+                    room.queued_events()
+                        .map(|event| {
+                            let txn_id = event.transaction_id().copied().unwrap();
+                            (
+                                txn_id,
+                                event.event_content().clone(),
+                                room.get_wait_for_duration(&txn_id),
+                            )
+                        })
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
     pub async fn join_room(
         inner: InnerClient,
         room_id_or_alias: ruma::RoomIdOrAliasId,
@@ -516,7 +539,9 @@ impl Client {
                 .flat_map(|r| r.deserialize())
             {
                 let tevent = TimelineEvent::new(event);
-                room.ack_event(&tevent);
+                if let Some(transaction_id) = tevent.acks_transaction() {
+                    room.ack_event(&transaction_id);
+                }
                 room.redact_event(&tevent);
                 if let Some(thumbnail_data) = tevent.download_or_read_thumbnail() {
                     thumbnails.push(thumbnail_data);
@@ -548,6 +573,19 @@ pub enum ClientError {
     MissingLoginInfo,
     /// Custom error
     Custom(String),
+}
+
+impl Clone for ClientError {
+    fn clone(&self) -> Self {
+        use ClientError::*;
+
+        match self {
+            AlreadyLoggedIn => AlreadyLoggedIn,
+            MissingLoginInfo => MissingLoginInfo,
+            Custom(err) => Custom(err.clone()),
+            _ => Custom(self.to_string()),
+        }
+    }
 }
 
 impl From<ruma_client::Error<ruma::api::client::Error>> for ClientError {

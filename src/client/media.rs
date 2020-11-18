@@ -38,7 +38,7 @@ pub fn content_exists(content_url: &Uri) -> bool {
         .unwrap_or(false)
 }
 
-pub fn infer_mimetype(data: &[u8]) -> String {
+pub fn infer_mimetype_from_bytes(data: &[u8]) -> String {
     infer::get(&data)
         .map(|filetype| filetype.mime_type().to_string())
         .unwrap_or_else(|| String::from("application/octet-stream"))
@@ -54,7 +54,7 @@ pub fn get_filename(path: impl AsRef<Path>) -> String {
 pub fn get_in_memory(handle: &ImageHandle) -> &[u8] {
     match handle.data() {
         Data::Bytes(raw) => raw.as_slice(),
-        _ => panic!(),
+        _ => unreachable!("We don't use path or pixel data for images, how did this happen?"),
     }
 }
 
@@ -86,6 +86,10 @@ impl ThumbnailStore {
         } else {
             self.0.insert(thumbnail_url, thumbnail);
         }
+    }
+
+    pub fn has_thumbnail(&self, thumbnail_url: &Uri) -> bool {
+        self.0.contains_key(thumbnail_url)
     }
 
     pub fn get_thumbnail(&self, thumbnail_url: &Uri) -> Option<&ImageHandle> {

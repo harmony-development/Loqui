@@ -15,21 +15,22 @@ panic = "abort"
 iced = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically", features = ["tokio", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically" }
 iced_futures = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically" }
+
+open = "1.4.0"
+infer = { version = "0.3.0", default-features = false }
 nfd2 = "0.2.3"
 image = "0.23.11"
 
+tokio = { version = "0.2", features = ["rt-core", "parking_lot", "time", "fs"] }
 ruma = { git = "https://github.com/ruma/ruma/", features = ["client-api"], branch = "main" }
 ruma-client = { git = "https://github.com/ruma/ruma/", branch = "main" }
 assign = "1.1.0"
+uuid = { version = "0.8.1", features = ["v4"] }
+ahash = "0.5.8"
+indexmap = "1.6.0"
 
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.5"
-
-tokio = { version = "0.2", features = ["rt-core", "parking_lot", "time", "fs"] }
-indexmap = "1.6.0"
-open = "1.4.0"
-uuid = { version = "0.8.1", features = ["v4"] }
 chrono = "0.4.19"
 log = "0.4.11"
 simplelog = "0.8.0"
-infer = { version = "0.3.0", default-features = false }

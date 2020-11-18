@@ -30,7 +30,12 @@ pub fn build_event_history<'a>(
     theme: Theme,
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
-        .on_scroll(Message::MessageHistoryScrolled)
+        .on_scroll(
+            |scroll_perc, prev_scroll_perc| Message::MessageHistoryScrolled {
+                prev_scroll_perc,
+                scroll_perc,
+            },
+        )
         .snap_to_bottom(true)
         .width(Length::Fill)
         .height(Length::Fill)
@@ -39,11 +44,12 @@ pub fn build_event_history<'a>(
         .spacing(8)
         .padding(16);
 
+    let displayable_events = room.displayable_events().collect::<Vec<_>>();
     let timeline_range_end = looking_at_event
         .saturating_add(SHOWN_MSGS_LIMIT)
-        .min(room.displayable_events().len());
+        .min(displayable_events.len());
     let timeline_range_start = timeline_range_end.saturating_sub(SHOWN_MSGS_LIMIT);
-    let displayable_events = &room.displayable_events()[timeline_range_start..timeline_range_end];
+    let displayable_events = &displayable_events[timeline_range_start..timeline_range_end];
 
     let mut last_timestamp = if let Some(ev) = displayable_events.first() {
         *ev.origin_server_timestamp()
@@ -154,7 +160,10 @@ pub fn build_event_history<'a>(
                 button_state: &'a mut button::State,
             ) -> Element<'a, Message> {
                 Button::new(button_state, content.into())
-                    .on_press(Message::OpenContent(content_url, is_thumbnail))
+                    .on_press(Message::OpenContent {
+                        content_url,
+                        is_thumbnail,
+                    })
                     .style(DarkButton)
                     .into()
             };
@@ -162,25 +171,21 @@ pub fn build_event_history<'a>(
             let is_thumbnail = matches!(content_type, ContentType::Image);
             let does_content_exist = content_exists(&content_url);
 
-            if let Some(thumbnail_image) = {
-                if is_thumbnail {
-                    Some(content_url.clone())
-                } else {
-                    timeline_event.thumbnail_url()
-                }
-            }
-            .map(|thumbnail_url| {
-                thumbnail_store
-                    .get_thumbnail(&thumbnail_url)
-                    .map(|handle| Image::new(handle.clone()).width(Length::Fill))
-            })
-            .flatten()
+            if let Some(thumbnail_image) = thumbnail_store
+                .get_thumbnail(&content_url)
+                .or_else(|| {
+                    timeline_event
+                        .thumbnail_url()
+                        .map(|url| thumbnail_store.get_thumbnail(&url))
+                        .flatten()
+                })
+                .map(|handle| Image::new(handle.clone()).width(Length::Units(360)))
             {
                 if does_content_exist {
                     message_body_widgets.push(create_button(
                         is_thumbnail,
                         content_url,
-                        thumbnail_image.width(Length::Units(360)),
+                        thumbnail_image,
                         media_open_button_state,
                     ));
                 } else {
@@ -189,7 +194,7 @@ pub fn build_event_history<'a>(
                         content_url,
                         Column::with_children(vec![
                             Text::new("Download content").into(),
-                            thumbnail_image.width(Length::Units(360)).into(),
+                            thumbnail_image.into(),
                         ]),
                         media_open_button_state,
                     );

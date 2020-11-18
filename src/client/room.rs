@@ -1,14 +1,13 @@
 use super::timeline_event::TimelineEvent;
+use ahash::AHashMap;
 use ruma::{
     api::exports::http::Uri, events::room::member::MembershipChange, EventId, RoomAliasId, RoomId,
     RoomVersionId, UserId,
 };
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
+use uuid::Uuid;
 
-pub type Members = HashMap<UserId, Member>;
+pub type Members = AHashMap<UserId, Member>;
 
 pub struct Member {
     avatar_url: Option<Uri>,
@@ -66,7 +65,7 @@ impl Member {
     }
 }
 
-pub type Rooms = HashMap<RoomId, Room>;
+pub type Rooms = AHashMap<RoomId, Room>;
 
 pub struct Room {
     version: RoomVersionId,
@@ -75,7 +74,8 @@ pub struct Room {
     alt_aliases: Vec<RoomAliasId>,
     timeline: Vec<TimelineEvent>,
     members: Members,
-    display_name_to_user_id: HashMap<String, Vec<UserId>>,
+    display_name_to_user_id: AHashMap<String, Vec<UserId>>,
+    wait_for_duration: AHashMap<Uuid, Duration>,
 }
 
 impl Default for Room {
@@ -85,10 +85,11 @@ impl Default for Room {
             version: RoomVersionId::Version5,
             name: None,
             canonical_alias: None,
-            alt_aliases: vec![],
-            timeline: vec![],
-            members: Members::new(),
-            display_name_to_user_id: HashMap::new(),
+            alt_aliases: Default::default(),
+            timeline: Default::default(),
+            members: Default::default(),
+            display_name_to_user_id: Default::default(),
+            wait_for_duration: Default::default(),
         }
     }
 }
@@ -118,12 +119,15 @@ impl Room {
         self.timeline.as_slice()
     }
 
+    pub fn queued_events(&self) -> impl Iterator<Item = &TimelineEvent> + '_ {
+        self.timeline.iter().filter(|event| !event.is_ack())
+    }
+
     /// Get all the displayable events in the timeline.
-    pub fn displayable_events(&self) -> Vec<&TimelineEvent> {
-        self.timeline()
+    pub fn displayable_events(&self) -> impl Iterator<Item = &TimelineEvent> + '_ {
+        self.timeline
             .iter()
             .filter(|event| event.should_show_to_user())
-            .collect()
     }
 
     /// Get the oldest event in the timeline.
@@ -342,11 +346,23 @@ impl Room {
         }
     }
 
-    pub fn ack_event(&mut self, ack_event: &TimelineEvent) {
+    pub fn wait_for_duration(&mut self, duration: Duration, transaction_id: Uuid) {
+        *self
+            .wait_for_duration
+            .entry(transaction_id)
+            .or_insert(duration) = duration;
+    }
+
+    pub fn get_wait_for_duration(&self, transaction_id: &Uuid) -> Option<Duration> {
+        self.wait_for_duration.get(transaction_id).copied()
+    }
+
+    pub fn ack_event(&mut self, transaction_id: &Uuid) {
+        self.wait_for_duration.remove(transaction_id);
         if let Some(index) = self
             .timeline
             .iter()
-            .position(|tevent| tevent.transaction_id() == ack_event.acks_transaction().as_ref())
+            .position(|tevent| tevent.transaction_id() == Some(transaction_id))
         {
             self.timeline.remove(index);
         }

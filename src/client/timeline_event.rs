@@ -426,6 +426,10 @@ impl TimelineEvent {
         }
     }
 
+    pub fn event_content(&self) -> &AnySyncRoomEvent {
+        &self.inner
+    }
+
     /// Check if this event is acknowledged by the server.
     pub fn is_ack(&self) -> bool {
         self.transaction_id.is_none()
