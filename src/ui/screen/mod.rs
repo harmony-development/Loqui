@@ -46,6 +46,13 @@ pub enum Message {
 pub enum StartupFlag {
     /// Use this session to login and skip the login screen.
     UseSession(Session),
+    None,
+}
+
+impl Default for StartupFlag {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 impl Display for StartupFlag {
@@ -53,6 +60,9 @@ impl Display for StartupFlag {
         match self {
             StartupFlag::UseSession(session) => {
                 write!(f, "Use this session when logging in: {}", session)
+            }
+            StartupFlag::None => {
+                write!(f, "No flag")
             }
         }
     }
@@ -66,6 +76,7 @@ pub enum Screen {
 pub struct ScreenManager {
     theme: Theme,
     screen: Screen,
+    client: Option<Client>,
 }
 
 impl Default for ScreenManager {
@@ -75,6 +86,7 @@ impl Default for ScreenManager {
             screen: Screen::Login {
                 screen: LoginScreen::default(),
             },
+            client: None,
         }
     }
 }
@@ -82,26 +94,23 @@ impl Default for ScreenManager {
 impl Application for ScreenManager {
     type Executor = executor::Default;
     type Message = Message;
-    type Flags = Option<StartupFlag>;
+    type Flags = StartupFlag;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        if let Some(flag) = flags {
-            match flag {
-                // "Login" with given session, skipping the info fields.
-                StartupFlag::UseSession(session) => (
-                    Self {
-                        screen: Screen::Login {
-                            screen: LoginScreen::with_logging_in(Some(true)),
-                        },
-                        ..Self::default()
+        match flags {
+            // "Login" with given session, skipping the info fields.
+            StartupFlag::UseSession(session) => (
+                Self {
+                    screen: Screen::Login {
+                        screen: LoginScreen::with_logging_in(Some(true)),
                     },
-                    Command::perform(async { session }, |session| {
-                        Message::LoginScreen(login::Message::LoginWithSession(session))
-                    }),
-                ),
-            }
-        } else {
-            (Self::default(), Command::none())
+                    ..Self::default()
+                },
+                Command::perform(async { session }, |session| {
+                    Message::LoginScreen(login::Message::LoginWithSession(session))
+                }),
+            ),
+            StartupFlag::None => (Self::default(), Command::none()),
         }
     }
 
@@ -113,8 +122,10 @@ impl Application for ScreenManager {
         match msg {
             Message::Nothing => {}
             Message::MainScreen(msg) => {
-                if let Screen::Main { ref mut screen } = self.screen {
-                    return screen.update(msg);
+                if let (Screen::Main { screen }, Some(client)) =
+                    (&mut self.screen, &mut self.client)
+                {
+                    return screen.update(msg, client);
                 }
             }
             Message::LoginScreen(msg) => {
@@ -123,8 +134,9 @@ impl Application for ScreenManager {
                 }
             }
             Message::LoginComplete(client) => {
+                self.client = Some(client);
                 self.screen = Screen::Main {
-                    screen: MainScreen::new(client),
+                    screen: MainScreen::new(),
                 };
             }
             Message::LogoutComplete => {
@@ -158,12 +170,9 @@ impl Application for ScreenManager {
                     }
                 }
 
-                if let Screen::Login { ref mut screen } = self.screen {
-                    screen.on_error(error_string.clone());
-                }
-
-                if let Screen::Main { ref mut screen } = self.screen {
-                    screen.on_error(error_string);
+                match &mut self.screen {
+                    Screen::Login { screen } => screen.on_error(error_string),
+                    Screen::Main { screen } => screen.on_error(error_string),
                 }
             }
         }
@@ -171,8 +180,8 @@ impl Application for ScreenManager {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        if let Screen::Main { ref screen, .. } = self.screen {
-            screen.subscription()
+        if let (Screen::Main { screen, .. }, Some(client)) = (&self.screen, self.client.as_ref()) {
+            screen.subscription(client)
         } else {
             Subscription::none()
         }
@@ -181,7 +190,9 @@ impl Application for ScreenManager {
     fn view(&mut self) -> Element<Self::Message> {
         match self.screen {
             Screen::Login { ref mut screen } => screen.view(self.theme).map(Message::LoginScreen),
-            Screen::Main { ref mut screen } => screen.view(self.theme).map(Message::MainScreen),
+            Screen::Main { ref mut screen } => screen
+                .view(self.theme, self.client.as_ref().unwrap())
+                .map(Message::MainScreen),
         }
     }
 }

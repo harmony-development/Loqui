@@ -410,7 +410,7 @@ mod dark {
         }
 
         fn placeholder_color(&self) -> Color {
-            Color::from_rgb(0.4, 0.4, 0.4)
+            Color::from_rgb(0.6, 0.6, 0.6)
         }
 
         fn value_color(&self) -> Color {

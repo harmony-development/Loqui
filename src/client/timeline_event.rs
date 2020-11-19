@@ -47,7 +47,7 @@ impl TimelineEvent {
         Self {
             inner: AnySyncRoomEvent::Message(AnySyncMessageEvent::RoomMessage(SyncMessageEvent {
                 content,
-                // FIXME: Replace this whole thing with an enum
+                // FIXME: Dirty hack, replace this whole thing with an enum
                 event_id: ruma::event_id!("$Rqnc-F-dvnEYJTyHq_iKxU2bZ1CI92-kuZq3a5lr5Zg"),
                 sender: ruma::user_id!("@default:default.com"),
                 origin_server_ts: SystemTime::now(),
@@ -78,7 +78,7 @@ impl TimelineEvent {
                     MessageEventContent::Notice(notice) => notice.body,
                     MessageEventContent::ServerNotice(server_notice) => server_notice.body,
                     MessageEventContent::Text(text) => text.body,
-                    MessageEventContent::Emote(emote) => emote.body,
+                    MessageEventContent::Emote(emote) => format!("* {} *", emote.body),
                     _ => String::from("Unknown message content"),
                 },
                 _ => String::from("Unknown message type"),
@@ -380,6 +380,18 @@ impl TimelineEvent {
 
     pub fn is_message(&self) -> bool {
         matches!(&self.inner, AnySyncRoomEvent::Message(_))
+    }
+
+    pub fn is_emote_message(&self) -> bool {
+        matches!(
+            &self.inner,
+            AnySyncRoomEvent::Message(
+                AnySyncMessageEvent::RoomMessage(SyncMessageEvent {
+                    content: MessageEventContent::Emote(_),
+                    ..
+                }),
+            )
+        )
     }
 
     pub fn is_redacted_message(&self) -> bool {

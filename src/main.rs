@@ -34,7 +34,7 @@ pub fn main() {
         ) {
             log::error!("Could not set permissions of session file: {}", err);
         }
-        Settings::with_flags(Some(StartupFlag::UseSession(session)))
+        Settings::with_flags(StartupFlag::UseSession(session))
     } else {
         Settings::default()
     };

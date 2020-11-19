@@ -64,6 +64,8 @@ pub enum Message {
     },
     /// Sent when the user selects a different room.
     RoomChanged(RoomId),
+    /// Sent when the user makes a change to the room search box.
+    RoomSearchTextChanged(String),
     /// Sent when the user scrolls the message history.
     MessageHistoryScrolled {
         prev_scroll_perc: f32,
@@ -79,14 +81,20 @@ pub enum Message {
 }
 
 pub struct MainScreen {
+    // Event history area state
+    event_history_state: scrollable::State,
+    content_open_buts_state: Vec<button::State>,
+    send_file_but_state: button::State,
     composer_state: text_input::State,
     scroll_to_bottom_but_state: button::State,
-    send_file_but_state: button::State,
-    event_history_state: scrollable::State,
+
+    // Room area state
+    menu_state: pick_list::State<String>,
     rooms_list_state: scrollable::State,
     rooms_buts_state: Vec<button::State>,
-    content_open_buts_state: Vec<button::State>,
-    menu_state: pick_list::State<String>,
+    room_search_box_state: text_input::State,
+
+    // Logout screen state
     logout_approve_but_state: button::State,
     logout_cancel_but_state: button::State,
 
@@ -96,23 +104,23 @@ pub struct MainScreen {
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
     current_room_id: Option<RoomId>,
     looking_at_event: AHashMap<RoomId, usize>,
-    // TODO: move client to `ScreenManager` as an `Option` so we can keep the client between screens
-    client: Client,
     /// The message the user is currently typing.
     message: String,
+    /// Text used to filter rooms.
+    room_search_text: String,
     thumbnail_store: ThumbnailStore,
 }
 
 impl MainScreen {
-    pub fn new(client: Client) -> Self {
+    pub fn new() -> Self {
         Self {
-            client,
             composer_state: Default::default(),
             scroll_to_bottom_but_state: Default::default(),
             send_file_but_state: Default::default(),
             event_history_state: Default::default(),
             rooms_list_state: Default::default(),
             rooms_buts_state: Default::default(),
+            room_search_box_state: Default::default(),
             content_open_buts_state: vec![Default::default(); SHOWN_MSGS_LIMIT],
             menu_state: Default::default(),
             logout_approve_but_state: Default::default(),
@@ -121,22 +129,45 @@ impl MainScreen {
             current_room_id: None,
             looking_at_event: Default::default(),
             message: Default::default(),
+            room_search_text: Default::default(),
             thumbnail_store: ThumbnailStore::new(),
         }
     }
 
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
-        if let Some(confirmation) = self.logging_out {
-            return if confirmation {
-                Container::new(Text::new("Logging out...").size(30))
-                    .center_y()
-                    .center_x()
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .style(theme)
-                    .into()
-            } else {
-                let logout_confirm_panel = Column::with_children(
+    pub fn logout_screen(&mut self, theme: Theme, confirmation: bool) -> Element<Message> {
+        if confirmation {
+            Container::new(Text::new("Logging out...").size(30))
+                .center_y()
+                .center_x()
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(theme)
+                .into()
+        } else {
+            #[inline(always)]
+            fn make_button<'a>(
+                state: &'a mut button::State,
+                confirm: bool,
+                theme: Theme,
+            ) -> Element<'a, Message> {
+                Button::new(
+                    state,
+                    Container::new(Text::new(if confirm { "Yes" } else { "No" }))
+                        .width(Length::Fill)
+                        .center_x(),
+                )
+                .width(Length::FillPortion(1))
+                .on_press(Message::LogoutConfirmation(confirm))
+                .style(theme)
+                .into()
+            }
+
+            #[inline(always)]
+            fn make_space<'a>(units: u16) -> Element<'a, Message> {
+                Space::with_width(Length::FillPortion(units)).into()
+            }
+
+            let logout_confirm_panel = Column::with_children(
                     vec![
                         Text::new("Do you want to logout?").into(),
                         Text::new("This will delete your current session and you will need to login with your password.")
@@ -144,19 +175,11 @@ impl MainScreen {
                             .into(),
                         Row::with_children(
                             vec![
-                                Space::with_width(Length::FillPortion(2)).into(),
-                                Button::new(&mut self.logout_approve_but_state, Container::new(Text::new("Yes")).width(Length::Fill).center_x())
-                                    .width(Length::FillPortion(1))
-                                    .on_press(Message::LogoutConfirmation(true))
-                                    .style(theme)
-                                    .into(),
-                                Space::with_width(Length::FillPortion(1)).into(),
-                                Button::new(&mut self.logout_cancel_but_state, Container::new(Text::new("No")).width(Length::Fill).center_x())
-                                    .width(Length::FillPortion(1))
-                                    .on_press(Message::LogoutConfirmation(false))
-                                    .style(theme)
-                                    .into(),
-                                Space::with_width(Length::FillPortion(2)).into(),
+                                make_space(2),
+                                make_button(&mut self.logout_approve_but_state, true, theme),
+                                make_space(1),
+                                make_button(&mut self.logout_cancel_but_state, false, theme),
+                                make_space(2),
                         ])
                         .width(Length::Fill)
                         .align_items(Align::Center)
@@ -165,34 +188,32 @@ impl MainScreen {
                     .align_items(Align::Center)
                     .spacing(12);
 
-                let padded_panel = Row::with_children(vec![
-                    Space::with_width(Length::FillPortion(3)).into(),
-                    logout_confirm_panel.width(Length::FillPortion(4)).into(),
-                    Space::with_width(Length::FillPortion(3)).into(),
-                ])
+            let padded_panel = Row::with_children(vec![
+                make_space(3),
+                logout_confirm_panel.width(Length::FillPortion(4)).into(),
+                make_space(3),
+            ])
+            .height(Length::Fill)
+            .align_items(Align::Center);
+
+            Container::new(padded_panel)
+                .width(Length::Fill)
                 .height(Length::Fill)
-                .align_items(Align::Center);
+                .style(theme)
+                .into()
+        }
+    }
 
-                Container::new(padded_panel)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .style(theme)
-                    .into()
-            };
+    pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {
+        if let Some(confirmation) = self.logging_out {
+            return self.logout_screen(theme, confirmation);
         }
 
-        for (room_id, index) in self.looking_at_event.drain().collect::<Vec<_>>() {
-            if self
-                .client
-                .rooms()
-                .keys()
-                .any(|other_room_id| other_room_id == &room_id)
-            {
-                self.looking_at_event.insert(room_id, index);
-            }
-        }
-        for (room_id, room) in self.client.rooms() {
-            if !self.looking_at_event.keys().any(|id| id == room_id) {
+        let rooms = client.rooms();
+
+        // Add missing looking_at_event values for newly added rooms (if there is any)
+        for (room_id, room) in rooms {
+            if !self.looking_at_event.contains_key(room_id) {
                 self.looking_at_event.insert(
                     room_id.clone(),
                     room.displayable_events().count().saturating_sub(1),
@@ -200,21 +221,8 @@ impl MainScreen {
             }
         }
 
-        let rooms = self.client.rooms();
-
-        self.rooms_buts_state
-            .resize(rooms.len(), Default::default());
-
-        let room_list = build_room_list(
-            rooms,
-            self.current_room_id.as_ref(),
-            &mut self.rooms_list_state,
-            self.rooms_buts_state.as_mut_slice(),
-            Message::RoomChanged,
-            theme,
-        );
-
-        let username = self.client.current_user_id().localpart().to_string();
+        let username = client.current_user_id().localpart().to_string();
+        // Build the top menu
         let menu = PickList::new(
             &mut self.menu_state,
             vec![
@@ -225,9 +233,57 @@ impl MainScreen {
             Some(username),
             Message::SelectedMenuOption,
         )
+        .width(Length::Fill)
         .style(theme);
 
-        let rooms_area = Column::with_children(vec![room_list, menu.width(Length::Fill).into()]);
+        // Resize and (if extended) initialize new button states for new rooms
+        self.rooms_buts_state
+            .resize_with(rooms.len(), Default::default);
+
+        // Build the room list
+        let (mut room_list, first_room_id) = build_room_list(
+            rooms,
+            self.current_room_id.as_ref(),
+            self.room_search_text.as_str(),
+            &mut self.rooms_list_state,
+            self.rooms_buts_state.as_mut_slice(),
+            Message::RoomChanged,
+            theme,
+        );
+
+        let mut room_search = TextInput::new(
+            &mut self.room_search_box_state,
+            "Search rooms...",
+            &self.room_search_text,
+            Message::RoomSearchTextChanged,
+        )
+        .padding(4)
+        .size(18)
+        .width(Length::Fill)
+        .style(theme);
+
+        if let Some(room_id) = first_room_id {
+            room_search = room_search.on_submit(Message::RoomChanged(room_id));
+        } else {
+            // if first_room_id is None, then that means no room found (either cause of filter, or the user aren't in any room)
+            // reusing the room_list variable here
+            room_list = Container::new(Text::new("No room found"))
+                .center_x()
+                .center_y()
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .style(theme)
+                .into();
+        }
+
+        let rooms_area = Column::with_children(vec![
+            menu.into(),
+            room_list,
+            Container::new(room_search)
+                .width(Length::Fill)
+                .padding(6)
+                .into(),
+        ]);
 
         let mut screen_widgets = vec![Container::new(rooms_area)
             .width(Length::Units(250))
@@ -252,7 +308,7 @@ impl MainScreen {
             .style(DarkTextInput)
             .on_submit(Message::SendMessageComposer(room_id.clone()));
 
-            let current_user_id = self.client.current_user_id();
+            let current_user_id = client.current_user_id();
             let displayable_event_count = room.displayable_events().count();
 
             let message_history_list = build_event_history(
@@ -370,7 +426,7 @@ impl MainScreen {
             .into()
     }
 
-    pub fn update(&mut self, msg: Message) -> Command<super::Message> {
+    pub fn update(&mut self, msg: Message, client: &mut Client) -> Command<super::Message> {
         fn make_thumbnail_commands(
             client: &Client,
             thumbnail_urls: Vec<(bool, Uri)>,
@@ -454,9 +510,8 @@ impl MainScreen {
             ));
         }
 
-        fn scroll_to_bottom(screen: &mut MainScreen, room_id: RoomId) {
-            if let Some(disp) = screen
-                .client
+        fn scroll_to_bottom(screen: &mut MainScreen, client: &Client, room_id: RoomId) {
+            if let Some(disp) = client
                 .get_room(&room_id)
                 .map(|room| room.displayable_events().count())
             {
@@ -479,7 +534,7 @@ impl MainScreen {
                         .clone()
                         .map(|id| {
                             Some((
-                                self.client
+                                client
                                     .get_room(&id)
                                     .map(|room| room.displayable_events().count())?,
                                 self.looking_at_event.get_mut(&id)?,
@@ -498,14 +553,14 @@ impl MainScreen {
                                 .current_room_id
                                 .as_ref()
                                 .map(|id| {
-                                    self.client
+                                    client
                                         .get_room(id)
                                         .map(|room| Some((room.displayable_events().next()?, id)))
                                         .flatten()
                                 })
                                 .flatten()
                             {
-                                let inner = self.client.inner();
+                                let inner = client.inner();
                                 let room_id = room_id.clone();
                                 let event_id = event.id().clone();
                                 return Command::perform(
@@ -528,7 +583,7 @@ impl MainScreen {
                         .clone()
                         .map(|id| {
                             Some((
-                                self.client
+                                client
                                     .get_room(&id)
                                     .map(|room| room.displayable_events().count())?,
                                 self.looking_at_event.get_mut(&id)?,
@@ -549,13 +604,13 @@ impl MainScreen {
                     self.logging_out = Some(false);
                 }
                 "Join Room" => println!("aaaaaa"),
-                u if u == self.client.current_user_id().localpart() => println!("bbbbbbbb"),
+                u if u == client.current_user_id().localpart() => println!("bbbbbbbb"),
                 _ => unreachable!(),
             },
             Message::LogoutConfirmation(confirmation) => {
                 if confirmation {
                     self.logging_out = Some(true);
-                    let inner = self.client.inner();
+                    let inner = client.inner();
                     return Command::perform(Client::logout(inner), |result| match result {
                         Ok(_) => super::Message::LogoutComplete,
                         Err(err) => super::Message::MatrixError(Box::new(err)),
@@ -568,9 +623,9 @@ impl MainScreen {
                 self.message = new_msg;
 
                 if let Some(room_id) = self.current_room_id.as_ref() {
-                    let inner = self.client.inner();
+                    let inner = client.inner();
                     return Command::perform(
-                        Client::send_typing(inner, room_id.clone(), self.client.current_user_id()),
+                        Client::send_typing(inner, room_id.clone(), client.current_user_id()),
                         |result| match result {
                             Ok(_) => super::Message::Nothing,
                             Err(err) => super::Message::MatrixError(Box::new(err)),
@@ -580,7 +635,7 @@ impl MainScreen {
             }
             Message::ScrollToBottom => {
                 if let Some(room_id) = self.current_room_id.clone() {
-                    scroll_to_bottom(self, room_id);
+                    scroll_to_bottom(self, client, room_id);
                     self.event_history_state.scroll_to_bottom();
                 }
             }
@@ -622,7 +677,7 @@ impl MainScreen {
                             },
                         )
                     } else {
-                        let inner = self.client.inner();
+                        let inner = client.inner();
                         Command::perform(
                             async move {
                                 match Client::download_content(inner, content_url.clone()).await {
@@ -670,7 +725,7 @@ impl MainScreen {
                 if !self.message.is_empty() {
                     let content =
                         MessageEventContent::text_plain(self.message.drain(..).collect::<String>());
-                    scroll_to_bottom(self, room_id.clone());
+                    scroll_to_bottom(self, client, room_id.clone());
                     self.event_history_state.scroll_to_bottom();
                     return Command::perform(
                         async move { (content, room_id) },
@@ -701,7 +756,7 @@ impl MainScreen {
                         Ok(paths)
                     });
 
-                let inner = self.client.inner();
+                let inner = client.inner();
 
                 return Command::perform(
                     async move {
@@ -933,7 +988,7 @@ impl MainScreen {
                 );
             }
             Message::SendMessage { content, room_id } => {
-                if let Some(room) = self.client.get_room_mut(&room_id) {
+                if let Some(room) = client.get_room_mut(&room_id) {
                     for content in content {
                         room.add_event(TimelineEvent::new_unacked_message(content, Uuid::new_v4()));
                     }
@@ -951,7 +1006,7 @@ impl MainScreen {
                         {
                             if let ClientAPIErrorKind::LimitExceeded { retry_after_ms } = err.kind {
                                 if let Some(retry_after) = retry_after_ms {
-                                    if let Some(room) = self.client.get_room_mut(&room_id) {
+                                    if let Some(room) = client.get_room_mut(&room_id) {
                                         room.wait_for_duration(retry_after, transaction_id);
                                     }
                                     log::error!("Send message after: {}", retry_after.as_secs());
@@ -964,10 +1019,9 @@ impl MainScreen {
                 }
             }
             Message::MatrixSyncResponse(response) => {
-                let thumbnail_urls = self.client.process_sync_response(*response);
+                let thumbnail_urls = client.process_sync_response(*response);
 
-                for (room_id, disp) in self
-                    .client
+                for (room_id, disp) in client
                     .rooms()
                     .iter()
                     .filter_map(|(id, room)| {
@@ -986,16 +1040,15 @@ impl MainScreen {
                     *self.looking_at_event.get_mut(&room_id).unwrap() = disp.saturating_sub(1);
                 }
 
-                return make_thumbnail_commands(&self.client, thumbnail_urls);
+                return make_thumbnail_commands(&client, thumbnail_urls);
             }
             Message::MatrixGetEventsAroundResponse(response) => {
-                let thumbnail_urls = self.client.process_events_around_response(*response);
-
-                return make_thumbnail_commands(&self.client, thumbnail_urls);
+                let thumbnail_urls = client.process_events_around_response(*response);
+                return make_thumbnail_commands(&client, thumbnail_urls);
             }
             Message::RoomChanged(new_room_id) => {
                 if let (Some(disp), Some(disp_at)) = (
-                    self.client
+                    client
                         .get_room(&new_room_id)
                         .map(|room| room.displayable_events().count()),
                     self.looking_at_event.get_mut(&new_room_id),
@@ -1007,23 +1060,26 @@ impl MainScreen {
                 }
                 self.current_room_id = Some(new_room_id);
             }
+            Message::RoomSearchTextChanged(new_room_search_text) => {
+                self.room_search_text = new_room_search_text;
+            }
         }
         Command::none()
     }
 
-    pub fn subscription(&self) -> Subscription<super::Message> {
-        let rooms_queued_events = self.client.rooms_queued_events();
+    pub fn subscription(&self, client: &Client) -> Subscription<super::Message> {
+        let rooms_queued_events = client.rooms_queued_events();
         let mut sub = Subscription::from_recipe(RetrySendEventRecipe {
-            client: self.client.inner(),
+            client: client.inner(),
             rooms_queued_events,
         })
         .map(|result| super::Message::MainScreen(Message::SendMessageResult(result)));
 
-        if let Some(since) = self.client.next_batch() {
+        if let Some(since) = client.next_batch() {
             sub = Subscription::batch(vec![
                 sub,
                 Subscription::from_recipe(SyncRecipe {
-                    client: self.client.inner(),
+                    client: client.inner(),
                     since,
                 })
                 .map(|result| match result {
