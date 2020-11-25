@@ -8,6 +8,9 @@ pub mod ui;
 const LOG_FILE_PATH: &str = concat!(data_dir!(), "log");
 
 pub fn main() {
+    // Make sure data dir exists
+    std::fs::create_dir_all(data_dir!()).unwrap();
+
     let mut config = ConfigBuilder::new();
 
     CombinedLogger::init(vec![

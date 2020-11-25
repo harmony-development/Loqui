@@ -137,6 +137,7 @@ impl Client {
         username: &str,
         password: &str,
     ) -> Result<Self, ClientError> {
+        // Make sure the data/content directory exists
         tokio::fs::create_dir_all(format!("{}content", data_dir!())).await?;
 
         let homeserver_url = homeserver
@@ -187,6 +188,9 @@ impl Client {
     }
 
     pub fn new_with_session(session: Session) -> Result<Self, ClientError> {
+        // Make sure the data/content directory exists
+        std::fs::create_dir_all(format!("{}content", data_dir!()))?;
+
         let homeserver = format!("https://{}", session.user_id.server_name());
         let homeserver_url = homeserver
             .parse::<Uri>()
