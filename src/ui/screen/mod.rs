@@ -61,9 +61,7 @@ impl Display for StartupFlag {
             StartupFlag::UseSession(session) => {
                 write!(f, "Use this session when logging in: {}", session)
             }
-            StartupFlag::None => {
-                write!(f, "No flag")
-            }
+            StartupFlag::None => write!(f, "No flag"),
         }
     }
 }

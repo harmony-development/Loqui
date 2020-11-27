@@ -12,13 +12,13 @@ lto = "thin"
 panic = "abort"
 
 [dependencies]
-iced = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically", features = ["tokio", "image"] }
+iced = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically", features = ["tokio_old", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically" }
 iced_futures = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically" }
 
 open = "1.4.0"
 infer = { version = "0.3.0", default-features = false }
-nfd2 = "0.2.3"
+rfd = { git = "https://github.com/yusdacra/rfd.git" }
 image = "0.23.11"
 
 tokio = { version = "0.2", features = ["rt-core", "parking_lot", "time", "fs"] }
@@ -26,7 +26,7 @@ ruma = { git = "https://github.com/ruma/ruma/", features = ["client-api"], branc
 ruma-client = { git = "https://github.com/ruma/ruma/", branch = "main" }
 assign = "1.1.0"
 uuid = { version = "0.8.1", features = ["v4"] }
-ahash = "0.5.8"
+ahash = "0.6"
 indexmap = "1.6.0"
 
 serde = { version = "1.0", features = ["derive"] }

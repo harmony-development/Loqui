@@ -741,19 +741,7 @@ impl MainScreen {
             Message::SendFile(room_id) => {
                 let file_select_task =
                     tokio::task::spawn_blocking(|| -> Result<Vec<PathBuf>, ClientError> {
-                        let paths = match nfd2::dialog_multiple()
-                            .open()
-                            .map_err(|e| ClientError::Custom(e.to_string()))?
-                        {
-                            nfd2::Response::Cancel => vec![],
-                            nfd2::Response::Okay(path) => vec![path],
-                            nfd2::Response::OkayMultiple(paths) => paths,
-                        }
-                        .into_iter()
-                        .filter(|path| !path.is_dir())
-                        .collect();
-
-                        Ok(paths)
+                        Ok(rfd::open().map_or_else(|| vec![], |p| vec![p]))
                     });
 
                 let inner = client.inner();

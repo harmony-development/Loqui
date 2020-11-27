@@ -11,4 +11,11 @@
 ^target(/|$)
 
 # icy_matrix
-^data(/|$)
+data(/|$)
+
+# nix
+result(/|$)
+
+# direnv
+.direnv(/|$)
+.envrc

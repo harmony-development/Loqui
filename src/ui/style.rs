@@ -249,7 +249,7 @@ mod light {
         fn active(&self) -> button::Style {
             button::Style {
                 background: Color::from_rgb(0.11, 0.42, 0.87).into(),
-                border_radius: 12,
+                border_radius: 12.0,
                 shadow_offset: Vector::new(1.0, 1.0),
                 text_color: Color::from_rgb8(0xEE, 0xEE, 0xEE),
                 ..button::Style::default()
@@ -308,8 +308,8 @@ mod dark {
         fn style(&self) -> container::Style {
             container::Style {
                 border_color: DARK_BG,
-                border_radius: 8,
-                border_width: 1,
+                border_radius: 8.0,
+                border_width: 1.0,
                 ..Container.style()
             }
         }
@@ -333,7 +333,7 @@ mod dark {
             radio::Style {
                 background: BRIGHT_BG.into(),
                 dot_color: ACCENT,
-                border_width: 1,
+                border_width: 1.0,
                 border_color: ACCENT,
             }
         }
@@ -362,7 +362,7 @@ mod dark {
 
         fn focused(&self) -> text_input::Style {
             text_input::Style {
-                border_width: 3,
+                border_width: 3.0,
                 border_color: ACCENT,
                 ..self.active()
             }
@@ -382,7 +382,7 @@ mod dark {
 
         fn hovered(&self) -> text_input::Style {
             text_input::Style {
-                border_width: 2,
+                border_width: 2.0,
                 border_color: Color { a: 0.5, ..ACCENT },
                 ..self.focused()
             }
@@ -395,15 +395,15 @@ mod dark {
         fn active(&self) -> text_input::Style {
             text_input::Style {
                 background: BRIGHT_BG.into(),
-                border_radius: 8,
-                border_width: 0,
+                border_radius: 8.0,
+                border_width: 0.0,
                 border_color: ACCENT,
             }
         }
 
         fn focused(&self) -> text_input::Style {
             text_input::Style {
-                border_width: 3,
+                border_width: 3.0,
                 border_color: ACCENT,
                 ..self.active()
             }
@@ -423,7 +423,7 @@ mod dark {
 
         fn hovered(&self) -> text_input::Style {
             text_input::Style {
-                border_width: 2,
+                border_width: 2.0,
                 border_color: Color { a: 0.5, ..ACCENT },
                 ..self.focused()
             }
@@ -436,7 +436,7 @@ mod dark {
         fn active(&self) -> button::Style {
             button::Style {
                 background: DARK_BG.into(),
-                border_radius: 8,
+                border_radius: 8.0,
                 text_color: Color::WHITE,
                 ..button::Style::default()
             }
@@ -451,7 +451,7 @@ mod dark {
 
         fn pressed(&self) -> button::Style {
             button::Style {
-                border_width: 1,
+                border_width: 1.0,
                 border_color: Color::WHITE,
                 ..self.hovered()
             }
@@ -469,8 +469,8 @@ mod dark {
             button::Style {
                 background: None,
                 border_color: Color::TRANSPARENT,
-                border_radius: 0,
-                border_width: 0,
+                border_radius: 0.0,
+                border_width: 0.0,
                 text_color: Color::WHITE,
                 ..button::Style::default()
             }
@@ -495,7 +495,7 @@ mod dark {
         fn active(&self) -> button::Style {
             button::Style {
                 background: BRIGHT_BG.into(),
-                border_radius: 8,
+                border_radius: 8.0,
                 text_color: Color::WHITE,
                 ..button::Style::default()
             }
@@ -510,7 +510,7 @@ mod dark {
 
         fn pressed(&self) -> button::Style {
             button::Style {
-                border_width: 1,
+                border_width: 1.0,
                 border_color: Color::WHITE,
                 ..self.hovered()
             }
@@ -527,13 +527,13 @@ mod dark {
         fn active(&self) -> scrollable::Scrollbar {
             scrollable::Scrollbar {
                 background: Color::TRANSPARENT.into(),
-                border_radius: 2,
-                border_width: 0,
+                border_radius: 2.0,
+                border_width: 0.0,
                 border_color: Color::TRANSPARENT,
                 scroller: scrollable::Scroller {
                     color: Color::TRANSPARENT,
-                    border_radius: 2,
-                    border_width: 0,
+                    border_radius: 2.0,
+                    border_width: 0.0,
                     border_color: Color::TRANSPARENT,
                 },
             }
@@ -576,9 +576,9 @@ mod dark {
             slider::Style {
                 rail_colors: (ACCENT, Color { a: 0.1, ..ACCENT }),
                 handle: slider::Handle {
-                    shape: slider::HandleShape::Circle { radius: 9 },
+                    shape: slider::HandleShape::Circle { radius: 9.0 },
                     color: ACCENT,
-                    border_width: 0,
+                    border_width: 0.0,
                     border_color: Color::TRANSPARENT,
                 },
             }
@@ -616,7 +616,7 @@ mod dark {
             progress_bar::Style {
                 background: BRIGHT_BG.into(),
                 bar: ACCENT.into(),
-                border_radius: 10,
+                border_radius: 10.0,
             }
         }
     }
@@ -628,8 +628,8 @@ mod dark {
             checkbox::Style {
                 background: if is_checked { ACCENT } else { BRIGHT_BG }.into(),
                 checkmark_color: Color::WHITE,
-                border_radius: 2,
-                border_width: 1,
+                border_radius: 2.0,
+                border_width: 1.0,
                 border_color: ACCENT,
             }
         }
@@ -655,7 +655,7 @@ mod dark {
                 text_color: Color::WHITE,
                 selected_background: ACCENT.into(),
                 selected_text_color: Color::WHITE,
-                border_width: 0,
+                border_width: 0.0,
                 ..pick_list::Menu::default()
             }
         }
@@ -664,7 +664,7 @@ mod dark {
             pick_list::Style {
                 background: DARK_BG.into(),
                 text_color: Color::WHITE,
-                border_width: 0,
+                border_width: 0.0,
                 ..pick_list::Style::default()
             }
         }
@@ -684,7 +684,7 @@ mod dark {
             rule::Style {
                 color: BRIGHT_BG,
                 width: 2,
-                radius: 1,
+                radius: 1.0,
                 fill_mode: rule::FillMode::Padded(15),
             }
         }
