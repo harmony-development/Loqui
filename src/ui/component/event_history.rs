@@ -6,12 +6,15 @@ use crate::{
     },
     ui::{
         screen::main::Message,
-        style::{DarkButton, Theme},
+        style::{
+            DarkButton, Theme, DATE_SEPERATOR_SIZE, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
+            MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
+        },
     },
 };
 use chrono::{DateTime, Datelike, Local};
 use iced::{
-    button, scrollable, Align, Button, Color, Column, Container, Element, Image, Length, Row,
+    button, scrollable, Align, Button, Color, Column, Container, Element, Image, Length,
     Scrollable, Space, Text,
 };
 use ruma::{api::exports::http::Uri, UserId};
@@ -41,8 +44,8 @@ pub fn build_event_history<'a>(
         .height(Length::Fill)
         .style(theme)
         .align_items(Align::Start)
-        .spacing(8)
-        .padding(16);
+        .spacing(SPACING * 2)
+        .padding(PADDING);
 
     let displayable_events = room.displayable_events().collect::<Vec<_>>();
     let timeline_range_end = looking_at_event
@@ -81,8 +84,8 @@ pub fn build_event_history<'a>(
         let sender_display_name = room.get_user_display_name(id_to_use);
         let sender_body_creator = |sender_display_name: &str| {
             Text::new(format!("[{}]", sender_display_name))
-                .color(theme.calculate_sender_color(id_to_use.localpart().len()))
-                .size(19)
+                .color(theme.calculate_sender_color(sender_display_name.len()))
+                .size(MESSAGE_SENDER_SIZE)
         };
 
         let mut is_sender_different = false;
@@ -90,13 +93,8 @@ pub fn build_event_history<'a>(
             is_sender_different = true;
             if !message_group.is_empty() {
                 event_history = event_history.push(
-                    Container::new(
-                        Column::with_children(message_group.drain(..).collect())
-                            .align_items(Align::Start)
-                            .padding(16)
-                            .spacing(4),
-                    )
-                    .style(crate::ui::style::RoundContainer),
+                    Container::new(super::column(message_group.drain(..).collect()))
+                        .style(crate::ui::style::RoundContainer),
                 );
             }
             message_group.push(sender_body_creator(&sender_display_name).into());
@@ -110,13 +108,8 @@ pub fn build_event_history<'a>(
                 && time.checked_sub(cur_timestamp).unwrap_or_default() > Duration::from_secs(60 * 5)
             {
                 event_history = event_history.push(
-                    Container::new(
-                        Column::with_children(message_group.drain(..).collect())
-                            .align_items(Align::Start)
-                            .padding(16)
-                            .spacing(4),
-                    )
-                    .style(crate::ui::style::RoundContainer),
+                    Container::new(super::column(message_group.drain(..).collect()))
+                        .style(crate::ui::style::RoundContainer),
                 );
                 let cur_time_date =
                     DateTime::<Local>::from(*timeline_event.origin_server_timestamp());
@@ -124,7 +117,7 @@ pub fn build_event_history<'a>(
                 if cur_time_date.day() != time_date.day() {
                     let date_time_seperator = Container::new(
                         Text::new(cur_time_date.format("[%d %B %Y]").to_string())
-                            .size(22)
+                            .size(DATE_SEPERATOR_SIZE)
                             .color(Color::from_rgb(0.6, 0.6, 0.6)),
                     )
                     .center_x()
@@ -138,7 +131,7 @@ pub fn build_event_history<'a>(
             }
         }
 
-        let mut message_text = Text::new(timeline_event.formatted(room)).size(16);
+        let mut message_text = Text::new(timeline_event.formatted(room)).size(MESSAGE_SIZE);
 
         if !timeline_event.is_ack() {
             message_text = message_text.color(Color::from_rgb(0.5, 0.5, 0.5));
@@ -179,6 +172,7 @@ pub fn build_event_history<'a>(
                         .map(|url| thumbnail_store.get_thumbnail(&url))
                         .flatten()
                 })
+                // FIXME: Don't hardcode this length, calculate it using the size of the window
                 .map(|handle| Image::new(handle.clone()).width(Length::Units(360)))
             {
                 if does_content_exist {
@@ -218,7 +212,7 @@ pub fn build_event_history<'a>(
 
         let mut message_row = vec![Column::with_children(message_body_widgets)
             .align_items(Align::Start)
-            .spacing(4)
+            .spacing(SPACING)
             .into()];
 
         // FIXME: doesnt work properly
@@ -230,32 +224,28 @@ pub fn build_event_history<'a>(
                     .format("%H:%M")
                     .to_string(),
             )
-            .size(14)
+            .size(MESSAGE_TIMESTAMP_SIZE)
             .color(Color::from_rgb8(160, 160, 160));
-            message_row.insert(0, Container::new(message_timestamp).padding(2).into());
+            message_row.insert(
+                0,
+                Container::new(message_timestamp)
+                    .padding(PADDING / 8)
+                    .into(),
+            );
         } else {
+            // FIXME: Don't hardcode the length here
             message_row.insert(0, Space::with_width(Length::Units(39)).into());
         }
 
-        message_group.push(
-            Row::with_children(message_row)
-                .align_items(Align::Start)
-                .spacing(8)
-                .into(),
-        );
+        message_group.push(super::row(message_row).padding(0).into());
 
         last_sender = Some(id_to_use);
         last_timestamp = *timeline_event.origin_server_timestamp();
     }
     if !message_group.is_empty() {
         event_history = event_history.push(
-            Container::new(
-                Column::with_children(message_group.drain(..).collect())
-                    .align_items(Align::Start)
-                    .padding(16)
-                    .spacing(4),
-            )
-            .style(crate::ui::style::RoundContainer),
+            Container::new(super::column(message_group.drain(..).collect()))
+                .style(crate::ui::style::RoundContainer),
         );
     }
     event_history.into()

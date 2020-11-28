@@ -2,7 +2,7 @@ pub mod login;
 pub mod main;
 
 use crate::{
-    client::{Client, ClientError, Session},
+    client::{error::ClientError, Client, Session},
     ui::style::Theme,
 };
 use iced::{executor, Application, Command, Element, Subscription};

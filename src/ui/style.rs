@@ -3,6 +3,14 @@ use iced::{
     text_input, Color,
 };
 
+pub const MESSAGE_TIMESTAMP_SIZE: u16 = 13;
+pub const MESSAGE_SIZE: u16 = 16;
+pub const MESSAGE_SENDER_SIZE: u16 = 19;
+pub const DATE_SEPERATOR_SIZE: u16 = 22;
+
+pub const PADDING: u16 = 16;
+pub const SPACING: u16 = 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Theme {
     Light,
@@ -10,50 +18,7 @@ pub enum Theme {
 }
 
 impl Theme {
-    pub const ALL: [Theme; 2] = [Theme::Light, Theme::Dark];
-    const SENDER_COLORS_DARK: [Color; 8] = [
-        Color::from_rgb(
-            0x6d as f32 / 255.0,
-            0xdd as f32 / 255.0,
-            0x18 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xfc as f32 / 255.0,
-            0xd2 as f32 / 255.0,
-            0x00 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xcc as f32 / 255.0,
-            0xf9 as f32 / 255.0,
-            0xff as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0x3d as f32 / 255.0,
-            0xdb as f32 / 255.0,
-            0x8c as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xdd as f32 / 255.0,
-            0x6a as f32 / 255.0,
-            0x35 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xe2 as f32 / 255.0,
-            0x22 as f32 / 255.0,
-            0x45 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0x09 as f32 / 255.0,
-            0xe5 as f32 / 255.0,
-            0x38 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xd1 as f32 / 255.0,
-            0x32 as f32 / 255.0,
-            0x71 as f32 / 255.0,
-        ),
-    ];
-    const SENDER_COLORS_LIGHT: [Color; 8] = [
+    const SENDER_COLORS: [Color; 8] = [
         Color::from_rgb(
             0x6d as f32 / 255.0,
             0xdd as f32 / 255.0,
@@ -97,10 +62,7 @@ impl Theme {
     ];
 
     pub fn calculate_sender_color(&self, name_len: usize) -> Color {
-        match self {
-            Theme::Light => Theme::SENDER_COLORS_LIGHT[name_len % Theme::SENDER_COLORS_LIGHT.len()],
-            Theme::Dark => Theme::SENDER_COLORS_DARK[name_len % Theme::SENDER_COLORS_DARK.len()],
-        }
+        Theme::SENDER_COLORS[name_len % Theme::SENDER_COLORS.len()]
     }
 }
 

@@ -1,6 +1,20 @@
 { system, sources ? import ./sources.nix { inherit system; }
 , nixpkgs ? sources.nixpkgs }:
-let pkgs = import nixpkgs { inherit system; };
+let
+  mozPkgs = import "${sources.nixpkgsMoz}/package-set.nix" {
+    pkgs = import nixpkgs { inherit system; };
+  };
+  rustChannel = mozPkgs.latest.rustChannels.stable;
+  pkgs = import nixpkgs {
+    inherit system;
+    overlays = [
+      (self: super: {
+        rustc = rustChannel.rust;
+        inherit (rustChannel)
+        ;
+      })
+    ];
+  };
 in with pkgs;
 let
   xorgLibraries = with xorg; [ libX11 libXcursor libXrandr libXi ];

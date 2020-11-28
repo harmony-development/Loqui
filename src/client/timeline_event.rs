@@ -447,6 +447,7 @@ impl TimelineEvent {
         self.transaction_id.is_none()
     }
 
+    /// Returns which transaction this event acknowledges.
     pub fn acks_transaction(&self) -> Option<Uuid> {
         if let AnySyncRoomEvent::Message(ref msg_event) = self.inner {
             if let AnySyncMessageEvent::RoomMessage(event) = msg_event {
@@ -458,6 +459,7 @@ impl TimelineEvent {
         None
     }
 
+    /// Return which event this event redacts.
     pub fn redacts(&self) -> Option<&EventId> {
         match &self.inner {
             AnySyncRoomEvent::Message(ev) => {

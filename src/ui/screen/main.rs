@@ -1,11 +1,14 @@
 use crate::{
     client::{
+        error::ClientError,
         media::{self, ContentType, ImageHandle, ThumbnailStore},
-        Client, ClientError, InnerClient, TimelineEvent,
+        Client, InnerClient, TimelineEvent,
     },
     ui::{
         component::{build_event_history, build_room_list, event_history::SHOWN_MSGS_LIMIT},
-        style::{BrightContainer, DarkButton, DarkTextInput, Theme},
+        style::{
+            BrightContainer, DarkButton, DarkTextInput, Theme, MESSAGE_SIZE, PADDING, SPACING,
+        },
     },
 };
 use ahash::AHashMap;
@@ -257,7 +260,7 @@ impl MainScreen {
             &self.room_search_text,
             Message::RoomSearchTextChanged,
         )
-        .padding(4)
+        .padding(PADDING / 4)
         .size(18)
         .width(Length::Fill)
         .style(theme);
@@ -281,7 +284,7 @@ impl MainScreen {
             room_list,
             Container::new(room_search)
                 .width(Length::Fill)
-                .padding(6)
+                .padding(PADDING / 2)
                 .into(),
         ]);
 
@@ -303,8 +306,8 @@ impl MainScreen {
                 self.message.as_str(),
                 Message::MessageChanged,
             )
-            .padding(12)
-            .size(16)
+            .padding((PADDING / 4) * 3)
+            .size(MESSAGE_SIZE)
             .style(DarkTextInput)
             .on_submit(Message::SendMessageComposer(room_id.clone()));
 
@@ -357,10 +360,12 @@ impl MainScreen {
             ])
             .height(Length::Units(14));
 
-            let send_file_button =
-                Button::new(&mut self.send_file_but_state, Text::new("↑").size(28))
-                    .style(DarkButton)
-                    .on_press(Message::SendFile(room_id.clone()));
+            let send_file_button = Button::new(
+                &mut self.send_file_but_state,
+                Text::new("↑").size((PADDING / 4) * 3 + MESSAGE_SIZE),
+            )
+            .style(DarkButton)
+            .on_press(Message::SendFile(room_id.clone()));
 
             let mut bottom_area_widgets = vec![
                 send_file_button.into(),
@@ -374,7 +379,7 @@ impl MainScreen {
                 bottom_area_widgets.push(
                     Button::new(
                         &mut self.scroll_to_bottom_but_state,
-                        Text::new("↡").size(28),
+                        Text::new("↡").size((PADDING / 4) * 3 + MESSAGE_SIZE),
                     )
                     .style(DarkButton)
                     .on_press(Message::ScrollToBottom)
@@ -387,11 +392,11 @@ impl MainScreen {
                 typing_users.into(),
                 Container::new(
                     Row::with_children(bottom_area_widgets)
-                        .spacing(8)
+                        .spacing(SPACING * 2)
                         .width(Length::Fill),
                 )
                 .width(Length::Fill)
-                .padding(8)
+                .padding(PADDING / 2)
                 .into(),
             ]);
 
@@ -485,7 +490,7 @@ impl MainScreen {
                                             tokio::fs::write(content_path, raw_data.as_slice())
                                                 .await
                                                 .map(|_| (thumbnail_url, raw_data))
-                                                .map_err(|e| e.into())
+                                                .map_err(Into::into)
                                         } else {
                                             Err(ClientError::Custom(String::from(
                                                 "Could not make content path or server media path",

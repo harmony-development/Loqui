@@ -1,6 +1,6 @@
 use crate::{
     client::Rooms,
-    ui::style::{DarkButton, Theme},
+    ui::style::{DarkButton, Theme, PADDING, SPACING},
 };
 use fuzzy_matcher::skim::SkimMatcherV2;
 use iced::{button, scrollable, Align, Button, Element, Length, Scrollable, Text};
@@ -52,8 +52,8 @@ pub fn build_room_list<'a, Message: Clone + 'a>(
         .style(theme)
         .align_items(Align::Start)
         .height(Length::Fill)
-        .spacing(8)
-        .padding(4);
+        .spacing(SPACING * 2)
+        .padding(PADDING / 4);
 
     let is_current_room = |room_id: &RoomId| {
         if let Some(id) = current_room_id {

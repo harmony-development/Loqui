@@ -479,9 +479,9 @@ rec {
       };
       "bytemuck_derive" = rec {
         crateName = "bytemuck_derive";
-        version = "1.0.0";
+        version = "1.0.1";
         edition = "2018";
-        sha256 = "1k59b6g2d87nf32qwhp73vng3al0zklxg64iiwf0pkxy74xf5ni8";
+        sha256 = "0m6cwx3bxl326xr81z75dz5vzm87zmznhpikr19wnycz5y65y8cf";
         procMacro = true;
         authors = [
           "Lokathor <zefria@gmail.com>"
@@ -2489,9 +2489,9 @@ rec {
       };
       "gfx-backend-dx11" = rec {
         crateName = "gfx-backend-dx11";
-        version = "0.6.15";
+        version = "0.6.16";
         edition = "2018";
-        sha256 = "0clmgr1vsnbs59cvjbriv3jr3dw6rm97dhm7h09hr9p0nawc7c2j";
+        sha256 = "14s1mnhiz6y8y2zbbl9axa71abbxwgsgcrnlhvx3qrlhpqr3cdxf";
         libName = "gfx_backend_dx11";
         authors = [
           "The Gfx-rs Developers"
@@ -2660,9 +2660,9 @@ rec {
       };
       "gfx-backend-metal" = rec {
         crateName = "gfx-backend-metal";
-        version = "0.6.4";
+        version = "0.6.5";
         edition = "2018";
-        sha256 = "0avzxlslwplkcklrzh2bli9wwxiadz99xm6vhrbx7rqjq5virfk0";
+        sha256 = "0cnbqgs8gxxshd6l9wcx799mczpnjn4p3l0i1ngdk5kz43an0g97";
         libName = "gfx_backend_metal";
         authors = [
           "The Gfx-rs Developers"
@@ -4826,9 +4826,9 @@ rec {
       };
       "miow" = rec {
         crateName = "miow";
-        version = "0.2.1";
+        version = "0.2.2";
         edition = "2015";
-        sha256 = "06g9b8sqlh5gxakwqq4rrib07afwanfnxgxajrldwcgk3hxjy7wc";
+        sha256 = "0kcl8rnv0bhiarcdakik670w8fnxzlxhi1ys7152sck68510in7b";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
         ];
@@ -5089,9 +5089,9 @@ rec {
       };
       "net2" = rec {
         crateName = "net2";
-        version = "0.2.35";
+        version = "0.2.36";
         edition = "2015";
-        sha256 = "0lv83nx533k3y2sggfnqam3gcsg2vq47iilnaljrlz7djb33xg1y";
+        sha256 = "00kx6flzbi1l2xq3gfix49ngfm6kpxnxr13p07m0bjqnizrpbkyp";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
         ];
@@ -6379,8 +6379,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jonas Platte <jplatte@posteo.de>"
@@ -6444,8 +6444,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6505,8 +6505,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         procMacro = true;
         authors = [
@@ -6541,8 +6541,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6622,8 +6622,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6699,8 +6699,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jonas Platte <jplatte@posteo.de>"
@@ -6710,6 +6710,10 @@ rec {
             name = "js_int";
             packageId = "js_int";
             features = [ "serde" ];
+          }
+          {
+            name = "maplit";
+            packageId = "maplit";
           }
           {
             name = "ruma-common-macros";
@@ -6744,8 +6748,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         procMacro = true;
         authors = [
@@ -6779,8 +6783,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6835,8 +6839,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         procMacro = true;
         authors = [
@@ -6872,8 +6876,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6918,8 +6922,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         procMacro = true;
         authors = [
@@ -6953,8 +6957,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6985,8 +6989,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "6c4bd7c72cef22b240a6babad38ecdbfd9f569da";
-          sha256 = "0hz5aanaw92ah2wcd2ppq4pp0yqa1j9qclladbckbpqarwff4s1l";
+          rev = "8ccf0f128b66192e46eee020b0e59da3c81397ae";
+          sha256 = "1mxlx5jkv3js0vv80aniw1xaanj3kqlhj5p5dsya1mib3bqk7pmz";
         };
         authors = [
           "Jonas Platte <jplatte@posteo.de>"
@@ -7810,9 +7814,9 @@ rec {
       };
       "syn" = rec {
         crateName = "syn";
-        version = "1.0.51";
+        version = "1.0.52";
         edition = "2018";
-        sha256 = "08wjvygyi3pn3fkmbh5wys6i7m957sahkvarsc22incp74ck8krv";
+        sha256 = "0k0d0zy7fd5fzlz6150xv73q7l6n61ygjixfryjld43j0j2l67kc";
         authors = [
           "David Tolnay <dtolnay@gmail.com>"
         ];

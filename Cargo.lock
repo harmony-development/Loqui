@@ -173,9 +173,9 @@ dependencies = [
 
 [[package]]
 name = "bytemuck_derive"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28dae23a39becf0b1c8f9198d7e9fc80aaf1ec1ee7428ec570f6a0269e59a9cc"
+checksum = "8e215f8c2f9f79cb53c8335e687ffd07d5bfcb6fe5fc80723762d0be46e7cc54"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -948,9 +948,9 @@ dependencies = [
 
 [[package]]
 name = "gfx-backend-dx11"
-version = "0.6.15"
+version = "0.6.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52b0c3b8b2e0a60c1380a7c27652cd86b791e5d8312fb9592a7a59bd437e9532"
+checksum = "ae373632be90663cfa86d466f6f4e37d2d158eea2ad1b5bef0c89b1fa1ad4193"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -1001,9 +1001,9 @@ dependencies = [
 
 [[package]]
 name = "gfx-backend-metal"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60ba1c77c112e7d35786dbd49ed26f2a76ce53a44bc09fe964935e4e35ed7f2b"
+checksum = "273d60d5207f96d99e0d11d0718995f67e56533a9df1444d83baf787f4c3cb32"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -1763,9 +1763,9 @@ dependencies = [
 
 [[package]]
 name = "miow"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
+checksum = "ebd808424166322d4a38da87083bfddd3ac4c131334ed55856112eb06d46944d"
 dependencies = [
  "kernel32-sys",
  "net2",
@@ -1852,9 +1852,9 @@ checksum = "c44922cb3dbb1c70b5e5f443d63b64363a898564d739ba5198e3a9138442868d"
 
 [[package]]
 name = "net2"
-version = "0.2.35"
+version = "0.2.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ebc3ec692ed7c9a255596c67808dee269f64655d8baf7b4f0638e51ba1d6853"
+checksum = "d7cf75f38f16cb05ea017784dc6dbfd354f76c223dba37701734c4f5a9337d02"
 dependencies = [
  "cfg-if 0.1.10",
  "libc",
@@ -2377,7 +2377,7 @@ dependencies = [
 [[package]]
 name = "ruma"
 version = "0.0.1"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "assign",
  "js_int",
@@ -2392,7 +2392,7 @@ dependencies = [
 [[package]]
 name = "ruma-api"
 version = "0.17.0-alpha.1"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "http",
  "percent-encoding",
@@ -2408,7 +2408,7 @@ dependencies = [
 [[package]]
 name = "ruma-api-macros"
 version = "0.17.0-alpha.1"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2419,7 +2419,7 @@ dependencies = [
 [[package]]
 name = "ruma-client"
 version = "0.4.0"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "assign",
  "futures-core",
@@ -2440,7 +2440,7 @@ dependencies = [
 [[package]]
 name = "ruma-client-api"
 version = "0.10.0-alpha.1"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "assign",
  "http",
@@ -2459,9 +2459,10 @@ dependencies = [
 [[package]]
 name = "ruma-common"
 version = "0.2.0"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "js_int",
+ "maplit",
  "ruma-common-macros",
  "ruma-identifiers",
  "ruma-serde",
@@ -2472,7 +2473,7 @@ dependencies = [
 [[package]]
 name = "ruma-common-macros"
 version = "0.2.0"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2483,7 +2484,7 @@ dependencies = [
 [[package]]
 name = "ruma-events"
 version = "0.22.0-alpha.1"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "js_int",
  "ruma-common",
@@ -2497,7 +2498,7 @@ dependencies = [
 [[package]]
 name = "ruma-events-macros"
 version = "0.22.0-alpha.1"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2508,7 +2509,7 @@ dependencies = [
 [[package]]
 name = "ruma-identifiers"
 version = "0.17.4"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "ruma-common-macros",
  "ruma-identifiers-macros",
@@ -2520,7 +2521,7 @@ dependencies = [
 [[package]]
 name = "ruma-identifiers-macros"
 version = "0.17.4"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2531,7 +2532,7 @@ dependencies = [
 [[package]]
 name = "ruma-identifiers-validation"
 version = "0.1.1"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "serde",
  "strum",
@@ -2540,7 +2541,7 @@ dependencies = [
 [[package]]
 name = "ruma-serde"
 version = "0.2.3"
-source = "git+https://github.com/ruma/ruma/?branch=main#6c4bd7c72cef22b240a6babad38ecdbfd9f569da"
+source = "git+https://github.com/ruma/ruma/?branch=main#8ccf0f128b66192e46eee020b0e59da3c81397ae"
 dependencies = [
  "form_urlencoded",
  "itoa",
@@ -2871,9 +2872,9 @@ checksum = "8fb1df15f412ee2e9dfc1c504260fa695c1c3f10fe9f4a6ee2d2184d7d6450e2"
 
 [[package]]
 name = "syn"
-version = "1.0.51"
+version = "1.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b4f34193997d92804d359ed09953e25d5138df6bcc055a71bf68ee89fdf9223"
+checksum = "6c1e438504729046a5cfae47f97c30d6d083c7d91d94603efdae3477fc070d4c"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -1,4 +1,7 @@
-use super::timeline_event::TimelineEvent;
+use super::{
+    member::{Member, Members},
+    TimelineEvent,
+};
 use ahash::AHashMap;
 use ruma::{
     api::exports::http::Uri, events::room::member::MembershipChange, EventId, RoomAliasId, RoomId,
@@ -6,64 +9,6 @@ use ruma::{
 };
 use std::time::{Duration, Instant};
 use uuid::Uuid;
-
-pub type Members = AHashMap<UserId, Member>;
-
-pub struct Member {
-    avatar_url: Option<Uri>,
-    display_name: Option<String>,
-    display_user: bool,
-    typing_received: Option<Duration>,
-}
-
-impl Default for Member {
-    fn default() -> Self {
-        Self {
-            avatar_url: None,
-            display_name: None,
-            display_user: true,
-            typing_received: None,
-        }
-    }
-}
-
-impl Member {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn avatar_url(&self) -> Option<&Uri> {
-        self.avatar_url.as_ref()
-    }
-
-    pub fn display_name(&self) -> Option<&str> {
-        self.display_name.as_deref()
-    }
-
-    pub fn display(&self) -> bool {
-        self.display_user
-    }
-
-    pub fn is_typing(&self) -> bool {
-        self.typing_received.is_some()
-    }
-
-    pub fn set_avatar_url(&mut self, new_avatar_url: Option<Uri>) {
-        self.avatar_url = new_avatar_url;
-    }
-
-    pub fn set_display_name(&mut self, new_display_name: Option<String>) {
-        self.display_name = new_display_name;
-    }
-
-    pub fn set_display(&mut self, new_display: bool) {
-        self.display_user = new_display;
-    }
-
-    pub fn set_typing(&mut self, new_typing_recieved: Option<Duration>) {
-        self.typing_received = new_typing_recieved;
-    }
-}
 
 pub type Rooms = AHashMap<RoomId, Room>;
 
@@ -157,8 +102,7 @@ impl Room {
     pub fn typing_members(&self) -> Vec<&UserId> {
         self.members
             .iter()
-            .filter(|(_, member)| member.is_typing())
-            .map(|(id, _)| id)
+            .filter_map(|(id, member)| if member.is_typing() { Some(id) } else { None })
             .collect()
     }
 
@@ -203,14 +147,14 @@ impl Room {
         user_id.to_string()
     }
 
-    pub fn update_typing(&mut self, typing_member_ids: &[UserId]) {
+    pub fn update_typing(&mut self, typing_member_ids: &[UserId], recv_time: Instant) {
         for member in self.members.values_mut() {
             member.set_typing(None);
         }
 
         for member_id in typing_member_ids {
-            if let Some(member) = self.members.get_mut(member_id) {
-                member.set_typing(Some(Instant::now().elapsed()))
+            if let Some(member) = self.members.get_mut(&member_id) {
+                member.set_typing(Some(recv_time))
             }
         }
     }

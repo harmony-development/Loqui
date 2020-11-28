@@ -1,7 +1,7 @@
 use super::LoginInformation;
 use crate::{
-    client::{Client, ClientError, Session},
-    ui::style::Theme,
+    client::{error::ClientError, Client, Session},
+    ui::style::{Theme, PADDING, SPACING},
 };
 use iced::{
     button, text_input, Align, Button, Color, Column, Command, Container, Element, Length, Row,
@@ -75,10 +75,12 @@ impl LoginScreen {
             &self.login_info.homeserver_domain,
             Message::HomeserverChanged,
         )
-        .padding(8)
+        .padding(PADDING / 2)
         .style(theme);
         let homeserver_area = Row::with_children(vec![
-            Container::new(homeserver_prefix).padding(8).into(),
+            Container::new(homeserver_prefix)
+                .padding(PADDING / 2)
+                .into(),
             homeserver_field.into(),
         ])
         .align_items(Align::Start);
@@ -89,7 +91,7 @@ impl LoginScreen {
             &self.login_info.username,
             Message::UsernameChanged,
         )
-        .padding(8)
+        .padding(PADDING / 2)
         .style(theme);
 
         let password_field = TextInput::new(
@@ -98,7 +100,7 @@ impl LoginScreen {
             &self.login_info.password,
             Message::PasswordChanged,
         )
-        .padding(8)
+        .padding(PADDING / 2)
         .style(theme)
         .on_submit(Message::LoginInitiated)
         .password();
@@ -115,7 +117,7 @@ impl LoginScreen {
             login_button.into(),
         ])
         .align_items(Align::Center)
-        .spacing(12);
+        .spacing(SPACING * 3);
 
         let padded_panel = Row::with_children(vec![
             Space::with_width(Length::FillPortion(3)).into(),

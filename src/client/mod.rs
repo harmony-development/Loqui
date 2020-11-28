@@ -1,4 +1,5 @@
 use assign::assign;
+use error::{ClientError, ClientResult};
 pub use room::{Room, Rooms};
 use ruma::{
     api::client::r0::media::{create_content, get_content},
@@ -13,7 +14,7 @@ use ruma::{
             typing::create_typing_event,
         },
         exports::{
-            http::{self, Uri},
+            http::Uri,
             serde::{Deserialize, Serialize},
         },
     },
@@ -38,7 +39,9 @@ use std::{
 pub use timeline_event::TimelineEvent;
 use uuid::Uuid;
 
+pub mod error;
 pub mod media;
+pub mod member;
 pub mod room;
 pub mod timeline_event;
 
@@ -132,11 +135,7 @@ impl Debug for Client {
 }
 
 impl Client {
-    pub async fn new(
-        homeserver: &str,
-        username: &str,
-        password: &str,
-    ) -> Result<Self, ClientError> {
+    pub async fn new(homeserver: &str, username: &str, password: &str) -> ClientResult<Self> {
         // Make sure the data/content directory exists
         tokio::fs::create_dir_all(format!("{}content", data_dir!())).await?;
 
@@ -187,7 +186,7 @@ impl Client {
         })
     }
 
-    pub fn new_with_session(session: Session) -> Result<Self, ClientError> {
+    pub fn new_with_session(session: Session) -> ClientResult<Self> {
         // Make sure the data/content directory exists
         std::fs::create_dir_all(format!("{}content", data_dir!()))?;
 
@@ -205,7 +204,7 @@ impl Client {
         })
     }
 
-    pub async fn logout(inner: InnerClient) -> Result<(), ClientError> {
+    pub async fn logout(inner: InnerClient) -> ClientResult<()> {
         inner.request(logout::Request::new()).await?;
 
         tokio::fs::remove_file(SESSION_ID_PATH).await?;
@@ -228,7 +227,7 @@ impl Client {
         self.next_batch.clone()
     }
 
-    pub async fn initial_sync(&mut self) -> Result<(), ClientError> {
+    pub async fn initial_sync(&mut self) -> ClientResult<()> {
         let lazy_load_filter = Client::member_lazy_load_sync_filter();
 
         let initial_sync_response = self
@@ -322,17 +321,14 @@ impl Client {
     pub async fn join_room(
         inner: InnerClient,
         room_id_or_alias: ruma::RoomIdOrAliasId,
-    ) -> Result<join_room_by_id_or_alias::Response, ClientError> {
+    ) -> ClientResult<join_room_by_id_or_alias::Response> {
         inner
             .request(join_room_by_id_or_alias::Request::new(&room_id_or_alias))
             .await
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
-    pub async fn download_content(
-        inner: InnerClient,
-        content_url: Uri,
-    ) -> Result<Vec<u8>, ClientError> {
+    pub async fn download_content(inner: InnerClient, content_url: Uri) -> ClientResult<Vec<u8>> {
         if let (Some(server_address), Some(content_id)) = (
             content_url
                 .authority()
@@ -360,7 +356,7 @@ impl Client {
         data: Vec<u8>,
         content_type: Option<String>,
         filename: Option<String>,
-    ) -> Result<Uri, ClientError> {
+    ) -> ClientResult<Uri> {
         let content_url = inner
             .request(assign!(create_content::Request::new(data), { content_type: content_type.as_deref(), filename: filename.as_deref() }))
             .await?
@@ -375,7 +371,7 @@ impl Client {
         inner: InnerClient,
         room_id: RoomId,
         current_user_id: UserId,
-    ) -> Result<create_typing_event::Response, ClientError> {
+    ) -> ClientResult<create_typing_event::Response> {
         let response = inner
             .request(create_typing_event::Request::new(
                 &current_user_id,
@@ -392,7 +388,7 @@ impl Client {
         content: AnyMessageEventContent,
         room_id: RoomId,
         txn_id: Uuid,
-    ) -> Result<send_message_event::Response, ClientError> {
+    ) -> ClientResult<send_message_event::Response> {
         inner
             .request(send_message_event::Request::new(
                 &room_id,
@@ -407,7 +403,7 @@ impl Client {
         inner: InnerClient,
         room_id: RoomId,
         event_id: EventId,
-    ) -> Result<get_context::Response, ClientError> {
+    ) -> ClientResult<get_context::Response> {
         let rooms = [room_id];
         inner
             .request(assign!(get_context::Request::new(&rooms[0], &event_id), {
@@ -454,7 +450,7 @@ impl Client {
                     raw_events
                         .into_iter()
                         .flat_map(|r| r.deserialize())
-                        .map(|e| e.into())
+                        .map(Into::into)
                         .collect()
                 }
 
@@ -489,7 +485,7 @@ impl Client {
                 if let AnyEphemeralRoomEventContent::Typing(TypingEventContent { user_ids }) =
                     event.content()
                 {
-                    room.update_typing(user_ids.as_slice());
+                    room.update_typing(user_ids.as_slice(), std::time::Instant::now());
                 }
             }
             for event in joined_room
@@ -560,110 +556,5 @@ impl Client {
 
         self.next_batch = Some(response.next_batch);
         thumbnails
-    }
-}
-
-#[derive(Debug)]
-pub enum ClientError {
-    /// Error occurred during an IO operation.
-    IOError(std::io::Error),
-    /// Error occurred while parsing a string as URL.
-    URLParse(String, http::uri::InvalidUri),
-    /// Error occurred in the Matrix client library.
-    Internal(ruma_client::Error<ruma::api::client::Error>),
-    /// The user is already logged in.
-    AlreadyLoggedIn,
-    /// Not all required login information was provided.
-    MissingLoginInfo,
-    /// Custom error
-    Custom(String),
-}
-
-impl Clone for ClientError {
-    fn clone(&self) -> Self {
-        use ClientError::*;
-
-        match self {
-            AlreadyLoggedIn => AlreadyLoggedIn,
-            MissingLoginInfo => MissingLoginInfo,
-            Custom(err) => Custom(err.clone()),
-            _ => Custom(self.to_string()),
-        }
-    }
-}
-
-impl From<ruma_client::Error<ruma::api::client::Error>> for ClientError {
-    fn from(other: ruma_client::Error<ruma::api::client::Error>) -> Self {
-        Self::Internal(other)
-    }
-}
-
-impl From<std::io::Error> for ClientError {
-    fn from(other: std::io::Error) -> Self {
-        Self::IOError(other)
-    }
-}
-
-impl Display for ClientError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        use ruma::{api::client::error::ErrorKind as ClientAPIErrorKind, api::error::*};
-        use ruma_client::Error as InnerClientError;
-
-        match self {
-            ClientError::URLParse(string, err) => {
-                write!(fmt, "Could not parse URL '{}': {}", string, err)
-            }
-            ClientError::Internal(err) => {
-                match err {
-                    InnerClientError::FromHttpResponse(FromHttpResponseError::Http(
-                        ServerError::Known(err),
-                    )) => match err.kind {
-                        ClientAPIErrorKind::Forbidden => {
-                            return write!(
-                                fmt,
-                                "The server rejected your login information: {}",
-                                err.message
-                            );
-                        }
-                        ClientAPIErrorKind::Unauthorized => {
-                            return write!(
-                                fmt,
-                                "You are unauthorized to perform an operation: {}",
-                                err.message
-                            );
-                        }
-                        ClientAPIErrorKind::UnknownToken { soft_logout: _ } => {
-                            return write!(
-                                fmt,
-                                "Your session has expired, please login again: {}",
-                                err.message
-                            );
-                        }
-                        _ => {}
-                    },
-                    InnerClientError::Response(_) => {
-                        return write!(
-                            fmt,
-                            "Please check if you can connect to the internet and try again: {}",
-                            err,
-                        );
-                    }
-                    InnerClientError::AuthenticationRequired => {
-                        return write!(
-                            fmt,
-                            "Authentication is required for an operation, please login (again)",
-                        );
-                    }
-                    _ => {}
-                }
-                write!(fmt, "An internal error occurred: {}", err.to_string())
-            }
-            ClientError::IOError(err) => write!(fmt, "An IO error occurred: {}", err),
-            ClientError::AlreadyLoggedIn => write!(fmt, "Already logged in with another user."),
-            ClientError::MissingLoginInfo => {
-                write!(fmt, "Missing required login information, can't login.")
-            }
-            ClientError::Custom(msg) => write!(fmt, "{}", msg),
-        }
     }
 }

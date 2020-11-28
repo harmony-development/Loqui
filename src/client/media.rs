@@ -7,9 +7,8 @@ use indexmap::IndexMap;
 use ruma::api::exports::http::Uri;
 
 pub fn make_content_path(content_url: &Uri) -> Option<PathBuf> {
-    make_content_folder(content_url)
-        .map(|f| make_content_filename(content_url).map(|ff| f.join(ff)))
-        .flatten()
+    let dir = make_content_folder(content_url)?;
+    make_content_filename(content_url).map(|filename| dir.join(filename))
 }
 
 pub fn make_content_filename(content_url: &Uri) -> Option<PathBuf> {
@@ -22,14 +21,13 @@ pub fn make_content_filename(content_url: &Uri) -> Option<PathBuf> {
 }
 
 pub fn make_content_folder(content_url: &Uri) -> Option<PathBuf> {
-    let server_media_dir = format!(
-        "{}content/{}",
-        crate::data_dir!(),
-        content_url
-            .authority()
-            .map(|a| a.as_str().replace('.', "_"))?
-    );
-    Some(PathBuf::from(server_media_dir))
+    content_url.authority().map(|authority| {
+        PathBuf::from(format!(
+            "{}content/{}",
+            crate::data_dir!(),
+            authority.as_str().replace('.', "_")
+        ))
+    })
 }
 
 pub fn content_exists(content_url: &Uri) -> bool {
@@ -114,14 +112,15 @@ impl ContentType {
         use ContentType::*;
 
         if let Some(filetype) = mimetype.split('/').next() {
-            return match filetype {
+            match filetype {
                 "image" => Image,
                 "audio" => Audio,
                 "video" => Video,
                 _ => Other,
-            };
+            }
+        } else {
+            Other
         }
-        Other
     }
 }
 

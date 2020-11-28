@@ -7,7 +7,7 @@ let
 in with pkgs;
 mkShell {
   name = "icy_matrix-dev-shell";
-  nativeBuildInputs = [ git niv nixfmt crate2nix cargo rustc rustfmt ];
+  nativeBuildInputs = [ git niv nixfmt crate2nix cargo clippy rustc rustfmt ];
   buildInputs = (lib.concatLists (lib.attrValues common.crateDeps)) ++ [ gtk3 ];
   shellHook = ''
     export LD_LIBRARY_PATH=${common.neededLibPaths}
