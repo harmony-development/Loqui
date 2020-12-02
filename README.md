@@ -9,10 +9,10 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
     - Current stable Rust and Cargo.
     - Make sure you have a working Vulkan setup.
     - gcc, python3, pkg-config, cmake; openssl, x11, xcb, freetype, fontconfig, expat, glib, gtk3, cairo, pango, atk, gdk_pixbuf libraries and development files.
-    - Above list maybe incomplete, please find out what you need by looking at compiler errors.
+    - Above list may be incomplete, please find out what you need by looking at compiler errors.
 
 ## Building
-- Clone the repo, and switch the working directory to it: `darcs clone --lazy https://hub.darcs.net/yusdacra/icy_matrix && cd icy_matrix`
+- Clone the repo, and switch the working directory to it: `git clone https://gitlab.com/yusdacra/icy_matrix.git && cd icy_matrix`
 - To build and run the project with debug info / checks use `cargo run`. Use `cargo run --release` for an optimized release build.
 
 ## Current features
