@@ -1,5 +1,4 @@
-{ system, sources ? import ./sources.nix { inherit system; }
-, nixpkgs ? sources.nixpkgs }:
+{ system, sources, nixpkgs }:
 let
   mozPkgs = import "${sources.nixpkgsMoz}/package-set.nix" {
     pkgs = import nixpkgs { inherit system; };
@@ -8,28 +7,48 @@ let
   pkgs = import nixpkgs {
     inherit system;
     overlays = [
-      (self: super: {
+      (final: prev: {
         rustc = rustChannel.rust;
         inherit (rustChannel)
-        ;
+          ;
+
+        crate2nix = prev.callPackage sources.crate2nix { pkgs = prev; };
       })
     ];
   };
-in with pkgs;
+in
+with pkgs;
 let
-  xorgLibraries = with xorg; [ libX11 libXcursor libXrandr libXi ];
-  otherLibraries = [ amdvlk vulkan-loader wayland ];
-  neededLibPaths = lib.concatStringsSep ":"
-    (map (p: "${p}/lib") (xorgLibraries ++ otherLibraries));
+  # Libraries needed to run icy_matrix (graphics stuff)
+  neededLibs = (with xorg; [ libX11 libXcursor libXrandr libXi ])
+    ++ [ vulkan-loader wayland wayland-protocols ];
 
-  crateDeps = {
-    rfd = [ pkg-config gtk3 ];
-    openssl-sys = [ pkg-config cmake openssl ];
-    expat-sys = [ pkg-config cmake expat ];
-    servo-freetype-sys = [ pkg-config cmake freetype ];
-    servo-fontconfig-sys = [ pkg-config freetype expat fontconfig ];
-    x11 = [ pkg-config x11 ];
-    xcb = [ python3 ];
-    icy_matrix = [ pkg-config gtk3 glib atk cairo pango gdk_pixbuf ];
-  };
-in { inherit pkgs neededLibPaths crateDeps; }
+  # Deps that certain crates need
+  crateDeps =
+    let
+      mkAttr = bi: nbi: {
+        buildInputs = bi;
+        nativeBuildInputs = nbi;
+      };
+    in
+    {
+      rfd = mkAttr [ gtk3 ] [ pkg-config ];
+      openssl-sys = mkAttr [ cmake openssl ] [ pkg-config ];
+      expat-sys = mkAttr [ expat ] [ cmake pkg-config ];
+      servo-freetype-sys = mkAttr [ freetype ] [ pkg-config cmake ];
+      servo-fontconfig-sys = mkAttr [ freetype expat fontconfig ] [ pkg-config ];
+      x11 = mkAttr [ x11 ] [ pkg-config ];
+      xcb = mkAttr [ ] [ python3 ];
+      icy_matrix = mkAttr [ gtk3 glib atk cairo pango gdk_pixbuf ] [ pkg-config ];
+    };
+
+  getCrateInputs = with lib;
+    name:
+    concatLists (map (attr: attr."${name}") (attrValues crateDeps));
+  crateBuildInputs = getCrateInputs "buildInputs";
+  crateNativeBuildInputs = getCrateInputs "nativeBuildInputs";
+
+in
+{
+  inherit pkgs neededLibs crateDeps crateBuildInputs crateNativeBuildInputs;
+}

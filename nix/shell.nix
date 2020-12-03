@@ -1,16 +1,17 @@
-{ nixpkgs ? <nixpkgs>, sources ? import ./sources.nix { }
-, system ? builtins.currentSystem }:
-let
-  common = import ./common.nix { inherit sources system; };
-  inherit (common) pkgs;
-  crate2nix = pkgs.callPackage sources.crate2nix { inherit pkgs; };
-in with pkgs;
+{ sources ? import ./sources.nix { }
+, nixpkgs ? sources.nixpkgs
+, system ? builtins.currentSystem
+}:
+with (import ./common.nix { inherit sources system nixpkgs; });
+with pkgs;
 mkShell {
   name = "icy_matrix-dev-shell";
-  nativeBuildInputs = [ git niv nixfmt crate2nix cargo clippy rustc rustfmt ];
-  buildInputs = (lib.concatLists (lib.attrValues common.crateDeps)) ++ [ gtk3 ];
+  nativeBuildInputs =
+    ([ git niv nixpkgs-fmt crate2nix cargo clippy rustc rustfmt ])
+    ++ crateNativeBuildInputs;
+  buildInputs = crateBuildInputs;
   shellHook = ''
-    export LD_LIBRARY_PATH=${common.neededLibPaths}
+    export LD_LIBRARY_PATH=${lib.makeLibraryPath neededLibs}
     export XDG_DATA_DIRS=$GSETTINGS_SCHEMAS_PATH:${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share
   '';
 }
