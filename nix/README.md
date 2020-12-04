@@ -26,7 +26,7 @@ crate2nix generate -f ../Cargo.toml
 
 ### Managing dependencies
 
-We use [niv](https://github.com/nmattia/niv) to manage dependencies.
+Use [niv](https://github.com/nmattia/niv) to manage dependencies.
 
 To update the dependencies, run (from repository root):
 ```shell
@@ -35,9 +35,9 @@ niv update
 
 ### Formatting
 
-Use [nixfmt](https://github.com/serokell/nixfmt) to format files.
+Use [nixpkgs-fmt](https://github.com/nix-community/nixpkgs-fmt) to format files.
 
-To format every Nix file in current working directory:
+To recursively format every Nix file in all directories:
 ```shell
-nixfmt *.nix
+nixpkgs-fmt **/**.nix
 ```

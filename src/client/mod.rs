@@ -25,7 +25,8 @@ use ruma::{
         AnySyncStateEvent, SyncStateEvent,
     },
     presence::PresenceState,
-    DeviceId, EventId, Raw, RoomId, UserId,
+    serde::Raw,
+    DeviceId, EventId, RoomId, UserId,
 };
 pub use ruma_client::{
     Client as InnerClient, Identification as InnerIdentification, Session as InnerSession,
