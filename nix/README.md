@@ -10,6 +10,11 @@ To enter the development shell (which includes all tools mentioned in this readm
 nix-shell nix/shell.nix
 ```
 
+If you have [direnv](https://direnv.net), copy `nix/envrc` file to repository root as `.envrc` to get your dev env automatically setup:
+```shell
+cp nix/envrc .envrc
+```
+
 ### Managing Cargo.nix
 
 Enter the development shell, switch your working directory to `nix`.
