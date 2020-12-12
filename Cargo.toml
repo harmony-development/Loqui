@@ -5,11 +5,12 @@ authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
 edition = "2018"
 
 [profile.dev]
-opt-level = 1
+opt-level = 2
+debug = false
+panic = "abort"
 
 [profile.release]
 lto = "thin"
-panic = "abort"
 
 [dependencies]
 iced = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically", features = ["tokio_old", "image"] }
@@ -18,7 +19,7 @@ iced_futures = { git = "https://github.com/yusdacra/iced", branch = "scrollable_
 
 open = "1.4.0"
 infer = { version = "0.3.0", default-features = false }
-rfd = { git = "https://github.com/yusdacra/rfd.git" }
+rfd = { git = "https://github.com/PolyMeilex/rfd.git" }
 image = "0.23.11"
 
 tokio = { version = "0.2", features = ["rt-core", "parking_lot", "time", "fs"] }

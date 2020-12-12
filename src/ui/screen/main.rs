@@ -746,7 +746,7 @@ impl MainScreen {
             Message::SendFile(room_id) => {
                 let file_select_task =
                     tokio::task::spawn_blocking(|| -> Result<Vec<PathBuf>, ClientError> {
-                        Ok(rfd::open().map_or_else(|| vec![], |p| vec![p]))
+                        Ok(rfd::pick_files(None).unwrap_or_else(Vec::new))
                     });
 
                 let inner = client.inner();
