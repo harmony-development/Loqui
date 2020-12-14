@@ -81,7 +81,7 @@ pub fn build_event_history<'a>(
             timeline_event.sender()
         };
 
-        let sender_display_name = room.get_user_display_name(id_to_use);
+        let sender_display_name = room.members.get_user_display_name(id_to_use);
         let sender_body_creator = |sender_display_name: &str| {
             Text::new(format!("[{}]", sender_display_name))
                 .color(theme.calculate_sender_color(sender_display_name.len()))
@@ -131,7 +131,8 @@ pub fn build_event_history<'a>(
             }
         }
 
-        let mut message_text = Text::new(timeline_event.formatted(room)).size(MESSAGE_SIZE);
+        let mut message_text =
+            Text::new(timeline_event.formatted(&room.members)).size(MESSAGE_SIZE);
 
         if !timeline_event.is_ack() {
             message_text = message_text.color(Color::from_rgb(0.5, 0.5, 0.5));

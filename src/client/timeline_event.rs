@@ -1,6 +1,6 @@
 use super::{
     content::{ContentStore, ContentType},
-    room::Room,
+    member::Members,
 };
 use ruma::{
     api::exports::http::Uri,
@@ -65,7 +65,7 @@ impl TimelineEvent {
 
     /// Get a formatted string representation of this event.
     /// It is recommended to first check if this event should be displayed to the user.
-    pub fn formatted(&self, room: &Room) -> String {
+    pub fn formatted(&self, members: &Members) -> String {
         match self.message_content() {
             Some(content) => match content {
                 AnyMessageEventContent::RoomMessage(msg) => match msg {
@@ -89,14 +89,14 @@ impl TimelineEvent {
             None => match self.message_redacted_because() {
                 Some(because) => format!(
                     "Message deleted by [{}]",
-                    room.get_user_display_name(&because.sender)
+                    members.get_user_display_name(&because.sender)
                 ),
                 None => {
                     if let AnySyncRoomEvent::State(AnySyncStateEvent::RoomMember(member_state)) =
                         &self.inner
                     {
                         let affected_user_name = UserId::try_from(member_state.state_key.as_str())
-                            .map(|id| room.get_user_display_name(&id))
+                            .map(|id| members.get_user_display_name(&id))
                             .unwrap_or_else(|_| member_state.state_key.to_string());
                         let banned_kicked_msg = |action: &str| -> String {
                             format!(
@@ -441,7 +441,7 @@ impl TimelineEvent {
         }
     }
 
-    pub fn event_content(&self) -> &AnySyncRoomEvent {
+    pub fn event(&self) -> &AnySyncRoomEvent {
         &self.inner
     }
 

@@ -329,7 +329,7 @@ impl MainScreen {
             );
 
             let mut typing_users_combined = String::new();
-            let mut typing_members = room.typing_members();
+            let mut typing_members = room.members.typing_members();
             // Remove own user id from the list (if its there)
             if let Some(index) = typing_members.iter().position(|id| *id == &current_user_id) {
                 typing_members.remove(index);
@@ -342,7 +342,7 @@ impl MainScreen {
                     break;
                 }
 
-                typing_users_combined += room.get_user_display_name(member_id).as_str();
+                typing_users_combined += room.members.get_user_display_name(member_id).as_str();
 
                 typing_users_combined += match typing_members_count {
                     x if x > index + 1 => ", ",

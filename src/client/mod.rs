@@ -340,7 +340,7 @@ impl Client {
                             let txn_id = event.transaction_id().copied().unwrap();
                             (
                                 txn_id,
-                                event.event_content().clone(),
+                                event.event().clone(),
                                 room.get_wait_for_duration(&txn_id),
                             )
                         })
@@ -520,7 +520,7 @@ impl Client {
                 if let AnyEphemeralRoomEventContent::Typing(TypingEventContent { user_ids }) =
                     event.content()
                 {
-                    room.update_typing(user_ids.as_slice(), std::time::Instant::now());
+                    room.members.update_typing(user_ids.as_slice(), std::time::Instant::now());
                 }
             }
             for event in joined_room
@@ -552,7 +552,7 @@ impl Client {
                     // TODO: Make UI to show users
                     AnySyncStateEvent::RoomMember(member_state) => {
                         let membership_change = member_state.membership_change();
-                        room.update_member(
+                        room.members.update_member(
                             member_state.prev_content.map(|c| c.displayname).flatten(),
                             member_state.content.displayname,
                             member_state

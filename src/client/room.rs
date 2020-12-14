@@ -1,13 +1,7 @@
-use super::{
-    member::{Member, Members},
-    TimelineEvent,
-};
+use super::{member::Members, TimelineEvent};
 use ahash::AHashMap;
-use ruma::{
-    api::exports::http::Uri, events::room::member::MembershipChange, EventId, RoomAliasId, RoomId,
-    RoomVersionId, UserId,
-};
-use std::time::{Duration, Instant};
+use ruma::{EventId, RoomAliasId, RoomId, RoomVersionId};
+use std::time::Duration;
 use uuid::Uuid;
 
 pub type Rooms = AHashMap<RoomId, Room>;
@@ -18,8 +12,7 @@ pub struct Room {
     canonical_alias: Option<RoomAliasId>,
     alt_aliases: Vec<RoomAliasId>,
     timeline: Vec<TimelineEvent>,
-    members: Members,
-    display_name_to_user_id: AHashMap<String, Vec<UserId>>,
+    pub members: Members,
     wait_for_duration: AHashMap<Uuid, Duration>,
 }
 
@@ -33,7 +26,6 @@ impl Default for Room {
             alt_aliases: Default::default(),
             timeline: Default::default(),
             members: Default::default(),
-            display_name_to_user_id: Default::default(),
             wait_for_duration: Default::default(),
         }
     }
@@ -85,27 +77,6 @@ impl Room {
         self.timeline.last()
     }
 
-    /// Get all members in this room.
-    pub fn members(&self) -> &Members {
-        &self.members
-    }
-
-    pub fn get_member(&self, user_id: &UserId) -> Option<&Member> {
-        self.members.get(user_id)
-    }
-
-    pub fn get_member_mut(&mut self, user_id: &UserId) -> Option<&mut Member> {
-        self.members.get_mut(user_id)
-    }
-
-    /// Get all typing members in this room.
-    pub fn typing_members(&self) -> Vec<&UserId> {
-        self.members
-            .iter()
-            .filter_map(|(id, member)| if member.is_typing() { Some(id) } else { None })
-            .collect()
-    }
-
     /// Get room display name formatted according to the specification.
     pub fn get_display_name(&self) -> String {
         match &self.name {
@@ -117,115 +88,22 @@ impl Room {
                     // These unwraps are safe since we check the length beforehand
                     x if x > 2 => format!(
                         "{}, {} and {} others",
-                        self.get_user_display_name(self.members.keys().next().unwrap()),
-                        self.get_user_display_name(self.members.keys().nth(1).unwrap()),
+                        self.members
+                            .get_user_display_name(self.members.member_ids().next().unwrap()),
+                        self.members
+                            .get_user_display_name(self.members.member_ids().nth(1).unwrap()),
                         self.members.len() - 2
                     ),
                     2 => format!(
                         "{} and {}",
-                        self.get_user_display_name(self.members.keys().next().unwrap()),
-                        self.get_user_display_name(self.members.keys().nth(1).unwrap()),
+                        self.members
+                            .get_user_display_name(self.members.member_ids().next().unwrap()),
+                        self.members
+                            .get_user_display_name(self.members.member_ids().nth(1).unwrap()),
                     ),
                     _ => String::from("Empty room"),
                 },
             },
-        }
-    }
-
-    /// Get a user's display name (disambugiated name) according to the specification.
-    pub fn get_user_display_name(&self, user_id: &UserId) -> String {
-        if let Some(member) = self.members.get(user_id) {
-            if let Some(name) = member.display_name() {
-                if let Some(ids) = self.display_name_to_user_id.get(name) {
-                    if ids.len() > 1 {
-                        return format!("{} ({})", name, user_id);
-                    }
-                }
-                return name.to_string();
-            }
-        }
-        user_id.to_string()
-    }
-
-    pub fn update_typing(&mut self, typing_member_ids: &[UserId], recv_time: Instant) {
-        for member in self.members.values_mut() {
-            member.set_typing(None);
-        }
-
-        for member_id in typing_member_ids {
-            if let Some(member) = self.members.get_mut(&member_id) {
-                member.set_typing(Some(recv_time))
-            }
-        }
-    }
-
-    pub fn update_member(
-        &mut self,
-        prev_displayname: Option<String>,
-        displayname: Option<String>,
-        avatar_url: Option<Uri>,
-        membership_change: MembershipChange,
-        user_id: UserId,
-    ) {
-        let member = self
-            .members
-            .entry(user_id.clone())
-            .and_modify(|member| {
-                member.set_display_name(displayname.clone());
-                member.set_avatar_url(avatar_url.clone());
-            })
-            .or_insert_with(move || {
-                let mut new_member = Member::new();
-                new_member.set_display_name(displayname);
-                new_member.set_avatar_url(avatar_url);
-                new_member
-            });
-
-        match membership_change {
-            MembershipChange::Left
-            | MembershipChange::Banned
-            | MembershipChange::Kicked
-            | MembershipChange::KickedAndBanned => {
-                if let Some(name) = member.display_name() {
-                    if let Some(ids) = self.display_name_to_user_id.get_mut(name) {
-                        if let Some(index) = ids.iter().position(|id| id == &user_id) {
-                            ids.remove(index);
-                        }
-                    }
-                }
-                member.set_display(false);
-            }
-            MembershipChange::Joined | MembershipChange::Unbanned => {
-                if let Some(name) = member.display_name() {
-                    let ids = self
-                        .display_name_to_user_id
-                        .entry(name.to_string())
-                        .or_default();
-
-                    ids.push(user_id.clone());
-                }
-                member.set_display(true);
-            }
-            MembershipChange::ProfileChanged {
-                displayname_changed,
-                avatar_url_changed: _,
-            } => {
-                if displayname_changed {
-                    if let Some(name) = prev_displayname {
-                        if let Some(ids) = self.display_name_to_user_id.get_mut(&name) {
-                            if let Some(index) = ids.iter().position(|id| id == &user_id) {
-                                ids.remove(index);
-                            }
-                        }
-                    }
-                    if let Some(name) = member.display_name() {
-                        if let Some(ids) = self.display_name_to_user_id.get_mut(name) {
-                            ids.push(user_id);
-                        }
-                    }
-                }
-            }
-            _ => {}
         }
     }
 
