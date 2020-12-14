@@ -17,7 +17,6 @@ pub enum Message {
     LoginInitiated,
 }
 
-#[derive(Default)]
 pub struct LoginScreen {
     homeserver_field: text_input::State,
     username_field: text_input::State,
@@ -26,23 +25,23 @@ pub struct LoginScreen {
 
     login_info: LoginInformation,
     /// `None` if not logging out, `Some(restoring_session)` if logging in.
-    logging_in: Option<bool>,
+    pub(in crate::ui::screen) logging_in: Option<bool>,
     /// The error formatted as a string to be displayed to the user.
-    current_error: String,
+    pub(in crate::ui::screen) current_error: String,
+    content_store: Arc<ContentStore>,
 }
 
 impl LoginScreen {
-    pub fn with_logging_in(logging_in: Option<bool>) -> Self {
+    pub fn new(content_store: Arc<ContentStore>) -> Self {
         Self {
-            logging_in,
-            ..Self::default()
-        }
-    }
-
-    pub fn with_error(current_error: String) -> Self {
-        Self {
-            current_error,
-            ..Self::default()
+            homeserver_field: Default::default(),
+            username_field: Default::default(),
+            password_field: Default::default(),
+            login_button: Default::default(),
+            login_info: Default::default(),
+            logging_in: None,
+            current_error: String::new(),
+            content_store,
         }
     }
 
@@ -134,11 +133,7 @@ impl LoginScreen {
             .into()
     }
 
-    pub fn update(
-        &mut self,
-        msg: Message,
-        content_store: Arc<ContentStore>,
-    ) -> Command<super::Message> {
+    pub fn update(&mut self, msg: Message) -> Command<super::Message> {
         match msg {
             Message::HomeserverChanged(new_homeserver) => {
                 self.login_info.homeserver_domain = new_homeserver;
@@ -150,17 +145,18 @@ impl LoginScreen {
                 self.login_info.password = new_password;
             }
             Message::LoginWithSession => {
-                return Command::perform(Client::new_with_session(content_store), |result| {
-                    match result {
+                return Command::perform(
+                    Client::new_with_session(self.content_store.clone()),
+                    |result| match result {
                         Ok(client) => super::Message::LoginComplete(client),
                         Err(err) => super::Message::MatrixError(Box::new(err)),
-                    }
-                });
+                    },
+                );
             }
             Message::LoginInitiated => {
                 self.logging_in = Some(false);
                 return Command::perform(
-                    Client::new(self.login_info.clone(), content_store),
+                    Client::new(self.login_info.clone(), self.content_store.clone()),
                     |result| match result {
                         Ok(client) => super::Message::LoginComplete(client),
                         Err(err) => super::Message::MatrixError(Box::new(err)),

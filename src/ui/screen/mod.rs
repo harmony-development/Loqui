@@ -39,13 +39,15 @@ pub struct ScreenManager {
 
 impl ScreenManager {
     pub fn new(content_store: ContentStore) -> Self {
+        let content_store = Arc::new(content_store);
+
         Self {
             theme: Theme::Dark,
             screen: Screen::Login {
-                screen: LoginScreen::default(),
+                screen: LoginScreen::new(content_store.clone()),
             },
             client: None,
-            content_store: Arc::new(content_store),
+            content_store,
         }
     }
 }
@@ -56,7 +58,16 @@ impl Application for ScreenManager {
     type Flags = ContentStore;
 
     fn new(content_store: Self::Flags) -> (Self, Command<Self::Message>) {
-        (ScreenManager::new(content_store), Command::none())
+        if content_store.session_file().exists() {
+            let mut manager = ScreenManager::new(content_store);
+            if let Screen::Login { screen } = &mut manager.screen {
+                screen.logging_in = Some(true);
+            }
+            let cmd = manager.update(Message::LoginScreen(login::Message::LoginWithSession));
+            (manager, cmd)
+        } else {
+            (ScreenManager::new(content_store), Command::none())
+        }
     }
 
     fn title(&self) -> String {
@@ -75,7 +86,7 @@ impl Application for ScreenManager {
             }
             Message::LoginScreen(msg) => {
                 if let Screen::Login { ref mut screen } = self.screen {
-                    return screen.update(msg, self.content_store.clone());
+                    return screen.update(msg);
                 }
             }
             Message::LoginComplete(client) => {
@@ -86,7 +97,7 @@ impl Application for ScreenManager {
             }
             Message::LogoutComplete => {
                 self.screen = Screen::Login {
-                    screen: LoginScreen::default(),
+                    screen: LoginScreen::new(self.content_store.clone()),
                 };
             }
             Message::MatrixError(err) => {
@@ -104,9 +115,10 @@ impl Application for ScreenManager {
                                 if let ClientAPIErrorKind::UnknownToken { soft_logout: _ } =
                                     err.kind
                                 {
-                                    self.screen = Screen::Login {
-                                        screen: LoginScreen::with_error(error_string),
-                                    };
+                                    let mut screen = LoginScreen::new(self.content_store.clone());
+                                    screen.current_error = error_string;
+
+                                    self.screen = Screen::Login { screen };
 
                                     return Command::none();
                                 }
