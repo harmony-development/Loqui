@@ -1,4 +1,7 @@
-use super::{media::content_exists, media::ContentType, room::Room};
+use super::{
+    content::{ContentStore, ContentType},
+    room::Room,
+};
 use ruma::{
     api::exports::http::Uri,
     events::{
@@ -274,10 +277,10 @@ impl TimelineEvent {
         None
     }
 
-    pub fn download_or_read_thumbnail(&self) -> Option<(bool, Uri)> {
+    pub fn download_or_read_thumbnail(&self, content_store: &ContentStore) -> Option<(bool, Uri)> {
         if let Some(thumbnail_url) = self.thumbnail_url() {
             Some((
-                if content_exists(&thumbnail_url) {
+                if content_store.content_exists(&thumbnail_url.to_string()) {
                     true
                 } else {
                     false
@@ -287,7 +290,7 @@ impl TimelineEvent {
         } else if let (Some(ContentType::Image), Some(content_size), Some(content_url)) =
             (self.content_type(), self.content_size(), self.content_url())
         {
-            if content_exists(&content_url) {
+            if content_store.content_exists(&content_url.to_string()) {
                 Some((true, content_url))
             } else if content_size < 1000 * 1000 {
                 Some((false, content_url))

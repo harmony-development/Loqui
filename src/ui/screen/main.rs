@@ -1,7 +1,7 @@
 use crate::{
     client::{
         error::ClientError,
-        media::{self, ContentType, ImageHandle, ThumbnailStore},
+        content::{self, ContentType, ContentStore, ImageHandle, ThumbnailCache},
         Client, InnerClient, TimelineEvent,
     },
     ui::{
@@ -111,7 +111,7 @@ pub struct MainScreen {
     message: String,
     /// Text used to filter rooms.
     room_search_text: String,
-    thumbnail_store: ThumbnailStore,
+    thumbnail_cache: ThumbnailCache,
 }
 
 impl MainScreen {
@@ -133,7 +133,7 @@ impl MainScreen {
             looking_at_event: Default::default(),
             message: Default::default(),
             room_search_text: Default::default(),
-            thumbnail_store: ThumbnailStore::new(),
+            thumbnail_cache: ThumbnailCache::default(),
         }
     }
 
@@ -207,7 +207,7 @@ impl MainScreen {
         }
     }
 
-    pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {
+    pub fn view(&mut self, theme: Theme, client: &Client, content_store: &ContentStore) -> Element<Message> {
         if let Some(confirmation) = self.logging_out {
             return self.logout_screen(theme, confirmation);
         }
@@ -315,7 +315,8 @@ impl MainScreen {
             let displayable_event_count = room.displayable_events().count();
 
             let message_history_list = build_event_history(
-                &self.thumbnail_store,
+                &content_store,
+                &self.thumbnail_cache,
                 room,
                 &current_user_id,
                 self.looking_at_event
@@ -438,6 +439,8 @@ impl MainScreen {
         ) -> Command<super::Message> {
             return Command::batch(thumbnail_urls.into_iter().map(
                 |(is_in_cache, thumbnail_url)| {
+                    let content_path = client.content_store().content_path(&thumbnail_url.to_string());
+                    
                     if is_in_cache {
                         Command::perform(
                             async move {
@@ -445,15 +448,7 @@ impl MainScreen {
                                     async {
                                         Ok(ImageHandle::from_memory(
                                             tokio::fs::read(
-                                                media::make_content_path(&thumbnail_url)
-                                                    .map_or_else(
-                                                        || {
-                                                            Err(ClientError::Custom(String::from(
-                                                                "Could not make content path",
-                                                            )))
-                                                        },
-                                                        |p| Ok(p),
-                                                    )?,
+                                                content_path,
                                             )
                                             .await?,
                                         ))
@@ -473,29 +468,16 @@ impl MainScreen {
                             },
                         )
                     } else {
-                        let inner = client.inner();
+                        let download_task = Client::download_content(client.inner(), thumbnail_url.clone());
 
                         Command::perform(
                             async move {
-                                let download_result =
-                                    Client::download_content(inner, thumbnail_url.clone()).await;
-
-                                match download_result {
+                                match download_task.await {
                                     Ok(raw_data) => {
-                                        if let (Some(content_path), Some(server_media_dir)) = (
-                                            media::make_content_path(&thumbnail_url),
-                                            media::make_content_folder(&thumbnail_url),
-                                        ) {
-                                            tokio::fs::create_dir_all(server_media_dir).await?;
-                                            tokio::fs::write(content_path, raw_data.as_slice())
-                                                .await
-                                                .map(|_| (thumbnail_url, raw_data))
-                                                .map_err(Into::into)
-                                        } else {
-                                            Err(ClientError::Custom(String::from(
-                                                "Could not make content path or server media path",
-                                            )))
-                                        }
+                                        tokio::fs::write(content_path, raw_data.as_slice())
+                                            .await
+                                            .map(|_| (thumbnail_url, raw_data))
+                                            .map_err(Into::into)
                                     }
                                     Err(err) => Err(err),
                                 }
@@ -565,11 +547,8 @@ impl MainScreen {
                                 })
                                 .flatten()
                             {
-                                let inner = client.inner();
-                                let room_id = room_id.clone();
-                                let event_id = event.id().clone();
                                 return Command::perform(
-                                    Client::get_events_around(inner, room_id, event_id),
+                                    Client::get_events_around(client.inner(), room_id.clone(), event.id().clone()),
                                     |result| match result {
                                         Ok(response) => super::Message::MainScreen(
                                             Message::MatrixGetEventsAroundResponse(Box::new(
@@ -615,8 +594,7 @@ impl MainScreen {
             Message::LogoutConfirmation(confirmation) => {
                 if confirmation {
                     self.logging_out = Some(true);
-                    let inner = client.inner();
-                    return Command::perform(Client::logout(inner), |result| match result {
+                    return Command::perform(Client::logout(client.inner(), client.content_store().session_file().to_path_buf()), |result| match result {
                         Ok(_) => super::Message::LogoutComplete,
                         Err(err) => super::Message::MatrixError(Box::new(err)),
                     });
@@ -627,10 +605,9 @@ impl MainScreen {
             Message::MessageChanged(new_msg) => {
                 self.message = new_msg;
 
-                if let Some(room_id) = self.current_room_id.as_ref() {
-                    let inner = client.inner();
+                if let Some(room_id) = self.current_room_id.clone() {
                     return Command::perform(
-                        Client::send_typing(inner, room_id.clone(), client.current_user_id()),
+                        Client::send_typing(client.inner(), room_id, client.current_user_id()),
                         |result| match result {
                             Ok(_) => super::Message::Nothing,
                             Err(err) => super::Message::MatrixError(Box::new(err)),
@@ -648,14 +625,14 @@ impl MainScreen {
                 thumbnail_url,
                 thumbnail,
             } => {
-                self.thumbnail_store.put_thumbnail(thumbnail_url, thumbnail);
+                self.thumbnail_cache.put_thumbnail(thumbnail_url, thumbnail);
             }
             Message::OpenContent {
                 content_url,
                 is_thumbnail,
             } => {
-                let thumbnail_exists = self.thumbnail_store.has_thumbnail(&content_url);
-                if let Some(content_path) = media::make_content_path(&content_url) {
+                let thumbnail_exists = self.thumbnail_cache.has_thumbnail(&content_url);
+                let content_path = client.content_store().content_path(&content_url.to_string());
                     return if content_path.exists() {
                         Command::perform(
                             async move {
@@ -682,28 +659,21 @@ impl MainScreen {
                             },
                         )
                     } else {
-                        let inner = client.inner();
+                        let download_task = Client::download_content(client.inner(), content_url.clone());
                         Command::perform(
                             async move {
-                                match Client::download_content(inner, content_url.clone()).await {
+                                match download_task.await {
                                     Ok(raw_data) => {
-                                        if let Some(server_media_dir) =
-                                            media::make_content_folder(&content_url)
-                                        {
-                                            tokio::fs::create_dir_all(server_media_dir).await?;
-                                            tokio::fs::write(&content_path, raw_data.as_slice())
-                                                .await?;
-                                            Ok((
-                                                content_path,
-                                                if is_thumbnail && !thumbnail_exists {
-                                                    Some((content_url, raw_data))
-                                                } else {
-                                                    None
-                                                },
-                                            ))
-                                        } else {
-                                            Err(ClientError::Custom(String::from("Could not make media path: media doesnt come from any server")))
-                                        }
+                                        tokio::fs::write(&content_path, raw_data.as_slice())
+                                            .await?;
+                                        Ok((
+                                            content_path,
+                                            if is_thumbnail && !thumbnail_exists {
+                                                Some((content_url, raw_data))
+                                            } else {
+                                                None
+                                            },
+                                        ))
                                     }
                                     Err(err) => Err(err),
                                 }
@@ -724,7 +694,6 @@ impl MainScreen {
                             },
                         )
                     };
-                }
             }
             Message::SendMessageComposer(room_id) => {
                 if !self.message.is_empty() {
@@ -750,6 +719,7 @@ impl MainScreen {
                     });
 
                 let inner = client.inner();
+                let content_store = client.content_store_arc();
 
                 return Command::perform(
                     async move {
@@ -761,9 +731,9 @@ impl MainScreen {
                         for path in paths {
                             match tokio::fs::read(&path).await {
                                 Ok(data) => {
-                                    let file_mimetype = media::infer_mimetype_from_bytes(&data);
+                                    let file_mimetype = content::infer_type_from_bytes(&data);
                                     let filesize = data.len();
-                                    let filename = media::get_filename(&path);
+                                    let filename = content::get_filename(&path).to_string();
 
                                     // TODO: implement video thumbnailing
                                     let (thumbnail, image_info) = if let ContentType::Image =
@@ -827,24 +797,10 @@ impl MainScreen {
 
                                     match send_result {
                                         Ok(content_url) => {
-                                            if let Some(server_media_dir) =
-                                                media::make_content_folder(&content_url)
+                                            if let Err(err) =
+                                                tokio::fs::hard_link(&path, content_store.content_path(&content_url.to_string())).await
                                             {
-                                                if let Err(err) =
-                                                    tokio::fs::create_dir_all(server_media_dir)
-                                                        .await
-                                                {
-                                                    log::warn!("An IO error occured while trying to create a folder to hard link a file you tried to upload: {}", err);
-                                                }
-                                            }
-                                            if let Some(content_path) =
-                                                media::make_content_path(&content_url)
-                                            {
-                                                if let Err(err) =
-                                                    tokio::fs::hard_link(&path, content_path).await
-                                                {
-                                                    log::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
-                                                }
+                                                log::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
                                             }
                                             content_urls_to_send.push((
                                                 content_url,
@@ -1033,11 +989,11 @@ impl MainScreen {
                     *self.looking_at_event.get_mut(&room_id).unwrap() = disp.saturating_sub(1);
                 }
 
-                return make_thumbnail_commands(&client, thumbnail_urls);
+                return make_thumbnail_commands(client, thumbnail_urls);
             }
             Message::MatrixGetEventsAroundResponse(response) => {
                 let thumbnail_urls = client.process_events_around_response(*response);
-                return make_thumbnail_commands(&client, thumbnail_urls);
+                return make_thumbnail_commands(client, thumbnail_urls);
             }
             Message::RoomChanged(new_room_id) => {
                 if let (Some(disp), Some(disp_at)) = (
@@ -1063,7 +1019,7 @@ impl MainScreen {
     pub fn subscription(&self, client: &Client) -> Subscription<super::Message> {
         let rooms_queued_events = client.rooms_queued_events();
         let mut sub = Subscription::from_recipe(RetrySendEventRecipe {
-            client: client.inner(),
+            inner: client.inner(),
             rooms_queued_events,
         })
         .map(|result| super::Message::MainScreen(Message::SendMessageResult(result)));
@@ -1072,8 +1028,8 @@ impl MainScreen {
             sub = Subscription::batch(vec![
                 sub,
                 Subscription::from_recipe(SyncRecipe {
-                    client: client.inner(),
-                    since,
+                    inner: client.inner(),
+                    since: since.to_string(),
                 })
                 .map(|result| match result {
                     Ok(response) => {
@@ -1094,7 +1050,7 @@ impl MainScreen {
 
 pub type RetrySendEventResult = Vec<(RoomId, Vec<(Uuid, ClientError)>)>;
 pub struct RetrySendEventRecipe {
-    client: InnerClient,
+    inner: InnerClient,
     rooms_queued_events: Vec<(RoomId, Vec<(Uuid, AnySyncRoomEvent, Option<Duration>)>)>,
 }
 
@@ -1114,41 +1070,43 @@ where
                 retry_after.hash(state);
             }
         }
+
+        self.inner.session().hash(state);
     }
 
     fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
         let future = async move {
-            let mut room_errors = Vec::new();
+                    let mut room_errors = Vec::new();
 
-            for (room_id, events) in self.rooms_queued_events {
-                let mut transaction_errors = Vec::new();
-                for (transaction_id, event, retry_after) in events {
-                    if let Some(dur) = retry_after {
-                        tokio::time::delay_for(dur).await;
-                    }
+                    for (room_id, events) in self.rooms_queued_events {
+                        let mut transaction_errors = Vec::new();
+                        for (transaction_id, event, retry_after) in events {
+                            if let Some(dur) = retry_after {
+                                tokio::time::delay_for(dur).await;
+                            }
 
-                    let result = match event {
-                        AnySyncRoomEvent::Message(ev) => {
-                            Client::send_message(
-                                self.client.clone(),
-                                ev.content(),
-                                room_id.clone(),
-                                transaction_id,
-                            )
-                            .await
+                            let result = match event {
+                                AnySyncRoomEvent::Message(ev) => {
+                                    Client::send_message(
+                                        self.inner.clone(),
+                                        ev.content(),
+                                        room_id.clone(),
+                                        transaction_id,
+                                    )
+                                    .await
+                                }
+                                _ => unimplemented!(),
+                            };
+
+                            if let Err(e) = result {
+                                transaction_errors.push((transaction_id, e));
+                            }
                         }
-                        _ => unimplemented!(),
-                    };
-
-                    if let Err(e) = result {
-                        transaction_errors.push((transaction_id, e));
+                        room_errors.push((room_id, transaction_errors));
                     }
-                }
-                room_errors.push((room_id, transaction_errors));
-            }
 
-            room_errors
-        };
+                    room_errors
+                };
 
         Box::pin(iced_futures::futures::stream::once(future))
     }
@@ -1156,7 +1114,7 @@ where
 
 pub type SyncResult = Result<sync_events::Response, ClientError>;
 pub struct SyncRecipe {
-    client: InnerClient,
+    inner: InnerClient,
     since: String,
 }
 
@@ -1170,14 +1128,14 @@ where
         std::any::TypeId::of::<Self>().hash(state);
 
         self.since.hash(state);
-        self.client.session().hash(state);
+        self.inner.session().hash(state);
     }
 
     fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
         use iced_futures::futures::TryStreamExt;
 
         Box::pin(
-            self.client
+            self.inner
                 .sync(
                     None,
                     self.since,

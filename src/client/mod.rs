@@ -1,6 +1,17 @@
+pub mod error;
+pub mod content;
+pub mod member;
+pub mod room;
+pub mod timeline_event;
+
+pub use timeline_event::TimelineEvent;
+pub use ruma_client::{
+    Client as InnerClient, Identification as InnerIdentification, Session as InnerSession,
+};
+pub use room::{Room, Rooms};
+
 use assign::assign;
 use error::{ClientError, ClientResult};
-pub use room::{Room, Rooms};
 use ruma::{
     api::client::r0::media::{create_content, get_content},
     api::{
@@ -28,31 +39,16 @@ use ruma::{
     serde::Raw,
     DeviceId, EventId, RoomId, UserId,
 };
-pub use ruma_client::{
-    Client as InnerClient, Identification as InnerIdentification, Session as InnerSession,
-};
 use std::{
     convert::TryFrom,
     convert::TryInto,
     fmt::{self, Debug, Display, Formatter},
     time::Duration,
+    path::PathBuf,
+    sync::Arc,
 };
-pub use timeline_event::TimelineEvent;
 use uuid::Uuid;
-
-pub mod error;
-pub mod media;
-pub mod member;
-pub mod room;
-pub mod timeline_event;
-
-#[macro_export]
-macro_rules! data_dir {
-    () => {
-        "data/"
-    };
-}
-pub const SESSION_ID_PATH: &str = concat!(data_dir!(), "session");
+use content::ContentStore;
 
 #[cfg(target_os = "linux")]
 pub const CLIENT_ID: &str = "icy_matrix Linux";
@@ -104,10 +100,9 @@ impl TryFrom<InnerSession> for Session {
     type Error = ClientError;
 
     fn try_from(value: InnerSession) -> Result<Self, Self::Error> {
-        let (access_token, user_id, device_id) = if let Some(id) = value.identification {
-            (value.access_token, id.user_id, id.device_id)
-        } else {
-            return Err(ClientError::MissingLoginInfo);
+        let (access_token, user_id, device_id) = match value.identification {
+            Some(id) => (value.access_token, id.user_id, id.device_id),
+            None => return Err(ClientError::MissingLoginInfo),
         };
 
         Ok(Self {
@@ -118,6 +113,24 @@ impl TryFrom<InnerSession> for Session {
     }
 }
 
+/// Login information needed for a login request.
+#[derive(Clone, Debug)]
+pub struct LoginInformation {
+    pub homeserver_domain: String,
+    pub username: String,
+    pub password: String,
+}
+
+impl Default for LoginInformation {
+    fn default() -> Self {
+        Self {
+            homeserver_domain: String::from("matrix.org"),
+            username: String::new(),
+            password: String::new(),
+        }
+    }
+}
+
 pub struct Client {
     /* The inner client stores the session (with our requirements,
     since we only allow `Client` creation when they are met),
@@ -125,147 +138,126 @@ pub struct Client {
     inner: InnerClient,
     rooms: Rooms,
     next_batch: Option<String>,
+    content_store: Arc<ContentStore>,
 }
 
 impl Debug for Client {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Client")
-            .field("user_id", &self.current_user_id().to_string())
+            .field("user_id", &format!("{:?}", self.current_user_id()))
+            .field("session_file", &self.content_store.session_file())
             .finish()
     }
 }
 
 impl Client {
-    pub async fn new(homeserver: &str, username: &str, password: &str) -> ClientResult<Self> {
-        // Make sure the data/content directory exists
-        tokio::fs::create_dir_all(format!("{}content", data_dir!())).await?;
+    pub async fn new(login_info: LoginInformation, content_store: Arc<ContentStore>) -> ClientResult<Self> {
+            let LoginInformation { homeserver_domain, username, password } = login_info;
 
-        let homeserver_url = homeserver
-            .parse::<Uri>()
-            .map_err(|e| ClientError::URLParse(homeserver.to_owned(), e))?;
+            let homeserver = format!("https://{}", homeserver_domain);
+            let homeserver_url = homeserver
+                .parse::<Uri>()
+                .map_err(|e| ClientError::URLParse(homeserver, e))?;
 
-        let inner = InnerClient::new(homeserver_url, None);
+            let inner = InnerClient::new(homeserver_url, None);
+            let session = {
+                Session::try_from(
+                    inner
+                        .log_in(&username, &password, None, Some(CLIENT_ID))
+                        .await?,
+                )?
+            };
 
-        let mut device_id = None;
-        if let Ok(s) = tokio::fs::read_to_string(SESSION_ID_PATH).await {
-            if let Ok(session) = toml::from_str::<Session>(&s) {
-                device_id = Some(session.device_id);
+            // Save the session
+            if let Ok(encoded_session) = toml::to_vec(&session) {
+                // Do not abort the sync if we can't save the session data
+                if let Err(err) = tokio::fs::write(content_store.session_file(), encoded_session).await {
+                    log::error!("Could not save session data: {}", err);
+                } else {
+                    use std::os::unix::fs::PermissionsExt;
+
+                    if let Err(err) = tokio::fs::set_permissions(
+                        content_store.session_file(),
+                        std::fs::Permissions::from_mode(0o600),
+                    )
+                    .await
+                    {
+                        log::error!("Could not set permissions of session file: {}", err);
+                    }
+                }
             }
-        }
 
-        let session = {
-            Session::try_from(
-                inner
-                    .log_in(username, password, device_id.as_deref(), Some(CLIENT_ID))
-                    .await?,
-            )?
-        };
+            let mut client = Self {
+                                inner,
+                                                rooms: Rooms::new(),
+                                                                next_batch: None,
+                                                                                content_store,
+            };
 
-        // Save the session
-        if let Ok(encoded_session) = toml::to_vec(&session) {
-            // Do not abort the sync if we can't save the session data
-            if let Err(err) = tokio::fs::write(SESSION_ID_PATH, encoded_session).await {
-                log::error!("Could not save session data: {}", err);
-            } else {
+            client.initial_sync().await?;
+
+            Ok(client)
+    }
+
+    pub async fn new_with_session(content_store: Arc<ContentStore>) -> ClientResult<Self> {
+            let session: Session = {
                 use std::os::unix::fs::PermissionsExt;
 
                 if let Err(err) = tokio::fs::set_permissions(
-                    SESSION_ID_PATH,
+                    content_store.session_file(),
                     std::fs::Permissions::from_mode(0o600),
-                )
-                .await
-                {
+                ).await {
                     log::error!("Could not set permissions of session file: {}", err);
                 }
-            }
-        }
 
-        Ok(Self {
-            inner,
-            rooms: Rooms::new(),
-            next_batch: None,
-        })
+                tokio::fs::read_to_string(content_store.session_file()).await.map(|s| toml::from_str(&s))?.map_err(|e| ClientError::Custom(e.to_string()))?
+            };
+
+            let homeserver = format!("https://{}", session.user_id.server_name());
+            let homeserver_url = homeserver
+                .parse()
+                .map_err(|e| ClientError::URLParse(homeserver, e))?;
+
+            let inner = InnerClient::new(homeserver_url, Some(session.into()));
+
+            let mut client = Self {
+                                inner,
+                                                rooms: Rooms::new(),
+                                                                next_batch: None,
+                                                                                content_store,
+            };
+
+            client.initial_sync().await?;
+
+            Ok(client)
     }
 
-    pub fn new_with_session(session: Session) -> ClientResult<Self> {
-        // Make sure the data/content directory exists
-        std::fs::create_dir_all(format!("{}content", data_dir!()))?;
-
-        let homeserver = format!("https://{}", session.user_id.server_name());
-        let homeserver_url = homeserver
-            .parse::<Uri>()
-            .map_err(|e| ClientError::URLParse(homeserver, e))?;
-
-        let inner = InnerClient::new(homeserver_url, Some(session.into()));
-
-        Ok(Self {
-            inner,
-            rooms: Rooms::new(),
-            next_batch: None,
-        })
-    }
-
-    pub async fn logout(inner: InnerClient) -> ClientResult<()> {
+    pub async fn logout(inner: InnerClient, session_file: PathBuf) -> ClientResult<()> {
         inner.request(logout::Request::new()).await?;
-
-        tokio::fs::remove_file(SESSION_ID_PATH).await?;
-
+        tokio::fs::remove_file(session_file).await?;
         Ok(())
+    }
+
+    pub fn content_store(&self) -> &ContentStore {
+        &self.content_store
+    }
+
+    pub fn content_store_arc(&self) -> Arc<ContentStore> {
+        self.content_store.clone()
     }
 
     pub fn current_user_id(&self) -> UserId {
         self.inner
             .session()
-            // This unwrap is safe since we check if there is a session beforehand
+            .map(|s| s.identification.map(|id| id.user_id))
+            .flatten()
+            // This unwrap is safe since it is impossible to construct a `Client`
+            // without a session (which MUST contain a user id)
             .unwrap()
-            .identification
-            // This unwrap is safe since we check if there is a user_id beforehand
-            .unwrap()
-            .user_id
     }
 
-    pub fn next_batch(&self) -> Option<String> {
-        self.next_batch.clone()
-    }
-
-    pub async fn initial_sync(&mut self) -> ClientResult<()> {
-        let lazy_load_filter = Client::member_lazy_load_sync_filter();
-
-        let initial_sync_response = self
-            .inner
-            .request(assign!(sync_events::Request::new(), {
-                filter: Some(
-                    // Lazy load room members here to ensure a fast login
-                    // FIXME: Some members do not load properly after this
-                    &lazy_load_filter
-                ),
-                since: self.next_batch.as_deref(),
-                full_state: false,
-                set_presence: &PresenceState::Online,
-                timeout: None,
-            }))
-            .await?;
-
-        self.process_sync_response(initial_sync_response);
-
-        Ok(())
-    }
-
-    fn member_lazy_load_sync_filter<'a>() -> sync_events::Filter<'a> {
-        sync_events::Filter::FilterDefinition(assign!(FilterDefinition::default(), {
-            room: assign!(RoomFilter::default(), {
-                state: Client::member_lazy_load_room_event_filter()
-            }),
-        }))
-    }
-
-    fn member_lazy_load_room_event_filter<'a>() -> RoomEventFilter<'a> {
-        assign!(RoomEventFilter::default(), {
-            lazy_load_options: LazyLoadOptions::Enabled {
-                    include_redundant_members: false,
-                }
-            }
-        )
+    pub fn next_batch(&self) -> Option<&str> {
+        self.next_batch.as_deref()
     }
 
     pub fn inner(&self) -> InnerClient {
@@ -296,6 +288,45 @@ impl Client {
         self.rooms.entry(room_id).or_insert_with(Room::new)
     }
 
+    fn member_lazy_load_sync_filter<'a>() -> sync_events::Filter<'a> {
+        sync_events::Filter::FilterDefinition(assign!(FilterDefinition::default(), {
+            room: assign!(RoomFilter::default(), {
+                state: Client::member_lazy_load_room_event_filter()
+            }),
+        }))
+    }
+
+    fn member_lazy_load_room_event_filter<'a>() -> RoomEventFilter<'a> {
+        assign!(RoomEventFilter::default(), {
+            lazy_load_options: LazyLoadOptions::Enabled {
+                    include_redundant_members: false,
+                }
+            }
+        )
+    }
+
+    async fn initial_sync(&mut self) -> ClientResult<()> {
+        let lazy_load_filter = Client::member_lazy_load_sync_filter();
+
+        let response = self.inner
+            .request(assign!(sync_events::Request::new(), {
+                filter: Some(
+                    // Lazy load room members here to ensure a fast login
+                    // FIXME: Some members do not load properly after this
+                    &lazy_load_filter
+                ),
+                since: self.next_batch.as_deref(),
+                full_state: false,
+                set_presence: &PresenceState::Online,
+                timeout: None,
+            }))
+            .await?;
+
+        self.process_sync_response(response);
+
+        Ok(())
+    }
+
     pub fn rooms_queued_events(
         &self,
     ) -> Vec<(RoomId, Vec<(Uuid, AnySyncRoomEvent, Option<Duration>)>)> {
@@ -323,33 +354,33 @@ impl Client {
         inner: InnerClient,
         room_id_or_alias: ruma::RoomIdOrAliasId,
     ) -> ClientResult<join_room_by_id_or_alias::Response> {
-        inner
-            .request(join_room_by_id_or_alias::Request::new(&room_id_or_alias))
-            .await
-            .map_err(Into::into)
+            inner
+                .request(join_room_by_id_or_alias::Request::new(&room_id_or_alias))
+                .await
+                .map_err(Into::into)
     }
 
     pub async fn download_content(inner: InnerClient, content_url: Uri) -> ClientResult<Vec<u8>> {
-        if let (Some(server_address), Some(content_id)) = (
-            content_url
-                .authority()
-                .map(|a| a.as_str().try_into().map_or(None, Some))
-                .flatten(),
-            if content_url.path().is_empty() {
-                None
+            if let (Some(server_address), Some(content_id)) = (
+                content_url
+                    .authority()
+                    .map(|a| a.as_str().try_into().map_or(None, Some))
+                    .flatten(),
+                if content_url.path().is_empty() {
+                    None
+                } else {
+                    Some(content_url.path().trim_matches('/'))
+                },
+            ) {
+                inner
+                    .request(get_content::Request::new(content_id, server_address))
+                    .await
+                    .map_or_else(|err| Err(err.into()), |response| Ok(response.file))
             } else {
-                Some(content_url.path().trim_matches('/'))
-            },
-        ) {
-            inner
-                .request(get_content::Request::new(content_id, server_address))
-                .await
-                .map_or_else(|err| Err(err.into()), |response| Ok(response.file))
-        } else {
-            Err(ClientError::Custom(String::from(
-                "Could not make server address or content ID",
-            )))
-        }
+                Err(ClientError::Custom(String::from(
+                    "Could not make server address or content ID",
+                )))
+            }
     }
 
     pub async fn send_content(
@@ -358,30 +389,31 @@ impl Client {
         content_type: Option<String>,
         filename: Option<String>,
     ) -> ClientResult<Uri> {
-        let content_url = inner
-            .request(assign!(create_content::Request::new(data), { content_type: content_type.as_deref(), filename: filename.as_deref() }))
-            .await?
-            .content_uri;
+            let content_url = inner
+                .request(assign!(create_content::Request::new(data), { content_type: content_type.as_deref(), filename: filename.as_deref() }))
+                .await?
+                .content_uri;
 
-        content_url
-            .parse::<Uri>()
-            .map_err(|err| ClientError::URLParse(content_url, err))
+            content_url
+                .parse::<Uri>()
+                .map_err(|err| ClientError::URLParse(content_url, err))
     }
 
     pub async fn send_typing(
         inner: InnerClient,
         room_id: RoomId,
-        current_user_id: UserId,
+        user_id: UserId,
     ) -> ClientResult<create_typing_event::Response> {
-        let response = inner
-            .request(create_typing_event::Request::new(
-                &current_user_id,
-                &room_id,
-                create_typing_event::Typing::Yes(Duration::from_secs(1)),
-            ))
-            .await?;
+        use create_typing_event::*;
 
-        Ok(response)
+            inner
+                .request(Request::new(
+                    &user_id,
+                    &room_id,
+                    Typing::Yes(Duration::from_secs(1)),
+                ))
+                .await
+                .map_err(Into::into)
     }
 
     pub async fn send_message(
@@ -390,14 +422,14 @@ impl Client {
         room_id: RoomId,
         txn_id: Uuid,
     ) -> ClientResult<send_message_event::Response> {
-        inner
+         inner
             .request(send_message_event::Request::new(
                 &room_id,
                 txn_id.to_string().as_str(),
                 &content,
             ))
             .await
-            .map_err(ClientError::Internal)
+            .map_err(Into::into)
     }
 
     pub async fn get_events_around(
@@ -406,15 +438,16 @@ impl Client {
         event_id: EventId,
     ) -> ClientResult<get_context::Response> {
         let rooms = [room_id];
-        inner
-            .request(assign!(get_context::Request::new(&rooms[0], &event_id), {
-                // We lazy load members here since they will be incrementally sent by the sync response after initial sync
-                filter: Some(assign!(Client::member_lazy_load_room_event_filter(), {
-                    rooms: Some(&rooms),
-                })),
-            }))
-            .await
-            .map_err(ClientError::Internal)
+
+            inner
+                .request(assign!(get_context::Request::new(&rooms[0], &event_id), {
+                    // We lazy load members here since they will be incrementally sent by the sync response after initial sync
+                    filter: Some(assign!(Client::member_lazy_load_room_event_filter(), {
+                        rooms: Some(&rooms),
+                    })),
+                }))
+                .await
+                .map_err(Into::into)
     }
 
     pub fn process_events_around_response(
@@ -457,15 +490,15 @@ impl Client {
 
                 let (room_id, event_id) = convert_room_to_sync_room_with_id(event);
 
-                if let Some(room) = self.get_room_mut(&room_id) {
+                if self.has_room(&room_id) {
                     let events_before = convert_to_timeline_event(events_before);
                     let events_after = convert_to_timeline_event(events_after);
                     thumbnails = events_after
                         .iter()
                         .chain(events_before.iter())
-                        .flat_map(|tevent| tevent.download_or_read_thumbnail())
+                        .flat_map(|tevent| tevent.download_or_read_thumbnail(&self.content_store))
                         .collect::<Vec<_>>();
-                    room.add_chunk_of_events(events_before, events_after, &event_id);
+                    self.get_room_mut(&room_id).unwrap().add_chunk_of_events(events_before, events_after, &event_id);
                 }
             }
         }
@@ -474,6 +507,7 @@ impl Client {
 
     pub fn process_sync_response(&mut self, response: sync_events::Response) -> Vec<(bool, Uri)> {
         let mut thumbnails = vec![];
+        let content_store = self.content_store_arc();
 
         for (room_id, joined_room) in response.rooms.join {
             let room = self.get_room_mut_or_create(room_id);
@@ -544,7 +578,7 @@ impl Client {
                     room.ack_event(&transaction_id);
                 }
                 room.redact_event(&tevent);
-                if let Some(thumbnail_data) = tevent.download_or_read_thumbnail() {
+                if let Some(thumbnail_data) = tevent.download_or_read_thumbnail(&content_store) {
                     thumbnails.push(thumbnail_data);
                 }
 

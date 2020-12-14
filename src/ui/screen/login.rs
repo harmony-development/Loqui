@@ -1,19 +1,19 @@
-use super::LoginInformation;
 use crate::{
-    client::{error::ClientError, Client, Session},
+    client::{content::ContentStore, Client, LoginInformation},
     ui::style::{Theme, PADDING, SPACING},
 };
 use iced::{
     button, text_input, Align, Button, Color, Column, Command, Container, Element, Length, Row,
     Space, Subscription, Text, TextInput,
 };
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum Message {
     HomeserverChanged(String),
     UsernameChanged(String),
     PasswordChanged(String),
-    LoginWithSession(Session),
+    LoginWithSession,
     LoginInitiated,
 }
 
@@ -134,7 +134,11 @@ impl LoginScreen {
             .into()
     }
 
-    pub fn update(&mut self, msg: Message) -> Command<super::Message> {
+    pub fn update(
+        &mut self,
+        msg: Message,
+        content_store: Arc<ContentStore>,
+    ) -> Command<super::Message> {
         match msg {
             Message::HomeserverChanged(new_homeserver) => {
                 self.login_info.homeserver_domain = new_homeserver;
@@ -145,36 +149,18 @@ impl LoginScreen {
             Message::PasswordChanged(new_password) => {
                 self.login_info.password = new_password;
             }
-            Message::LoginWithSession(session) => {
-                async fn try_login(session: Session) -> Result<Client, ClientError> {
-                    let mut client = Client::new_with_session(session)?;
-                    client.initial_sync().await?;
-
-                    Ok(client)
-                }
-
-                return Command::perform(try_login(session), |result| match result {
-                    Ok(client) => super::Message::LoginComplete(client),
-                    Err(err) => super::Message::MatrixError(Box::new(err)),
+            Message::LoginWithSession => {
+                return Command::perform(Client::new_with_session(content_store), |result| {
+                    match result {
+                        Ok(client) => super::Message::LoginComplete(client),
+                        Err(err) => super::Message::MatrixError(Box::new(err)),
+                    }
                 });
             }
             Message::LoginInitiated => {
-                async fn try_login(login_info: LoginInformation) -> Result<Client, ClientError> {
-                    let mut client = Client::new(
-                        &format!("https://{}", login_info.homeserver_domain),
-                        &login_info.username,
-                        &login_info.password,
-                    )
-                    .await?;
-
-                    client.initial_sync().await?;
-
-                    Ok(client)
-                }
-
                 self.logging_in = Some(false);
                 return Command::perform(
-                    try_login(self.login_info.clone()),
+                    Client::new(self.login_info.clone(), content_store),
                     |result| match result {
                         Ok(client) => super::Message::LoginComplete(client),
                         Err(err) => super::Message::MatrixError(Box::new(err)),

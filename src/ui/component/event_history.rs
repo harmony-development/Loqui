@@ -1,7 +1,6 @@
 use crate::{
     client::{
-        media::ContentType,
-        media::{content_exists, ThumbnailStore},
+        content::{ContentStore, ContentType, ThumbnailCache},
         Room,
     },
     ui::{
@@ -24,7 +23,8 @@ pub const SHOWN_MSGS_LIMIT: usize = 32; // for only one half
 
 #[allow(clippy::mutable_key_type)]
 pub fn build_event_history<'a>(
-    thumbnail_store: &ThumbnailStore,
+    content_store: &ContentStore,
+    thumbnail_cache: &ThumbnailCache,
     room: &Room,
     current_user_id: &UserId,
     looking_at_event: usize,
@@ -162,14 +162,14 @@ pub fn build_event_history<'a>(
             };
 
             let is_thumbnail = matches!(content_type, ContentType::Image);
-            let does_content_exist = content_exists(&content_url);
+            let does_content_exist = content_store.content_exists(&content_url.to_string());
 
-            if let Some(thumbnail_image) = thumbnail_store
+            if let Some(thumbnail_image) = thumbnail_cache
                 .get_thumbnail(&content_url)
                 .or_else(|| {
                     timeline_event
                         .thumbnail_url()
-                        .map(|url| thumbnail_store.get_thumbnail(&url))
+                        .map(|url| thumbnail_cache.get_thumbnail(&url))
                         .flatten()
                 })
                 // FIXME: Don't hardcode this length, calculate it using the size of the window

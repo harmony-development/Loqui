@@ -1,32 +1,15 @@
 pub mod login;
 pub mod main;
 
+pub use login::LoginScreen;
+pub use main::MainScreen;
+
 use crate::{
-    client::{error::ClientError, Client, Session},
+    client::{content::ContentStore, error::ClientError, Client},
     ui::style::Theme,
 };
 use iced::{executor, Application, Command, Element, Subscription};
-pub use login::LoginScreen;
-pub use main::MainScreen;
-use std::fmt::{Display, Formatter};
-
-/// Login information needed for a login request.
-#[derive(Clone, Debug)]
-pub struct LoginInformation {
-    homeserver_domain: String,
-    username: String,
-    password: String,
-}
-
-impl Default for LoginInformation {
-    fn default() -> Self {
-        Self {
-            homeserver_domain: String::from("matrix.org"),
-            username: String::new(),
-            password: String::new(),
-        }
-    }
-}
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum Message {
@@ -42,30 +25,6 @@ pub enum Message {
     Nothing,
 }
 
-#[derive(Debug)]
-pub enum StartupFlag {
-    /// Use this session to login and skip the login screen.
-    UseSession(Session),
-    None,
-}
-
-impl Default for StartupFlag {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-impl Display for StartupFlag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StartupFlag::UseSession(session) => {
-                write!(f, "Use this session when logging in: {}", session)
-            }
-            StartupFlag::None => write!(f, "No flag"),
-        }
-    }
-}
-
 pub enum Screen {
     Login { screen: LoginScreen },
     Main { screen: MainScreen },
@@ -75,16 +34,18 @@ pub struct ScreenManager {
     theme: Theme,
     screen: Screen,
     client: Option<Client>,
+    content_store: Arc<ContentStore>,
 }
 
-impl Default for ScreenManager {
-    fn default() -> Self {
+impl ScreenManager {
+    pub fn new(content_store: ContentStore) -> Self {
         Self {
             theme: Theme::Dark,
             screen: Screen::Login {
                 screen: LoginScreen::default(),
             },
             client: None,
+            content_store: Arc::new(content_store),
         }
     }
 }
@@ -92,24 +53,10 @@ impl Default for ScreenManager {
 impl Application for ScreenManager {
     type Executor = executor::Default;
     type Message = Message;
-    type Flags = StartupFlag;
+    type Flags = ContentStore;
 
-    fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        match flags {
-            // "Login" with given session, skipping the info fields.
-            StartupFlag::UseSession(session) => (
-                Self {
-                    screen: Screen::Login {
-                        screen: LoginScreen::with_logging_in(Some(true)),
-                    },
-                    ..Self::default()
-                },
-                Command::perform(async { session }, |session| {
-                    Message::LoginScreen(login::Message::LoginWithSession(session))
-                }),
-            ),
-            StartupFlag::None => (Self::default(), Command::none()),
-        }
+    fn new(content_store: Self::Flags) -> (Self, Command<Self::Message>) {
+        (ScreenManager::new(content_store), Command::none())
     }
 
     fn title(&self) -> String {
@@ -128,7 +75,7 @@ impl Application for ScreenManager {
             }
             Message::LoginScreen(msg) => {
                 if let Screen::Login { ref mut screen } = self.screen {
-                    return screen.update(msg);
+                    return screen.update(msg, self.content_store.clone());
                 }
             }
             Message::LoginComplete(client) => {
@@ -178,7 +125,7 @@ impl Application for ScreenManager {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        if let (Screen::Main { screen, .. }, Some(client)) = (&self.screen, self.client.as_ref()) {
+        if let (Screen::Main { screen, .. }, Some(client)) = (&self.screen, &self.client) {
             screen.subscription(client)
         } else {
             Subscription::none()
@@ -189,7 +136,11 @@ impl Application for ScreenManager {
         match self.screen {
             Screen::Login { ref mut screen } => screen.view(self.theme).map(Message::LoginScreen),
             Screen::Main { ref mut screen } => screen
-                .view(self.theme, self.client.as_ref().unwrap())
+                .view(
+                    self.theme,
+                    self.client.as_ref().unwrap(),
+                    &self.content_store,
+                )
                 .map(Message::MainScreen),
         }
     }

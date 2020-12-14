@@ -18,10 +18,13 @@ iced_native = { git = "https://github.com/yusdacra/iced", branch = "scrollable_p
 iced_futures = { git = "https://github.com/yusdacra/iced", branch = "scrollable_programmatically" }
 
 open = "1.4.0"
-infer = { version = "0.3.0", default-features = false }
+infer = "0.3.0"
 rfd = { git = "https://github.com/PolyMeilex/rfd.git" }
 image = "0.23.11"
+directories-next = "2.0.0"
 
+http = "0.2"
+parking_lot = "0.11.1"
 tokio = { version = "0.2", features = ["rt-core", "parking_lot", "time", "fs"] }
 ruma = { git = "https://github.com/ruma/ruma/", features = ["client-api"], branch = "main" }
 ruma-client = { git = "https://github.com/ruma/ruma/", branch = "main" }

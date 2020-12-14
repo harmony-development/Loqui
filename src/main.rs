@@ -1,15 +1,15 @@
+use client::content::ContentStore;
 use iced::{Application, Settings};
 use simplelog::*;
-use ui::screen::{ScreenManager, StartupFlag};
+use ui::screen::ScreenManager;
 
 pub mod client;
 pub mod ui;
 
-const LOG_FILE_PATH: &str = concat!(data_dir!(), "log");
-
 pub fn main() {
-    // Make sure data dir exists
-    std::fs::create_dir_all(data_dir!()).unwrap();
+    // Create the content store
+    let content_store = ContentStore::default();
+    content_store.create_req_dirs().unwrap();
 
     let mut config = ConfigBuilder::new();
 
@@ -21,26 +21,12 @@ pub fn main() {
                 .set_target_level(LevelFilter::Error)
                 .set_location_level(LevelFilter::Error)
                 .build(),
-            std::fs::File::create(LOG_FILE_PATH).unwrap(),
+            std::fs::File::create(content_store.log_file()).unwrap(),
         ),
     ])
     .unwrap();
 
-    let mut settings = if let Ok(Ok(session)) =
-        std::fs::read_to_string(client::SESSION_ID_PATH).map(|s| toml::from_str(&s))
-    {
-        use std::os::unix::fs::PermissionsExt;
-
-        if let Err(err) = std::fs::set_permissions(
-            client::SESSION_ID_PATH,
-            std::fs::Permissions::from_mode(0o600),
-        ) {
-            log::error!("Could not set permissions of session file: {}", err);
-        }
-        Settings::with_flags(StartupFlag::UseSession(session))
-    } else {
-        Settings::default()
-    };
+    let mut settings = Settings::with_flags(content_store);
     settings.window.size = (1280, 720);
 
     ScreenManager::run(settings).unwrap();
