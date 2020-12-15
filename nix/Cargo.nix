@@ -1309,9 +1309,9 @@ rec {
       };
       "darling" = rec {
         crateName = "darling";
-        version = "0.10.3";
+        version = "0.10.2";
         edition = "2015";
-        sha256 = "1v5xns5vhngpw1z27ygvp63jy39gbpyb7mf8fiajnqqj39qmimhm";
+        sha256 = "0n7qsp6854wm3y1q1lvylhv15zvc87ibbac1nyfmcdbyv1snww0d";
         authors = [
           "Ted Driggs <ted.driggs@outlook.com>"
         ];
@@ -1334,9 +1334,9 @@ rec {
       };
       "darling_core" = rec {
         crateName = "darling_core";
-        version = "0.10.3";
+        version = "0.10.2";
         edition = "2015";
-        sha256 = "083jk9gsh7h8rsfz9hjkm2ysnyhls12wzgsnvsndhc9k4i6m3lqn";
+        sha256 = "16sija1jv0l754x4aa6b6fy01d1kf8m0r4id3flqipm45np61jgh";
         authors = [
           "Ted Driggs <ted.driggs@outlook.com>"
         ];
@@ -1375,9 +1375,9 @@ rec {
       };
       "darling_macro" = rec {
         crateName = "darling_macro";
-        version = "0.10.3";
+        version = "0.10.2";
         edition = "2015";
-        sha256 = "0blshkwscmyv05p7dw0bf7ifq3gi5dgivlw5fp8pmhghkqv3rxj4";
+        sha256 = "0wlv31cxkrjijz5gv13hvk55c9lmd781aj12c8n84sa9mksa5dfr";
         procMacro = true;
         authors = [
           "Ted Driggs <ted.driggs@outlook.com>"
@@ -3405,9 +3405,9 @@ rec {
       };
       "http" = rec {
         crateName = "http";
-        version = "0.2.1";
+        version = "0.2.2";
         edition = "2018";
-        sha256 = "1y827q7j0gvs8z2x12biaik9db6nb902lpqv889cbcj84sbnkm98";
+        sha256 = "09lfcl4589xfin22hblysab3zbx43j1ypy0gjr3d4mvdi8lrs4l4";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
           "Carl Lerche <me@carllerche.com>"
@@ -4243,9 +4243,9 @@ rec {
       };
       "indexmap" = rec {
         crateName = "indexmap";
-        version = "1.6.0";
+        version = "1.6.1";
         edition = "2018";
-        sha256 = "1wi8l3y2f3k4c2azaf3jm3pw2sksm90rzgv18x1a0lxacp3y9qjm";
+        sha256 = "0friqyzr4ssyayks7nirqbc36zcsf8fdi67jmvl4vpjh8a9zmcag";
         authors = [
           "bluss"
           "Josh Stone <cuviper@gmail.com>"
@@ -7781,11 +7781,11 @@ rec {
       };
       "strsim" = rec {
         crateName = "strsim";
-        version = "0.10.0";
+        version = "0.9.3";
         edition = "2015";
-        sha256 = "08s69r4rcrahwnickvi0kq49z524ci50capybln83mg6b473qivk";
+        sha256 = "0k497pv882qn3q977ckznm13vxx927g8s1swvcv68j3c1pccwik4";
         authors = [
-          "Danny Guo <danny@dannyguo.com>"
+          "Danny Guo <dannyguo91@gmail.com>"
         ];
 
       };

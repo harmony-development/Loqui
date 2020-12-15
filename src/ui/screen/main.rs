@@ -1,7 +1,7 @@
 use crate::{
     client::{
+        content::{self, ContentStore, ContentType, ImageHandle, ThumbnailCache},
         error::ClientError,
-        content::{self, ContentType, ContentStore, ImageHandle, ThumbnailCache},
         Client, InnerClient, TimelineEvent,
     },
     ui::{
@@ -11,7 +11,6 @@ use crate::{
         },
     },
 };
-use ahash::AHashMap;
 use iced::{
     button, pick_list, scrollable, text_input, Align, Button, Color, Column, Command, Container,
     Element, Length, PickList, Row, Space, Subscription, Text, TextInput,
@@ -20,20 +19,16 @@ use iced_futures::BoxStream;
 use image::GenericImageView;
 use ruma::{
     api::{
-        client::r0::{context::get_context, sync::sync_events},
+        client::r0::{message::get_message_events, sync::sync_events},
         exports::http::Uri,
     },
-    events::room::message::FileMessageEventContent,
-    events::room::message::VideoInfo,
-    events::room::message::VideoMessageEventContent,
-    events::room::ThumbnailInfo,
     events::{
         room::{
             message::{
-                AudioInfo, AudioMessageEventContent, FileInfo, ImageMessageEventContent,
-                MessageEventContent,
+                AudioInfo, AudioMessageEventContent, FileInfo, FileMessageEventContent,
+                ImageMessageEventContent, MessageEventContent, VideoInfo, VideoMessageEventContent,
             },
-            ImageInfo,
+            ImageInfo, ThumbnailInfo,
         },
         AnySyncRoomEvent,
     },
@@ -78,9 +73,9 @@ pub enum Message {
     SelectedMenuOption(String),
     LogoutConfirmation(bool),
     /// Sent when a sync response is received from the server.
-    MatrixSyncResponse(Box<sync_events::Response>),
+    SyncResponse(Box<sync_events::Response>),
     /// Sent when a "get context" (get events around an event) is received from the server.
-    MatrixGetEventsAroundResponse(Box<get_context::Response>),
+    GetEventsBackwardsResponse(Box<get_message_events::Response>),
 }
 
 pub struct MainScreen {
@@ -106,7 +101,6 @@ pub struct MainScreen {
     logging_out: Option<bool>,
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
     current_room_id: Option<RoomId>,
-    looking_at_event: AHashMap<RoomId, usize>,
     /// The message the user is currently typing.
     message: String,
     /// Text used to filter rooms.
@@ -130,7 +124,6 @@ impl MainScreen {
             logout_cancel_but_state: Default::default(),
             logging_out: None,
             current_room_id: None,
-            looking_at_event: Default::default(),
             message: Default::default(),
             room_search_text: Default::default(),
             thumbnail_cache: ThumbnailCache::default(),
@@ -207,22 +200,17 @@ impl MainScreen {
         }
     }
 
-    pub fn view(&mut self, theme: Theme, client: &Client, content_store: &ContentStore) -> Element<Message> {
+    pub fn view(
+        &mut self,
+        theme: Theme,
+        client: &Client,
+        content_store: &ContentStore,
+    ) -> Element<Message> {
         if let Some(confirmation) = self.logging_out {
             return self.logout_screen(theme, confirmation);
         }
 
-        let rooms = client.rooms();
-
-        // Add missing looking_at_event values for newly added rooms (if there is any)
-        for (room_id, room) in rooms {
-            if !self.looking_at_event.contains_key(room_id) {
-                self.looking_at_event.insert(
-                    room_id.clone(),
-                    room.displayable_events().count().saturating_sub(1),
-                );
-            }
-        }
+        let rooms = &client.rooms;
 
         let username = client.current_user_id().localpart().to_string();
         // Build the top menu
@@ -319,17 +307,15 @@ impl MainScreen {
                 &self.thumbnail_cache,
                 room,
                 &current_user_id,
-                self.looking_at_event
-                    .get(room_id)
-                    .copied()
-                    .unwrap_or_else(|| displayable_event_count.saturating_sub(1)),
+                room.looking_at_event,
                 &mut self.event_history_state,
                 &mut self.content_open_buts_state,
                 theme,
             );
 
+            let members = room.members();
             let mut typing_users_combined = String::new();
-            let mut typing_members = room.members.typing_members();
+            let mut typing_members = members.typing_members();
             // Remove own user id from the list (if its there)
             if let Some(index) = typing_members.iter().position(|id| *id == &current_user_id) {
                 typing_members.remove(index);
@@ -342,7 +328,7 @@ impl MainScreen {
                     break;
                 }
 
-                typing_users_combined += room.members.get_user_display_name(member_id).as_str();
+                typing_users_combined += members.get_user_display_name(member_id).as_str();
 
                 typing_users_combined += match typing_members_count {
                     x if x > index + 1 => ", ",
@@ -373,10 +359,7 @@ impl MainScreen {
                 message_composer.width(Length::Fill).into(),
             ];
 
-            // This unwrap is safe since we add the room to the map before this
-            if *self.looking_at_event.get(room_id).unwrap()
-                < displayable_event_count.saturating_sub(SHOWN_MSGS_LIMIT)
-            {
+            if room.looking_at_event < displayable_event_count.saturating_sub(SHOWN_MSGS_LIMIT) {
                 bottom_area_widgets.push(
                     Button::new(
                         &mut self.scroll_to_bottom_but_state,
@@ -439,18 +422,17 @@ impl MainScreen {
         ) -> Command<super::Message> {
             return Command::batch(thumbnail_urls.into_iter().map(
                 |(is_in_cache, thumbnail_url)| {
-                    let content_path = client.content_store().content_path(&thumbnail_url.to_string());
-                    
+                    let content_path = client
+                        .content_store()
+                        .content_path(&thumbnail_url.to_string());
+
                     if is_in_cache {
                         Command::perform(
                             async move {
                                 (
                                     async {
                                         Ok(ImageHandle::from_memory(
-                                            tokio::fs::read(
-                                                content_path,
-                                            )
-                                            .await?,
+                                            tokio::fs::read(content_path).await?,
                                         ))
                                     }
                                     .await,
@@ -468,7 +450,8 @@ impl MainScreen {
                             },
                         )
                     } else {
-                        let download_task = Client::download_content(client.inner(), thumbnail_url.clone());
+                        let download_task =
+                            Client::download_content(client.inner(), thumbnail_url.clone());
 
                         Command::perform(
                             async move {
@@ -497,16 +480,14 @@ impl MainScreen {
             ));
         }
 
-        fn scroll_to_bottom(screen: &mut MainScreen, client: &Client, room_id: RoomId) {
-            if let Some(disp) = client
-                .get_room(&room_id)
-                .map(|room| room.displayable_events().count())
-            {
-                screen
-                    .looking_at_event
-                    .entry(room_id)
-                    .and_modify(|d| *d = disp.saturating_sub(1))
-                    .or_insert_with(|| disp.saturating_sub(1));
+        fn scroll_to_bottom(client: &mut Client, room_id: RoomId) {
+            if let Some((disp, looking_at_event)) = client.rooms.get_mut(&room_id).map(|room| {
+                (
+                    room.displayable_events().count(),
+                    &mut room.looking_at_event,
+                )
+            }) {
+                *looking_at_event = disp.saturating_sub(1);
             }
         }
 
@@ -515,70 +496,59 @@ impl MainScreen {
                 prev_scroll_perc,
                 scroll_perc,
             } => {
-                if scroll_perc < 0.01 && scroll_perc <= prev_scroll_perc {
-                    if let Some((disp, looking_at_event)) = self
-                        .current_room_id
-                        .clone()
-                        .map(|id| {
-                            Some((
-                                client
-                                    .get_room(&id)
-                                    .map(|room| room.displayable_events().count())?,
-                                self.looking_at_event.get_mut(&id)?,
-                            ))
-                        })
-                        .flatten()
-                    {
-                        if *looking_at_event == disp.saturating_sub(1) {
-                            *looking_at_event = disp.saturating_sub(SHOWN_MSGS_LIMIT + 1);
-                        } else {
-                            *looking_at_event = looking_at_event.saturating_sub(1);
-                        }
+                if let Some(current_room_id) = self.current_room_id.clone() {
+                    if scroll_perc < 0.01 && scroll_perc <= prev_scroll_perc {
+                        if let Some((disp, loading_events_backward, looking_at_event, prev_batch)) =
+                            client.rooms.get_mut(&current_room_id).map(|room| {
+                                (
+                                    room.displayable_events().count(),
+                                    &mut room.loading_events_backward,
+                                    &mut room.looking_at_event,
+                                    room.prev_batch.clone(),
+                                )
+                            })
+                        {
+                            if *looking_at_event == disp.saturating_sub(1) {
+                                *looking_at_event = disp.saturating_sub(SHOWN_MSGS_LIMIT + 1);
+                            } else {
+                                *looking_at_event = looking_at_event.saturating_sub(1);
+                            }
 
-                        if *looking_at_event < 2 {
-                            if let Some((event, room_id)) = self
-                                .current_room_id
-                                .as_ref()
-                                .map(|id| {
-                                    client
-                                        .get_room(id)
-                                        .map(|room| Some((room.displayable_events().next()?, id)))
-                                        .flatten()
-                                })
-                                .flatten()
-                            {
-                                return Command::perform(
-                                    Client::get_events_around(client.inner(), room_id.clone(), event.id().clone()),
-                                    |result| match result {
-                                        Ok(response) => super::Message::MainScreen(
-                                            Message::MatrixGetEventsAroundResponse(Box::new(
-                                                response,
-                                            )),
+                            if *looking_at_event < 2 && !*loading_events_backward {
+                                if let Some(prev_batch) = prev_batch {
+                                    *loading_events_backward = true;
+                                    return Command::perform(
+                                        Client::get_events_backwards(
+                                            client.inner(),
+                                            current_room_id,
+                                            prev_batch.clone(),
                                         ),
-                                        Err(err) => super::Message::MatrixError(Box::new(err)),
-                                    },
-                                );
+                                        |result| match result {
+                                            Ok(response) => super::Message::MainScreen(
+                                                Message::GetEventsBackwardsResponse(Box::new(
+                                                    response,
+                                                )),
+                                            ),
+                                            Err(err) => super::Message::MatrixError(Box::new(err)),
+                                        },
+                                    );
+                                }
                             }
                         }
-                    }
-                } else if scroll_perc > 0.99 && scroll_perc >= prev_scroll_perc {
-                    if let Some((disp, looking_at_event)) = self
-                        .current_room_id
-                        .clone()
-                        .map(|id| {
-                            Some((
-                                client
-                                    .get_room(&id)
-                                    .map(|room| room.displayable_events().count())?,
-                                self.looking_at_event.get_mut(&id)?,
-                            ))
-                        })
-                        .flatten()
-                    {
-                        if *looking_at_event > disp.saturating_sub(SHOWN_MSGS_LIMIT) {
-                            *looking_at_event = disp.saturating_sub(1);
-                        } else {
-                            *looking_at_event = looking_at_event.saturating_add(1).min(disp);
+                    } else if scroll_perc > 0.99 && scroll_perc >= prev_scroll_perc {
+                        if let Some((disp, looking_at_event)) =
+                            client.rooms.get_mut(&current_room_id).map(|room| {
+                                (
+                                    room.displayable_events().count(),
+                                    &mut room.looking_at_event,
+                                )
+                            })
+                        {
+                            if *looking_at_event > disp.saturating_sub(SHOWN_MSGS_LIMIT) {
+                                *looking_at_event = disp.saturating_sub(1);
+                            } else {
+                                *looking_at_event = looking_at_event.saturating_add(1).min(disp);
+                            }
                         }
                     }
                 }
@@ -594,10 +564,16 @@ impl MainScreen {
             Message::LogoutConfirmation(confirmation) => {
                 if confirmation {
                     self.logging_out = Some(true);
-                    return Command::perform(Client::logout(client.inner(), client.content_store().session_file().to_path_buf()), |result| match result {
-                        Ok(_) => super::Message::LogoutComplete,
-                        Err(err) => super::Message::MatrixError(Box::new(err)),
-                    });
+                    return Command::perform(
+                        Client::logout(
+                            client.inner(),
+                            client.content_store().session_file().to_path_buf(),
+                        ),
+                        |result| match result {
+                            Ok(_) => super::Message::LogoutComplete,
+                            Err(err) => super::Message::MatrixError(Box::new(err)),
+                        },
+                    );
                 } else {
                     self.logging_out = None;
                 }
@@ -617,7 +593,7 @@ impl MainScreen {
             }
             Message::ScrollToBottom => {
                 if let Some(room_id) = self.current_room_id.clone() {
-                    scroll_to_bottom(self, client, room_id);
+                    scroll_to_bottom(client, room_id);
                     self.event_history_state.scroll_to_bottom();
                 }
             }
@@ -632,74 +608,76 @@ impl MainScreen {
                 is_thumbnail,
             } => {
                 let thumbnail_exists = self.thumbnail_cache.has_thumbnail(&content_url);
-                let content_path = client.content_store().content_path(&content_url.to_string());
-                    return if content_path.exists() {
-                        Command::perform(
-                            async move {
-                                let thumbnail = if is_thumbnail && !thumbnail_exists {
-                                    tokio::fs::read(&content_path)
-                                        .await
-                                        .map_or(None, |data| Some((data, content_url)))
-                                } else {
-                                    None
-                                };
+                let content_path = client
+                    .content_store()
+                    .content_path(&content_url.to_string());
+                return if content_path.exists() {
+                    Command::perform(
+                        async move {
+                            let thumbnail = if is_thumbnail && !thumbnail_exists {
+                                tokio::fs::read(&content_path)
+                                    .await
+                                    .map_or(None, |data| Some((data, content_url)))
+                            } else {
+                                None
+                            };
 
-                                (content_path, thumbnail)
-                            },
-                            |(content_path, thumbnail)| {
+                            (content_path, thumbnail)
+                        },
+                        |(content_path, thumbnail)| {
+                            open::that_in_background(content_path);
+                            if let Some((data, thumbnail_url)) = thumbnail {
+                                super::Message::MainScreen(Message::DownloadedThumbnail {
+                                    thumbnail_url,
+                                    thumbnail: ImageHandle::from_memory(data),
+                                })
+                            } else {
+                                super::Message::Nothing
+                            }
+                        },
+                    )
+                } else {
+                    let download_task =
+                        Client::download_content(client.inner(), content_url.clone());
+                    Command::perform(
+                        async move {
+                            match download_task.await {
+                                Ok(raw_data) => {
+                                    tokio::fs::write(&content_path, raw_data.as_slice()).await?;
+                                    Ok((
+                                        content_path,
+                                        if is_thumbnail && !thumbnail_exists {
+                                            Some((content_url, raw_data))
+                                        } else {
+                                            None
+                                        },
+                                    ))
+                                }
+                                Err(err) => Err(err),
+                            }
+                        },
+                        |result| match result {
+                            Ok((content_path, thumbnail)) => {
                                 open::that_in_background(content_path);
-                                if let Some((data, thumbnail_url)) = thumbnail {
+                                if let Some((content_url, raw_data)) = thumbnail {
                                     super::Message::MainScreen(Message::DownloadedThumbnail {
-                                        thumbnail_url,
-                                        thumbnail: ImageHandle::from_memory(data),
+                                        thumbnail_url: content_url,
+                                        thumbnail: ImageHandle::from_memory(raw_data),
                                     })
                                 } else {
                                     super::Message::Nothing
                                 }
-                            },
-                        )
-                    } else {
-                        let download_task = Client::download_content(client.inner(), content_url.clone());
-                        Command::perform(
-                            async move {
-                                match download_task.await {
-                                    Ok(raw_data) => {
-                                        tokio::fs::write(&content_path, raw_data.as_slice())
-                                            .await?;
-                                        Ok((
-                                            content_path,
-                                            if is_thumbnail && !thumbnail_exists {
-                                                Some((content_url, raw_data))
-                                            } else {
-                                                None
-                                            },
-                                        ))
-                                    }
-                                    Err(err) => Err(err),
-                                }
-                            },
-                            |result| match result {
-                                Ok((content_path, thumbnail)) => {
-                                    open::that_in_background(content_path);
-                                    if let Some((content_url, raw_data)) = thumbnail {
-                                        super::Message::MainScreen(Message::DownloadedThumbnail {
-                                            thumbnail_url: content_url,
-                                            thumbnail: ImageHandle::from_memory(raw_data),
-                                        })
-                                    } else {
-                                        super::Message::Nothing
-                                    }
-                                }
-                                Err(err) => super::Message::MatrixError(Box::new(err)),
-                            },
-                        )
-                    };
+                            }
+                            Err(err) => super::Message::MatrixError(Box::new(err)),
+                        },
+                    )
+                };
             }
             Message::SendMessageComposer(room_id) => {
                 if !self.message.is_empty() {
                     let content =
                         MessageEventContent::text_plain(self.message.drain(..).collect::<String>());
-                    scroll_to_bottom(self, client, room_id.clone());
+                    scroll_to_bottom(client, room_id.clone());
                     self.event_history_state.scroll_to_bottom();
                     return Command::perform(
                         async move { (content, room_id) },
@@ -797,8 +775,12 @@ impl MainScreen {
 
                                     match send_result {
                                         Ok(content_url) => {
-                                            if let Err(err) =
-                                                tokio::fs::hard_link(&path, content_store.content_path(&content_url.to_string())).await
+                                            if let Err(err) = tokio::fs::hard_link(
+                                                &path,
+                                                content_store
+                                                    .content_path(&content_url.to_string()),
+                                            )
+                                            .await
                                             {
                                                 log::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
                                             }
@@ -937,7 +919,7 @@ impl MainScreen {
                 );
             }
             Message::SendMessage { content, room_id } => {
-                if let Some(room) = client.get_room_mut(&room_id) {
+                if let Some(room) = client.rooms.get_mut(&room_id) {
                     for content in content {
                         room.add_event(TimelineEvent::new_unacked_message(content, Uuid::new_v4()));
                     }
@@ -955,7 +937,7 @@ impl MainScreen {
                         {
                             if let ClientAPIErrorKind::LimitExceeded { retry_after_ms } = err.kind {
                                 if let Some(retry_after) = retry_after_ms {
-                                    if let Some(room) = client.get_room_mut(&room_id) {
+                                    if let Some(room) = client.rooms.get_mut(&room_id) {
                                         room.wait_for_duration(retry_after, transaction_id);
                                     }
                                     log::error!("Send message after: {}", retry_after.as_secs());
@@ -967,41 +949,40 @@ impl MainScreen {
                     }
                 }
             }
-            Message::MatrixSyncResponse(response) => {
+            Message::SyncResponse(response) => {
                 let thumbnail_urls = client.process_sync_response(*response);
 
-                for (room_id, disp) in client
-                    .rooms()
-                    .iter()
-                    .filter_map(|(id, room)| {
-                        let disp = room.displayable_events().count();
-                        if self.current_room_id.as_ref() != Some(id) {
-                            if let Some(disp_at) = self.looking_at_event.get(id) {
-                                if *disp_at == disp.saturating_sub(1) {
-                                    return Some((id.clone(), disp));
-                                }
-                            }
+                for (room_id, room) in client.rooms.iter_mut() {
+                    let disp = room.displayable_events().count().saturating_sub(1);
+                    if self.current_room_id.as_ref() != Some(room_id) {
+                        if room.looking_at_event == disp {
+                            room.looking_at_event = disp;
                         }
-                        None
-                    })
-                    .collect::<Vec<(RoomId, usize)>>()
-                {
-                    *self.looking_at_event.get_mut(&room_id).unwrap() = disp.saturating_sub(1);
+                    }
                 }
 
                 return make_thumbnail_commands(client, thumbnail_urls);
             }
-            Message::MatrixGetEventsAroundResponse(response) => {
-                let thumbnail_urls = client.process_events_around_response(*response);
-                return make_thumbnail_commands(client, thumbnail_urls);
+            Message::GetEventsBackwardsResponse(response) => {
+                if let Some((room_id, thumbnail_urls)) =
+                    client.process_events_backwards_response(*response)
+                {
+                    // Safe unwrap
+                    client
+                        .rooms
+                        .get_mut(&room_id)
+                        .unwrap()
+                        .loading_events_backward = false;
+                    return make_thumbnail_commands(client, thumbnail_urls);
+                }
             }
             Message::RoomChanged(new_room_id) => {
-                if let (Some(disp), Some(disp_at)) = (
-                    client
-                        .get_room(&new_room_id)
-                        .map(|room| room.displayable_events().count()),
-                    self.looking_at_event.get_mut(&new_room_id),
-                ) {
+                if let Some((disp, disp_at)) = client.rooms.get_mut(&new_room_id).map(|room| {
+                    (
+                        room.displayable_events().count(),
+                        &mut room.looking_at_event,
+                    )
+                }) {
                     if *disp_at >= disp.saturating_sub(SHOWN_MSGS_LIMIT) {
                         *disp_at = disp.saturating_sub(1);
                         self.event_history_state.scroll_to_bottom();
@@ -1033,7 +1014,7 @@ impl MainScreen {
                 })
                 .map(|result| match result {
                     Ok(response) => {
-                        super::Message::MainScreen(Message::MatrixSyncResponse(Box::from(response)))
+                        super::Message::MainScreen(Message::SyncResponse(Box::from(response)))
                     }
                     Err(err) => super::Message::MatrixError(Box::new(err)),
                 }),
@@ -1076,37 +1057,37 @@ where
 
     fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
         let future = async move {
-                    let mut room_errors = Vec::new();
+            let mut room_errors = Vec::new();
 
-                    for (room_id, events) in self.rooms_queued_events {
-                        let mut transaction_errors = Vec::new();
-                        for (transaction_id, event, retry_after) in events {
-                            if let Some(dur) = retry_after {
-                                tokio::time::delay_for(dur).await;
-                            }
-
-                            let result = match event {
-                                AnySyncRoomEvent::Message(ev) => {
-                                    Client::send_message(
-                                        self.inner.clone(),
-                                        ev.content(),
-                                        room_id.clone(),
-                                        transaction_id,
-                                    )
-                                    .await
-                                }
-                                _ => unimplemented!(),
-                            };
-
-                            if let Err(e) = result {
-                                transaction_errors.push((transaction_id, e));
-                            }
-                        }
-                        room_errors.push((room_id, transaction_errors));
+            for (room_id, events) in self.rooms_queued_events {
+                let mut transaction_errors = Vec::new();
+                for (transaction_id, event, retry_after) in events {
+                    if let Some(dur) = retry_after {
+                        tokio::time::delay_for(dur).await;
                     }
 
-                    room_errors
-                };
+                    let result = match event {
+                        AnySyncRoomEvent::Message(ev) => {
+                            Client::send_message(
+                                self.inner.clone(),
+                                ev.content(),
+                                room_id.clone(),
+                                transaction_id,
+                            )
+                            .await
+                        }
+                        _ => unimplemented!(),
+                    };
+
+                    if let Err(e) = result {
+                        transaction_errors.push((transaction_id, e));
+                    }
+                }
+                room_errors.push((room_id, transaction_errors));
+            }
+
+            room_errors
+        };
 
         Box::pin(iced_futures::futures::stream::once(future))
     }

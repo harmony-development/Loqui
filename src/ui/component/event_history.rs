@@ -19,7 +19,7 @@ use iced::{
 use ruma::{api::exports::http::Uri, UserId};
 use std::time::{Duration, Instant};
 
-pub const SHOWN_MSGS_LIMIT: usize = 32; // for only one half
+pub const SHOWN_MSGS_LIMIT: usize = 32;
 
 #[allow(clippy::mutable_key_type)]
 pub fn build_event_history<'a>(
@@ -46,6 +46,8 @@ pub fn build_event_history<'a>(
         .align_items(Align::Start)
         .spacing(SPACING * 2)
         .padding(PADDING);
+
+    let members = room.members();
 
     let displayable_events = room.displayable_events().collect::<Vec<_>>();
     let timeline_range_end = looking_at_event
@@ -81,7 +83,7 @@ pub fn build_event_history<'a>(
             timeline_event.sender()
         };
 
-        let sender_display_name = room.members.get_user_display_name(id_to_use);
+        let sender_display_name = members.get_user_display_name(id_to_use);
         let sender_body_creator = |sender_display_name: &str| {
             Text::new(format!("[{}]", sender_display_name))
                 .color(theme.calculate_sender_color(sender_display_name.len()))
@@ -131,8 +133,7 @@ pub fn build_event_history<'a>(
             }
         }
 
-        let mut message_text =
-            Text::new(timeline_event.formatted(&room.members)).size(MESSAGE_SIZE);
+        let mut message_text = Text::new(timeline_event.formatted(&members)).size(MESSAGE_SIZE);
 
         if !timeline_event.is_ack() {
             message_text = message_text.color(Color::from_rgb(0.5, 0.5, 0.5));
