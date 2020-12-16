@@ -13,13 +13,15 @@ use crate::{
 };
 use chrono::{DateTime, Datelike, Local};
 use iced::{
-    button, scrollable, Align, Button, Color, Column, Container, Element, Image, Length,
+    button, scrollable, Align, Button, Color, Column, Container, Element, Image, Length, Row,
     Scrollable, Space, Text,
 };
 use ruma::{api::exports::http::Uri, UserId};
 use std::time::{Duration, Instant};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
+const MSG_LR_PADDING: u16 = SPACING * 2;
+const AVATAR_WIDTH: u16 = 32;
 
 #[allow(clippy::mutable_key_type)]
 pub fn build_event_history<'a>(
@@ -84,10 +86,36 @@ pub fn build_event_history<'a>(
         };
 
         let sender_display_name = members.get_user_display_name(id_to_use);
+        let sender_avatar_url = members
+            .get_member(id_to_use)
+            .map(|m| m.avatar_url())
+            .flatten();
         let sender_body_creator = |sender_display_name: &str| {
-            Text::new(format!("[{}]", sender_display_name))
-                .color(theme.calculate_sender_color(sender_display_name.len()))
-                .size(MESSAGE_SENDER_SIZE)
+            let mut widgets = Vec::with_capacity(2);
+
+            if let Some(handle) = sender_avatar_url
+                .map(|u| thumbnail_cache.get_thumbnail(u))
+                .flatten()
+                .cloned()
+            {
+                // TODO: Add `border_radius` styling for `Image` so we can use it here
+                widgets.push(Image::new(handle).width(Length::Units(AVATAR_WIDTH)).into());
+            }
+
+            widgets.push(
+                Container::new(
+                    Text::new(format!("[{}]", sender_display_name))
+                        .color(theme.calculate_sender_color(sender_display_name.len()))
+                        .size(MESSAGE_SENDER_SIZE),
+                )
+                .align_y(Align::End)
+                .into(),
+            );
+
+            super::row(widgets)
+                .spacing(MSG_LR_PADDING)
+                .padding(0)
+                .align_items(Align::Center)
         };
 
         let mut is_sender_different = false;
@@ -175,7 +203,7 @@ pub fn build_event_history<'a>(
                         .flatten()
                 })
                 // FIXME: Don't hardcode this length, calculate it using the size of the window
-                .map(|handle| Image::new(handle.clone()).width(Length::Units(360)))
+                .map(|handle| Image::new(handle.clone()).width(Length::Units(320)))
             {
                 if does_content_exist {
                     message_body_widgets.push(create_button(
@@ -212,10 +240,11 @@ pub fn build_event_history<'a>(
             }
         }
 
-        let mut message_row = vec![Column::with_children(message_body_widgets)
-            .align_items(Align::Start)
-            .spacing(SPACING)
-            .into()];
+        let msg_body = super::column(message_body_widgets)
+            .padding(0)
+            .spacing(MSG_LR_PADDING)
+            .into();
+        let mut message_row = Vec::with_capacity(2);
 
         // FIXME: doesnt work properly
         let cur_minute = (cur_timestamp.as_secs() / 60) % 60;
@@ -228,16 +257,19 @@ pub fn build_event_history<'a>(
             )
             .size(MESSAGE_TIMESTAMP_SIZE)
             .color(Color::from_rgb8(160, 160, 160));
-            message_row.insert(
-                0,
-                Container::new(message_timestamp)
-                    .padding(PADDING / 8)
+            message_row.push(
+                Column::with_children(vec![
+                    Space::with_height(Length::Units(PADDING / 8)).into(),
+                    Row::with_children(vec![
+                        message_timestamp.into(),
+                        Space::with_width(Length::Units(PADDING / 4)).into(),
+                    ])
                     .into(),
+                ])
+                .into(),
             );
-        } else {
-            // FIXME: Don't hardcode the length here
-            message_row.insert(0, Space::with_width(Length::Units(39)).into());
         }
+        message_row.push(msg_body);
 
         message_group.push(super::row(message_row).padding(0).into());
 

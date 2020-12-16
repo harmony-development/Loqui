@@ -90,10 +90,22 @@ impl Application for ScreenManager {
                 }
             }
             Message::LoginComplete(client) => {
+                let inner = client.inner();
+
                 self.client = Some(client);
                 self.screen = Screen::Main {
                     screen: MainScreen::new(),
                 };
+
+                // TODO: Display "syncing with homeserver" when initial sync is running
+                // TODO: Errors also need to be shown on the main screen as well (a "toast" would do probably)
+                return Command::perform(Client::initial_sync(inner), |result| match result {
+                    Ok(response) => {
+                        Message::MainScreen(main::Message::SyncResponse(Box::new(response)))
+                    }
+                    // TODO: If initial sync errors out, we should go back to the login screen probably (?)
+                    Err(e) => Message::MatrixError(Box::new(e)),
+                });
             }
             Message::LogoutComplete => {
                 self.screen = Screen::Login {

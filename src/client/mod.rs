@@ -31,7 +31,10 @@ use ruma::{
         },
     },
     events::{
-        room::{aliases::AliasesEventContent, canonical_alias::CanonicalAliasEventContent},
+        room::{
+            aliases::AliasesEventContent, avatar::AvatarEventContent,
+            canonical_alias::CanonicalAliasEventContent,
+        },
         typing::TypingEventContent,
         AnyEphemeralRoomEventContent, AnyMessageEventContent, AnyRoomEvent, AnySyncRoomEvent,
         AnySyncStateEvent, SyncStateEvent,
@@ -194,16 +197,12 @@ impl Client {
             }
         }
 
-        let mut client = Self {
+        Ok(Self {
             inner,
             rooms: Rooms::new(),
             next_batch: None,
             content_store,
-        };
-
-        client.initial_sync().await?;
-
-        Ok(client)
+        })
     }
 
     pub async fn new_with_session(content_store: Arc<ContentStore>) -> ClientResult<Self> {
@@ -230,18 +229,12 @@ impl Client {
             .parse()
             .map_err(|e| ClientError::URLParse(homeserver, e))?;
 
-        let inner = InnerClient::new(homeserver_url, Some(session.into()));
-
-        let mut client = Self {
-            inner,
+        Ok(Self {
+            inner: InnerClient::new(homeserver_url, Some(session.into())),
             rooms: Rooms::new(),
             next_batch: None,
             content_store,
-        };
-
-        client.initial_sync().await?;
-
-        Ok(client)
+        })
     }
 
     pub async fn logout(inner: InnerClient, session_file: PathBuf) -> ClientResult<()> {
@@ -293,27 +286,23 @@ impl Client {
         )
     }
 
-    async fn initial_sync(&mut self) -> ClientResult<()> {
+    pub async fn initial_sync(inner: InnerClient) -> ClientResult<sync_events::Response> {
         let lazy_load_filter = Client::member_lazy_load_sync_filter();
 
-        let response = self
-            .inner
+        inner
             .request(assign!(sync_events::Request::new(), {
                 filter: Some(
                     // Lazy load room members here to ensure a fast login
                     // FIXME: Some members do not load properly after this
                     &lazy_load_filter
                 ),
-                since: self.next_batch.as_deref(),
+                since: None,
                 full_state: false,
                 set_presence: &PresenceState::Online,
                 timeout: None,
             }))
-            .await?;
-
-        self.process_sync_response(response);
-
-        Ok(())
+            .await
+            .map_err(Into::into)
     }
 
     pub fn rooms_queued_events(
@@ -470,7 +459,7 @@ impl Client {
                     .flat_map(|r| r.deserialize().map(|e| e.into()))
                     .collect();
 
-                let thumbnails = events
+                let mut thumbnails = events
                     .iter()
                     .flat_map(|ev| ev.download_or_read_thumbnail(&self.content_store))
                     .collect::<Vec<_>>();
@@ -484,6 +473,14 @@ impl Client {
                         .flat_map(|r| r.deserialize().map(|s| s.into()))
                         .collect(),
                 );
+                // TODO: move all thumbnail operations to the update method in main screen?
+                // since update will get called anyways when we receive something
+                for avatar_url in room.members().member_datas().flat_map(|m| m.avatar_url()) {
+                    thumbnails.push((
+                        self.content_store.content_exists(&avatar_url.to_string()),
+                        avatar_url.clone(),
+                    ));
+                }
 
                 room.prev_batch = prev_batch;
 
@@ -518,34 +515,58 @@ impl Client {
                         room.update_typing(user_ids);
                     }
                 }
-                for event in joined_room
-                    .state
-                    .events
-                    .iter()
-                    .flat_map(|r| r.deserialize())
-                {
-                    room.push_state(event.clone());
-                    match event {
-                        AnySyncStateEvent::RoomAliases(SyncStateEvent {
-                            content: AliasesEventContent { aliases, .. },
-                            ..
-                        }) => {
-                            room.set_alt_aliases(aliases);
+                // TODO: state redacts
+                if !joined_room.state.is_empty() {
+                    for event in joined_room
+                        .state
+                        .events
+                        .iter()
+                        .flat_map(|r| r.deserialize())
+                    {
+                        room.add_state(event.clone());
+                        match event {
+                            AnySyncStateEvent::RoomAvatar(SyncStateEvent {
+                                content: AvatarEventContent { url, .. },
+                                ..
+                            }) => {
+                                room.set_avatar(url.parse::<Uri>().map_or(None, Some));
+                            }
+                            AnySyncStateEvent::RoomAliases(SyncStateEvent {
+                                content: AliasesEventContent { aliases, .. },
+                                ..
+                            }) => {
+                                room.set_alt_aliases(aliases);
+                            }
+                            AnySyncStateEvent::RoomName(SyncStateEvent { content, .. }) => {
+                                room.set_name(content.name().map(|s| s.to_string()));
+                            }
+                            AnySyncStateEvent::RoomCanonicalAlias(SyncStateEvent {
+                                content:
+                                    CanonicalAliasEventContent {
+                                        alias, alt_aliases, ..
+                                    },
+                                ..
+                            }) => {
+                                room.set_canonical_alias(alias);
+                                room.set_alt_aliases(alt_aliases);
+                            }
+                            _ => {}
                         }
-                        AnySyncStateEvent::RoomName(SyncStateEvent { content, .. }) => {
-                            room.set_name(content.name().map(|s| s.to_string()));
-                        }
-                        AnySyncStateEvent::RoomCanonicalAlias(SyncStateEvent {
-                            content:
-                                CanonicalAliasEventContent {
-                                    alias, alt_aliases, ..
-                                },
-                            ..
-                        }) => {
-                            room.set_canonical_alias(alias);
-                            room.set_alt_aliases(alt_aliases);
-                        }
-                        _ => {}
+                    }
+                    room.recalculate_members();
+                    // TODO: move all thumbnail operations to the update method in main screen?
+                    // since update will get called anyways when we receive something
+                    for avatar_url in room.members().member_datas().flat_map(|m| m.avatar_url()) {
+                        thumbnails.push((
+                            content_store.content_exists(&avatar_url.to_string()),
+                            avatar_url.clone(),
+                        ));
+                    }
+                    if let Some(avatar_url) = room.avatar_url() {
+                        thumbnails.push((
+                            content_store.content_exists(&avatar_url.to_string()),
+                            avatar_url.clone(),
+                        ));
                     }
                 }
                 for event in joined_room
@@ -563,7 +584,6 @@ impl Client {
                     {
                         thumbnails.push(thumbnail_data);
                     }
-
                     room.add_event(tevent);
                 }
             }

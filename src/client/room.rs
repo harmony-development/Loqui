@@ -1,5 +1,6 @@
 use super::{member::Members, TimelineEvent};
 use ahash::AHashMap;
+use http::Uri;
 use ruma::{events::AnySyncStateEvent, RoomAliasId, RoomId, RoomVersionId, UserId};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
@@ -9,6 +10,7 @@ pub type Rooms = AHashMap<RoomId, Room>;
 pub struct Room {
     version: RoomVersionId,
     name: Option<String>,
+    avatar_url: Option<Uri>,
     canonical_alias: Option<RoomAliasId>,
     alt_aliases: Vec<RoomAliasId>,
     timeline: Vec<TimelineEvent>,
@@ -27,6 +29,7 @@ impl Default for Room {
             // FIXME: take this as arg
             version: RoomVersionId::Version5,
             name: None,
+            avatar_url: None,
             canonical_alias: None,
             alt_aliases: Default::default(),
             timeline: Default::default(),
@@ -49,6 +52,14 @@ impl Room {
     /// Get the name of this room.
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
+    }
+
+    pub fn avatar_url(&self) -> Option<&Uri> {
+        self.avatar_url.as_ref()
+    }
+
+    pub fn set_avatar(&mut self, url: Option<Uri>) {
+        self.avatar_url = url;
     }
 
     /// Get the canonical alias of this room.
@@ -87,7 +98,7 @@ impl Room {
         self.timeline.last()
     }
 
-    fn recalculate_members(&mut self) {
+    pub(super) fn recalculate_members(&mut self) {
         let mut members = Members::default();
 
         for state in &self.state {
@@ -152,9 +163,9 @@ impl Room {
             .update_typing(self.typing.0.as_slice(), self.typing.1);
     }
 
-    pub fn push_state(&mut self, state: AnySyncStateEvent) {
+    pub fn add_state(&mut self, state: AnySyncStateEvent) {
         self.state.push(state);
-        self.recalculate_members();
+        // We don't recalculate_members here and instead do it when we finish adding all of the state of a sync response.
     }
 
     pub fn add_state_backwards(&mut self, state: Vec<AnySyncStateEvent>) {

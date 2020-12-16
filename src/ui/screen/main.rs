@@ -214,6 +214,7 @@ impl MainScreen {
 
         let username = client.current_user_id().localpart().to_string();
         // Build the top menu
+        // TODO: show user avatar next to name
         let menu = PickList::new(
             &mut self.menu_state,
             vec![
@@ -234,6 +235,7 @@ impl MainScreen {
         // Build the room list
         let (mut room_list, first_room_id) = build_room_list(
             rooms,
+            &self.thumbnail_cache,
             self.current_room_id.as_ref(),
             self.room_search_text.as_str(),
             &mut self.rooms_list_state,
@@ -419,62 +421,67 @@ impl MainScreen {
         fn make_thumbnail_commands(
             client: &Client,
             thumbnail_urls: Vec<(bool, Uri)>,
+            thumbnail_cache: &ThumbnailCache,
         ) -> Command<super::Message> {
-            return Command::batch(thumbnail_urls.into_iter().map(
-                |(is_in_cache, thumbnail_url)| {
-                    let content_path = client
-                        .content_store()
-                        .content_path(&thumbnail_url.to_string());
+            return Command::batch(thumbnail_urls.into_iter().flat_map(
+                |(is_on_disk, thumbnail_url)| {
+                    if !thumbnail_cache.has_thumbnail(&thumbnail_url) {
+                        let content_path = client
+                            .content_store()
+                            .content_path(&thumbnail_url.to_string());
 
-                    if is_in_cache {
-                        Command::perform(
-                            async move {
-                                (
-                                    async {
-                                        Ok(ImageHandle::from_memory(
-                                            tokio::fs::read(content_path).await?,
-                                        ))
-                                    }
-                                    .await,
-                                    thumbnail_url,
-                                )
-                            },
-                            |(result, thumbnail_url)| match result {
-                                Ok(thumbnail) => {
-                                    super::Message::MainScreen(Message::DownloadedThumbnail {
-                                        thumbnail,
+                        Some(if is_on_disk {
+                            Command::perform(
+                                async move {
+                                    (
+                                        async {
+                                            Ok(ImageHandle::from_memory(
+                                                tokio::fs::read(content_path).await?,
+                                            ))
+                                        }
+                                        .await,
                                         thumbnail_url,
-                                    })
-                                }
-                                Err(err) => super::Message::MatrixError(Box::new(err)),
-                            },
-                        )
+                                    )
+                                },
+                                |(result, thumbnail_url)| match result {
+                                    Ok(thumbnail) => {
+                                        super::Message::MainScreen(Message::DownloadedThumbnail {
+                                            thumbnail,
+                                            thumbnail_url,
+                                        })
+                                    }
+                                    Err(err) => super::Message::MatrixError(Box::new(err)),
+                                },
+                            )
+                        } else {
+                            let download_task =
+                                Client::download_content(client.inner(), thumbnail_url.clone());
+
+                            Command::perform(
+                                async move {
+                                    match download_task.await {
+                                        Ok(raw_data) => {
+                                            tokio::fs::write(content_path, raw_data.as_slice())
+                                                .await
+                                                .map(|_| (thumbnail_url, raw_data))
+                                                .map_err(Into::into)
+                                        }
+                                        Err(err) => Err(err),
+                                    }
+                                },
+                                |result| match result {
+                                    Ok((thumbnail_url, raw_data)) => {
+                                        super::Message::MainScreen(Message::DownloadedThumbnail {
+                                            thumbnail_url,
+                                            thumbnail: ImageHandle::from_memory(raw_data),
+                                        })
+                                    }
+                                    Err(err) => super::Message::MatrixError(Box::new(err)),
+                                },
+                            )
+                        })
                     } else {
-                        let download_task =
-                            Client::download_content(client.inner(), thumbnail_url.clone());
-
-                        Command::perform(
-                            async move {
-                                match download_task.await {
-                                    Ok(raw_data) => {
-                                        tokio::fs::write(content_path, raw_data.as_slice())
-                                            .await
-                                            .map(|_| (thumbnail_url, raw_data))
-                                            .map_err(Into::into)
-                                    }
-                                    Err(err) => Err(err),
-                                }
-                            },
-                            |result| match result {
-                                Ok((thumbnail_url, raw_data)) => {
-                                    super::Message::MainScreen(Message::DownloadedThumbnail {
-                                        thumbnail_url,
-                                        thumbnail: ImageHandle::from_memory(raw_data),
-                                    })
-                                }
-                                Err(err) => super::Message::MatrixError(Box::new(err)),
-                            },
-                        )
+                        None
                     }
                 },
             ));
@@ -952,16 +959,16 @@ impl MainScreen {
             Message::SyncResponse(response) => {
                 let thumbnail_urls = client.process_sync_response(*response);
 
-                for (room_id, room) in client.rooms.iter_mut() {
-                    let disp = room.displayable_events().count().saturating_sub(1);
-                    if self.current_room_id.as_ref() != Some(room_id) {
-                        if room.looking_at_event == disp {
-                            room.looking_at_event = disp;
-                        }
-                    }
-                }
+                // for (room_id, room) in client.rooms.iter_mut() {
+                //     let disp = room.displayable_events().count().saturating_sub(1);
+                //     if self.current_room_id.as_ref() != Some(room_id) {
+                //         if room.looking_at_event == disp {
+                //             room.looking_at_event = disp;
+                //         }
+                //     }
+                // }
 
-                return make_thumbnail_commands(client, thumbnail_urls);
+                return make_thumbnail_commands(client, thumbnail_urls, &self.thumbnail_cache);
             }
             Message::GetEventsBackwardsResponse(response) => {
                 if let Some((room_id, thumbnail_urls)) =
@@ -973,7 +980,7 @@ impl MainScreen {
                         .get_mut(&room_id)
                         .unwrap()
                         .loading_events_backward = false;
-                    return make_thumbnail_commands(client, thumbnail_urls);
+                    return make_thumbnail_commands(client, thumbnail_urls, &self.thumbnail_cache);
                 }
             }
             Message::RoomChanged(new_room_id) => {

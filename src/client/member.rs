@@ -50,10 +50,6 @@ impl Member {
         self.display_name = new_display_name;
     }
 
-    pub fn set_display(&mut self, new_display: bool) {
-        self.display_user = new_display;
-    }
-
     pub fn set_typing(&mut self, new_typing_recieved: Option<Instant>) {
         self.typing_received = new_typing_recieved;
     }
@@ -134,33 +130,21 @@ impl Members {
         membership_change: MembershipChange,
         user_id: UserId,
     ) {
-        let member = self
-            .members
-            .entry(user_id.clone())
-            .and_modify(|member| {
-                member.set_display_name(displayname.clone());
-                member.set_avatar_url(avatar_url.clone());
-            })
-            .or_insert_with(move || {
-                let mut new_member = Member::new();
-                new_member.set_display_name(displayname);
-                new_member.set_avatar_url(avatar_url);
-                new_member
-            });
+        let member = self.members.entry(user_id.clone()).or_default();
 
         match membership_change {
             MembershipChange::Left
             | MembershipChange::Banned
             | MembershipChange::Kicked
             | MembershipChange::KickedAndBanned => {
-                if let Some(name) = member.display_name() {
+                if let Some(name) = &displayname {
                     if let Some(ids) = self.display_name_to_user_id.get_mut(name) {
                         if let Some(index) = ids.iter().position(|id| id == &user_id) {
                             ids.remove(index);
                         }
                     }
                 }
-                member.set_display(false);
+                member.display_user = false;
             }
             MembershipChange::Joined | MembershipChange::Unbanned => {
                 if let Some(name) = member.display_name() {
@@ -171,25 +155,31 @@ impl Members {
 
                     ids.push(user_id.clone());
                 }
-                member.set_display(true);
+                member.avatar_url = avatar_url;
+                member.display_name = displayname;
+                member.display_user = true;
             }
             MembershipChange::ProfileChanged {
                 displayname_changed,
-                avatar_url_changed: _,
+                avatar_url_changed,
             } => {
                 if displayname_changed {
-                    if let Some(name) = prev_displayname {
-                        if let Some(ids) = self.display_name_to_user_id.get_mut(&name) {
+                    if let Some(name) = &prev_displayname {
+                        if let Some(ids) = self.display_name_to_user_id.get_mut(name) {
                             if let Some(index) = ids.iter().position(|id| id == &user_id) {
                                 ids.remove(index);
                             }
                         }
                     }
-                    if let Some(name) = member.display_name() {
+                    if let Some(name) = &displayname {
                         if let Some(ids) = self.display_name_to_user_id.get_mut(name) {
                             ids.push(user_id);
                         }
                     }
+                    member.display_name = displayname;
+                }
+                if avatar_url_changed {
+                    member.avatar_url = avatar_url;
                 }
             }
             _ => {}
