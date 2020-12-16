@@ -81,7 +81,7 @@ impl TimelineEvent {
                     MessageEventContent::Notice(notice) => notice.body,
                     MessageEventContent::ServerNotice(server_notice) => server_notice.body,
                     MessageEventContent::Text(text) => text.body,
-                    MessageEventContent::Emote(emote) => format!("* {} *", emote.body),
+                    MessageEventContent::Emote(emote) => emote.body,
                     _ => String::from("Unknown message content"),
                 },
                 _ => String::from("Unknown message type"),

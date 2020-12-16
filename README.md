@@ -4,7 +4,7 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 
 ## Requirements
 - If you have the Nix package manager:
-    - Read the `README.md` in the `nix` directory.
+    - `nix develop` to get a dev shell. (or `nix-shell nix/shell.nix` if you don't have flakes enabled)
 - If not:
     - Current stable Rust and Cargo.
     - Make sure you have a working Vulkan setup.
