@@ -773,9 +773,9 @@ rec {
       };
       "cocoa" = rec {
         crateName = "cocoa";
-        version = "0.23.0";
+        version = "0.24.0";
         edition = "2015";
-        sha256 = "1cj4c2axmg7aiid2786mpzj7wxpd582biv7c7yimqfnggp002hn5";
+        sha256 = "0cp8hsajmi7gini22bmlsf9dac7cap7x1k169vxhwlr3j8p90qvg";
         authors = [
           "The Servo Project Developers"
         ];
@@ -3624,8 +3624,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -3687,8 +3687,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -3702,8 +3702,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -3743,8 +3743,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -3795,8 +3795,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -3833,8 +3833,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -3854,8 +3854,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -3908,8 +3908,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -3978,8 +3978,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/yusdacra/iced";
-          rev = "dec0e0a246095d2dd01d2d9c6cb7b5bdf8f404b4";
-          sha256 = "1ybxxbnjc0jmibv8hxqvh6ffncbazg9d4fq37xifb8x9xfli7alf";
+          rev = "21e8ad5a6f9b370b4aea0ba3a167e58bd10011f0";
+          sha256 = "1aj6a9mqm4wqhb0ca93m4fhlfw2y5w7pwcc38zxzm0y1x1ls1xnv";
         };
         authors = [
           "Héctor Ramón Jiménez <hector0193@gmail.com>"
@@ -6439,8 +6439,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jonas Platte <jplatte@posteo.de>"
@@ -6506,8 +6506,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6557,8 +6557,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         procMacro = true;
         authors = [
@@ -6593,8 +6593,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6674,8 +6674,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6751,8 +6751,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jonas Platte <jplatte@posteo.de>"
@@ -6795,8 +6795,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6850,8 +6850,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         procMacro = true;
         authors = [
@@ -6887,8 +6887,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -6938,8 +6938,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         procMacro = true;
         authors = [
@@ -6973,8 +6973,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jimmy Cuadra <jimmy@jimmycuadra.com>"
@@ -7000,8 +7000,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         authors = [
           "Jonas Platte <jplatte@posteo.de>"
@@ -7046,8 +7046,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ruma/ruma/";
-          rev = "212153ea5fb62388e613053212660216d8b3e068";
-          sha256 = "1znlxavb2yfvmf9aa30f69bshpglygrv0pidhaz393cy1hhwymmy";
+          rev = "1f8384722fd60e11e42130d41a59a0ef440d8a7e";
+          sha256 = "0cjkmpqpy54d5wklmqkph2kvppsz3xxjx90izik1x87ismyayy00";
         };
         procMacro = true;
         authors = [
@@ -9942,7 +9942,7 @@ rec {
         features = {
           "debug" = [ "impl-debug" ];
         };
-        resolvedDefaultFeatures = [ "basetsd" "combaseapi" "commctrl" "consoleapi" "d3d11" "d3d11_1" "d3d11sdklayers" "d3d12" "d3d12sdklayers" "d3d12shader" "d3dcommon" "d3dcompiler" "dwmapi" "dwrite" "dwrite_1" "dwrite_3" "dxgi1_2" "dxgi1_3" "dxgi1_4" "dxgi1_5" "dxgi1_6" "dxgidebug" "dxgiformat" "dxgitype" "errhandlingapi" "fileapi" "handleapi" "hidusage" "knownfolders" "libloaderapi" "lmcons" "minschannel" "minwinbase" "minwindef" "ntdef" "ntstatus" "objbase" "ole2" "processenv" "processthreadsapi" "profileapi" "schannel" "securitybaseapi" "shellapi" "shellscalingapi" "shlobj" "shobjidl" "shobjidl_core" "sspi" "std" "stringapiset" "synchapi" "sysinfoapi" "timezoneapi" "unknwnbase" "winbase" "wincon" "wincrypt" "windef" "windowsx" "winerror" "wingdi" "winnls" "winnt" "winsock2" "winuser" "ws2def" "ws2ipdef" "ws2tcpip" ];
+        resolvedDefaultFeatures = [ "basetsd" "combaseapi" "commctrl" "consoleapi" "d3d11" "d3d11_1" "d3d11sdklayers" "d3d12" "d3d12sdklayers" "d3d12shader" "d3dcommon" "d3dcompiler" "dwmapi" "dwrite" "dwrite_1" "dwrite_3" "dxgi1_2" "dxgi1_3" "dxgi1_4" "dxgi1_5" "dxgi1_6" "dxgidebug" "dxgiformat" "dxgitype" "errhandlingapi" "fileapi" "handleapi" "hidusage" "imm" "knownfolders" "libloaderapi" "lmcons" "minschannel" "minwinbase" "minwindef" "ntdef" "ntstatus" "objbase" "ole2" "processenv" "processthreadsapi" "profileapi" "schannel" "securitybaseapi" "shellapi" "shellscalingapi" "shlobj" "shobjidl" "shobjidl_core" "sspi" "std" "stringapiset" "synchapi" "sysinfoapi" "timezoneapi" "unknwnbase" "winbase" "wincon" "wincrypt" "windef" "windowsx" "winerror" "wingdi" "winnls" "winnt" "winsock2" "winuser" "ws2def" "ws2ipdef" "ws2tcpip" ];
       };
       "winapi-build" = rec {
         crateName = "winapi-build";
@@ -10032,9 +10032,9 @@ rec {
       };
       "winit" = rec {
         crateName = "winit";
-        version = "0.23.0";
+        version = "0.24.0";
         edition = "2018";
-        sha256 = "0wmpq4qqj65ri01f34fby9xjr64ysh287l5w3dksmn37lnfmbg5m";
+        sha256 = "15zmpx5ip6ziqhds7md1s0ri0blhxfa8fg1ylg84pf0frrpxlkns";
         authors = [
           "The winit contributors"
           "Pierre Krieger <pierre.krieger1708@gmail.com>"
@@ -10090,11 +10090,13 @@ rec {
           {
             name = "mio";
             packageId = "mio";
+            optional = true;
             target = { target, features }: ((target."os" == "linux") || (target."os" == "dragonfly") || (target."os" == "freebsd") || (target."os" == "openbsd") || (target."os" == "netbsd"));
           }
           {
             name = "mio-extras";
             packageId = "mio-extras";
+            optional = true;
             target = { target, features }: ((target."os" == "linux") || (target."os" == "dragonfly") || (target."os" == "freebsd") || (target."os" == "openbsd") || (target."os" == "netbsd"));
           }
           {
@@ -10115,21 +10117,23 @@ rec {
           {
             name = "objc";
             packageId = "objc";
-            target = { target, features }: (target."os" == "ios");
-          }
-          {
-            name = "objc";
-            packageId = "objc";
-            target = { target, features }: (target."os" == "macos");
+            target = { target, features }: ((target."os" == "ios") || (target."os" == "macos"));
           }
           {
             name = "parking_lot";
             packageId = "parking_lot";
-            target = { target, features }: ((target."os" == "linux") || (target."os" == "dragonfly") || (target."os" == "freebsd") || (target."os" == "openbsd") || (target."os" == "netbsd") || (target."os" == "windows"));
+            optional = true;
+            target = { target, features }: ((target."os" == "linux") || (target."os" == "dragonfly") || (target."os" == "freebsd") || (target."os" == "openbsd") || (target."os" == "netbsd"));
+          }
+          {
+            name = "parking_lot";
+            packageId = "parking_lot";
+            target = { target, features }: (target."os" == "windows");
           }
           {
             name = "percent-encoding";
             packageId = "percent-encoding";
+            optional = true;
             target = { target, features }: ((target."os" == "linux") || (target."os" == "dragonfly") || (target."os" == "freebsd") || (target."os" == "openbsd") || (target."os" == "netbsd"));
           }
           {
@@ -10154,7 +10158,7 @@ rec {
             name = "winapi";
             packageId = "winapi 0.3.9";
             target = { target, features }: (target."os" == "windows");
-            features = [ "combaseapi" "commctrl" "dwmapi" "errhandlingapi" "hidusage" "libloaderapi" "objbase" "ole2" "processthreadsapi" "shellapi" "shellscalingapi" "shobjidl_core" "unknwnbase" "winbase" "windowsx" "winerror" "wingdi" "winnt" "winuser" ];
+            features = [ "combaseapi" "commctrl" "dwmapi" "errhandlingapi" "imm" "hidusage" "libloaderapi" "objbase" "ole2" "processthreadsapi" "shellapi" "shellscalingapi" "shobjidl_core" "unknwnbase" "winbase" "windowsx" "winerror" "wingdi" "winnt" "winuser" ];
           }
           {
             name = "x11-dl";
@@ -10168,9 +10172,9 @@ rec {
           "stdweb" = [ "std_web" "instant/stdweb" ];
           "wayland" = [ "wayland-client" "sctk" ];
           "web-sys" = [ "web_sys" "wasm-bindgen" "instant/wasm-bindgen" ];
-          "x11" = [ "x11-dl" ];
+          "x11" = [ "x11-dl" "mio" "mio-extras" "percent-encoding" "parking_lot" ];
         };
-        resolvedDefaultFeatures = [ "default" "sctk" "wayland" "wayland-client" "x11" "x11-dl" ];
+        resolvedDefaultFeatures = [ "default" "mio" "mio-extras" "parking_lot" "percent-encoding" "sctk" "wayland" "wayland-client" "x11" "x11-dl" ];
       };
       "wio" = rec {
         crateName = "wio";
