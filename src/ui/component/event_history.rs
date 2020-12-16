@@ -192,7 +192,7 @@ pub fn build_event_history<'a>(
             };
 
             let is_thumbnail = matches!(content_type, ContentType::Image);
-            let does_content_exist = content_store.content_exists(&content_url.to_string());
+            let does_content_exist = content_store.content_exists(&content_url);
 
             if let Some(thumbnail_image) = thumbnail_cache
                 .get_thumbnail(&content_url)

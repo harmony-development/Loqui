@@ -477,7 +477,7 @@ impl Client {
                 // since update will get called anyways when we receive something
                 for avatar_url in room.members().member_datas().flat_map(|m| m.avatar_url()) {
                     thumbnails.push((
-                        self.content_store.content_exists(&avatar_url.to_string()),
+                        self.content_store.content_exists(&avatar_url),
                         avatar_url.clone(),
                     ));
                 }
@@ -558,13 +558,13 @@ impl Client {
                     // since update will get called anyways when we receive something
                     for avatar_url in room.members().member_datas().flat_map(|m| m.avatar_url()) {
                         thumbnails.push((
-                            content_store.content_exists(&avatar_url.to_string()),
+                            content_store.content_exists(&avatar_url),
                             avatar_url.clone(),
                         ));
                     }
                     if let Some(avatar_url) = room.avatar_url() {
                         thumbnails.push((
-                            content_store.content_exists(&avatar_url.to_string()),
+                            content_store.content_exists(&avatar_url),
                             avatar_url.clone(),
                         ));
                     }

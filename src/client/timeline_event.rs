@@ -279,14 +279,11 @@ impl TimelineEvent {
 
     pub fn download_or_read_thumbnail(&self, content_store: &ContentStore) -> Option<(bool, Uri)> {
         if let Some(thumbnail_url) = self.thumbnail_url() {
-            Some((
-                content_store.content_exists(&thumbnail_url.to_string()),
-                thumbnail_url,
-            ))
+            Some((content_store.content_exists(&thumbnail_url), thumbnail_url))
         } else if let (Some(ContentType::Image), Some(content_size), Some(content_url)) =
             (self.content_type(), self.content_size(), self.content_url())
         {
-            if content_store.content_exists(&content_url.to_string()) {
+            if content_store.content_exists(&content_url) {
                 Some((true, content_url))
             } else if content_size < 1000 * 1000 {
                 Some((false, content_url))

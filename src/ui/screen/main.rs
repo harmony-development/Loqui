@@ -426,9 +426,7 @@ impl MainScreen {
             return Command::batch(thumbnail_urls.into_iter().flat_map(
                 |(is_on_disk, thumbnail_url)| {
                     if !thumbnail_cache.has_thumbnail(&thumbnail_url) {
-                        let content_path = client
-                            .content_store()
-                            .content_path(&thumbnail_url.to_string());
+                        let content_path = client.content_store().content_path(&thumbnail_url);
 
                         Some(if is_on_disk {
                             Command::perform(
@@ -615,9 +613,7 @@ impl MainScreen {
                 is_thumbnail,
             } => {
                 let thumbnail_exists = self.thumbnail_cache.has_thumbnail(&content_url);
-                let content_path = client
-                    .content_store()
-                    .content_path(&content_url.to_string());
+                let content_path = client.content_store().content_path(&content_url);
                 return if content_path.exists() {
                     Command::perform(
                         async move {
@@ -784,8 +780,7 @@ impl MainScreen {
                                         Ok(content_url) => {
                                             if let Err(err) = tokio::fs::hard_link(
                                                 &path,
-                                                content_store
-                                                    .content_path(&content_url.to_string()),
+                                                content_store.content_path(&content_url),
                                             )
                                             .await
                                             {
@@ -958,16 +953,6 @@ impl MainScreen {
             }
             Message::SyncResponse(response) => {
                 let thumbnail_urls = client.process_sync_response(*response);
-
-                // for (room_id, room) in client.rooms.iter_mut() {
-                //     let disp = room.displayable_events().count().saturating_sub(1);
-                //     if self.current_room_id.as_ref() != Some(room_id) {
-                //         if room.looking_at_event == disp {
-                //             room.looking_at_event = disp;
-                //         }
-                //     }
-                // }
-
                 return make_thumbnail_commands(client, thumbnail_urls, &self.thumbnail_cache);
             }
             Message::GetEventsBackwardsResponse(response) => {

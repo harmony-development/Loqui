@@ -1,5 +1,4 @@
 use super::ClientError;
-use directories_next::ProjectDirs;
 use http::Uri;
 use iced_native::image::Data;
 use indexmap::IndexMap;
@@ -33,20 +32,20 @@ pub struct ContentStore {
 
 impl Default for ContentStore {
     fn default() -> Self {
-        let maybe_app_dirs = ProjectDirs::from("nodomain", "yusdacra", "icy_matrix");
-
-        let session_file = maybe_app_dirs.as_ref().map_or_else(
-            || SESSION_FILENAME.into(),
-            |dirs| dirs.data_dir().join(SESSION_FILENAME),
-        );
-        let log_file = maybe_app_dirs.as_ref().map_or_else(
-            || LOG_FILENAME.into(),
-            |dirs| dirs.data_dir().join(LOG_FILENAME),
-        );
-        let content_dir = maybe_app_dirs.as_ref().map_or_else(
-            || CONTENT_DIR_NAME.into(),
-            |dirs| dirs.cache_dir().join(CONTENT_DIR_NAME),
-        );
+        let (session_file, log_file, content_dir) =
+            match directories_next::ProjectDirs::from("nodomain", "yusdacra", "icy_matrix") {
+                Some(app_dirs) => (
+                    app_dirs.data_dir().join(SESSION_FILENAME),
+                    app_dirs.data_dir().join(LOG_FILENAME),
+                    app_dirs.data_dir().join(CONTENT_DIR_NAME),
+                ),
+                // Fallback to current working directory if no HOME is present
+                None => (
+                    SESSION_FILENAME.into(),
+                    LOG_FILENAME.into(),
+                    CONTENT_DIR_NAME.into(),
+                ),
+            };
 
         Self {
             session_file,
@@ -57,12 +56,14 @@ impl Default for ContentStore {
 }
 
 impl ContentStore {
-    pub fn content_path(&self, id: &str) -> PathBuf {
-        let normalized_id = id.replace(|c| [' ', '/', '\\', '.', ':'].contains(&c), "_");
+    pub fn content_path(&self, id: &Uri) -> PathBuf {
+        let normalized_id = id
+            .to_string()
+            .replace(|c| [' ', '/', '\\', '.', ':'].contains(&c), "_");
         self.content_dir().join(normalized_id)
     }
 
-    pub fn content_mimetype(&self, id: &str) -> String {
+    pub fn content_mimetype(&self, id: &Uri) -> String {
         infer::get_from_path(self.content_path(id))
             .map_or(None, Some)
             .flatten()
@@ -70,7 +71,7 @@ impl ContentStore {
             .unwrap_or_else(|| String::from("application/octet-stream"))
     }
 
-    pub fn content_exists(&self, id: &str) -> bool {
+    pub fn content_exists(&self, id: &Uri) -> bool {
         self.content_path(id).exists()
     }
 
@@ -130,7 +131,7 @@ impl ThumbnailCache {
         }
     }
 
-    pub fn put_thumbnail(&mut self, thumbnail_url: Uri, thumbnail: ImageHandle) {
+    pub fn put_thumbnail(&mut self, thumbnail_id: Uri, thumbnail: ImageHandle) {
         let thumbnail_size = match get_image_size_from_handle(&thumbnail) {
             Some(size) => size,
             None => return,
@@ -156,7 +157,7 @@ impl ThumbnailCache {
                 self.thumbnails.shift_remove_index(index);
             }
         } else {
-            self.thumbnails.insert(thumbnail_url, thumbnail);
+            self.thumbnails.insert(thumbnail_id, thumbnail);
         }
     }
 
@@ -167,16 +168,16 @@ impl ThumbnailCache {
             .sum()
     }
 
-    pub fn has_thumbnail(&self, thumbnail_url: &Uri) -> bool {
-        self.thumbnails.contains_key(thumbnail_url)
+    pub fn has_thumbnail(&self, thumbnail_id: &Uri) -> bool {
+        self.thumbnails.contains_key(thumbnail_id)
     }
 
-    pub fn get_thumbnail(&self, thumbnail_url: &Uri) -> Option<&ImageHandle> {
-        self.thumbnails.get(thumbnail_url)
+    pub fn get_thumbnail(&self, thumbnail_id: &Uri) -> Option<&ImageHandle> {
+        self.thumbnails.get(thumbnail_id)
     }
 
-    pub fn invalidate_thumbnail(&mut self, thumbnail_url: &Uri) {
-        self.thumbnails.remove(thumbnail_url);
+    pub fn invalidate_thumbnail(&mut self, thumbnail_id: &Uri) {
+        self.thumbnails.remove(thumbnail_id);
     }
 }
 
