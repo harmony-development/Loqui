@@ -1,10 +1,13 @@
 use crate::{
-    client::{content::ContentStore, Client, LoginInformation},
-    ui::style::{Theme, PADDING, SPACING},
+    client::{content::ContentStore, error::ClientError, Client, LoginInformation},
+    ui::{
+        component::*,
+        style::{Theme, PADDING, SPACING},
+    },
 };
 use iced::{
     button, text_input, Align, Button, Color, Column, Command, Container, Element, Length, Row,
-    Space, Subscription, Text, TextInput,
+    Space, Text, TextInput,
 };
 use std::sync::Arc;
 
@@ -17,6 +20,7 @@ pub enum Message {
     LoginInitiated,
 }
 
+#[derive(Debug)]
 pub struct LoginScreen {
     homeserver_field: text_input::State,
     username_field: text_input::State,
@@ -25,9 +29,9 @@ pub struct LoginScreen {
 
     login_info: LoginInformation,
     /// `None` if not logging out, `Some(restoring_session)` if logging in.
-    pub(in crate::ui::screen) logging_in: Option<bool>,
+    logging_in: Option<bool>,
     /// The error formatted as a string to be displayed to the user.
-    pub(in crate::ui::screen) current_error: String,
+    current_error: String,
     content_store: Arc<ContentStore>,
 }
 
@@ -47,7 +51,7 @@ impl LoginScreen {
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
         if let Some(restoring_session) = self.logging_in {
-            return Container::new(
+            return fill_container(
                 Text::new(if restoring_session {
                     "Restoring session..."
                 } else {
@@ -55,10 +59,6 @@ impl LoginScreen {
                 })
                 .size(30),
             )
-            .center_x()
-            .center_y()
-            .width(Length::Fill)
-            .height(Length::Fill)
             .style(theme)
             .into();
         }
@@ -126,11 +126,7 @@ impl LoginScreen {
         .height(Length::Fill)
         .align_items(Align::Center);
 
-        Container::new(padded_panel)
-            .style(theme)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        fill_container(padded_panel).style(theme).into()
     }
 
     pub fn update(&mut self, msg: Message) -> Command<super::Message> {
@@ -145,6 +141,7 @@ impl LoginScreen {
                 self.login_info.password = new_password;
             }
             Message::LoginWithSession => {
+                self.logging_in = Some(true);
                 return Command::perform(
                     Client::new_with_session(self.content_store.clone()),
                     |result| match result {
@@ -167,12 +164,10 @@ impl LoginScreen {
         Command::none()
     }
 
-    pub fn subscription(&self) -> Subscription<super::Message> {
-        Subscription::none()
-    }
-
-    pub fn on_error(&mut self, error_string: String) {
-        self.current_error = error_string;
+    pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
+        self.current_error = error.to_string();
         self.logging_in = None;
+
+        Command::none()
     }
 }

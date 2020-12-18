@@ -61,7 +61,7 @@ impl Display for ClientError {
                         ClientAPIErrorKind::Forbidden => {
                             return write!(
                                 fmt,
-                                "The server rejected your login information: {}",
+                                "It's forbidden to perform this operation: {}",
                                 err.message
                             );
                         }

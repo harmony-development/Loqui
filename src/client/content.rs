@@ -111,6 +111,7 @@ fn get_image_size_from_handle(handle: &ImageHandle) -> Option<u64> {
     }
 }
 
+#[derive(Debug)]
 pub struct ThumbnailCache {
     thumbnails: IndexMap<Uri, ImageHandle>,
     max_size: u64,

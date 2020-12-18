@@ -20,10 +20,17 @@ pub fn main() {
         .add_filter_ignore_str("tracing")
         .build();
 
+    let show_debug = std::env::args().nth(1).map_or(false, |s| s == "-d");
+    let filter_level = if show_debug {
+        LevelFilter::Debug
+    } else {
+        LevelFilter::Info
+    };
+
     CombinedLogger::init(vec![
-        TermLogger::new(LevelFilter::Info, config.clone(), TerminalMode::Mixed),
+        TermLogger::new(filter_level, config.clone(), TerminalMode::Mixed),
         WriteLogger::new(
-            LevelFilter::Info,
+            filter_level,
             config,
             std::fs::File::create(content_store.log_file()).unwrap(),
         ),

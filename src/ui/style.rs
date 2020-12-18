@@ -11,6 +11,9 @@ pub const DATE_SEPERATOR_SIZE: u16 = 22;
 pub const PADDING: u16 = 16;
 pub const SPACING: u16 = 4;
 
+pub const ERROR_COLOR: Color = Color::from_rgb(1.0, 0.0, 0.0);
+pub const SUCCESS_COLOR: Color = Color::from_rgb(0.0, 1.0, 0.0);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Theme {
     Light,

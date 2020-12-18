@@ -31,7 +31,7 @@ pub fn build_event_history<'a>(
     current_user_id: &UserId,
     looking_at_event: usize,
     scrollable_state: &'a mut scrollable::State,
-    content_open_buttons: &'a mut Vec<button::State>,
+    content_open_buttons: &'a mut [button::State; SHOWN_MSGS_LIMIT],
     theme: Theme,
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
