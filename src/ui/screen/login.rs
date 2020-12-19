@@ -1,35 +1,31 @@
 use crate::{
-    client::{content::ContentStore, error::ClientError, Client, LoginInformation},
+    client::{content::ContentStore, error::ClientError, AuthInfo, AuthMethod, Client},
     ui::{
         component::*,
-        style::{Theme, PADDING, SPACING},
+        style::{Theme, ERROR_COLOR, PADDING},
     },
-};
-use iced::{
-    button, text_input, Align, Button, Color, Column, Command, Container, Element, Length, Row,
-    Space, Text, TextInput,
 };
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    HomeserverChanged(String),
     UsernameChanged(String),
     PasswordChanged(String),
-    LoginWithSession,
-    LoginInitiated,
+    HomeserverChanged(String),
+    AuthWith(AuthMethod),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct LoginScreen {
     homeserver_field: text_input::State,
     username_field: text_input::State,
     password_field: text_input::State,
     login_button: button::State,
+    register_button: button::State,
+    guest_button: button::State,
 
-    login_info: LoginInformation,
-    /// `None` if not logging out, `Some(restoring_session)` if logging in.
-    logging_in: Option<bool>,
+    auth_info: AuthInfo,
+    cur_auth_method: Option<AuthMethod>,
     /// The error formatted as a string to be displayed to the user.
     current_error: String,
     content_store: Arc<ContentStore>,
@@ -38,56 +34,57 @@ pub struct LoginScreen {
 impl LoginScreen {
     pub fn new(content_store: Arc<ContentStore>) -> Self {
         Self {
-            homeserver_field: Default::default(),
-            username_field: Default::default(),
-            password_field: Default::default(),
-            login_button: Default::default(),
-            login_info: Default::default(),
-            logging_in: None,
-            current_error: String::new(),
             content_store,
+            ..Self::default()
         }
     }
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
-        if let Some(restoring_session) = self.logging_in {
-            return fill_container(
-                Text::new(if restoring_session {
-                    "Restoring session..."
-                } else {
-                    "Logging in..."
-                })
-                .size(30),
-            )
-            .style(theme)
-            .into();
+        if let Some(method) = &self.cur_auth_method {
+            let text = match method {
+                AuthMethod::LoginOrRegister { info, register } => {
+                    if *register {
+                        format!(
+                            "Registering with username \"{}\" to homeserver \"{}\"",
+                            info.username, info.homeserver_domain
+                        )
+                    } else {
+                        format!(
+                            "Logging in with username \"{}\" to homeserver \"{}\"",
+                            info.username, info.homeserver_domain
+                        )
+                    }
+                }
+                AuthMethod::Guest { homeserver_domain } => {
+                    format!(
+                        "Creating a guest account on homeserver {}...",
+                        homeserver_domain
+                    )
+                }
+                AuthMethod::RestoringSession => String::from("Restoring existing session..."),
+            };
+
+            return fill_container(label(text).size(30)).style(theme).into();
         }
 
-        let error_text = Text::new(&self.current_error)
-            .color(Color::from_rgb8(200, 0, 0))
-            .size(18);
+        let error_text = label(&self.current_error).color(ERROR_COLOR).size(18);
 
-        let homeserver_prefix = Text::new("https://");
+        let homeserver_prefix = Container::new(label("https://")).padding(PADDING / 2);
         let homeserver_field = TextInput::new(
             &mut self.homeserver_field,
             "Enter your homeserver domain here...",
-            &self.login_info.homeserver_domain,
+            &self.auth_info.homeserver_domain,
             Message::HomeserverChanged,
         )
         .padding(PADDING / 2)
         .style(theme);
-        let homeserver_area = Row::with_children(vec![
-            Container::new(homeserver_prefix)
-                .padding(PADDING / 2)
-                .into(),
-            homeserver_field.into(),
-        ])
-        .align_items(Align::Start);
+        let homeserver_field =
+            Row::with_children(vec![homeserver_prefix.into(), homeserver_field.into()]);
 
         let username_field = TextInput::new(
             &mut self.username_field,
             "Enter your username here...",
-            &self.login_info.username,
+            &self.auth_info.username,
             Message::UsernameChanged,
         )
         .padding(PADDING / 2)
@@ -96,35 +93,59 @@ impl LoginScreen {
         let password_field = TextInput::new(
             &mut self.password_field,
             "Enter your password here...",
-            &self.login_info.password,
+            &self.auth_info.password,
             Message::PasswordChanged,
         )
         .padding(PADDING / 2)
         .style(theme)
-        .on_submit(Message::LoginInitiated)
+        .on_submit(Message::AuthWith(AuthMethod::LoginOrRegister {
+            info: self.auth_info.clone(),
+            register: false,
+        }))
         .password();
 
-        let login_button = Button::new(&mut self.login_button, Text::new("Login"))
-            .on_press(Message::LoginInitiated)
+        let login_button = label_button(&mut self.login_button, "Login")
+            .on_press(Message::AuthWith(AuthMethod::LoginOrRegister {
+                info: self.auth_info.clone(),
+                register: false,
+            }))
             .style(theme);
 
-        let login_panel = Column::with_children(vec![
+        let register_button = label_button(&mut self.register_button, "Register")
+            .on_press(Message::AuthWith(AuthMethod::LoginOrRegister {
+                info: self.auth_info.clone(),
+                register: true,
+            }))
+            .style(theme);
+
+        let guest_button = label_button(&mut self.guest_button, "Guest")
+            .on_press(Message::AuthWith(AuthMethod::Guest {
+                homeserver_domain: self.auth_info.homeserver_domain.clone(),
+            }))
+            .style(theme);
+
+        let login_panel = column(vec![
             error_text.into(),
-            homeserver_area.into(),
+            homeserver_field.into(),
             username_field.into(),
             password_field.into(),
-            login_button.into(),
-        ])
-        .align_items(Align::Center)
-        .spacing(SPACING * 3);
+            row(vec![
+                login_button.width(Length::FillPortion(1)).into(),
+                wspace(1).into(),
+                register_button.width(Length::FillPortion(1)).into(),
+                wspace(1).into(),
+                guest_button.width(Length::FillPortion(1)).into(),
+            ])
+            .width(Length::Fill)
+            .into(),
+        ]);
 
-        let padded_panel = Row::with_children(vec![
-            Space::with_width(Length::FillPortion(3)).into(),
-            login_panel.width(Length::FillPortion(4)).into(),
-            Space::with_width(Length::FillPortion(3)).into(),
+        let padded_panel = row(vec![
+            wspace(2).into(),
+            login_panel.width(Length::FillPortion(6)).into(),
+            wspace(2).into(),
         ])
-        .height(Length::Fill)
-        .align_items(Align::Center);
+        .height(Length::Fill);
 
         fill_container(padded_panel).style(theme).into()
     }
@@ -132,28 +153,18 @@ impl LoginScreen {
     pub fn update(&mut self, msg: Message) -> Command<super::Message> {
         match msg {
             Message::HomeserverChanged(new_homeserver) => {
-                self.login_info.homeserver_domain = new_homeserver;
+                self.auth_info.homeserver_domain = new_homeserver;
             }
             Message::UsernameChanged(new_username) => {
-                self.login_info.username = new_username;
+                self.auth_info.username = new_username;
             }
             Message::PasswordChanged(new_password) => {
-                self.login_info.password = new_password;
+                self.auth_info.password = new_password;
             }
-            Message::LoginWithSession => {
-                self.logging_in = Some(true);
+            Message::AuthWith(method) => {
+                self.cur_auth_method = Some(method.clone());
                 return Command::perform(
-                    Client::new_with_session(self.content_store.clone()),
-                    |result| match result {
-                        Ok(client) => super::Message::LoginComplete(client),
-                        Err(err) => super::Message::MatrixError(Box::new(err)),
-                    },
-                );
-            }
-            Message::LoginInitiated => {
-                self.logging_in = Some(false);
-                return Command::perform(
-                    Client::new(self.login_info.clone(), self.content_store.clone()),
+                    Client::new(method, self.content_store.clone()),
                     |result| match result {
                         Ok(client) => super::Message::LoginComplete(client),
                         Err(err) => super::Message::MatrixError(Box::new(err)),
@@ -166,7 +177,7 @@ impl LoginScreen {
 
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
         self.current_error = error.to_string();
-        self.logging_in = None;
+        self.cur_auth_method = None;
 
         Command::none()
     }

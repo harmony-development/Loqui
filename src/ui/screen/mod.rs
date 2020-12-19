@@ -12,7 +12,7 @@ use crate::{
     client::{
         content::{ContentStore, ImageHandle, ThumbnailCache},
         error::ClientError,
-        Client, InnerClient, TimelineEvent,
+        AuthMethod, Client, InnerClient, TimelineEvent,
     },
     ui::style::Theme,
 };
@@ -141,7 +141,7 @@ impl ScreenManager {
         let content_store = Arc::new(content_store);
 
         Self {
-            theme: Theme::Dark,
+            theme: Theme::default(),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new(content_store.clone()))),
             client: None,
             content_store,
@@ -158,7 +158,9 @@ impl Application for ScreenManager {
     fn new(content_store: Self::Flags) -> (Self, Command<Self::Message>) {
         if content_store.session_file().exists() {
             let mut manager = ScreenManager::new(content_store);
-            let cmd = manager.update(Message::LoginScreen(login::Message::LoginWithSession));
+            let cmd = manager.update(Message::LoginScreen(login::Message::AuthWith(
+                AuthMethod::RestoringSession,
+            )));
             (manager, cmd)
         } else {
             (ScreenManager::new(content_store), Command::none())

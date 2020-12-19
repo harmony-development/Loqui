@@ -115,20 +115,26 @@ impl TryFrom<InnerSession> for Session {
     }
 }
 
-/// Login information needed for a login request.
-#[derive(Clone, Debug)]
-pub struct LoginInformation {
+#[derive(Debug, Clone)]
+pub enum AuthMethod {
+    LoginOrRegister { info: AuthInfo, register: bool },
+    Guest { homeserver_domain: String },
+    RestoringSession,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthInfo {
     pub homeserver_domain: String,
     pub username: String,
     pub password: String,
 }
 
-impl Default for LoginInformation {
+impl Default for AuthInfo {
     fn default() -> Self {
         Self {
             homeserver_domain: String::from("matrix.org"),
-            username: String::new(),
-            password: String::new(),
+            username: String::default(),
+            password: String::default(),
         }
     }
 }
@@ -154,27 +160,55 @@ impl Debug for Client {
 
 impl Client {
     pub async fn new(
-        login_info: LoginInformation,
+        auth_method: AuthMethod,
         content_store: Arc<ContentStore>,
     ) -> ClientResult<Self> {
-        let LoginInformation {
-            homeserver_domain,
-            username,
-            password,
-        } = login_info;
+        fn get_homeserver(homeserver_domain: &str) -> ClientResult<Uri> {
+            let homeserver = format!("https://{}", homeserver_domain);
+            homeserver
+                .parse::<Uri>()
+                .map_err(|e| ClientError::URLParse(homeserver, e))
+        }
 
-        let homeserver = format!("https://{}", homeserver_domain);
-        let homeserver_url = homeserver
-            .parse::<Uri>()
-            .map_err(|e| ClientError::URLParse(homeserver, e))?;
+        let (session, inner) = {
+            match auth_method {
+                AuthMethod::Guest { homeserver_domain } => {
+                    let inner = InnerClient::new(get_homeserver(&homeserver_domain)?, None);
 
-        let inner = InnerClient::new(homeserver_url, None);
-        let session = {
-            Session::try_from(
-                inner
-                    .log_in(&username, &password, None, Some(CLIENT_ID))
-                    .await?,
-            )?
+                    (inner.register_guest().await?.try_into()?, inner)
+                }
+                AuthMethod::LoginOrRegister { info, register } => {
+                    let AuthInfo {
+                        homeserver_domain,
+                        username,
+                        password,
+                    } = info;
+                    let inner = InnerClient::new(get_homeserver(&homeserver_domain)?, None);
+
+                    let session = if register {
+                        inner.register_user(Some(&username), &password).await?
+                    } else {
+                        inner
+                            .log_in(&username, &password, None, Some(CLIENT_ID))
+                            .await?
+                    };
+
+                    (session.try_into()?, inner)
+                }
+                AuthMethod::RestoringSession => {
+                    let session: Session = tokio::fs::read_to_string(content_store.session_file())
+                        .await
+                        .map(|s| toml::from_str(&s))?
+                        .map_err(|e| ClientError::Custom(e.to_string()))?;
+
+                    let inner = InnerClient::new(
+                        get_homeserver(session.user_id.server_name().as_str())?,
+                        Some(session.clone().into()),
+                    );
+
+                    (session, inner)
+                }
+            }
         };
 
         // Save the session
@@ -199,38 +233,6 @@ impl Client {
 
         Ok(Self {
             inner,
-            rooms: Rooms::new(),
-            next_batch: None,
-            content_store,
-        })
-    }
-
-    pub async fn new_with_session(content_store: Arc<ContentStore>) -> ClientResult<Self> {
-        let session: Session = {
-            use std::os::unix::fs::PermissionsExt;
-
-            if let Err(err) = tokio::fs::set_permissions(
-                content_store.session_file(),
-                std::fs::Permissions::from_mode(0o600),
-            )
-            .await
-            {
-                log::error!("Could not set permissions of session file: {}", err);
-            }
-
-            tokio::fs::read_to_string(content_store.session_file())
-                .await
-                .map(|s| toml::from_str(&s))?
-                .map_err(|e| ClientError::Custom(e.to_string()))?
-        };
-
-        let homeserver = format!("https://{}", session.user_id.server_name());
-        let homeserver_url = homeserver
-            .parse()
-            .map_err(|e| ClientError::URLParse(homeserver, e))?;
-
-        Ok(Self {
-            inner: InnerClient::new(homeserver_url, Some(session.into())),
             rooms: Rooms::new(),
             next_batch: None,
             content_store,
@@ -293,7 +295,6 @@ impl Client {
             .request(assign!(sync_events::Request::new(), {
                 filter: Some(
                     // Lazy load room members here to ensure a fast login
-                    // FIXME: Some members do not load properly after this
                     &lazy_load_filter
                 ),
                 since: None,
@@ -429,7 +430,7 @@ impl Client {
         from: String,
     ) -> ClientResult<get_message_events::Response> {
         inner
-            .request(assign!(get_message_events::Request::backward(&room_id, &from), { limit: ruma::UInt::from(5_u32), filter: Some(Client::member_lazy_load_room_event_filter()) }))
+            .request(assign!(get_message_events::Request::backward(&room_id, &from), { limit: ruma::uint!(5_u32), filter: Some(Client::member_lazy_load_room_event_filter()) }))
             .await
             .map_err(Into::into)
     }

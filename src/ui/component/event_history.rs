@@ -3,25 +3,22 @@ use crate::{
         content::{ContentStore, ContentType, ThumbnailCache},
         Room,
     },
+    color,
     ui::{
+        component::*,
         screen::main::Message,
         style::{
-            DarkButton, Theme, DATE_SEPERATOR_SIZE, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
-            MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
+            Theme, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, ERROR_COLOR, MESSAGE_SENDER_SIZE,
+            MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
         },
     },
 };
 use chrono::{DateTime, Datelike, Local};
-use iced::{
-    button, scrollable, Align, Button, Color, Column, Container, Element, Image, Length, Row,
-    Scrollable, Space, Text,
-};
 use ruma::{api::exports::http::Uri, UserId};
 use std::time::{Duration, Instant};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
-const AVATAR_WIDTH: u16 = 32;
 
 #[allow(clippy::mutable_key_type)]
 pub fn build_event_history<'a>(
@@ -104,7 +101,7 @@ pub fn build_event_history<'a>(
 
             widgets.push(
                 Container::new(
-                    Text::new(format!("[{}]", sender_display_name))
+                    label(format!("[{}]", sender_display_name))
                         .color(theme.calculate_sender_color(sender_display_name.len()))
                         .size(MESSAGE_SENDER_SIZE),
                 )
@@ -112,10 +109,7 @@ pub fn build_event_history<'a>(
                 .into(),
             );
 
-            super::row(widgets)
-                .spacing(MSG_LR_PADDING)
-                .padding(0)
-                .align_items(Align::Center)
+            row(widgets).spacing(MSG_LR_PADDING).padding(0)
         };
 
         let mut is_sender_different = false;
@@ -123,8 +117,10 @@ pub fn build_event_history<'a>(
             is_sender_different = true;
             if !message_group.is_empty() {
                 event_history = event_history.push(
-                    Container::new(super::column(message_group.drain(..).collect()))
-                        .style(crate::ui::style::RoundContainer),
+                    Container::new(
+                        column(message_group.drain(..).collect()).align_items(Align::Start),
+                    )
+                    .style(theme.round()),
                 );
             }
             message_group.push(sender_body_creator(&sender_display_name).into());
@@ -138,22 +134,21 @@ pub fn build_event_history<'a>(
                 && time.checked_sub(cur_timestamp).unwrap_or_default() > Duration::from_secs(60 * 5)
             {
                 event_history = event_history.push(
-                    Container::new(super::column(message_group.drain(..).collect()))
-                        .style(crate::ui::style::RoundContainer),
+                    Container::new(
+                        column(message_group.drain(..).collect()).align_items(Align::Start),
+                    )
+                    .style(theme.round()),
                 );
                 let cur_time_date =
                     DateTime::<Local>::from(*timeline_event.origin_server_timestamp());
                 let time_date = DateTime::<Local>::from(last_timestamp);
                 if cur_time_date.day() != time_date.day() {
-                    let date_time_seperator = Container::new(
-                        Text::new(cur_time_date.format("[%d %B %Y]").to_string())
+                    let date_time_seperator = fill_container(
+                        label(cur_time_date.format("[%d %B %Y]").to_string())
                             .size(DATE_SEPERATOR_SIZE)
-                            .color(Color::from_rgb(0.6, 0.6, 0.6)),
+                            .color(color!(153, 153, 153)),
                     )
-                    .center_x()
-                    .center_y()
-                    .height(Length::Shrink)
-                    .width(Length::Fill);
+                    .height(Length::Shrink);
 
                     event_history = event_history.push(date_time_seperator);
                 }
@@ -161,14 +156,14 @@ pub fn build_event_history<'a>(
             }
         }
 
-        let mut message_text = Text::new(timeline_event.formatted(&members)).size(MESSAGE_SIZE);
+        let mut message_text = label(timeline_event.formatted(&members)).size(MESSAGE_SIZE);
 
         if !timeline_event.is_ack() {
-            message_text = message_text.color(Color::from_rgb(0.5, 0.5, 0.5));
+            message_text = message_text.color(color!(128, 128, 128));
         } else if timeline_event.is_state() {
-            message_text = message_text.color(Color::from_rgb8(200, 200, 200));
+            message_text = message_text.color(color!(200, 200, 200));
         } else if timeline_event.is_redacted_message() {
-            message_text = message_text.color(Color::from_rgb8(200, 0, 0));
+            message_text = message_text.color(ERROR_COLOR);
         }
 
         let mut message_body_widgets = vec![message_text.into()];
@@ -181,13 +176,14 @@ pub fn build_event_history<'a>(
                 content_url: Uri,
                 content: impl Into<Element<'a, Message>>,
                 button_state: &'a mut button::State,
+                theme: Theme,
             ) -> Element<'a, Message> {
                 Button::new(button_state, content.into())
                     .on_press(Message::OpenContent {
                         content_url,
                         is_thumbnail,
                     })
-                    .style(DarkButton)
+                    .style(theme.secondary())
                     .into()
             };
 
@@ -211,36 +207,40 @@ pub fn build_event_history<'a>(
                         content_url,
                         thumbnail_image,
                         media_open_button_state,
+                        theme,
                     ));
                 } else {
                     let button = create_button(
                         is_thumbnail,
                         content_url,
                         Column::with_children(vec![
-                            Text::new("Download content").into(),
+                            label("Download content").into(),
                             thumbnail_image.into(),
                         ]),
                         media_open_button_state,
+                        theme,
                     );
 
                     message_body_widgets.push(button);
                 }
             } else {
-                let button_label = Text::new(if does_content_exist {
+                let text = if does_content_exist {
                     "Open content"
                 } else {
                     "Download content"
-                });
+                };
+
                 message_body_widgets.push(create_button(
                     is_thumbnail,
                     content_url,
-                    button_label,
+                    label(text),
                     media_open_button_state,
+                    theme,
                 ));
             }
         }
 
-        let msg_body = super::column(message_body_widgets)
+        let msg_body = column(message_body_widgets)
             .padding(0)
             .spacing(MSG_LR_PADDING)
             .into();
@@ -250,36 +250,35 @@ pub fn build_event_history<'a>(
         let cur_minute = (cur_timestamp.as_secs() / 60) % 60;
         if is_sender_different || last_minute != cur_minute {
             last_minute = cur_minute;
-            let message_timestamp = Text::new(
+            let message_timestamp =
                 DateTime::<Local>::from(*timeline_event.origin_server_timestamp())
                     .format("%H:%M")
-                    .to_string(),
-            )
-            .size(MESSAGE_TIMESTAMP_SIZE)
-            .color(Color::from_rgb8(160, 160, 160));
+                    .to_string();
+
+            let timestamp_label = label(message_timestamp)
+                .size(MESSAGE_TIMESTAMP_SIZE)
+                .color(color!(160, 160, 160));
+
             message_row.push(
                 Column::with_children(vec![
-                    Space::with_height(Length::Units(PADDING / 8)).into(),
-                    Row::with_children(vec![
-                        message_timestamp.into(),
-                        Space::with_width(Length::Units(PADDING / 4)).into(),
-                    ])
-                    .into(),
+                    ahspace(PADDING / 8).into(),
+                    Row::with_children(vec![timestamp_label.into(), ahspace(PADDING / 4).into()])
+                        .into(),
                 ])
                 .into(),
             );
         }
         message_row.push(msg_body);
 
-        message_group.push(super::row(message_row).padding(0).into());
+        message_group.push(row(message_row).padding(0).into());
 
         last_sender = Some(id_to_use);
         last_timestamp = *timeline_event.origin_server_timestamp();
     }
     if !message_group.is_empty() {
         event_history = event_history.push(
-            Container::new(super::column(message_group.drain(..).collect()))
-                .style(crate::ui::style::RoundContainer),
+            Container::new(column(message_group.drain(..).collect()).align_items(Align::Start))
+                .style(theme.round()),
         );
     }
     event_history.into()

@@ -1,4 +1,7 @@
+use ruma::api::client::r0::uiaa::UiaaResponse;
+use ruma::api::client::Error as ApiError;
 use ruma::api::exports::http;
+use ruma_client::Error as InnerClientError;
 use std::fmt::{self, Display};
 
 pub type ClientResult<T> = Result<T, ClientError>;
@@ -10,7 +13,9 @@ pub enum ClientError {
     /// Error occurred while parsing a string as URL.
     URLParse(String, http::uri::InvalidUri),
     /// Error occurred in the Matrix client library.
-    Internal(ruma_client::Error<ruma::api::client::Error>),
+    Internal(InnerClientError<ApiError>),
+    /// Error occurred in the Matrix client library.
+    InternalUiaa(InnerClientError<UiaaResponse>),
     /// The user is already logged in.
     AlreadyLoggedIn,
     /// Not all required login information was provided.
@@ -32,9 +37,15 @@ impl Clone for ClientError {
     }
 }
 
-impl From<ruma_client::Error<ruma::api::client::Error>> for ClientError {
-    fn from(other: ruma_client::Error<ruma::api::client::Error>) -> Self {
+impl From<InnerClientError<ApiError>> for ClientError {
+    fn from(other: InnerClientError<ApiError>) -> Self {
         Self::Internal(other)
+    }
+}
+
+impl From<InnerClientError<UiaaResponse>> for ClientError {
+    fn from(other: InnerClientError<UiaaResponse>) -> Self {
+        Self::InternalUiaa(other)
     }
 }
 
@@ -47,7 +58,6 @@ impl From<std::io::Error> for ClientError {
 impl Display for ClientError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         use ruma::{api::client::error::ErrorKind as ClientAPIErrorKind, api::error::*};
-        use ruma_client::Error as InnerClientError;
 
         match self {
             ClientError::URLParse(string, err) => {
@@ -96,7 +106,14 @@ impl Display for ClientError {
                     }
                     _ => {}
                 }
-                write!(fmt, "An internal error occurred: {}", err.to_string())
+                write!(fmt, "An internal error occurred: {}", err)
+            }
+            ClientError::InternalUiaa(err) => {
+                write!(
+                    fmt,
+                    "An internal error occured while trying to register: {}",
+                    err
+                )
             }
             ClientError::IOError(err) => write!(fmt, "An IO error occurred: {}", err),
             ClientError::AlreadyLoggedIn => write!(fmt, "Already logged in with another user."),

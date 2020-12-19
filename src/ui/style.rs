@@ -1,3 +1,4 @@
+use crate::color;
 use iced::{
     button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
     text_input, Color,
@@ -11,189 +12,168 @@ pub const DATE_SEPERATOR_SIZE: u16 = 22;
 pub const PADDING: u16 = 16;
 pub const SPACING: u16 = 4;
 
-pub const ERROR_COLOR: Color = Color::from_rgb(1.0, 0.0, 0.0);
-pub const SUCCESS_COLOR: Color = Color::from_rgb(0.0, 1.0, 0.0);
+pub const ERROR_COLOR: Color = color!(255, 0, 0);
+pub const SUCCESS_COLOR: Color = color!(0, 255, 0);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Theme {
-    Light,
-    Dark,
+pub const AVATAR_WIDTH: u16 = 32;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Theme {
+    dark: bool,
+    secondary: bool,
+    round: bool,
 }
 
 impl Theme {
     const SENDER_COLORS: [Color; 8] = [
-        Color::from_rgb(
-            0x6d as f32 / 255.0,
-            0xdd as f32 / 255.0,
-            0x18 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xfc as f32 / 255.0,
-            0xd2 as f32 / 255.0,
-            0x00 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xcc as f32 / 255.0,
-            0xf9 as f32 / 255.0,
-            0xff as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0x3d as f32 / 255.0,
-            0xdb as f32 / 255.0,
-            0x8c as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xdd as f32 / 255.0,
-            0x6a as f32 / 255.0,
-            0x35 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xe2 as f32 / 255.0,
-            0x22 as f32 / 255.0,
-            0x45 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0x09 as f32 / 255.0,
-            0xe5 as f32 / 255.0,
-            0x38 as f32 / 255.0,
-        ),
-        Color::from_rgb(
-            0xd1 as f32 / 255.0,
-            0x32 as f32 / 255.0,
-            0x71 as f32 / 255.0,
-        ),
+        color!(109, 221, 24),
+        color!(252, 210, 0),
+        color!(204, 249, 255),
+        color!(61, 219, 140),
+        color!(221, 106, 53),
+        color!(226, 34, 69),
+        color!(9, 229, 56),
+        color!(209, 50, 113),
     ];
 
-    pub fn calculate_sender_color(&self, name_len: usize) -> Color {
+    pub const fn calculate_sender_color(&self, name_len: usize) -> Color {
         Theme::SENDER_COLORS[name_len % Theme::SENDER_COLORS.len()]
+    }
+
+    pub const fn secondary(mut self) -> Self {
+        self.secondary = true;
+        self
+    }
+
+    pub const fn round(mut self) -> Self {
+        self.round = true;
+        self
     }
 }
 
 impl Default for Theme {
-    fn default() -> Theme {
-        Theme::Dark
+    fn default() -> Self {
+        Self {
+            dark: true,
+            secondary: false,
+            round: false,
+        }
     }
 }
 
 impl From<Theme> for Box<dyn container::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::Container.into(),
+        if theme.dark {
+            if theme.secondary {
+                dark::BrightContainer.into()
+            } else {
+                if theme.round {
+                    dark::RoundContainer.into()
+                } else {
+                    dark::Container.into()
+                }
+            }
+        } else {
+            Default::default()
         }
     }
 }
 
 impl From<Theme> for Box<dyn radio::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::Radio.into(),
+        if theme.dark {
+            dark::Radio.into()
+        } else {
+            Default::default()
         }
     }
 }
 
 impl From<Theme> for Box<dyn text_input::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::TextInput.into(),
+        if theme.dark {
+            if theme.secondary {
+                dark::DarkTextInput.into()
+            } else {
+                dark::TextInput.into()
+            }
+        } else {
+            Default::default()
         }
     }
 }
 
 impl From<Theme> for Box<dyn button::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => light::Button.into(),
-            Theme::Dark => dark::Button.into(),
+        if theme.dark {
+            if theme.secondary {
+                dark::DarkButton.into()
+            } else {
+                dark::Button.into()
+            }
+        } else {
+            light::Button.into()
         }
     }
 }
 
 impl From<Theme> for Box<dyn scrollable::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::Scrollable.into(),
+        if theme.dark {
+            dark::Scrollable.into()
+        } else {
+            Default::default()
         }
     }
 }
 
 impl From<Theme> for Box<dyn slider::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::Slider.into(),
+        if theme.dark {
+            dark::Slider.into()
+        } else {
+            Default::default()
         }
     }
 }
 
 impl From<Theme> for Box<dyn progress_bar::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::ProgressBar.into(),
+        if theme.dark {
+            dark::ProgressBar.into()
+        } else {
+            Default::default()
         }
     }
 }
 
 impl From<Theme> for Box<dyn checkbox::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::Checkbox.into(),
+        if theme.dark {
+            dark::Checkbox.into()
+        } else {
+            Default::default()
         }
     }
 }
 
 impl From<Theme> for Box<dyn pick_list::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::PickList.into(),
+        if theme.dark {
+            dark::PickList.into()
+        } else {
+            Default::default()
         }
     }
 }
 
 impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Light => Default::default(),
-            Theme::Dark => dark::Rule.into(),
+        if theme.dark {
+            dark::Rule.into()
+        } else {
+            Default::default()
         }
-    }
-}
-
-pub struct BrightContainer;
-
-impl From<BrightContainer> for Box<dyn container::StyleSheet> {
-    fn from(_: BrightContainer) -> Self {
-        dark::BrightContainer.into()
-    }
-}
-
-pub struct RoundContainer;
-
-impl From<RoundContainer> for Box<dyn container::StyleSheet> {
-    fn from(_: RoundContainer) -> Self {
-        dark::RoundContainer.into()
-    }
-}
-
-pub struct DarkTextInput;
-
-impl From<DarkTextInput> for Box<dyn text_input::StyleSheet> {
-    fn from(_: DarkTextInput) -> Self {
-        dark::DarkTextInput.into()
-    }
-}
-
-pub struct DarkButton;
-
-impl From<DarkButton> for Box<dyn button::StyleSheet> {
-    fn from(_: DarkButton) -> Self {
-        dark::DarkButton.into()
     }
 }
 
@@ -206,6 +186,7 @@ impl From<TransparentButton> for Box<dyn button::StyleSheet> {
 }
 
 mod light {
+    use crate::color;
     use iced::{button, Color, Vector};
 
     pub struct Button;
@@ -213,10 +194,10 @@ mod light {
     impl button::StyleSheet for Button {
         fn active(&self) -> button::Style {
             button::Style {
-                background: Color::from_rgb(0.11, 0.42, 0.87).into(),
+                background: color!(28, 108, 223).into(),
                 border_radius: 12.0,
                 shadow_offset: Vector::new(1.0, 1.0),
-                text_color: Color::from_rgb8(0xEE, 0xEE, 0xEE),
+                text_color: color!(238, 238, 238),
                 ..button::Style::default()
             }
         }
@@ -232,28 +213,15 @@ mod light {
 }
 
 mod dark {
+    use crate::color;
     use iced::{
         button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
         text_input, Color,
     };
 
-    const DARK_BG: Color = Color::from_rgb(
-        0x36 as f32 / 255.0,
-        0x39 as f32 / 255.0,
-        0x3F as f32 / 255.0,
-    );
-
-    const BRIGHT_BG: Color = Color::from_rgb(
-        0x44 as f32 / 255.0,
-        0x48 as f32 / 255.0,
-        0x4F as f32 / 255.0,
-    );
-
-    const ACCENT: Color = Color::from_rgb(
-        0x60 as f32 / 255.0,
-        0x64 as f32 / 255.0,
-        0x6B as f32 / 255.0,
-    );
+    const DARK_BG: Color = color!(0x36, 0x39, 0x3F);
+    const BRIGHT_BG: Color = color!(0x44, 0x48, 0x4F);
+    const ACCENT: Color = color!(0x60, 0x64, 0x6B);
 
     pub struct Container;
 
@@ -375,7 +343,7 @@ mod dark {
         }
 
         fn placeholder_color(&self) -> Color {
-            Color::from_rgb(0.6, 0.6, 0.6)
+            color!(153, 153, 153)
         }
 
         fn value_color(&self) -> Color {
@@ -526,7 +494,7 @@ mod dark {
 
             scrollable::Scrollbar {
                 scroller: scrollable::Scroller {
-                    color: Color::from_rgb(0.85, 0.85, 0.85),
+                    color: color!(217, 217, 217),
                     ..hovered.scroller
                 },
                 ..hovered
@@ -566,7 +534,7 @@ mod dark {
 
             slider::Style {
                 handle: slider::Handle {
-                    color: Color::from_rgb(0.85, 0.85, 0.85),
+                    color: color!(217, 217, 217),
                     ..active.handle
                 },
                 ..active

@@ -1,10 +1,12 @@
 use crate::{
     client::{content::ThumbnailCache, Rooms},
-    ui::style::{DarkButton, Theme, PADDING, SPACING},
+    ui::{
+        component::*,
+        style::{Theme, PADDING, SPACING},
+    },
 };
 use fuzzy_matcher::skim::SkimMatcherV2;
 use http::Uri;
-use iced::{button, scrollable, Align, Button, Element, Image, Length, Scrollable, Text};
 use ruma::RoomId;
 
 /// Builds a room list.
@@ -78,11 +80,11 @@ pub fn build_room_list<'a, Message: Clone + 'a>(
         {
             content.push(Image::new(handle).width(Length::Units(32)).into());
         }
-        content.push(Text::new(room_name).into());
+        content.push(label(room_name).into());
 
-        let mut but = Button::new(button_state, super::row(content).padding(0))
+        let mut but = Button::new(button_state, row(content).padding(0))
             .width(Length::Fill)
-            .style(DarkButton);
+            .style(theme.secondary());
 
         if !is_current_room(room_id) {
             but = but.on_press(on_button_press(room_id.clone()));

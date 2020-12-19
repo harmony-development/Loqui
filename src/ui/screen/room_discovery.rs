@@ -5,9 +5,6 @@ use crate::{
         style::{Theme, ERROR_COLOR, PADDING, SUCCESS_COLOR},
     },
 };
-use iced::{
-    button, text_input, Align, Button, Command, Element, Length, Row, Space, Text, TextInput,
-};
 use ruma::{RoomId, RoomIdOrAliasId};
 
 #[derive(Clone, Debug)]
@@ -39,18 +36,11 @@ impl RoomDiscovery {
         .padding(PADDING / 2)
         .style(theme);
 
-        let mut join = Button::new(
-            &mut self.direct_join_but_state,
-            fill_container(Text::new("Join")),
-        )
-        .style(theme);
+        let mut join = label_button(&mut self.direct_join_but_state, "Join").style(theme);
 
-        let back = Button::new(
-            &mut self.join_room_back_but_state,
-            fill_container(Text::new("Back")),
-        )
-        .style(theme)
-        .on_press(Message::GoBack);
+        let back = label_button(&mut self.join_room_back_but_state, "Back")
+            .style(theme)
+            .on_press(Message::GoBack);
 
         let mut widgets = Vec::with_capacity(3);
 
@@ -70,7 +60,7 @@ impl RoomDiscovery {
             Err(e) => {
                 if !self.room_join_alias_or_id.is_empty() {
                     log::debug!("{}", e); // We don't print this as an error since it'll spam the logs
-                    widgets.push(Text::new(e.to_string()).color(ERROR_COLOR).into());
+                    widgets.push(label(e.to_string()).color(ERROR_COLOR).into());
                 }
             }
         }
@@ -82,38 +72,35 @@ impl RoomDiscovery {
             .flatten()
         {
             widgets.push(
-                Text::new(format!("Successfully joined room {}", name))
+                label(format!("Successfully joined room {}", name))
                     .color(SUCCESS_COLOR)
                     .into(),
             );
         }
 
         if let Some(name) = self.joining_room.as_ref() {
-            widgets.push(Text::new(format!("Joining room {}", name)).into());
+            widgets.push(label(format!("Joining room {}", name)).into());
         }
 
         widgets.push(text_edit.into());
         widgets.push(
-            Row::with_children(vec![
-                join.width(Length::Fill).into(),
-                Space::with_width(Length::Fill).into(),
-                back.width(Length::Fill).into(),
+            row(vec![
+                join.width(Length::FillPortion(1)).into(),
+                wspace(1).into(),
+                back.width(Length::FillPortion(1)).into(),
             ])
-            .align_items(Align::Center)
             .width(Length::Fill)
             .into(),
         );
 
-        fill_container(
-            Row::with_children(vec![
-                Space::with_width(Length::FillPortion(3)).into(),
-                column(widgets).width(Length::FillPortion(4)).into(),
-                Space::with_width(Length::FillPortion(3)).into(),
-            ])
-            .width(Length::Fill),
-        )
-        .style(theme)
-        .into()
+        let padded_panel = row(vec![
+            wspace(3).into(),
+            column(widgets).width(Length::FillPortion(4)).into(),
+            wspace(3).into(),
+        ])
+        .width(Length::Fill);
+
+        fill_container(padded_panel).style(theme).into()
     }
 
     pub fn update(&mut self, msg: Message, client: &Client) -> Command<super::Message> {

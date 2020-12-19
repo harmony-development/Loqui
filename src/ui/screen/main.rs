@@ -6,16 +6,10 @@ use crate::{
     },
     ui::{
         component::{event_history::SHOWN_MSGS_LIMIT, *},
-        style::{
-            BrightContainer, DarkButton, DarkTextInput, Theme, MESSAGE_SIZE, PADDING, SPACING,
-        },
+        style::{Theme, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
 use http::Uri;
-use iced::{
-    button, pick_list, scrollable, text_input, Button, Color, Column, Command, Container, Element,
-    Length, PickList, Row, Space, Text, TextInput,
-};
 use image::GenericImageView;
 use ruma::{
     events::room::{
@@ -135,9 +129,7 @@ impl MainScreen {
         } else {
             // if first_room_id is None, then that means no room found (either cause of filter, or the user aren't in any room)
             // reusing the room_list variable here
-            room_list = fill_container(Text::new("No room found"))
-                .style(theme)
-                .into();
+            room_list = fill_container(label("No room found")).style(theme).into();
         }
 
         let rooms_area = Column::with_children(vec![
@@ -169,7 +161,7 @@ impl MainScreen {
             )
             .padding((PADDING / 4) * 3)
             .size(MESSAGE_SIZE)
-            .style(DarkTextInput)
+            .style(theme.secondary())
             .on_submit(Message::SendMessageComposer(room_id.clone()));
 
             let current_user_id = client.current_user_id();
@@ -211,10 +203,10 @@ impl MainScreen {
             }
 
             let typing_users = Column::with_children(vec![
-                Space::with_width(Length::Units(6)).into(),
+                awspace(6).into(),
                 Row::with_children(vec![
-                    Space::with_width(Length::Units(9)).into(),
-                    Text::new(typing_users_combined).size(14).into(),
+                    awspace(9).into(),
+                    label(typing_users_combined).size(14).into(),
                 ])
                 .into(),
             ])
@@ -222,9 +214,9 @@ impl MainScreen {
 
             let send_file_button = Button::new(
                 &mut self.send_file_but_state,
-                Text::new("↑").size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                label("↑").size((PADDING / 4) * 3 + MESSAGE_SIZE),
             )
-            .style(DarkButton)
+            .style(theme.secondary())
             .on_press(Message::SendFile(room_id.clone()));
 
             let mut bottom_area_widgets = vec![
@@ -236,9 +228,9 @@ impl MainScreen {
                 bottom_area_widgets.push(
                     Button::new(
                         &mut self.scroll_to_bottom_but_state,
-                        Text::new("↡").size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                        label("↡").size((PADDING / 4) * 3 + MESSAGE_SIZE),
                     )
-                    .style(DarkButton)
+                    .style(theme.secondary())
                     .on_press(Message::ScrollToBottom)
                     .into(),
                 );
@@ -257,17 +249,17 @@ impl MainScreen {
                 .into(),
             ]);
 
-            screen_widgets.push(fill_container(message_area).style(BrightContainer).into());
+            screen_widgets.push(fill_container(message_area).style(theme.secondary()).into());
         }
 
         // We know that there will be only one widget if the user isn't looking at a room currently
         if screen_widgets.len() < 2 {
             let in_no_room_warning = fill_container(
-                Text::new("Select / join a room to start chatting!")
+                label("Select / join a room to start chatting!")
                     .size(35)
-                    .color(Color::from_rgb(0.5, 0.5, 0.5)),
+                    .color(color!(128, 128, 128)),
             )
-            .style(BrightContainer);
+            .style(theme.secondary());
 
             screen_widgets.push(in_no_room_warning.into());
         }
