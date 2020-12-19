@@ -6361,8 +6361,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/PolyMeilex/rfd.git";
-          rev = "53ef45dfe3ac6d377b2cc52ca9e62e78dfa5f75e";
-          sha256 = "1km7wbd3zkxzlqr55afdvsyczxvnjn8z45sw4p98yxkk3hw2gc8c";
+          rev = "1d09cd8abba429b022de1c42015882de15416f45";
+          sha256 = "1xf421df7qls1z0rsflmxg6w2ghgqigd2g8vvz1qxwzx6f2bjfyn";
         };
         authors = [
           "Poly <bartek.marynczak@op.pl>"
@@ -7625,9 +7625,9 @@ rec {
       };
       "smithay-clipboard" = rec {
         crateName = "smithay-clipboard";
-        version = "0.6.1";
+        version = "0.6.2";
         edition = "2018";
-        sha256 = "0hncg8a57riyr6yirbiy0181xvkmjn2ch944ndvf4afrh0sfq3kf";
+        sha256 = "14dwisd56cbr80zf719l3fh0n8pm1fjmvry9lsbhdbccf8cv525b";
         authors = [
           "Kirill Chibisov <contact@kchibisov.com>"
           "Victor Berger <victor.berger@m4x.org>"
@@ -7656,9 +7656,9 @@ rec {
       };
       "socket2" = rec {
         crateName = "socket2";
-        version = "0.3.17";
+        version = "0.3.18";
         edition = "2018";
-        sha256 = "00k98q2ab98j9ffmmsh0wlwck2apy83a7v5bfy122apfpmx98a9c";
+        sha256 = "0mqh39dkspcz3x11jhck9k2yrbx2krawn7xr3zva8n3lazyykq4p";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
         ];
@@ -7666,18 +7666,13 @@ rec {
           {
             name = "cfg-if";
             packageId = "cfg-if 1.0.0";
-            target = { target, features }: (target."unix" || (target."os" == "redox"));
+            target = { target, features }: target."unix";
           }
           {
             name = "libc";
             packageId = "libc";
-            target = { target, features }: (target."unix" || (target."os" == "redox"));
+            target = { target, features }: target."unix";
             features = [ "align" ];
-          }
-          {
-            name = "redox_syscall";
-            packageId = "redox_syscall";
-            target = { target, features }: (target."os" == "redox");
           }
           {
             name = "winapi";
@@ -8398,9 +8393,9 @@ rec {
       };
       "toml" = rec {
         crateName = "toml";
-        version = "0.5.7";
+        version = "0.5.8";
         edition = "2018";
-        sha256 = "0iannv6pb226h0q9vlqg7hdn36fs146yrahw016n107g1fxlbkvm";
+        sha256 = "1apcmjrrjw429pjw7mqlmdwwd67g8305vwqy4kw3swr612bl44d3";
         authors = [
           "Alex Crichton <alex@alexcrichton.com>"
         ];
