@@ -18,7 +18,7 @@ iced_futures = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix"
 
 open = "1.4.0"
 infer = "0.3.4"
-rfd = { git = "https://github.com/PolyMeilex/rfd.git" }
+rfd = "0.0.3"
 image = "0.23.12"
 directories-next = "2.0.0"
 

@@ -2450,7 +2450,8 @@ dependencies = [
 [[package]]
 name = "rfd"
 version = "0.0.3"
-source = "git+https://github.com/PolyMeilex/rfd.git#4d8eae1bc870851f4563b8adec43dc091878bd32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0d39ac2ebb55e24e11464cd071a3e1be5567bf8caa62064954612beb091af72"
 dependencies = [
  "cocoa-foundation",
  "glib-sys",
