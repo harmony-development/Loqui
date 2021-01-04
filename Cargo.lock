@@ -1369,7 +1369,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1382,14 +1382,13 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 
 [[package]]
 name = "iced_futures"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 dependencies = [
- "async-stream",
  "futures",
  "log",
  "tokio",
@@ -1399,7 +1398,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 dependencies = [
  "bytemuck",
  "font-kit",
@@ -1413,7 +1412,7 @@ dependencies = [
 [[package]]
 name = "iced_native"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1425,7 +1424,7 @@ dependencies = [
 [[package]]
 name = "iced_style"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 dependencies = [
  "iced_core",
 ]
@@ -1433,7 +1432,7 @@ dependencies = [
 [[package]]
 name = "iced_web"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 dependencies = [
  "dodrio",
  "iced_core",
@@ -1449,7 +1448,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 dependencies = [
  "bytemuck",
  "futures",
@@ -1467,7 +1466,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#11915cf1ec9082c1f4f75abc0c0d4593e90b5485"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#73750fcc61e242bedd1a8a6bfdc49918abe90fd6"
 dependencies = [
  "iced_futures",
  "iced_graphics",
@@ -3106,11 +3105,10 @@ dependencies = [
 
 [[package]]
 name = "tokio-stream"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f3be913b74b13210c8fe04b17ab833f5a124f45b93d0f99f59fff621f64392a"
+checksum = "e4cdeb73537e63f98adcd73138af75e3f368ccaecffaa29d7eb61b9f5a440457"
 dependencies = [
- "async-stream",
  "futures-core",
  "pin-project-lite",
  "tokio",
