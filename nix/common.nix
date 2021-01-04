@@ -1,10 +1,28 @@
-{ crate2nix, nixpkgs, system }:
-rec {
-  pkgs = import nixpkgs {
+{ sources, system }:
+let
+  pkgs = import sources.nixpkgs { inherit system; };
+  mozPkgs = import "${sources.nixpkgsMoz}/package-set.nix" { inherit pkgs; };
+
+  rustChannel =
+    let
+      channel = mozPkgs.rustChannelOf {
+        channel = "stable";
+        sha256 = "sha256-KCh2UBGtdlBJ/4UOqZlxUtcyefv7MH1neoVNV4z0nWs=";
+      };
+    in
+    channel // {
+      rust = channel.rust.override { extensions = [ "rust-src" ]; };
+    };
+in rec {
+  pkgs = import sources.nixpkgs {
     inherit system;
     overlays = [
       (final: prev: {
-        crate2nix = prev.callPackage crate2nix { pkgs = prev; };
+        rustc = rustChannel.rust;
+        inherit (rustChannel);
+      })
+      (final: prev: {
+        naersk = prev.callPackage sources.naersk { };
       })
     ];
   };
@@ -15,30 +33,9 @@ rec {
 
   # Deps that certain crates need
   crateDeps =
-    let
-      mkDeps = b: n: {
-        buildInputs = b;
-        nativeBuildInputs = n;
-      };
-    in
     with pkgs;
     {
-      rfd = mkDeps [ gtk3 ] [ pkg-config ];
-      atk-sys = mkDeps [ atk ] [ pkg-config ];
-      cairo-sys-rs = mkDeps [ cairo ] [ pkg-config ];
-      pango-sys = mkDeps [ pango ] [ pkg-config ];
-      gdk-pixbuf-sys = mkDeps [ gdk_pixbuf ] [ pkg-config ];
-      gdk-sys = mkDeps [ gtk3 ] [ pkg-config ];
-      gtk-sys = mkDeps [ gtk3 ] [ pkg-config ];
-      glib-sys = mkDeps [ glib ] [ pkg-config ];
-      gio-sys = mkDeps [ glib ] [ pkg-config ];
-      gobject-sys = mkDeps [ glib ] [ pkg-config ];
-      openssl-sys = mkDeps [ openssl ] [ cmake pkg-config ];
-      expat-sys = mkDeps [ expat ] [ cmake pkg-config ];
-      servo-freetype-sys = mkDeps [ freetype ] [ pkg-config cmake ];
-      servo-fontconfig-sys = mkDeps [ freetype expat fontconfig ] [ pkg-config ];
-      x11 = mkDeps [ x11 ] [ pkg-config ];
-      xcb = mkDeps [ ] [ python3 ];
-      icy_matrix = mkDeps [ xorg.libxcb ] [ pkg-config ];
+      buildInputs = [ gtk3 atk cairo pango gdk_pixbuf glib openssl expat freetype fontconfig x11 xorg.libxcb ];
+      nativeBuildInputs = [ pkg-config cmake python3 ];
     };
 }

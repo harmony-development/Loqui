@@ -6,7 +6,10 @@ data/
 
 # nix
 result*
+/shell.nix
 
 # direnv
 .direnv/
 .envrc
+
+.vscode
