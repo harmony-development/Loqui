@@ -406,7 +406,7 @@ where
                 let mut transaction_errors = Vec::new();
                 for (transaction_id, event, retry_after) in events {
                     if let Some(dur) = retry_after {
-                        tokio::time::delay_for(dur).await;
+                        tokio::time::sleep(dur).await;
                     }
 
                     let result = match event {
