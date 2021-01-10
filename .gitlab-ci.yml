@@ -1,0 +1,12 @@
+image: nixos/nix:latest
+
+before_script:
+  - nix-env -iA nixpkgs.cachix
+  - cachix use icy-matrix
+  - cachix authtoken $CACHIX_AUTH_TOKEN
+
+build:
+  stage: build
+  script:
+    - nix-build nix/default.nix
+    - nix-store --query --references $(nix-instantiate nix/default.nix) | xargs nix-store --realise | xargs nix-store --query --requisites | cachix push icy-matrix
