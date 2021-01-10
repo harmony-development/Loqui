@@ -5,11 +5,21 @@ authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
 edition = "2018"
 
 [profile.dev]
-debug = false
+opt-level = 2
+overflow-checks = true
+debug-assertions = true
 panic = "abort"
+debug = false
+codegen-units = 8
+lto = false
+incremental = true
 
 [profile.release]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false
 lto = "thin"
+debug = false
 
 [dependencies]
 iced = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix", features = ["tokio", "image"] }
