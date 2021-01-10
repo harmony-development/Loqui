@@ -3,9 +3,22 @@ let
   pkgz = import sources.nixpkgs { inherit system; };
   mozPkgs = import "${sources.nixpkgsMoz}/package-set.nix" { pkgs = pkgz; };
 
+  rustNightlyChannel =
+    let
+      channel = mozPkgs.rustChannelOf {
+        date = "2021-01-08";
+        channel = "nightly";
+        sha256 = "sha256-y5iX4AJfCWccwgbeYVZbEYs2B8w9UplvivKlNEv+wRk=";
+      };
+    in
+    channel // {
+      rust = channel.rust.override { extensions = [ "rust-src" "clippy-preview" "rustfmt-preview" ]; };
+    };
+
   rustChannel =
     let
       channel = mozPkgs.rustChannelOf {
+        date = "2020-12-31";
         channel = "stable";
         sha256 = "sha256-KCh2UBGtdlBJ/4UOqZlxUtcyefv7MH1neoVNV4z0nWs=";
       };
@@ -19,6 +32,7 @@ let
     overlays = [
       (final: prev: {
         rustc = rustChannel.rust;
+        cargo = rustNightlyChannel.cargo;
       })
       (final: prev: {
         naersk = prev.callPackage sources.naersk { };
