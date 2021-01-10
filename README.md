@@ -2,6 +2,8 @@
 
 It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 
+![Icy Matrix](resources/screenshot.png)
+
 ## Current features
 - Plain-text message and file sending
 - Receiving messages and media, can show thumbnails (does not support location messages)
