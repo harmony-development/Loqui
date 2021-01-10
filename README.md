@@ -11,24 +11,30 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 - Remembers login
 
 ## Requirements
-If you have the Nix package manager:
-- `nix develop` to get a dev shell. (or `nix-shell nix/shell.nix` if you don't have flakes enabled)
 
-Otherwise:
 - Current stable Rust and Cargo.
 - Make sure you have a working Vulkan setup.
 - gcc, python3, pkg-config, cmake; openssl, x11, xcb, freetype, fontconfig, expat, glib, gtk3, cairo, pango, atk, gdk_pixbuf libraries and development files.
 - Above list may be incomplete, please find out what you need by looking at compiler errors.
 
-## Building
-If you have the Nix package manager:
-- `nix build .#icy_matrix-debug` to compile a debug build.
-- `nix build .#icy_matrix` to compile a release build.
-- If you don't have flakes enabled, `nix-build nix/default.nix` will give you a release build.
+### Nix
+- `nix develop` to get a dev shell. (or `nix-shell nix/shell.nix` if you don't have flakes enabled)
 
-Otherwise:
+## Building
+
 - Clone the repo, and switch the working directory to it: `git clone https://gitlab.com/yusdacra/icy_matrix.git && cd icy_matrix`
 - To build and run the project with debug info / checks use `cargo run`. Use `cargo run --release` for an optimized release build.
+
+### Nix
+- `nix build .#icy_matrix-debug` to compile a debug build.
+- `nix build .#icy_matrix` to compile a release build.
+- If you don't have flakes enabled, `nix-build` will give you a release build.
+
+## Installing
+
+### Nix
+- For flakes: `nix profile install "https://gitlab.com/yusdacra/icy_matrix.git"`
+- For legacy: `nix-env -i -f "https://gitlab.com/yusdacra/icy_matrix/-/archive/master/icy_matrix-master.tar.gz"`
 
 ## Planned features (not ordered)
 - Multiline message composer
