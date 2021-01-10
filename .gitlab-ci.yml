@@ -1,8 +1,8 @@
 image: nixos/nix:latest
 
-before-script:
-    - nix-env -iA nixpkgs.cachix
-    - cachix use icy-matrix && cachix authtoken $CACHIX_AUTH_TOKEN
+before_script:
+  - nix-env -iA nixpkgs.cachix
+  - cachix use icy-matrix && cachix authtoken $CACHIX_AUTH_TOKEN
 
 build:
   stage: build
