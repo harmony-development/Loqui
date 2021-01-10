@@ -10,6 +10,7 @@ use http::Uri;
 use ruma::RoomId;
 
 /// Builds a room list.
+#[allow(clippy::clippy::too_many_arguments)]
 pub fn build_room_list<'a, Message: Clone + 'a>(
     rooms: &Rooms,
     thumbnail_cache: &ThumbnailCache,
@@ -51,7 +52,11 @@ pub fn build_room_list<'a, Message: Clone + 'a>(
             .collect();
     }
 
-    let first_room_id = rooms.first().map(|(room_id, _, _)| room_id.clone().clone());
+    let first_room_id = if !rooms.is_empty() {
+        Some(rooms.remove(0).0.clone())
+    } else {
+        None
+    };
 
     let mut room_list = Scrollable::new(state)
         .style(theme)

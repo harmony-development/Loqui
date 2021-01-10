@@ -111,7 +111,7 @@ impl Room {
                     member_state
                         .content
                         .avatar_url
-                        .map(|u| u.parse::<http::Uri>().map_or(None, Some))
+                        .map(|u| u.parse::<http::Uri>().ok())
                         .flatten(),
                     membership_change,
                     member_state.sender,

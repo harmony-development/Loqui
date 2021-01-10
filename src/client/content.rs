@@ -65,7 +65,7 @@ impl ContentStore {
 
     pub fn content_mimetype(&self, id: &Uri) -> String {
         infer::get_from_path(self.content_path(id))
-            .map_or(None, Some)
+            .ok()
             .flatten()
             .map(|filetype| filetype.mime_type().to_string())
             .unwrap_or_else(|| String::from("application/octet-stream"))
@@ -167,6 +167,10 @@ impl ThumbnailCache {
             .values()
             .flat_map(|h| get_image_size_from_handle(h))
             .sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() < 1
     }
 
     pub fn has_thumbnail(&self, thumbnail_id: &Uri) -> bool {

@@ -317,7 +317,7 @@ impl MainScreen {
                                         Client::get_events_backwards(
                                             client.inner(),
                                             current_room_id,
-                                            prev_batch.clone(),
+                                            prev_batch,
                                         ),
                                         |result| match result {
                                             Ok(response) => {

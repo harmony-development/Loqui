@@ -12,7 +12,7 @@ use crate::{
     client::{
         content::{ContentStore, ImageHandle, ThumbnailCache},
         error::ClientError,
-        AuthMethod, Client, InnerClient, TimelineEvent,
+        ActionRetry, AuthMethod, Client, InnerClient, TimelineEvent,
     },
     ui::style::Theme,
 };
@@ -334,7 +334,7 @@ impl Application for ScreenManager {
                 inner: client.inner(),
                 rooms_queued_events,
             })
-            .map(|result| Message::SendMessageResult(result));
+            .map(Message::SendMessageResult);
 
             if let Some(since) = client.next_batch() {
                 sub = Subscription::batch(vec![
@@ -375,7 +375,7 @@ impl Application for ScreenManager {
 pub type RetrySendEventResult = Vec<(RoomId, Vec<(Uuid, ClientError)>)>;
 pub struct RetrySendEventRecipe {
     inner: InnerClient,
-    rooms_queued_events: Vec<(RoomId, Vec<(Uuid, AnySyncRoomEvent, Option<Duration>)>)>,
+    rooms_queued_events: Vec<(RoomId, Vec<ActionRetry>)>,
 }
 
 impl<H, I> iced_futures::subscription::Recipe<H, I> for RetrySendEventRecipe
@@ -476,7 +476,7 @@ fn make_thumbnail_commands(
     thumbnail_urls: Vec<(bool, Uri)>,
     thumbnail_cache: &ThumbnailCache,
 ) -> Command<Message> {
-    return Command::batch(
+    Command::batch(
         thumbnail_urls
             .into_iter()
             .flat_map(|(is_on_disk, thumbnail_url)| {
@@ -533,5 +533,5 @@ fn make_thumbnail_commands(
                     None
                 }
             }),
-    );
+    )
 }

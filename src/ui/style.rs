@@ -66,12 +66,10 @@ impl From<Theme> for Box<dyn container::StyleSheet> {
         if theme.dark {
             if theme.secondary {
                 dark::BrightContainer.into()
+            } else if theme.round {
+                dark::RoundContainer.into()
             } else {
-                if theme.round {
-                    dark::RoundContainer.into()
-                } else {
-                    dark::Container.into()
-                }
+                dark::Container.into()
             }
         } else {
             Default::default()

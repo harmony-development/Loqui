@@ -66,6 +66,10 @@ impl Members {
         self.members.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() < 1
+    }
+
     /// Get all members in this room.
     pub fn members(&self) -> &AHashMap<UserId, Member> {
         &self.members
@@ -153,7 +157,7 @@ impl Members {
                         .entry(name.to_string())
                         .or_default();
 
-                    ids.push(user_id.clone());
+                    ids.push(user_id);
                 }
                 member.avatar_url = avatar_url;
                 member.display_name = displayname;

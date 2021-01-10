@@ -21,6 +21,7 @@ pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
 
 #[allow(clippy::mutable_key_type)]
+#[allow(clippy::clippy::too_many_arguments)]
 pub fn build_event_history<'a>(
     content_store: &ContentStore,
     thumbnail_cache: &ThumbnailCache,

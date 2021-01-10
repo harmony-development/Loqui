@@ -12,7 +12,7 @@ pub use room_list::build_room_list;
 use super::style::{PADDING, SPACING};
 
 #[inline(always)]
-pub fn column<'a, M>(children: Vec<Element<'a, M>>) -> Column<'a, M> {
+pub fn column<M>(children: Vec<Element<M>>) -> Column<M> {
     Column::with_children(children)
         .align_items(Align::Center)
         .padding(PADDING)
@@ -20,7 +20,7 @@ pub fn column<'a, M>(children: Vec<Element<'a, M>>) -> Column<'a, M> {
 }
 
 #[inline(always)]
-pub fn row<'a, M>(children: Vec<Element<'a, M>>) -> Row<'a, M> {
+pub fn row<M>(children: Vec<Element<M>>) -> Row<M> {
     Row::with_children(children)
         .align_items(Align::Center)
         .padding(PADDING)

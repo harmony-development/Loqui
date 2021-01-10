@@ -1,3 +1,5 @@
+#![allow(clippy::field_reassign_with_default)]
+
 pub mod content;
 pub mod error;
 pub mod member;
@@ -138,6 +140,8 @@ impl Default for AuthInfo {
         }
     }
 }
+
+pub type ActionRetry = (Uuid, AnySyncRoomEvent, Option<Duration>);
 
 pub struct Client {
     /* The inner client stores the session (with our requirements,
@@ -306,9 +310,7 @@ impl Client {
             .map_err(Into::into)
     }
 
-    pub fn rooms_queued_events(
-        &self,
-    ) -> Vec<(RoomId, Vec<(Uuid, AnySyncRoomEvent, Option<Duration>)>)> {
+    pub fn rooms_queued_events(&self) -> Vec<(RoomId, Vec<ActionRetry>)> {
         self.rooms
             .iter()
             .map(|(id, room)| {
@@ -343,7 +345,7 @@ impl Client {
         if let (Some(server_address), Some(content_id)) = (
             content_url
                 .authority()
-                .map(|a| a.as_str().try_into().map_or(None, Some))
+                .map(|a| a.as_str().try_into().ok())
                 .flatten(),
             if content_url.path().is_empty() {
                 None
@@ -530,7 +532,7 @@ impl Client {
                                 content: AvatarEventContent { url, .. },
                                 ..
                             }) => {
-                                room.set_avatar(url.parse::<Uri>().map_or(None, Some));
+                                room.set_avatar(url.parse::<Uri>().ok());
                             }
                             AnySyncStateEvent::RoomAliases(SyncStateEvent {
                                 content: AliasesEventContent { aliases, .. },
