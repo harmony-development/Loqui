@@ -52,11 +52,7 @@ pub fn build_room_list<'a, Message: Clone + 'a>(
             .collect();
     }
 
-    let first_room_id = if !rooms.is_empty() {
-        Some(rooms.remove(0).0.clone())
-    } else {
-        None
-    };
+    let first_room_id = rooms.first().cloned().map(|(id, _, _)| id.clone());
 
     let mut room_list = Scrollable::new(state)
         .style(theme)
