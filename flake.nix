@@ -31,9 +31,9 @@
       {
         inherit packages apps;
 
-        defaultPackage = packages.icy_matrix;
+        defaultPackage = packages.icy_matrix-debug;
 
-        defaultApp = apps.icy_matrix;
+        defaultApp = apps.icy_matrix-debug;
 
         devShell = import ./nix/devShell.nix { inherit common; };
       }

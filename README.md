@@ -30,13 +30,12 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 ### Nix
 - `nix build .#icy_matrix-debug` to compile a debug build.
 - `nix build .#icy_matrix` to compile a release build.
-- If you don't have flakes enabled, `nix-build` will give you a release build.
+- If you don't have flakes enabled, `nix-build` will give you a debug build.
 
 ## Installing
 
 ### Nix
-- For flakes: `nix profile install "https://gitlab.com/yusdacra/icy_matrix.git"`
-- For legacy: `nix-env -i -f "https://gitlab.com/yusdacra/icy_matrix/-/archive/master/icy_matrix-master.tar.gz"`
+- For flakes: `nix profile install gitlab:yusdacra/icy_matrix#icy_matrix`
 
 ## Planned features (not ordered)
 - Multiline message composer
