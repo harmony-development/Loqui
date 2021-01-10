@@ -2,14 +2,14 @@
 /target
 
 # icy_matrix
-data/
+/data
 
 # nix
-result*
+/result*
 /shell.nix
 
 # direnv
-.direnv/
-.envrc
+/.direnv
+/.envrc
 
-.vscode
+/.vscode

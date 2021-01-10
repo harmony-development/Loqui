@@ -1,5 +1,0 @@
-nix/Cargo.nix
-nix/crate-hashes.json
-nix/sources.nix
-nix/sources.json
-target/
