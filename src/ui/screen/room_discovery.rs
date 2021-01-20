@@ -1,3 +1,5 @@
+use harmony_rust_sdk::{api::chat::InviteId, client::api::chat::*};
+
 use crate::{
     client::{error::ClientError, Client},
     ui::{
@@ -5,13 +7,12 @@ use crate::{
         style::{Theme, ERROR_COLOR, PADDING, SUCCESS_COLOR},
     },
 };
-use ruma::{RoomId, RoomIdOrAliasId};
 
 #[derive(Clone, Debug)]
 pub enum Message {
-    DirectJoinRoomIdOrAliasChanged(String),
-    JoinRoom(RoomIdOrAliasId),
-    JoinedRoom(RoomId),
+    InviteChanged(String),
+    JoinRoom(InviteId),
+    JoinedRoom(u64),
     GoBack,
 }
 
@@ -20,8 +21,8 @@ pub struct RoomDiscovery {
     direct_join_textedit_state: text_input::State,
     direct_join_but_state: button::State,
     join_room_back_but_state: button::State,
-    room_join_alias_or_id: String,
-    joined_room: Option<RoomId>,
+    invite: String,
+    joined_room: Option<u64>,
     joining_room: Option<String>,
 }
 
@@ -29,9 +30,9 @@ impl RoomDiscovery {
     pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {
         let mut text_edit = TextInput::new(
             &mut self.direct_join_textedit_state,
-            "Enter a room ID or alias...",
-            &self.room_join_alias_or_id,
-            Message::DirectJoinRoomIdOrAliasChanged,
+            "Enter a guild invite...",
+            &self.invite,
+            Message::InviteChanged,
         )
         .padding(PADDING / 2)
         .style(theme);
@@ -44,21 +45,23 @@ impl RoomDiscovery {
 
         let mut widgets = Vec::with_capacity(3);
 
-        let maybe_room_alias_or_id = self
-            .room_join_alias_or_id
-            .parse::<RoomIdOrAliasId>()
-            .map_err(|e| {
-                ClientError::Custom(format!("Please enter a valid room alias or ID: {}", e))
-            });
+        let maybe_invite = InviteId::new(&self.invite).map_or_else(
+            || {
+                Err(ClientError::Custom(
+                    "Please enter a valid invite".to_string(),
+                ))
+            },
+            Ok,
+        );
 
-        match maybe_room_alias_or_id {
-            Ok(alias_or_id) => {
-                let msg = Message::JoinRoom(alias_or_id);
+        match maybe_invite {
+            Ok(invite) => {
+                let msg = Message::JoinRoom(invite);
                 text_edit = text_edit.on_submit(msg.clone());
                 join = join.on_press(msg);
             }
             Err(e) => {
-                if !self.room_join_alias_or_id.is_empty() {
+                if !self.invite.is_empty() {
                     log::debug!("{}", e); // We don't print this as an error since it'll spam the logs
                     widgets.push(label(e.to_string()).color(ERROR_COLOR).into());
                 }
@@ -68,18 +71,18 @@ impl RoomDiscovery {
         if let Some(name) = self
             .joined_room
             .as_ref()
-            .map(|id| client.rooms.get(id).map(|r| r.get_display_name()))
+            .map(|id| client.guilds.get(id).map(|r| &r.name))
             .flatten()
         {
             widgets.push(
-                label(format!("Successfully joined room {}", name))
+                label(format!("Successfully joined guild {}", name))
                     .color(SUCCESS_COLOR)
                     .into(),
             );
         }
 
         if let Some(name) = self.joining_room.as_ref() {
-            widgets.push(label(format!("Joining room {}", name)).into());
+            widgets.push(label(format!("Joining guild {}", name)).into());
         }
 
         widgets.push(text_edit.into());
@@ -105,19 +108,21 @@ impl RoomDiscovery {
 
     pub fn update(&mut self, msg: Message, client: &Client) -> Command<super::Message> {
         match msg {
-            Message::DirectJoinRoomIdOrAliasChanged(new_join_room_alias_or_id) => {
-                self.room_join_alias_or_id = new_join_room_alias_or_id;
+            Message::InviteChanged(new_invite) => {
+                self.invite = new_invite;
             }
-            Message::JoinRoom(room_alias_or_id) => {
+            Message::JoinRoom(invite) => {
                 self.joined_room = None;
-                self.joining_room = Some(room_alias_or_id.to_string());
+                self.joining_room = Some(invite.to_string());
+                let inner = client.inner().clone();
+
                 return Command::perform(
-                    Client::join_room(client.inner(), room_alias_or_id),
+                    async move { guild::join_guild(&inner, invite).await },
                     |result| match result {
                         Ok(response) => super::Message::RoomDiscoveryScreen(Message::JoinedRoom(
-                            response.room_id,
+                            response.guild_id,
                         )),
-                        Err(e) => super::Message::MatrixError(Box::new(e)),
+                        Err(e) => super::Message::MatrixError(Box::new(e.into())),
                     },
                 );
             }

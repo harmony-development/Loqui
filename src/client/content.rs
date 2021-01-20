@@ -1,5 +1,5 @@
 use super::ClientError;
-use http::Uri;
+use harmony_rust_sdk::client::api::rest::FileId;
 use iced_native::image::Data;
 use indexmap::IndexMap;
 use std::path::{Path, PathBuf};
@@ -33,7 +33,7 @@ pub struct ContentStore {
 impl Default for ContentStore {
     fn default() -> Self {
         let (session_file, log_file, content_dir) =
-            match directories_next::ProjectDirs::from("nodomain", "yusdacra", "icy_matrix") {
+            match directories_next::ProjectDirs::from("nodomain", "yusdacra", "rucies") {
                 Some(app_dirs) => (
                     app_dirs.data_dir().join(SESSION_FILENAME),
                     app_dirs.data_dir().join(LOG_FILENAME),
@@ -56,14 +56,17 @@ impl Default for ContentStore {
 }
 
 impl ContentStore {
-    pub fn content_path(&self, id: &Uri) -> PathBuf {
-        let normalized_id = id
-            .to_string()
-            .replace(|c| [' ', '/', '\\', '.', ':'].contains(&c), "_");
+    pub fn content_path(&self, id: &FileId) -> PathBuf {
+        let normalized_id = match id {
+            FileId::External(uri) => uri.to_string(),
+            FileId::Hmc(hmc) => hmc.to_string(),
+            FileId::Id(id) => id.to_string(),
+        }
+        .replace(|c| [' ', '/', '\\', '.', ':'].contains(&c), "_");
         self.content_dir().join(normalized_id)
     }
 
-    pub fn content_mimetype(&self, id: &Uri) -> String {
+    pub fn content_mimetype(&self, id: &FileId) -> String {
         infer::get_from_path(self.content_path(id))
             .ok()
             .flatten()
@@ -71,7 +74,7 @@ impl ContentStore {
             .unwrap_or_else(|| String::from("application/octet-stream"))
     }
 
-    pub fn content_exists(&self, id: &Uri) -> bool {
+    pub fn content_exists(&self, id: &FileId) -> bool {
         self.content_path(id).exists()
     }
 
@@ -113,7 +116,7 @@ fn get_image_size_from_handle(handle: &ImageHandle) -> Option<u64> {
 
 #[derive(Debug)]
 pub struct ThumbnailCache {
-    thumbnails: IndexMap<Uri, ImageHandle>,
+    thumbnails: IndexMap<String, ImageHandle>,
     max_size: u64,
 }
 
@@ -132,7 +135,7 @@ impl ThumbnailCache {
         }
     }
 
-    pub fn put_thumbnail(&mut self, thumbnail_id: Uri, thumbnail: ImageHandle) {
+    pub fn put_thumbnail(&mut self, thumbnail_id: FileId, thumbnail: ImageHandle) {
         let thumbnail_size = match get_image_size_from_handle(&thumbnail) {
             Some(size) => size,
             None => return,
@@ -158,7 +161,14 @@ impl ThumbnailCache {
                 self.thumbnails.shift_remove_index(index);
             }
         } else {
-            self.thumbnails.insert(thumbnail_id, thumbnail);
+            self.thumbnails.insert(
+                match thumbnail_id {
+                    FileId::External(uri) => uri.to_string(),
+                    FileId::Hmc(hmc) => hmc.to_string(),
+                    FileId::Id(id) => id,
+                },
+                thumbnail,
+            );
         }
     }
 
@@ -173,16 +183,31 @@ impl ThumbnailCache {
         self.len() < 1
     }
 
-    pub fn has_thumbnail(&self, thumbnail_id: &Uri) -> bool {
-        self.thumbnails.contains_key(thumbnail_id)
+    pub fn has_thumbnail(&self, thumbnail_id: &FileId) -> bool {
+        let key = match thumbnail_id {
+            FileId::External(uri) => uri.to_string(),
+            FileId::Hmc(hmc) => hmc.to_string(),
+            FileId::Id(id) => id.to_string(),
+        };
+        self.thumbnails.contains_key(&key)
     }
 
-    pub fn get_thumbnail(&self, thumbnail_id: &Uri) -> Option<&ImageHandle> {
-        self.thumbnails.get(thumbnail_id)
+    pub fn get_thumbnail(&self, thumbnail_id: &FileId) -> Option<&ImageHandle> {
+        let key = match thumbnail_id {
+            FileId::External(uri) => uri.to_string(),
+            FileId::Hmc(hmc) => hmc.to_string(),
+            FileId::Id(id) => id.to_string(),
+        };
+        self.thumbnails.get(&key)
     }
 
-    pub fn invalidate_thumbnail(&mut self, thumbnail_id: &Uri) {
-        self.thumbnails.remove(thumbnail_id);
+    pub fn invalidate_thumbnail(&mut self, thumbnail_id: &FileId) {
+        let key = match thumbnail_id {
+            FileId::External(uri) => uri.to_string(),
+            FileId::Hmc(hmc) => hmc.to_string(),
+            FileId::Id(id) => id.to_string(),
+        };
+        self.thumbnails.remove(&key);
     }
 }
 

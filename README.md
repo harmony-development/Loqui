@@ -1,22 +1,13 @@
-`icy_matrix` is a Matrix client written in Rust using the `iced` GUI library. It uses `ruma` and `ruma-client` to interact with the Matrix network.
+`rucies` is a Harmony client written in Rust using the `iced` GUI library.
 
 It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 
-![Icy Matrix](resources/screenshot.png)
-
-## Current features
-- Plain-text message and file sending
-- Receiving messages and media, can show thumbnails (does not support location messages)
-- Show state changes (kicks / bans, room title changes etc.)
-- Change rooms (the ones you joined to)
-- Room search (powered by [`fuzzy-matcher`](https://lib.rs/crates/fuzzy-matcher) using the `SkimMatcherV2` implementation)
-- Remembers login
+![rucies](resources/screenshot.png)
 
 ## Requirements
-
 - Current stable Rust and Cargo.
 - Make sure you have a working Vulkan setup.
-- gcc, python3, pkg-config, cmake; openssl, x11, xcb, freetype, fontconfig, expat, glib, gtk3, cairo, pango, atk, gdk_pixbuf libraries and development files.
+- gcc, python3, pkg-config, cmake; protobuf, protoc, openssl, x11, xcb, freetype, fontconfig, expat, glib, gtk3, cairo, pango, atk, gdk_pixbuf libraries and development files.
 - Above list may be incomplete, please find out what you need by looking at compiler errors.
 
 ### Nix
@@ -24,35 +15,15 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 
 ## Building
 
-- Clone the repo, and switch the working directory to it: `git clone https://gitlab.com/yusdacra/icy_matrix.git && cd icy_matrix`
+- Clone the repo, and switch the working directory to it: `git clone https://github.com/harmony-development/rucies.git && cd rucies`
 - To build and run the project with debug info / checks use `cargo run`. Use `cargo run --release` for an optimized release build.
 
 ### Nix
-- `nix build .#icy_matrix-debug` to compile a debug build.
-- `nix build .#icy_matrix` to compile a release build.
-- If you don't have flakes enabled, `nix-build` will give you a debug build.
+- `nix build .#rucies-debug` to compile a debug build.
+- `nix build .#rucies` to compile a release build.
+- If you don't have flakes enabled, `nix-build` will give you a release build.
 
 ## Installing
 
 ### Nix
-- For flakes: `nix profile install gitlab:yusdacra/icy_matrix#icy_matrix`
-
-## Planned features (not ordered)
-- Multiline message composer
-- Play audio / video and show images in app
-- HTML tag rendering of messages (need widget for iced)
-- Embedding URLs (pictures / video thumbnails)
-- Read markers
-- Settings screen
-- User list for rooms
-- User presence
-- Showing invites, leaving rooms 
-- Public room explorer
-- Room settings
-- Moderator actions (kick, ban, delete message etc.)
-- Encryption (via [pantalaimon](https://github.com/matrix-org/pantalaimon)?)
-- Animations for better UX (whenever iced supports this)
-- Custom emotes (depends on HTML rendering of messages)
-
-## Not planned features
-- Video / audio calls
+- For flakes: `nix profile install github:harmony-development/rucies`

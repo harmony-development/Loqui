@@ -3,32 +3,64 @@ pub mod logout;
 pub mod main;
 pub mod room_discovery;
 
+use flume::Receiver;
+use futures::channel::mpsc::unbounded;
 pub use login::LoginScreen;
 pub use logout::Logout as LogoutScreen;
 pub use main::MainScreen;
 pub use room_discovery::RoomDiscovery as RoomDiscoveryScreen;
 
+use client::{
+    channel::Channel,
+    guild::{Guild, Guilds},
+    member::{Member, Members},
+    message::{Message as IcyMessage, MessageId},
+};
+
+use ahash::AHashMap;
+use harmony_rust_sdk::{
+    api::{
+        chat::{event::Event, GetGuildListRequest},
+        harmonytypes::{Override, UserStatus},
+    },
+    client::api::{
+        auth::AuthStepResponse,
+        chat::{
+            channel::{get_channel_messages, get_guild_channels, GetChannelMessages},
+            guild::{get_guild, get_guild_list, get_guild_members},
+            message::{SendMessage, SendMessageSelfBuilder},
+            profile::get_user,
+            EventSource, GuildId, UserId,
+        },
+        harmonytypes::Message as HarmonyMessage,
+        rest::FileId,
+    },
+};
+use tokio::sync::Mutex;
+
 use crate::{
     client::{
+        self,
         content::{ContentStore, ImageHandle, ThumbnailCache},
-        error::ClientError,
-        ActionRetry, AuthMethod, Client, InnerClient, TimelineEvent,
+        error::{ClientError, ClientResult},
+        message::harmony_messages_to_ui_messages,
+        Client, InnerClient, Session,
     },
     ui::style::Theme,
 };
-use iced::{executor, Application, Command, Element, Subscription};
-use iced_futures::BoxStream;
-use ruma::{
-    api::{
-        client::r0::{message::get_message_events, sync::sync_events},
-        exports::http::Uri,
-    },
-    events::{room::message::MessageEventContent, AnySyncRoomEvent},
-    presence::PresenceState,
-    RoomId,
+use iced::{
+    executor,
+    futures::{self, channel::mpsc::UnboundedReceiver, StreamExt},
+    Application, Command, Element, Subscription,
 };
-use std::{hash::Hash, hash::Hasher, sync::Arc, time::Duration};
-use uuid::Uuid;
+use iced_futures::BoxStream;
+use std::{
+    hash::Hash,
+    hash::Hasher,
+    str::FromStr,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
 
 #[derive(Debug)]
 pub enum Message {
@@ -39,22 +71,39 @@ pub enum Message {
     PopScreen,
     PushScreen(Box<Screen>),
     /// Sent when the "login" is complete, ie. establishing a session and performing an initial sync.
-    LoginComplete(Client),
+    LoginComplete(Option<Client>),
+    ClientCreated(Client),
+    InitialSync {
+        guilds: Guilds,
+        imgs_to_download: Vec<FileId>,
+    },
     /// Do nothing.
     Nothing,
     DownloadedThumbnail {
-        thumbnail_url: Uri,
+        thumbnail_url: FileId,
         thumbnail: ImageHandle,
     },
     /// Sent when a sync response is received from the server.
-    SyncResponse(Box<sync_events::Response>),
+    SyncResponse(Event),
     /// Sent when a "get context" (get events around an event) is received from the server.
-    GetEventsBackwardsResponse(Box<get_message_events::Response>),
-    SendMessage {
-        content: Vec<MessageEventContent>,
-        room_id: RoomId,
+    GetEventsBackwardsResponse {
+        messages: Vec<HarmonyMessage>,
+        reached_top: bool,
+        guild_id: u64,
+        channel_id: u64,
     },
-    SendMessageResult(RetrySendEventResult),
+    MessageSent {
+        message_id: u64,
+        transaction_id: u64,
+        guild_id: u64,
+        channel_id: u64,
+    },
+    SendMessage {
+        message: IcyMessage,
+        retry_after: Duration,
+        guild_id: u64,
+        channel_id: u64,
+    },
     /// Sent whenever an error occurs.
     MatrixError(Box<ClientError>),
 }
@@ -63,7 +112,7 @@ pub enum Message {
 pub enum Screen {
     Logout(LogoutScreen),
     Login(LoginScreen),
-    Main(MainScreen),
+    Main(Box<MainScreen>),
     RoomDiscovery(RoomDiscoveryScreen),
 }
 
@@ -137,9 +186,7 @@ pub struct ScreenManager {
 }
 
 impl ScreenManager {
-    pub fn new(content_store: ContentStore) -> Self {
-        let content_store = Arc::new(content_store);
-
+    pub fn new(content_store: Arc<ContentStore>) -> Self {
         Self {
             theme: Theme::default(),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new(content_store.clone()))),
@@ -156,15 +203,34 @@ impl Application for ScreenManager {
     type Flags = ContentStore;
 
     fn new(content_store: Self::Flags) -> (Self, Command<Self::Message>) {
-        if content_store.session_file().exists() {
-            let mut manager = ScreenManager::new(content_store);
-            let cmd = manager.update(Message::LoginScreen(login::Message::AuthWith(
-                AuthMethod::RestoringSession,
-            )));
-            (manager, cmd)
+        let content_store = Arc::new(content_store);
+        let mut manager = ScreenManager::new(content_store.clone());
+        let cmd = if content_store.session_file().exists() {
+            let session_file = content_store.session_file().to_path_buf();
+            if let Screen::Login(screen) = manager.screens.current_mut() {
+                screen.waiting = true;
+            }
+            Command::perform(
+                async move {
+                    let session_raw = tokio::fs::read(session_file).await?;
+                    let session: Session = toml::de::from_slice(&session_raw)
+                        .map_err(|_| ClientError::MissingLoginInfo)?;
+                    Client::new(
+                        session.homeserver.parse().unwrap(),
+                        Some(session.into()),
+                        content_store.clone(),
+                    )
+                    .await
+                },
+                |result| match result {
+                    Ok(client) => Message::LoginComplete(Some(client)),
+                    Err(err) => Message::MatrixError(Box::new(err)),
+                },
+            )
         } else {
-            (ScreenManager::new(content_store), Command::none())
-        }
+            Command::none()
+        };
+        (manager, cmd)
     }
 
     fn title(&self) -> String {
@@ -176,7 +242,7 @@ impl Application for ScreenManager {
             Message::Nothing => {}
             Message::LoginScreen(msg) => {
                 if let Screen::Login(screen) = self.screens.current_mut() {
-                    return screen.update(msg);
+                    return screen.update(self.client.as_ref(), msg, &self.content_store);
                 }
             }
             Message::MainScreen(msg) => {
@@ -200,19 +266,140 @@ impl Application for ScreenManager {
                     return screen.update(msg, client);
                 }
             }
-            Message::LoginComplete(client) => {
-                let inner = client.inner();
+            Message::InitialSync {
+                guilds,
+                imgs_to_download,
+            } => {
+                if let Some(client) = self.client.as_mut() {
+                    client
+                        .should_subscribe_to_events
+                        .store(true, Ordering::Relaxed);
+                    client.guilds = guilds;
+                    return make_thumbnail_commands(
+                        client,
+                        imgs_to_download,
+                        &self.thumbnail_cache,
+                    );
+                }
+            }
+            Message::ClientCreated(client) => {
+                self.client = Some(client);
+                let inner = self.client.as_ref().unwrap().inner().clone();
+                return Command::perform(
+                    async move {
+                        inner.begin_auth().await?;
+                        inner.next_auth_step(AuthStepResponse::Initial).await
+                    },
+                    |result| match result {
+                        Ok(step) => Message::LoginScreen(login::Message::AuthStep(step)),
+                        Err(err) => Message::MatrixError(Box::new(err.into())),
+                    },
+                );
+            }
+            Message::LoginComplete(maybe_client) => {
+                if let Some(client) = maybe_client {
+                    self.client = Some(client); // This is the only place we set a main screen [tag:client_set_before_main_view]
+                }
+                self.screens
+                    .push(Screen::Main(Box::new(MainScreen::default())));
 
-                self.client = Some(client); // This is the only place we set a main screen [tag:client_set_before_main_view]
-                self.screens.push(Screen::Main(MainScreen::default()));
-
-                // TODO: Display "syncing with homeserver" when initial sync is running
-                // TODO: Errors also need to be shown on the main screen as well (a "toast" would do probably)
-                return Command::perform(Client::initial_sync(inner), |result| match result {
-                    Ok(response) => Message::SyncResponse(Box::new(response)),
-                    // TODO: If initial sync errors out, we should go back to the login screen probably (?)
-                    Err(e) => Message::MatrixError(Box::new(e)),
-                });
+                let inner = self.client.as_ref().unwrap().inner().clone();
+                self.client.as_mut().unwrap().user_id =
+                    Some(inner.auth_status().session().unwrap().user_id);
+                return Command::perform(
+                    async move {
+                        let mut images_to_download = Vec::new();
+                        let guild_list =
+                            get_guild_list(&inner, GetGuildListRequest {}).await?.guilds;
+                        let mut guilds = Guilds::with_capacity(guild_list.len());
+                        for guild_entry in guild_list {
+                            let guild_id = guild_entry.guild_id;
+                            let guild_data = get_guild(&inner, GuildId::new(guild_id)).await?;
+                            let channels_list = get_guild_channels(&inner, GuildId::new(guild_id))
+                                .await?
+                                .channels;
+                            let mut channels = AHashMap::with_capacity(channels_list.len());
+                            for channel in channels_list {
+                                let messages = harmony_messages_to_ui_messages(
+                                    get_channel_messages(
+                                        &inner,
+                                        GetChannelMessages::new(guild_id, channel.channel_id),
+                                    )
+                                    .await?
+                                    .messages,
+                                );
+                                for message in &messages {
+                                    if let Some(avatar_id) = message
+                                        .overrides
+                                        .as_ref()
+                                        .map(|overrides| overrides.avatar_url.clone())
+                                        .flatten()
+                                    {
+                                        images_to_download.push(avatar_id);
+                                    }
+                                }
+                                channels.insert(
+                                    channel.channel_id,
+                                    Channel {
+                                        is_category: channel.is_category,
+                                        loading_messages_history: false,
+                                        looking_at_message: messages.len(),
+                                        name: channel.channel_name,
+                                        messages,
+                                    },
+                                );
+                            }
+                            let members_list = get_guild_members(&inner, GuildId::new(guild_id))
+                                .await?
+                                .members;
+                            let mut members = Members::default();
+                            for member_id in members_list {
+                                if let Ok(member) = get_user(&inner, UserId::new(member_id)).await {
+                                    members.update_member(
+                                        Member {
+                                            username: member.user_name,
+                                            avatar_url: {
+                                                let id = FileId::from_str(&member.user_avatar).ok();
+                                                if let Some(id) = id.clone() {
+                                                    images_to_download.push(id);
+                                                }
+                                                id
+                                            },
+                                            display_user: true,
+                                            typing_in_channel: None,
+                                            status: UserStatus::from_i32(member.user_status)
+                                                .unwrap(),
+                                        },
+                                        member_id,
+                                    );
+                                }
+                            }
+                            guilds.insert(
+                                guild_id,
+                                Guild {
+                                    channels,
+                                    members,
+                                    name: guild_data.guild_name,
+                                    picture: {
+                                        let id = FileId::from_str(&guild_data.guild_picture).ok();
+                                        if let Some(id) = id.clone() {
+                                            images_to_download.push(id);
+                                        }
+                                        id
+                                    },
+                                },
+                            );
+                        }
+                        Ok((guilds, images_to_download))
+                    },
+                    |result| match result {
+                        Err(err) => Message::MatrixError(Box::new(err)),
+                        Ok((guilds, imgs_to_download)) => Message::InitialSync {
+                            guilds,
+                            imgs_to_download,
+                        },
+                    },
+                );
             }
             Message::PopScreen => {
                 self.screens.pop();
@@ -220,49 +407,95 @@ impl Application for ScreenManager {
             Message::PushScreen(screen) => {
                 self.screens.push(*screen);
             }
-            Message::SendMessage { content, room_id } => {
-                if let Some(client) = self.client.as_mut() {
-                    if let Some(room) = client.rooms.get_mut(&room_id) {
-                        for content in content {
-                            room.add_event(TimelineEvent::new_unacked_message(
-                                content,
-                                Uuid::new_v4(),
-                            ));
-                        }
+            Message::MessageSent {
+                message_id,
+                transaction_id,
+                guild_id,
+                channel_id,
+            } => {
+                if let Some(channel) = self
+                    .client
+                    .as_mut()
+                    .map(|client| client.get_channel(guild_id, channel_id))
+                    .flatten()
+                {
+                    if let Some(msg) = channel
+                        .messages
+                        .iter_mut()
+                        .find(|msg| msg.id.transaction_id() == Some(transaction_id))
+                    {
+                        msg.id = MessageId::Ack(message_id);
                     }
                 }
             }
-            Message::SendMessageResult(errors) => {
-                if let Some(client) = self.client.as_mut() {
-                    use ruma::{
-                        api::client::error::ErrorKind as ClientAPIErrorKind, api::error::*,
-                    };
-                    use ruma_client::Error as InnerClientError;
-
-                    for (room_id, errors) in errors {
-                        for (transaction_id, error) in errors {
-                            if let ClientError::Internal(InnerClientError::FromHttpResponse(
-                                FromHttpResponseError::Http(ServerError::Known(err)),
-                            )) = error
-                            {
-                                if let ClientAPIErrorKind::LimitExceeded { retry_after_ms } =
-                                    err.kind
-                                {
-                                    if let Some(retry_after) = retry_after_ms {
-                                        if let Some(room) = client.rooms.get_mut(&room_id) {
-                                            room.wait_for_duration(retry_after, transaction_id);
-                                        }
-                                        log::error!(
-                                            "Send message after: {}",
-                                            retry_after.as_secs()
-                                        );
-                                    }
-                                }
-                            } else {
-                                log::error!("Error while sending message: {}", error);
-                            }
-                        }
+            Message::SendMessage {
+                message,
+                retry_after,
+                guild_id,
+                channel_id,
+            } => {
+                if let Some(channel) = self
+                    .client
+                    .as_mut()
+                    .map(|client| client.get_channel(guild_id, channel_id))
+                    .flatten()
+                {
+                    if retry_after.as_secs() == 0 {
+                        channel.messages.push(message.clone());
                     }
+
+                    let inner = self.client.as_ref().unwrap().inner().clone();
+
+                    return Command::perform(
+                        async move {
+                            tokio::time::sleep(retry_after).await;
+
+                            let send_message =
+                                SendMessage::new(guild_id, channel_id, message.content.clone())
+                                    .echo_id(message.id.transaction_id().unwrap())
+                                    .attachments(
+                                        message
+                                            .attachments
+                                            .clone()
+                                            .into_iter()
+                                            .map(|a| a.id)
+                                            .collect::<Vec<_>>(),
+                                    )
+                                    .overrides(message.overrides.as_ref().map(|o| {
+                                        Override {
+                                            avatar: o
+                                                .avatar_url
+                                                .as_ref()
+                                                .map_or_else(String::default, |id| id.to_string()),
+                                            name: o.name.clone(),
+                                            reason: o.reason.clone(),
+                                        }
+                                    }));
+
+                            let send_result =
+                                harmony_rust_sdk::client::api::chat::message::send_message(
+                                    &inner,
+                                    send_message,
+                                )
+                                .await;
+
+                            match send_result {
+                                Ok(resp) => Message::MessageSent {
+                                    message_id: resp.message_id,
+                                    transaction_id: message.id.transaction_id().unwrap(),
+                                    channel_id,
+                                    guild_id,
+                                },
+                                Err(_) => Message::SendMessage {
+                                    message,
+                                    retry_after: retry_after + Duration::from_secs(1),
+                                    channel_id,
+                                    guild_id,
+                                },
+                            }
+                        },
+                        |retry| retry,
+                    );
                 }
             }
             Message::DownloadedThumbnail {
@@ -271,53 +504,35 @@ impl Application for ScreenManager {
             } => {
                 self.thumbnail_cache.put_thumbnail(thumbnail_url, thumbnail);
             }
-            Message::SyncResponse(response) => {
+            Message::SyncResponse(event) => {
                 if let Some(client) = self.client.as_mut() {
-                    let thumbnail_urls = client.process_sync_response(*response);
+                    let thumbnail_urls = client.process_event(event);
                     return make_thumbnail_commands(client, thumbnail_urls, &self.thumbnail_cache);
                 }
             }
-            Message::GetEventsBackwardsResponse(response) => {
+            Message::GetEventsBackwardsResponse {
+                messages,
+                reached_top,
+                guild_id,
+                channel_id,
+            } => {
                 if let Some(client) = self.client.as_mut() {
-                    if let Some((room_id, thumbnail_urls)) =
-                        client.process_events_backwards_response(*response)
-                    {
-                        // Safe unwrap
-                        client
-                            .rooms
-                            .get_mut(&room_id)
-                            .unwrap()
-                            .loading_events_backward = false;
-                        return make_thumbnail_commands(
-                            client,
-                            thumbnail_urls,
-                            &self.thumbnail_cache,
-                        );
-                    }
+                    let thumbnail_urls = client.process_get_message_history_response(
+                        guild_id,
+                        channel_id,
+                        messages,
+                        reached_top,
+                    );
+                    // Safe unwrap
+                    client
+                        .get_channel(guild_id, channel_id)
+                        .unwrap()
+                        .loading_messages_history = false;
+                    return make_thumbnail_commands(client, thumbnail_urls, &self.thumbnail_cache);
                 }
             }
             Message::MatrixError(err) => {
-                use ruma::{api::client::error::ErrorKind as ClientAPIErrorKind, api::error::*};
-                use ruma_client::Error as InnerClientError;
-
                 log::error!("{}", err);
-
-                if let ClientError::Internal(err) = &*err {
-                    if let InnerClientError::FromHttpResponse(err) = err {
-                        if let FromHttpResponseError::Http(err) = err {
-                            if let ServerError::Known(err) = err {
-                                // Return to login screen since the users session has expired.
-                                if let ClientAPIErrorKind::UnknownToken { soft_logout: _ } =
-                                    err.kind
-                                {
-                                    self.screens.clear(Screen::Login(LoginScreen::new(
-                                        self.content_store.clone(),
-                                    )));
-                                }
-                            }
-                        }
-                    }
-                }
 
                 return self.screens.current_mut().on_error(*err);
             }
@@ -328,28 +543,37 @@ impl Application for ScreenManager {
     fn subscription(&self) -> Subscription<Self::Message> {
         let mut sub = Subscription::none();
 
-        if let Some(client) = &self.client {
-            let rooms_queued_events = client.rooms_queued_events();
-            sub = Subscription::from_recipe(RetrySendEventRecipe {
-                inner: client.inner(),
-                rooms_queued_events,
-            })
-            .map(Message::SendMessageResult);
+        /*if let Some(client) = &self.client {
+            if client.auth_status().is_authenticated()
+                && client.should_subscribe_to_events.load(Ordering::Relaxed)
+            {
+                let sources = client.subscribe_to();
+                let inner = client.inner().clone();
+                let (tx, rx) = flume::unbounded();
 
-            if let Some(since) = client.next_batch() {
+                tokio::task::spawn_blocking(|| async move {
+                    let mut events = inner.subscribe_events(sources).await.unwrap().0;
+
+                    loop {
+                        if let Some(event) = events.next().await {
+                            tx.send(event.map_err(ClientError::Internal)).unwrap();
+                        }
+                    }
+                });
+
                 sub = Subscription::batch(vec![
                     sub,
-                    Subscription::from_recipe(SyncRecipe {
-                        inner: client.inner(),
-                        since: since.to_string(),
-                    })
-                    .map(|result| match result {
-                        Ok(response) => Message::SyncResponse(Box::from(response)),
+                    Subscription::from_recipe(SyncRecipe { chan: rx }).map(|result| match result {
+                        Ok(response) => Message::SyncResponse(response),
                         Err(err) => Message::MatrixError(Box::new(err)),
                     }),
                 ]);
+
+                client
+                    .should_subscribe_to_events
+                    .store(false, Ordering::Relaxed);
             }
-        }
+        }*/
 
         sub
     }
@@ -372,166 +596,70 @@ impl Application for ScreenManager {
     }
 }
 
-pub type RetrySendEventResult = Vec<(RoomId, Vec<(Uuid, ClientError)>)>;
-pub struct RetrySendEventRecipe {
-    inner: InnerClient,
-    rooms_queued_events: Vec<(RoomId, Vec<ActionRetry>)>,
-}
-
-impl<H, I> iced_futures::subscription::Recipe<H, I> for RetrySendEventRecipe
-where
-    H: Hasher,
-{
-    type Output = RetrySendEventResult;
-
-    fn hash(&self, state: &mut H) {
-        std::any::TypeId::of::<Self>().hash(state);
-
-        for (id, events) in &self.rooms_queued_events {
-            id.hash(state);
-            for (transaction_id, _, retry_after) in events {
-                transaction_id.hash(state);
-                retry_after.hash(state);
-            }
-        }
-
-        self.inner.session().hash(state);
-    }
-
-    fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
-        let future = async move {
-            let mut room_errors = Vec::new();
-
-            for (room_id, events) in self.rooms_queued_events {
-                let mut transaction_errors = Vec::new();
-                for (transaction_id, event, retry_after) in events {
-                    if let Some(dur) = retry_after {
-                        tokio::time::sleep(dur).await;
-                    }
-
-                    let result = match event {
-                        AnySyncRoomEvent::Message(ev) => {
-                            Client::send_message(
-                                self.inner.clone(),
-                                ev.content(),
-                                room_id.clone(),
-                                transaction_id,
-                            )
-                            .await
-                        }
-                        _ => unimplemented!(),
-                    };
-
-                    if let Err(e) = result {
-                        transaction_errors.push((transaction_id, e));
-                    }
-                }
-                room_errors.push((room_id, transaction_errors));
-            }
-
-            room_errors
-        };
-
-        Box::pin(iced_futures::futures::stream::once(future))
-    }
-}
-
-pub type SyncResult = Result<sync_events::Response, ClientError>;
 pub struct SyncRecipe {
-    inner: InnerClient,
-    since: String,
+    chan: Receiver<ClientResult<Event>>,
 }
 
 impl<H, I> iced_futures::subscription::Recipe<H, I> for SyncRecipe
 where
     H: Hasher,
 {
-    type Output = SyncResult;
+    type Output = ClientResult<Event>;
 
     fn hash(&self, state: &mut H) {
         std::any::TypeId::of::<Self>().hash(state);
-
-        self.since.hash(state);
-        self.inner.session().hash(state);
     }
 
     fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
-        use iced_futures::futures::TryStreamExt;
-
-        Box::pin(
-            self.inner
-                .sync(
-                    None,
-                    self.since,
-                    &PresenceState::Online,
-                    Some(Duration::from_secs(20)),
-                )
-                .map_err(ClientError::Internal),
-        )
+        Box::pin(self.chan.into_stream())
     }
 }
 
 fn make_thumbnail_commands(
     client: &Client,
-    thumbnail_urls: Vec<(bool, Uri)>,
+    thumbnail_urls: Vec<FileId>,
     thumbnail_cache: &ThumbnailCache,
 ) -> Command<Message> {
-    Command::batch(
-        thumbnail_urls
-            .into_iter()
-            .flat_map(|(is_on_disk, thumbnail_url)| {
-                if !thumbnail_cache.has_thumbnail(&thumbnail_url) {
-                    let content_path = client.content_store().content_path(&thumbnail_url);
+    Command::batch(thumbnail_urls.into_iter().flat_map(|thumbnail_url| {
+        if !thumbnail_cache.has_thumbnail(&thumbnail_url) {
+            let content_path = client.content_store().content_path(&thumbnail_url);
 
-                    Some(if is_on_disk {
-                        Command::perform(
-                            async move {
-                                (
-                                    async {
-                                        Ok(ImageHandle::from_memory(
-                                            tokio::fs::read(content_path).await?,
-                                        ))
-                                    }
-                                    .await,
-                                    thumbnail_url,
-                                )
-                            },
-                            |(result, thumbnail_url)| match result {
-                                Ok(thumbnail) => Message::DownloadedThumbnail {
-                                    thumbnail,
-                                    thumbnail_url,
-                                },
-                                Err(err) => Message::MatrixError(Box::new(err)),
-                            },
-                        )
-                    } else {
-                        let download_task =
-                            Client::download_content(client.inner(), thumbnail_url.clone());
+            let inner = client.inner().clone();
 
-                        Command::perform(
-                            async move {
-                                match download_task.await {
-                                    Ok(raw_data) => {
-                                        tokio::fs::write(content_path, raw_data.as_slice())
-                                            .await
-                                            .map(|_| (thumbnail_url, raw_data))
-                                            .map_err(Into::into)
-                                    }
-                                    Err(err) => Err(err),
-                                }
-                            },
-                            |result| match result {
-                                Ok((thumbnail_url, raw_data)) => Message::DownloadedThumbnail {
-                                    thumbnail_url,
-                                    thumbnail: ImageHandle::from_memory(raw_data),
-                                },
-                                Err(err) => Message::MatrixError(Box::new(err)),
-                            },
-                        )
-                    })
-                } else {
-                    None
-                }
-            }),
-    )
+            Some(Command::perform(
+                async move {
+                    match tokio::fs::read(&content_path).await {
+                        Ok(raw) => Ok((thumbnail_url, ImageHandle::from_memory(raw))),
+                        Err(_) => {
+                            let download_task = harmony_rust_sdk::client::api::rest::download(
+                                &inner,
+                                thumbnail_url.clone(),
+                            );
+                            let resp = download_task.await?;
+                            match resp.bytes().await {
+                                Ok(raw_data) => tokio::fs::write(content_path, &raw_data)
+                                    .await
+                                    .map(|_| {
+                                        (thumbnail_url, ImageHandle::from_memory(raw_data.to_vec()))
+                                    })
+                                    .map_err(Into::into),
+                                Err(err) => Err(err)
+                                    .map_err(harmony_rust_sdk::client::error::ClientError::Reqwest)
+                                    .map_err(Into::into),
+                            }
+                        }
+                    }
+                },
+                |result| match result {
+                    Ok((thumbnail_id, thumbnail)) => Message::DownloadedThumbnail {
+                        thumbnail_url: thumbnail_id,
+                        thumbnail,
+                    },
+                    Err(err) => Message::MatrixError(Box::new(err)),
+                },
+            ))
+        } else {
+            None
+        }
+    }))
 }

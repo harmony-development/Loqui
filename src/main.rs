@@ -21,7 +21,10 @@ pub fn main() {
         .build();
 
     let show_debug = std::env::args().nth(1).map_or(false, |s| s == "-d");
-    let filter_level = if show_debug {
+    let show_trace = std::env::args().nth(1).map_or(false, |s| s == "-v");
+    let filter_level = if show_trace {
+        LevelFilter::Trace
+    } else if show_debug {
         LevelFilter::Debug
     } else {
         LevelFilter::Info

@@ -1,5 +1,5 @@
 [package]
-name = "icy_matrix"
+name = "rucies"
 version = "0.1.0"
 authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
 edition = "2018"
@@ -8,7 +8,6 @@ edition = "2018"
 opt-level = 2
 overflow-checks = true
 debug-assertions = true
-panic = "abort"
 debug = false
 codegen-units = 8
 lto = false
@@ -22,23 +21,21 @@ lto = "thin"
 debug = false
 
 [dependencies]
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", features = ["client"] }
+
 iced = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix", features = ["tokio", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
 iced_futures = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
 
 open = "1.4.0"
 infer = "0.3.4"
-rfd = "0.0.3"
+rfd = "0.1.1"
 image = "0.23.12"
 directories-next = "2.0.0"
 
-http = "0.2"
-parking_lot = "0.11.1"
-tokio = { version = "1.0.1", features = ["rt-multi-thread", "parking_lot", "time", "fs"] }
-ruma = { git = "https://github.com/ruma/ruma/", features = ["client-api"], branch = "main" }
-ruma-client = { git = "https://github.com/ruma/ruma/", branch = "main" }
-assign = "1.1.1"
-uuid = { version = "0.8.1", features = ["v4"] }
+flume = "0.10.1"
+tokio = { version = "1.0.2", features = ["rt-multi-thread", "parking_lot", "time", "fs"] }
+uuid = { version = "0.8.2", features = ["v4"] }
 ahash = "0.6"
 indexmap = "1.6.1"
 

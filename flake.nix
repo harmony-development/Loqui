@@ -1,9 +1,9 @@
 {
-  description = "Flake for icy_matrix, a Matrix client written in Rust";
+  description = "Flake for rucies, a Harmony client written in Rust";
 
   inputs = rec {
     naersk = {
-      url = "github:yusdacra/naersk/extract-rev-cargolock";
+      url = "github:nmattia/naersk";
       inputs.nixpkgs = nixpkgs;
     };
     flakeUtils.url = "github:numtide/flake-utils";
@@ -23,17 +23,17 @@
         };
 
         packages = {
-          icy_matrix = import ./nix/build.nix { inherit common; release = true; };
-          icy_matrix-debug = import ./nix/build.nix { inherit common; };
+          rucies = import ./nix/build.nix { inherit common; release = true; };
+          rucies-debug = import ./nix/build.nix { inherit common; };
         };
-        apps = builtins.mapAttrs (n: v: mkApp { name = n; drv = v; exePath = "/bin/icy_matrix"; }) packages;
+        apps = builtins.mapAttrs (n: v: mkApp { name = n; drv = v; exePath = "/bin/rucies"; }) packages;
       in
       {
         inherit packages apps;
 
-        defaultPackage = packages.icy_matrix-debug;
+        defaultPackage = packages.rucies;
 
-        defaultApp = apps.icy_matrix-debug;
+        defaultApp = apps.rucies;
 
         devShell = import ./nix/devShell.nix { inherit common; };
       }

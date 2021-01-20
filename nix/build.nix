@@ -6,27 +6,27 @@ with common;
 let
   # TODO: Need an icon
   desktopFile = pkgs.makeDesktopItem rec {
-    name = "icy_matrix";
+    name = "rucies";
     exec = name;
-    comment = "icy_matrix is a Matrix client written in Rust.";
-    desktopName = "Icy Matrix";
-    genericName = "Matrix Client";
+    comment = "rucies is a Harmony client written in Rust.";
+    desktopName = "Rucies";
+    genericName = "Harmony Client";
     categories = "Network;";
   };
 
   meta = with pkgs.stdenv.lib; {
-    description = "icy_matrix is a Matrix client written in Rust.";
+    description = "rucies is a Harmony client written in Rust.";
     longDescription = ''
-      icy_matrix is a Matrix client written in Rust using the iced GUI library. It uses ruma and ruma-client to interact with the Matrix network.
+      rucies is a Harmony client written in Rust using the iced GUI library.
 
       It aims to be lightweight with a good out-of-the-box experience.
     '';
-    upstream = "https://gitlab.com/yusdacra/icy_matrix";
+    upstream = "https://github.com/harmony-development/rucies";
     license = licenses.gpl3;
     maintainers = [ maintainers.yusdacra ];
   };
 
-  icyMatrix = with pkgs; naersk.buildPackage {
+  icyHarmony = with pkgs; naersk.buildPackage {
     root = ../.;
     nativeBuildInputs = crateDeps.nativeBuildInputs;
     buildInputs = crateDeps.buildInputs;
@@ -36,7 +36,7 @@ let
       nativeBuildInputs = prev.nativeBuildInputs ++ [ makeWrapper copyDesktopItems wrapGAppsHook ];
       desktopItems = [ desktopFile ];
       fixupPhase = ''
-        wrapProgram $out/bin/icy_matrix\
+        wrapProgram $out/bin/rucies\
           --set LD_LIBRARY_PATH ${lib.makeLibraryPath neededLibs}\
           --set XDG_DATA_DIRS ${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share
       '';
@@ -44,4 +44,4 @@ let
     inherit release;
   };
 in
-icyMatrix
+icyHarmony

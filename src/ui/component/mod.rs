@@ -7,7 +7,7 @@ pub use iced::{
     button, pick_list, scrollable, text_input, Align, Button, Color, Column, Command, Container,
     Element, Image, Length, PickList, Row, Scrollable, Space, Subscription, Text, TextInput,
 };
-pub use room_list::build_room_list;
+pub use room_list::build_channel_list;
 
 use super::style::{PADDING, SPACING};
 

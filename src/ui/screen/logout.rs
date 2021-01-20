@@ -61,7 +61,7 @@ impl Logout {
             self.confirmation = true;
             Command::perform(
                 Client::logout(
-                    client.inner(),
+                    client.inner().clone(),
                     client.content_store().session_file().to_path_buf(),
                 ),
                 |result| match result {

@@ -1,21 +1,21 @@
 use crate::{
     client::{
+        channel::Channel,
         content::{ContentStore, ContentType, ThumbnailCache},
-        Room,
+        member::Members,
     },
     color,
     ui::{
         component::*,
         screen::main::Message,
         style::{
-            Theme, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, ERROR_COLOR, MESSAGE_SENDER_SIZE,
-            MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
+            Theme, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
+            MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
         },
     },
 };
-use chrono::{DateTime, Datelike, Local};
-use ruma::{api::exports::http::Uri, UserId};
-use std::time::{Duration, Instant};
+use chrono::{Datelike, Timelike};
+use harmony_rust_sdk::{api::harmonytypes::r#override::Reason, client::api::rest::FileId};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
@@ -25,8 +25,9 @@ const MSG_LR_PADDING: u16 = SPACING * 2;
 pub fn build_event_history<'a>(
     content_store: &ContentStore,
     thumbnail_cache: &ThumbnailCache,
-    room: &Room,
-    current_user_id: &UserId,
+    channel: &Channel,
+    members: &Members,
+    current_user_id: u64,
     looking_at_event: usize,
     scrollable_state: &'a mut scrollable::State,
     content_open_buttons: &'a mut [button::State; SHOWN_MSGS_LIMIT],
@@ -47,9 +48,7 @@ pub fn build_event_history<'a>(
         .spacing(SPACING * 2)
         .padding(PADDING);
 
-    let members = room.members();
-
-    let displayable_events = room.displayable_events().collect::<Vec<_>>();
+    let displayable_events = &channel.messages;
     let timeline_range_end = looking_at_event
         .saturating_add(SHOWN_MSGS_LIMIT)
         .min(displayable_events.len());
@@ -57,42 +56,57 @@ pub fn build_event_history<'a>(
     let displayable_events = &displayable_events[timeline_range_start..timeline_range_end];
 
     let mut last_timestamp = if let Some(ev) = displayable_events.first() {
-        *ev.origin_server_timestamp()
+        ev.timestamp
     } else {
         return event_history.into();
     };
     let mut last_sender = None;
-    let mut last_minute = last_timestamp
-        .elapsed()
-        .unwrap_or_else(|_| Instant::now().elapsed())
-        .as_secs()
-        / 60;
     let mut message_group = vec![];
 
-    for (timeline_event, media_open_button_state) in displayable_events
+    for (message, media_open_button_state) in displayable_events
         .iter()
         .zip(content_open_buttons.iter_mut())
     {
-        let cur_timestamp = timeline_event
-            .origin_server_timestamp()
-            .elapsed()
-            .unwrap_or_else(|_| Instant::now().elapsed());
-        let id_to_use = if !timeline_event.is_ack() {
+        let id_to_use = if !message.id.is_ack() {
             current_user_id
         } else {
-            timeline_event.sender()
+            message.sender
         };
 
-        let sender_display_name = members.get_user_display_name(id_to_use);
-        let sender_avatar_url = members
-            .get_member(id_to_use)
-            .map(|m| m.avatar_url())
-            .flatten();
+        let override_reason = message
+            .overrides
+            .as_ref()
+            .map(|overrides| overrides.reason.as_ref())
+            .flatten()
+            .map(|reason| match reason {
+                Reason::Bridge(_) => {
+                    format!("bridged by {}", members.get_user_display_name(&id_to_use))
+                }
+                Reason::SystemMessage(_) => "system message".to_string(),
+                Reason::UserDefined(reason) => reason.to_string(),
+                Reason::Webhook(_) => {
+                    format!("webhook by {}", members.get_user_display_name(&id_to_use))
+                }
+                _ => todo!("plurality"),
+            });
+        let sender_display_name = if let Some(overrides) = &message.overrides {
+            overrides.name.clone()
+        } else {
+            members.get_user_display_name(&id_to_use)
+        };
+        let sender_avatar_url = if let Some(overrides) = &message.overrides {
+            overrides.avatar_url.as_ref()
+        } else {
+            members
+                .get_member(&id_to_use)
+                .map(|m| m.avatar_url.as_ref())
+                .flatten()
+        };
         let sender_body_creator = |sender_display_name: &str| {
             let mut widgets = Vec::with_capacity(2);
 
             if let Some(handle) = sender_avatar_url
-                .map(|u| thumbnail_cache.get_thumbnail(u))
+                .map(|u| thumbnail_cache.get_thumbnail(&u))
                 .flatten()
                 .cloned()
             {
@@ -106,15 +120,29 @@ pub fn build_event_history<'a>(
                         .color(theme.calculate_sender_color(sender_display_name.len()))
                         .size(MESSAGE_SENDER_SIZE),
                 )
+                .align_x(Align::Start)
                 .align_y(Align::End)
                 .into(),
             );
+
+            if let Some(reason) = &override_reason {
+                widgets.push(
+                    Container::new(
+                        label(reason)
+                            .color(color!(128, 128, 128))
+                            .size(MESSAGE_SIZE),
+                    )
+                    .align_x(Align::Start)
+                    .align_y(Align::End)
+                    .into(),
+                );
+            }
 
             row(widgets).spacing(MSG_LR_PADDING).padding(0)
         };
 
         let mut is_sender_different = false;
-        if last_sender != Some(id_to_use) {
+        if last_sender.as_ref() != Some(&sender_display_name) {
             is_sender_different = true;
             if !message_group.is_empty() {
                 event_history = event_history.push(
@@ -127,54 +155,40 @@ pub fn build_event_history<'a>(
             message_group.push(sender_body_creator(&sender_display_name).into());
         }
 
-        if !is_sender_different {
-            let time = last_timestamp
-                .elapsed()
-                .unwrap_or_else(|_| Instant::now().elapsed());
-            if !message_group.is_empty()
-                && time.checked_sub(cur_timestamp).unwrap_or_default() > Duration::from_secs(60 * 5)
-            {
-                event_history = event_history.push(
-                    Container::new(
-                        column(message_group.drain(..).collect()).align_items(Align::Start),
-                    )
+        if !is_sender_different
+            && !message_group.is_empty()
+            && last_timestamp.signed_duration_since(message.timestamp)
+                > chrono::Duration::minutes(5)
+        {
+            event_history = event_history.push(
+                Container::new(column(message_group.drain(..).collect()).align_items(Align::Start))
                     .style(theme.round()),
-                );
-                let cur_time_date =
-                    DateTime::<Local>::from(*timeline_event.origin_server_timestamp());
-                let time_date = DateTime::<Local>::from(last_timestamp);
-                if cur_time_date.day() != time_date.day() {
-                    let date_time_seperator = fill_container(
-                        label(cur_time_date.format("[%d %B %Y]").to_string())
-                            .size(DATE_SEPERATOR_SIZE)
-                            .color(color!(153, 153, 153)),
-                    )
-                    .height(Length::Shrink);
+            );
+            if message.timestamp.day() != last_timestamp.day() {
+                let date_time_seperator = fill_container(
+                    label(message.timestamp.format("[%d %B %Y]").to_string())
+                        .size(DATE_SEPERATOR_SIZE)
+                        .color(color!(153, 153, 153)),
+                )
+                .height(Length::Shrink);
 
-                    event_history = event_history.push(date_time_seperator);
-                }
-                message_group.push(sender_body_creator(&sender_display_name).into());
+                event_history = event_history.push(date_time_seperator);
             }
+            message_group.push(sender_body_creator(&sender_display_name).into());
         }
 
-        let mut message_text = label(timeline_event.formatted(&members)).size(MESSAGE_SIZE);
+        let mut message_text = label(&message.content).size(MESSAGE_SIZE);
 
-        if !timeline_event.is_ack() {
-            message_text = message_text.color(color!(128, 128, 128));
-        } else if timeline_event.is_state() {
+        if !message.id.is_ack() {
             message_text = message_text.color(color!(200, 200, 200));
-        } else if timeline_event.is_redacted_message() {
-            message_text = message_text.color(ERROR_COLOR);
         }
 
         let mut message_body_widgets = vec![message_text.into()];
 
-        if let (Some(content_url), Some(content_type)) =
-            (timeline_event.content_url(), timeline_event.content_type())
-        {
+        if let Some(attachment) = message.attachments.first() {
             fn create_button<'a>(
                 is_thumbnail: bool,
-                content_url: Uri,
+                content_url: FileId,
                 content: impl Into<Element<'a, Message>>,
                 button_state: &'a mut button::State,
                 theme: Theme,
@@ -188,24 +202,18 @@ pub fn build_event_history<'a>(
                     .into()
             };
 
-            let is_thumbnail = matches!(content_type, ContentType::Image);
-            let does_content_exist = content_store.content_exists(&content_url);
+            let is_thumbnail = matches!(attachment.kind, ContentType::Image);
+            let does_content_exist = content_store.content_exists(&attachment.id);
 
             if let Some(thumbnail_image) = thumbnail_cache
-                .get_thumbnail(&content_url)
-                .or_else(|| {
-                    timeline_event
-                        .thumbnail_url()
-                        .map(|url| thumbnail_cache.get_thumbnail(&url))
-                        .flatten()
-                })
+                .get_thumbnail(&attachment.id)
                 // FIXME: Don't hardcode this length, calculate it using the size of the window
                 .map(|handle| Image::new(handle.clone()).width(Length::Units(320)))
             {
                 if does_content_exist {
                     message_body_widgets.push(create_button(
                         is_thumbnail,
-                        content_url,
+                        attachment.id.clone(),
                         thumbnail_image,
                         media_open_button_state,
                         theme,
@@ -213,7 +221,7 @@ pub fn build_event_history<'a>(
                 } else {
                     let button = create_button(
                         is_thumbnail,
-                        content_url,
+                        attachment.id.clone(),
                         Column::with_children(vec![
                             label("Download content").into(),
                             thumbnail_image.into(),
@@ -233,7 +241,7 @@ pub fn build_event_history<'a>(
 
                 message_body_widgets.push(create_button(
                     is_thumbnail,
-                    content_url,
+                    attachment.id.clone(),
                     label(text),
                     media_open_button_state,
                     theme,
@@ -248,13 +256,8 @@ pub fn build_event_history<'a>(
         let mut message_row = Vec::with_capacity(2);
 
         // FIXME: doesnt work properly
-        let cur_minute = (cur_timestamp.as_secs() / 60) % 60;
-        if is_sender_different || last_minute != cur_minute {
-            last_minute = cur_minute;
-            let message_timestamp =
-                DateTime::<Local>::from(*timeline_event.origin_server_timestamp())
-                    .format("%H:%M")
-                    .to_string();
+        if is_sender_different || last_timestamp.minute() != message.timestamp.minute() {
+            let message_timestamp = message.timestamp.format("%H:%M").to_string();
 
             let timestamp_label = label(message_timestamp)
                 .size(MESSAGE_TIMESTAMP_SIZE)
@@ -273,8 +276,8 @@ pub fn build_event_history<'a>(
 
         message_group.push(row(message_row).padding(0).into());
 
-        last_sender = Some(id_to_use);
-        last_timestamp = *timeline_event.origin_server_timestamp();
+        last_sender = Some(sender_display_name);
+        last_timestamp = message.timestamp;
     }
     if !message_group.is_empty() {
         event_history = event_history.push(

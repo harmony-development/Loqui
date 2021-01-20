@@ -1,183 +1,296 @@
 use crate::{
-    client::{content::ContentStore, error::ClientError, AuthInfo, AuthMethod, Client},
+    client::{content::ContentStore, error::ClientError, Client, Session},
     ui::{
         component::*,
         style::{Theme, ERROR_COLOR, PADDING},
     },
 };
-use std::sync::Arc;
+use harmony_rust_sdk::{
+    api::{
+        auth::{auth_step::Step, next_step_request::form_fields::Field},
+        exports::http::Uri,
+    },
+    client::{
+        api::auth::{AuthStep, AuthStepResponse},
+        AuthStatus,
+    },
+};
+use std::{collections::HashMap, sync::Arc};
+
+#[derive(Debug, Clone, Copy)]
+enum AuthType {
+    Form,
+    Choice,
+    Waiting,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum AuthPart {
+    Homeserver,
+    Step(AuthType),
+}
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    UsernameChanged(String),
-    PasswordChanged(String),
-    HomeserverChanged(String),
-    AuthWith(AuthMethod),
+    FieldChanged(String, String),
+    AuthResponse(Option<String>),
+    GoBack,
+    AuthStep(Option<AuthStep>),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LoginScreen {
-    homeserver_field: text_input::State,
-    username_field: text_input::State,
-    password_field: text_input::State,
-    login_button: button::State,
-    register_button: button::State,
-    guest_button: button::State,
+    fields: HashMap<String, (text_input::State, String, String)>,
+    choices: HashMap<String, button::State>,
+    choice: String,
+    proceed: button::State,
+    back: button::State,
 
-    auth_info: AuthInfo,
-    cur_auth_method: Option<AuthMethod>,
+    current_step: AuthPart,
+    can_go_back: bool,
     /// The error formatted as a string to be displayed to the user.
     current_error: String,
     content_store: Arc<ContentStore>,
+    pub waiting: bool,
 }
 
 impl LoginScreen {
     pub fn new(content_store: Arc<ContentStore>) -> Self {
         Self {
             content_store,
-            ..Self::default()
+            fields: {
+                let mut map = HashMap::with_capacity(2);
+                map.insert("homeserver".to_string(), Default::default());
+                map
+            },
+            choices: HashMap::new(),
+            choice: Default::default(),
+            proceed: Default::default(),
+            back: Default::default(),
+            current_step: AuthPart::Homeserver,
+            can_go_back: false,
+            current_error: Default::default(),
+            waiting: false,
         }
     }
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
-        if let Some(method) = &self.cur_auth_method {
-            let text = match method {
-                AuthMethod::LoginOrRegister { info, register } => {
-                    if *register {
-                        format!(
-                            "Registering with username \"{}\" to homeserver \"{}\"",
-                            info.username, info.homeserver_domain
-                        )
-                    } else {
-                        format!(
-                            "Logging in with username \"{}\" to homeserver \"{}\"",
-                            info.username, info.homeserver_domain
-                        )
-                    }
-                }
-                AuthMethod::Guest { homeserver_domain } => {
-                    format!(
-                        "Creating a guest account on homeserver {}...",
-                        homeserver_domain
-                    )
-                }
-                AuthMethod::RestoringSession => String::from("Restoring existing session..."),
-            };
-
-            return fill_container(label(text).size(30)).style(theme).into();
+        if self.waiting {
+            return fill_container(label("Please wait...").size(30))
+                .style(theme)
+                .into();
         }
 
-        let error_text = label(&self.current_error).color(ERROR_COLOR).size(18);
+        let mut widgets = Vec::with_capacity(self.fields.len() + 1);
+        if !self.current_error.is_empty() {
+            let error_text = label(&self.current_error).color(ERROR_COLOR).size(18);
+            widgets.push(error_text.into());
+        }
 
-        let homeserver_prefix = Container::new(label("https://")).padding(PADDING / 2);
-        let homeserver_field = TextInput::new(
-            &mut self.homeserver_field,
-            "Enter your homeserver domain here...",
-            &self.auth_info.homeserver_domain,
-            Message::HomeserverChanged,
-        )
-        .padding(PADDING / 2)
-        .style(theme);
-        let homeserver_field =
-            Row::with_children(vec![homeserver_prefix.into(), homeserver_field.into()]);
-
-        let username_field = TextInput::new(
-            &mut self.username_field,
-            "Enter your username here...",
-            &self.auth_info.username,
-            Message::UsernameChanged,
-        )
-        .padding(PADDING / 2)
-        .style(theme);
-
-        let password_field = TextInput::new(
-            &mut self.password_field,
-            "Enter your password here...",
-            &self.auth_info.password,
-            Message::PasswordChanged,
-        )
-        .padding(PADDING / 2)
-        .style(theme)
-        .on_submit(Message::AuthWith(AuthMethod::LoginOrRegister {
-            info: self.auth_info.clone(),
-            register: false,
-        }))
-        .password();
-
-        let login_button = label_button(&mut self.login_button, "Login")
-            .on_press(Message::AuthWith(AuthMethod::LoginOrRegister {
-                info: self.auth_info.clone(),
-                register: false,
-            }))
+        for (name, (state, value, r#type)) in &mut self.fields {
+            let namee = name.clone();
+            let mut input = TextInput::new(state, name, value, move |new| {
+                Message::FieldChanged(namee.clone(), new)
+            })
+            .padding(PADDING / 2)
             .style(theme);
+            input = match r#type.as_str() {
+                "password" | "new-password" => input.password(),
+                _ => input,
+            };
+            widgets.push(input.into());
+        }
 
-        let register_button = label_button(&mut self.register_button, "Register")
-            .on_press(Message::AuthWith(AuthMethod::LoginOrRegister {
-                info: self.auth_info.clone(),
-                register: true,
-            }))
-            .style(theme);
+        for (name, state) in &mut self.choices {
+            widgets.push(
+                Button::new(state, label(name))
+                    .on_press(Message::AuthResponse(Some(name.clone())))
+                    .style(theme)
+                    .into(),
+            );
+        }
 
-        let guest_button = label_button(&mut self.guest_button, "Guest")
-            .on_press(Message::AuthWith(AuthMethod::Guest {
-                homeserver_domain: self.auth_info.homeserver_domain.clone(),
-            }))
-            .style(theme);
+        if matches!(self.current_step, AuthPart::Step(AuthType::Form))
+            || matches!(self.current_step, AuthPart::Homeserver)
+        {
+            widgets.push(
+                label_button(&mut self.proceed, "Proceed")
+                    .on_press(Message::AuthResponse(None))
+                    .style(theme)
+                    .into(),
+            );
+        }
 
-        let login_panel = column(vec![
-            error_text.into(),
-            homeserver_field.into(),
-            username_field.into(),
-            password_field.into(),
-            row(vec![
-                login_button.width(Length::FillPortion(1)).into(),
-                wspace(1).into(),
-                register_button.width(Length::FillPortion(1)).into(),
-                wspace(1).into(),
-                guest_button.width(Length::FillPortion(1)).into(),
-            ])
-            .width(Length::Fill)
-            .into(),
-        ]);
+        if self.can_go_back {
+            widgets.push(
+                label_button(&mut self.back, "Back")
+                    .on_press(Message::GoBack)
+                    .style(theme)
+                    .into(),
+            );
+        }
+
+        let field_panel = column(widgets);
 
         let padded_panel = row(vec![
-            wspace(2).into(),
-            login_panel.width(Length::FillPortion(6)).into(),
-            wspace(2).into(),
+            wspace(3).into(),
+            field_panel.width(Length::FillPortion(4)).into(),
+            wspace(3).into(),
         ])
         .height(Length::Fill);
 
         fill_container(padded_panel).style(theme).into()
     }
 
-    pub fn update(&mut self, msg: Message) -> Command<super::Message> {
+    pub fn update(
+        &mut self,
+        client: Option<&Client>,
+        msg: Message,
+        content_store: &Arc<ContentStore>,
+    ) -> Command<super::Message> {
         match msg {
-            Message::HomeserverChanged(new_homeserver) => {
-                self.auth_info.homeserver_domain = new_homeserver;
+            Message::FieldChanged(field, value) => {
+                if let Some((_, val, _)) = self.fields.get_mut(&field) {
+                    *val = value;
+                }
             }
-            Message::UsernameChanged(new_username) => {
-                self.auth_info.username = new_username;
+            Message::GoBack => {
+                if let Some(client) = client {
+                    self.waiting = true;
+                    let inner = client.inner().clone();
+                    return Command::perform(
+                        async move { inner.prev_auth_step().await },
+                        |result| match result {
+                            Ok(step) => super::Message::LoginScreen(Message::AuthStep(Some(step))),
+                            Err(err) => super::Message::MatrixError(Box::new(err.into())),
+                        },
+                    );
+                }
             }
-            Message::PasswordChanged(new_password) => {
-                self.auth_info.password = new_password;
+            Message::AuthResponse(maybe_choice) => {
+                if let Some(choice) = maybe_choice {
+                    self.choice = choice;
+                }
+
+                if let (Some(client), AuthPart::Step(step)) = (client, self.current_step) {
+                    let response = match step {
+                        AuthType::Choice => AuthStepResponse::Choice(self.choice.to_string()),
+                        AuthType::Form => AuthStepResponse::form(
+                            self.fields
+                                .iter()
+                                .map(|(_, (_, value, r#type))| match r#type.as_str() {
+                                    "number" => Field::Number(value.parse().unwrap()),
+                                    "password" => Field::Bytes(value.as_bytes().to_vec()),
+                                    "new-password" => Field::Bytes(value.as_bytes().to_vec()),
+                                    _ => Field::String(value.clone()),
+                                })
+                                .collect(),
+                        ),
+                        _ => todo!("Implement waiting"),
+                    };
+                    self.waiting = true;
+                    let inner = client.inner().clone();
+                    return Command::perform(
+                        async move { inner.next_auth_step(response).await },
+                        |result| match result {
+                            Err(err) => super::Message::MatrixError(Box::new(err.into())),
+                            Ok(step) => super::Message::LoginScreen(Message::AuthStep(step)),
+                        },
+                    );
+                } else if let AuthPart::Homeserver = &self.current_step {
+                    if let Some(homeserver) = self
+                        .fields
+                        .get("homeserver")
+                        .map(|(_, homeserver, _)| homeserver.clone())
+                    {
+                        match homeserver.parse::<Uri>() {
+                            Ok(uri) => {
+                                let content_store = content_store.clone();
+                                self.waiting = true;
+                                return Command::perform(
+                                    Client::new(uri, None, content_store),
+                                    |result| match result {
+                                        Err(err) => super::Message::MatrixError(Box::new(err)),
+                                        Ok(client) => super::Message::ClientCreated(client),
+                                    },
+                                );
+                            }
+                            Err(err) => {
+                                self.on_error(ClientError::URLParse(homeserver.clone(), err));
+                            }
+                        }
+                    }
+                }
             }
-            Message::AuthWith(method) => {
-                self.cur_auth_method = Some(method.clone());
-                return Command::perform(
-                    Client::new(method, self.content_store.clone()),
-                    |result| match result {
-                        Ok(client) => super::Message::LoginComplete(client),
-                        Err(err) => super::Message::MatrixError(Box::new(err)),
-                    },
-                );
-            }
+            Message::AuthStep(step) => match step {
+                Some(step) => {
+                    self.current_error = String::default();
+                    self.waiting = false;
+                    self.fields.clear();
+                    self.choices.clear();
+                    self.can_go_back = step.can_go_back;
+
+                    if let Some(step) = step.step {
+                        match step {
+                            Step::Choice(choice) => {
+                                for option in choice.options {
+                                    self.choices.insert(option, Default::default());
+                                }
+                                self.current_step = AuthPart::Step(AuthType::Choice);
+                            }
+                            Step::Form(form) => {
+                                for field in form.fields {
+                                    self.fields.insert(
+                                        field.name,
+                                        (Default::default(), Default::default(), field.r#type),
+                                    );
+                                }
+                                self.current_step = AuthPart::Step(AuthType::Form);
+                            }
+                            _ => todo!("Implement waiting"),
+                        }
+                    }
+                }
+                None => {
+                    self.waiting = true;
+                    let auth_status = client.unwrap().auth_status();
+                    let homeserver = client.unwrap().inner().homeserver_url().to_string();
+                    let session_file = content_store.session_file().to_path_buf();
+                    return Command::perform(
+                        async move {
+                            if let AuthStatus::Complete(session) = auth_status {
+                                let session = Session {
+                                    homeserver,
+                                    session_token: session.session_token,
+                                    user_id: session.user_id,
+                                };
+
+                                let ser = toml::ser::to_vec(&session).unwrap();
+                                tokio::fs::write(session_file, ser).await
+                            } else {
+                                Ok(())
+                            }
+                        },
+                        |result| match result {
+                            Ok(_) => super::Message::LoginComplete(None),
+                            Err(err) => super::Message::MatrixError(Box::new(err.into())),
+                        },
+                    );
+                }
+            },
         }
         Command::none()
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
+        self.waiting = false;
         self.current_error = error.to_string();
-        self.cur_auth_method = None;
+        self.current_step = AuthPart::Homeserver;
+        self.fields.clear();
+        self.choices.clear();
+
+        self.fields
+            .insert("homeserver".to_string(), Default::default());
 
         Command::none()
     }
