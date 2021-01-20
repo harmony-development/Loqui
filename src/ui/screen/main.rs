@@ -160,10 +160,26 @@ impl MainScreen {
                     .flatten()
                 {
                     content.push(
-                        Container::new(Image::new(handle.clone()).width(Length::Fill))
+                        fill_container(Image::new(handle.clone()).width(Length::Fill))
                             .width(Length::Units(32))
-                            .style(theme.secondary())
+                            .height(Length::Units(32))
+                            .style(theme.round())
                             .into(),
+                    );
+                } else {
+                    content.push(
+                        fill_container(label(
+                            member
+                                .username
+                                .chars()
+                                .next()
+                                .unwrap_or('u')
+                                .to_ascii_uppercase(),
+                        ))
+                        .width(Length::Units(32))
+                        .height(Length::Units(32))
+                        .style(theme.round())
+                        .into(),
                     );
                 }
 

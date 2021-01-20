@@ -161,7 +161,16 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
             {
                 Element::from(Image::new(handle.clone()))
             } else {
-                Element::from(label(guild_name.chars().next().unwrap()).size(30))
+                Element::from(
+                    label(
+                        guild_name
+                            .chars()
+                            .next()
+                            .unwrap_or('u')
+                            .to_ascii_uppercase(),
+                    )
+                    .size(30),
+                )
             },
         );
 
