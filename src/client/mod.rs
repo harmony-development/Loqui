@@ -66,6 +66,7 @@ impl Into<InnerSession> for Session {
 #[derive(Debug)]
 pub enum PostProcessEvent {
     FetchNewMember(u64),
+    FetchNewGuild(u64),
     FetchThumbnails(Vec<FileId>),
     HistoryScrollToBottom(u64),
     Nothing,
@@ -293,6 +294,32 @@ impl Client {
                         return PostProcessEvent::FetchThumbnails(vec![id]);
                     }
                 };
+            }
+            Event::GuildAddedToList(guild_added) => {
+                let guild_id = guild_added.guild_id;
+                self.guilds.insert(guild_id, Default::default());
+                return PostProcessEvent::FetchNewGuild(guild_id);
+            }
+            Event::GuildRemovedFromList(guild_removed) => {
+                self.guilds.remove(&guild_removed.guild_id);
+            }
+            Event::DeletedGuild(guild_deleted) => {
+                self.guilds.remove(&guild_deleted.guild_id);
+            }
+            Event::EditedGuild(guild_updated) => {
+                let guild_id = guild_updated.guild_id;
+                let guild = self.guilds.entry(guild_id).or_default();
+
+                if guild_updated.update_name {
+                    guild.name = guild_updated.name;
+                }
+                if guild_updated.update_picture {
+                    let parsed = FileId::from_str(&guild_updated.picture).ok();
+                    guild.picture = parsed.clone();
+                    if let Some(id) = parsed {
+                        return PostProcessEvent::FetchThumbnails(vec![id]);
+                    }
+                }
             }
             x => todo!("implement {:?}", x),
         }

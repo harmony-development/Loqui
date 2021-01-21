@@ -18,7 +18,7 @@ use client::{
 use harmony_rust_sdk::{
     api::{
         chat::{
-            event::{Event, ProfileUpdated},
+            event::{Event, GuildAddedToList, GuildUpdated, ProfileUpdated},
             GetGuildListRequest,
         },
         harmonytypes::Override,
@@ -75,10 +75,6 @@ pub enum Message {
     /// Sent when the "login" is complete, ie. establishing a session and performing an initial sync.
     LoginComplete(Option<Client>),
     ClientCreated(Client),
-    InitialSync {
-        guilds: Guilds,
-        imgs_to_download: Vec<FileId>,
-    },
     /// Do nothing.
     Nothing,
     DownloadedThumbnail {
@@ -268,24 +264,6 @@ impl Application for ScreenManager {
                     return screen.update(msg, client);
                 }
             }
-            Message::InitialSync {
-                guilds,
-                imgs_to_download,
-            } => {
-                if let Some(client) = self.client.as_mut() {
-                    client
-                        .should_subscribe_to_events
-                        .store(true, Ordering::Relaxed);
-                    client.guilds = guilds;
-                }
-                if let Some(client) = self.client.as_ref() {
-                    return Command::batch(
-                        imgs_to_download
-                            .into_iter()
-                            .map(|id| make_thumbnail_command(client, id, &self.thumbnail_cache)),
-                    );
-                }
-            }
             Message::ClientCreated(client) => {
                 self.client = Some(client);
                 let inner = self.client.as_ref().unwrap().inner().clone();
@@ -307,41 +285,26 @@ impl Application for ScreenManager {
                 self.screens
                     .push(Screen::Main(Box::new(MainScreen::default())));
 
-                let inner = self.client.as_ref().unwrap().inner().clone();
-                self.client.as_mut().unwrap().user_id =
-                    Some(inner.auth_status().session().unwrap().user_id);
+                let client = self.client.as_mut().unwrap();
+                let inner = client.inner().clone();
+                client.user_id = Some(inner.auth_status().session().unwrap().user_id);
                 return Command::perform(
                     async move {
-                        let mut images_to_download = Vec::new();
-                        let guild_list =
-                            get_guild_list(&inner, GetGuildListRequest {}).await?.guilds;
-                        let mut guilds = Guilds::with_capacity(guild_list.len());
-                        for guild_entry in guild_list {
-                            let guild_id = guild_entry.guild_id;
-                            let guild_data = get_guild(&inner, GuildId::new(guild_id)).await?;
-                            guilds.insert(
-                                guild_id,
-                                Guild {
-                                    name: guild_data.guild_name,
-                                    picture: {
-                                        let id = FileId::from_str(&guild_data.guild_picture).ok();
-                                        if let Some(id) = id.clone() {
-                                            images_to_download.push(id);
-                                        }
-                                        id
-                                    },
-                                    ..Default::default()
-                                },
-                            );
-                        }
-                        Ok((guilds, images_to_download))
+                        let guilds = get_guild_list(&inner, GetGuildListRequest {}).await?.guilds;
+                        let events = guilds
+                            .into_iter()
+                            .map(|guild| {
+                                Event::GuildAddedToList(GuildAddedToList {
+                                    guild_id: guild.guild_id,
+                                    homeserver: guild.host,
+                                })
+                            })
+                            .collect();
+                        Ok(events)
                     },
                     |result| match result {
                         Err(err) => Message::MatrixError(Box::new(err)),
-                        Ok((guilds, imgs_to_download)) => Message::InitialSync {
-                            guilds,
-                            imgs_to_download,
-                        },
+                        Ok(events) => Message::SyncResponse(events),
                     },
                 );
             }
@@ -505,6 +468,29 @@ impl Application for ScreenManager {
                                         &self.thumbnail_cache,
                                     ));
                                 }
+                            }
+                            PostProcessEvent::FetchNewGuild(guild_id) => {
+                                let inner = client.inner().clone();
+                                cmds.push(Command::perform(
+                                    async move {
+                                        let guild_data =
+                                            get_guild(&inner, GuildId::new(guild_id)).await?;
+                                        let event = Event::EditedGuild(GuildUpdated {
+                                            guild_id,
+                                            metadata: guild_data.metadata,
+                                            name: guild_data.guild_name,
+                                            picture: guild_data.guild_picture,
+                                            update_name: true,
+                                            update_picture: true,
+                                            update_metadata: true,
+                                        });
+                                        Ok(event)
+                                    },
+                                    |result| match result {
+                                        Ok(event) => Message::SyncResponse(vec![event]),
+                                        Err(err) => Message::MatrixError(Box::new(err)),
+                                    },
+                                ));
                             }
                             PostProcessEvent::Nothing => {}
                         }
