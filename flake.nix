@@ -1,10 +1,10 @@
 {
   description = "Flake for rucies, a Harmony client written in Rust";
 
-  inputs = rec {
+  inputs = {
     naersk = {
       url = "github:nmattia/naersk";
-      inputs.nixpkgs = nixpkgs;
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     flakeUtils.url = "github:numtide/flake-utils";
     nixpkgs.url = "nixpkgs/nixpkgs-unstable";
