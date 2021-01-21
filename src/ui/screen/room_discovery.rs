@@ -122,7 +122,7 @@ impl RoomDiscovery {
                         Ok(response) => super::Message::RoomDiscoveryScreen(Message::JoinedRoom(
                             response.guild_id,
                         )),
-                        Err(e) => super::Message::MatrixError(Box::new(e.into())),
+                        Err(e) => super::Message::Error(Box::new(e.into())),
                     },
                 );
             }

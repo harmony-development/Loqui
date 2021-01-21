@@ -37,12 +37,12 @@ pub enum Message {
         channel_id: u64,
     },
     /// Sent when the user wants to send a file.
-    SendFile {
+    SendFiles {
         guild_id: u64,
         channel_id: u64,
     },
     /// Sent when user makes a change to the message they are composing.
-    MessageChanged(String),
+    ComposerMessageChanged(String),
     ScrollToBottom(u64),
     OpenContent {
         content_url: FileId,
@@ -243,7 +243,7 @@ impl MainScreen {
                     &mut self.composer_state,
                     "Enter your message here...",
                     self.message.as_str(),
-                    Message::MessageChanged,
+                    Message::ComposerMessageChanged,
                 )
                 .padding((PADDING / 4) * 3)
                 .size(MESSAGE_SIZE)
@@ -317,7 +317,7 @@ impl MainScreen {
                     label("↑").size((PADDING / 4) * 3 + MESSAGE_SIZE),
                 )
                 .style(theme.secondary())
-                .on_press(Message::SendFile {
+                .on_press(Message::SendFiles {
                     guild_id,
                     channel_id,
                 });
@@ -459,9 +459,7 @@ impl MainScreen {
                                             }
                                         }
 
-                                        Err(err) => {
-                                            super::Message::MatrixError(Box::new(err.into()))
-                                        }
+                                        Err(err) => super::Message::Error(Box::new(err.into())),
                                     },
                                 );
                             }
@@ -502,7 +500,7 @@ impl MainScreen {
                 }
                 _ => unreachable!(),
             },
-            Message::MessageChanged(new_msg) => {
+            Message::ComposerMessageChanged(new_msg) => {
                 self.message = new_msg;
 
                 if let (Some(guild_id), Some(channel_id)) =
@@ -513,7 +511,7 @@ impl MainScreen {
                         async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
                         |result| match result {
                             Ok(_) => super::Message::Nothing,
-                            Err(err) => super::Message::MatrixError(Box::new(err.into())),
+                            Err(err) => super::Message::Error(Box::new(err.into())),
                         },
                     );
                 }
@@ -593,7 +591,7 @@ impl MainScreen {
                                     super::Message::Nothing
                                 }
                             }
-                            Err(err) => super::Message::MatrixError(Box::new(err)),
+                            Err(err) => super::Message::Error(Box::new(err)),
                         },
                     )
                 };
@@ -620,7 +618,7 @@ impl MainScreen {
                     });
                 }
             }
-            Message::SendFile {
+            Message::SendFiles {
                 guild_id,
                 channel_id,
             } => {
@@ -703,7 +701,7 @@ impl MainScreen {
                             guild_id,
                             channel_id,
                         },
-                        Err(err) => super::Message::MatrixError(Box::new(err)),
+                        Err(err) => super::Message::Error(Box::new(err)),
                     },
                 );
             }
@@ -743,8 +741,8 @@ impl MainScreen {
                             Ok(events)
                         },
                         |result| match result {
-                            Ok(events) => super::Message::SyncResponse(events),
-                            Err(err) => super::Message::MatrixError(Box::new(err)),
+                            Ok(events) => super::Message::EventsReceived(events),
+                            Err(err) => super::Message::Error(Box::new(err)),
                         },
                     );
                 }
@@ -785,8 +783,8 @@ impl MainScreen {
                                 Ok(events)
                             },
                             |result| match result {
-                                Ok(events) => super::Message::SyncResponse(events),
-                                Err(err) => super::Message::MatrixError(Box::new(err)),
+                                Ok(events) => super::Message::EventsReceived(events),
+                                Err(err) => super::Message::Error(Box::new(err)),
                             },
                         );
                     }

@@ -72,18 +72,14 @@ pub enum Message {
     RoomDiscoveryScreen(room_discovery::Message),
     PopScreen,
     PushScreen(Box<Screen>),
-    /// Sent when the "login" is complete, ie. establishing a session and performing an initial sync.
     LoginComplete(Option<Client>),
     ClientCreated(Client),
-    /// Do nothing.
     Nothing,
     DownloadedThumbnail {
         thumbnail_url: FileId,
         thumbnail: ImageHandle,
     },
-    /// Sent when a sync response is received from the server.
-    SyncResponse(Vec<Event>),
-    /// Sent when a "get context" (get events around an event) is received from the server.
+    EventsReceived(Vec<Event>),
     GetEventsBackwardsResponse {
         messages: Vec<HarmonyMessage>,
         reached_top: bool,
@@ -103,7 +99,7 @@ pub enum Message {
         channel_id: u64,
     },
     /// Sent whenever an error occurs.
-    MatrixError(Box<ClientError>),
+    Error(Box<ClientError>),
 }
 
 #[derive(Debug)]
@@ -222,7 +218,7 @@ impl Application for ScreenManager {
                 },
                 |result| match result {
                     Ok(client) => Message::LoginComplete(Some(client)),
-                    Err(err) => Message::MatrixError(Box::new(err)),
+                    Err(err) => Message::Error(Box::new(err)),
                 },
             )
         } else {
@@ -274,7 +270,7 @@ impl Application for ScreenManager {
                     },
                     |result| match result {
                         Ok(step) => Message::LoginScreen(login::Message::AuthStep(step)),
-                        Err(err) => Message::MatrixError(Box::new(err.into())),
+                        Err(err) => Message::Error(Box::new(err.into())),
                     },
                 );
             }
@@ -303,8 +299,8 @@ impl Application for ScreenManager {
                         Ok(events)
                     },
                     |result| match result {
-                        Err(err) => Message::MatrixError(Box::new(err)),
-                        Ok(events) => Message::SyncResponse(events),
+                        Err(err) => Message::Error(Box::new(err)),
+                        Ok(events) => Message::EventsReceived(events),
                     },
                 );
             }
@@ -411,7 +407,7 @@ impl Application for ScreenManager {
             } => {
                 self.thumbnail_cache.put_thumbnail(thumbnail_url, thumbnail);
             }
-            Message::SyncResponse(events) => {
+            Message::EventsReceived(events) => {
                 if let Some(client) = self.client.as_mut() {
                     let mut cmds = Vec::with_capacity(events.len());
 
@@ -430,7 +426,7 @@ impl Application for ScreenManager {
                                     ));
                                 }
                             }
-                            PostProcessEvent::FetchNewMember(user_id) => {
+                            PostProcessEvent::FetchProfile(user_id) => {
                                 let inner = client.inner().clone();
                                 cmds.push(Command::perform(
                                     async move {
@@ -450,12 +446,12 @@ impl Application for ScreenManager {
                                         Ok(event)
                                     },
                                     |result| match result {
-                                        Ok(event) => Message::SyncResponse(vec![event]),
-                                        Err(err) => Message::MatrixError(Box::new(err)),
+                                        Ok(event) => Message::EventsReceived(vec![event]),
+                                        Err(err) => Message::Error(Box::new(err)),
                                     },
                                 ));
                             }
-                            PostProcessEvent::HistoryScrollToBottom(channel_id) => {
+                            PostProcessEvent::GoToFirstMsgOnChannel(channel_id) => {
                                 if let Some(Screen::Main(screen)) = self
                                     .screens
                                     .stack
@@ -469,7 +465,7 @@ impl Application for ScreenManager {
                                     ));
                                 }
                             }
-                            PostProcessEvent::FetchNewGuild(guild_id) => {
+                            PostProcessEvent::FetchGuildData(guild_id) => {
                                 let inner = client.inner().clone();
                                 cmds.push(Command::perform(
                                     async move {
@@ -487,8 +483,8 @@ impl Application for ScreenManager {
                                         Ok(event)
                                     },
                                     |result| match result {
-                                        Ok(event) => Message::SyncResponse(vec![event]),
-                                        Err(err) => Message::MatrixError(Box::new(err)),
+                                        Ok(event) => Message::EventsReceived(vec![event]),
+                                        Err(err) => Message::Error(Box::new(err)),
                                     },
                                 ));
                             }
@@ -520,7 +516,7 @@ impl Application for ScreenManager {
                     //return make_thumbnail_commands(client, thumbnail_urls, &self.thumbnail_cache);
                 }
             }
-            Message::MatrixError(err) => {
+            Message::Error(err) => {
                 log::error!("{}", err);
 
                 if let ClientError::Internal(InnerClientError::Grpc(status)) = err.as_ref() {
@@ -650,7 +646,7 @@ fn make_thumbnail_command(
                     thumbnail_url: thumbnail_id,
                     thumbnail,
                 },
-                Err(err) => Message::MatrixError(Box::new(err)),
+                Err(err) => Message::Error(Box::new(err)),
             },
         )
     } else {

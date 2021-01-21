@@ -66,7 +66,7 @@ impl Logout {
                 ),
                 |result| match result {
                     Ok(_) => super::Message::PopScreen,
-                    Err(err) => super::Message::MatrixError(Box::new(err)),
+                    Err(err) => super::Message::Error(Box::new(err)),
                 },
             )
         } else {

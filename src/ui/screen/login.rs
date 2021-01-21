@@ -33,7 +33,8 @@ enum AuthPart {
 #[derive(Debug, Clone)]
 pub enum Message {
     FieldChanged(String, String),
-    AuthResponse(Option<String>),
+    ProceedWithChoice(String),
+    Proceed,
     GoBack,
     AuthStep(Option<AuthStep>),
 }
@@ -42,7 +43,6 @@ pub enum Message {
 pub struct LoginScreen {
     fields: HashMap<String, (text_input::State, String, String)>,
     choices: HashMap<String, button::State>,
-    choice: String,
     proceed: button::State,
     back: button::State,
 
@@ -64,7 +64,6 @@ impl LoginScreen {
                 map
             },
             choices: HashMap::new(),
-            choice: Default::default(),
             proceed: Default::default(),
             back: Default::default(),
             current_step: AuthPart::Homeserver,
@@ -81,7 +80,7 @@ impl LoginScreen {
                 .into();
         }
 
-        let mut widgets = Vec::with_capacity(self.fields.len() + 1);
+        let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 1);
         if !self.current_error.is_empty() {
             let error_text = label(
                 self.current_error
@@ -96,27 +95,35 @@ impl LoginScreen {
             widgets.push(error_text.into());
         }
 
-        for (name, (state, value, r#type)) in &mut self.fields {
-            let namee = name.clone();
-            let mut input = TextInput::new(state, name, value, move |new| {
-                Message::FieldChanged(namee.clone(), new)
-            })
-            .padding(PADDING / 2)
-            .style(theme);
-            input = match r#type.as_str() {
-                "password" | "new-password" => input.password(),
-                _ => input,
-            };
-            widgets.push(input.into());
+        if !self.fields.is_empty() {
+            let mut sorted_fields = self.fields.iter_mut().collect::<Vec<_>>();
+            sorted_fields.sort_unstable_by_key(|(name, _)| name.as_str());
+            for (name, (state, value, r#type)) in sorted_fields {
+                let namee = name.clone();
+                let mut input = TextInput::new(state, name, value, move |new| {
+                    Message::FieldChanged(namee.clone(), new)
+                })
+                .padding(PADDING / 2)
+                .style(theme);
+                input = match r#type.as_str() {
+                    "password" | "new-password" => input.password(),
+                    _ => input,
+                };
+                widgets.push(input.into());
+            }
         }
 
-        for (name, state) in &mut self.choices {
-            widgets.push(
-                Button::new(state, label(name))
-                    .on_press(Message::AuthResponse(Some(name.clone())))
-                    .style(theme)
-                    .into(),
-            );
+        if !self.choices.is_empty() {
+            let mut sorted_choices = self.choices.iter_mut().collect::<Vec<_>>();
+            sorted_choices.sort_unstable_by_key(|(name, _)| name.as_str());
+            for (name, state) in &mut self.choices {
+                widgets.push(
+                    Button::new(state, label(name))
+                        .on_press(Message::ProceedWithChoice(name.clone()))
+                        .style(theme)
+                        .into(),
+                );
+            }
         }
 
         if matches!(self.current_step, AuthPart::Step(AuthType::Form))
@@ -124,7 +131,7 @@ impl LoginScreen {
         {
             widgets.push(
                 label_button(&mut self.proceed, "Proceed")
-                    .on_press(Message::AuthResponse(None))
+                    .on_press(Message::Proceed)
                     .style(theme)
                     .into(),
             );
@@ -157,6 +164,22 @@ impl LoginScreen {
         msg: Message,
         content_store: &Arc<ContentStore>,
     ) -> Command<super::Message> {
+        fn respond(
+            screen: &mut LoginScreen,
+            client: &Client,
+            response: AuthStepResponse,
+        ) -> Command<super::Message> {
+            screen.waiting = true;
+            let inner = client.inner().clone();
+            Command::perform(
+                async move { inner.next_auth_step(response).await },
+                |result| match result {
+                    Err(err) => super::Message::Error(Box::new(err.into())),
+                    Ok(step) => super::Message::LoginScreen(Message::AuthStep(step)),
+                },
+            )
+        }
+
         match msg {
             Message::FieldChanged(field, value) => {
                 if let Some((_, val, _)) = self.fields.get_mut(&field) {
@@ -171,19 +194,21 @@ impl LoginScreen {
                         async move { inner.prev_auth_step().await },
                         |result| match result {
                             Ok(step) => super::Message::LoginScreen(Message::AuthStep(Some(step))),
-                            Err(err) => super::Message::MatrixError(Box::new(err.into())),
+                            Err(err) => super::Message::Error(Box::new(err.into())),
                         },
                     );
                 }
             }
-            Message::AuthResponse(maybe_choice) => {
-                if let Some(choice) = maybe_choice {
-                    self.choice = choice;
+            Message::ProceedWithChoice(choice) => {
+                if let Some(client) = client {
+                    let response = AuthStepResponse::Choice(choice);
+                    return respond(self, client, response);
                 }
-
+            }
+            Message::Proceed => {
                 if let (Some(client), AuthPart::Step(step)) = (client, self.current_step) {
                     let response = match step {
-                        AuthType::Choice => AuthStepResponse::Choice(self.choice.to_string()),
+                        AuthType::Choice => unreachable!("choice is not handled here"),
                         AuthType::Form => AuthStepResponse::form(
                             self.fields
                                 .iter()
@@ -197,37 +222,28 @@ impl LoginScreen {
                         ),
                         _ => todo!("Implement waiting"),
                     };
-                    self.waiting = true;
-                    let inner = client.inner().clone();
-                    return Command::perform(
-                        async move { inner.next_auth_step(response).await },
-                        |result| match result {
-                            Err(err) => super::Message::MatrixError(Box::new(err.into())),
-                            Ok(step) => super::Message::LoginScreen(Message::AuthStep(step)),
-                        },
-                    );
+                    return respond(self, client, response);
                 } else if let AuthPart::Homeserver = &self.current_step {
                     if let Some(homeserver) = self
                         .fields
                         .get("homeserver")
                         .map(|(_, homeserver, _)| homeserver.clone())
                     {
-                        match homeserver.parse::<Uri>() {
+                        return match homeserver.parse::<Uri>() {
                             Ok(uri) => {
                                 let content_store = content_store.clone();
                                 self.waiting = true;
-                                return Command::perform(
-                                    Client::new(uri, None, content_store),
-                                    |result| match result {
-                                        Err(err) => super::Message::MatrixError(Box::new(err)),
+                                Command::perform(Client::new(uri, None, content_store), |result| {
+                                    match result {
+                                        Err(err) => super::Message::Error(Box::new(err)),
                                         Ok(client) => super::Message::ClientCreated(client),
-                                    },
-                                );
+                                    }
+                                })
                             }
                             Err(err) => {
-                                self.on_error(ClientError::URLParse(homeserver.clone(), err));
+                                self.on_error(ClientError::URLParse(homeserver.clone(), err))
                             }
-                        }
+                        };
                     }
                 }
             }
@@ -282,7 +298,7 @@ impl LoginScreen {
                         },
                         |result| match result {
                             Ok(_) => super::Message::LoginComplete(None),
-                            Err(err) => super::Message::MatrixError(Box::new(err.into())),
+                            Err(err) => super::Message::Error(Box::new(err.into())),
                         },
                     );
                 }

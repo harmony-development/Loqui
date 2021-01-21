@@ -65,10 +65,10 @@ impl Into<InnerSession> for Session {
 
 #[derive(Debug)]
 pub enum PostProcessEvent {
-    FetchNewMember(u64),
-    FetchNewGuild(u64),
+    FetchProfile(u64),
+    FetchGuildData(u64),
     FetchThumbnails(Vec<FileId>),
-    HistoryScrollToBottom(u64),
+    GoToFirstMsgOnChannel(u64),
     Nothing,
 }
 
@@ -171,7 +171,7 @@ impl Client {
                         let disp = channel.messages.len();
                         if channel.looking_at_message >= disp.saturating_sub(SHOWN_MSGS_LIMIT) {
                             channel.looking_at_message = disp.saturating_sub(1);
-                            return PostProcessEvent::HistoryScrollToBottom(channel_id);
+                            return PostProcessEvent::GoToFirstMsgOnChannel(channel_id);
                         }
                     }
                 }
@@ -263,7 +263,7 @@ impl Client {
                 }
 
                 if !self.members.contains_key(&member_id) {
-                    return PostProcessEvent::FetchNewMember(member_id);
+                    return PostProcessEvent::FetchProfile(member_id);
                 }
             }
             Event::LeftMember(member_left) => {
@@ -298,7 +298,7 @@ impl Client {
             Event::GuildAddedToList(guild_added) => {
                 let guild_id = guild_added.guild_id;
                 self.guilds.insert(guild_id, Default::default());
-                return PostProcessEvent::FetchNewGuild(guild_id);
+                return PostProcessEvent::FetchGuildData(guild_id);
             }
             Event::GuildRemovedFromList(guild_removed) => {
                 self.guilds.remove(&guild_removed.guild_id);
