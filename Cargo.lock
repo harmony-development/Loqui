@@ -1353,7 +1353,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git#1e17261d75853000006b3353a1a332735c1324cc"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git#59551a4b9c5b91c33e5677e1ff7258be287cb0f6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1363,7 +1363,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.3.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git#1e17261d75853000006b3353a1a332735c1324cc"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git#59551a4b9c5b91c33e5677e1ff7258be287cb0f6"
 dependencies = [
  "assign",
  "async-mutex",
@@ -3287,10 +3287,11 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12ae4751faa60b9f96dd8344d74592e5a17c0c9a220413dbc6942d14139bbfcc"
+checksum = "feb971a26599ffd28066d387f109746df178eff14d5ea1e235015c5601967a4b"
 dependencies = [
+ "async-stream",
  "bytes",
  "futures-core",
  "futures-sink",
