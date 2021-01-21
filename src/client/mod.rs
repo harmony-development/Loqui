@@ -21,10 +21,10 @@ use harmony_rust_sdk::{
     client::api::{chat::EventSource, rest::FileId},
 };
 
-use content::ContentStore;
+use content::{ContentStore, ContentType};
 use error::{ClientError, ClientResult};
 use member::{Member, Members};
-use message::{harmony_messages_to_ui_messages, MessageId};
+use message::{harmony_messages_to_ui_messages, Attachment, MessageId, Override};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -35,7 +35,7 @@ use std::{
 
 use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
 
-use self::{guild::Guilds, message::Message};
+use self::{content::MAX_THUMB_SIZE, guild::Guilds, message::Message};
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
 #[derive(Clone, Deserialize, Serialize)]
@@ -67,7 +67,7 @@ impl Into<InnerSession> for Session {
 pub enum PostProcessEvent {
     FetchProfile(u64),
     FetchGuildData(u64),
-    FetchThumbnails(Vec<FileId>),
+    FetchThumbnail(FileId),
     GoToFirstMsgOnChannel(u64),
     Nothing,
 }
@@ -147,7 +147,9 @@ impl Client {
         self.members.get_mut(&user_id)
     }
 
-    pub fn process_event(&mut self, event: Event) -> PostProcessEvent {
+    pub fn process_event(&mut self, event: Event) -> Vec<PostProcessEvent> {
+        let mut post = Vec::new();
+
         match event {
             Event::SentMessage(message_sent) => {
                 let echo_id = message_sent.echo_id;
@@ -158,6 +160,22 @@ impl Client {
 
                     if let Some(channel) = self.get_channel(guild_id, channel_id) {
                         let message = Message::from(message);
+
+                        if let Some(id) = message
+                            .overrides
+                            .as_ref()
+                            .map(|overrides| overrides.avatar_url.clone())
+                            .flatten()
+                        {
+                            post.push(PostProcessEvent::FetchThumbnail(id));
+                        }
+
+                        for attachment in &message.attachments {
+                            if attachment.is_thumbnail() {
+                                post.push(PostProcessEvent::FetchThumbnail(attachment.id.clone()));
+                            }
+                        }
+
                         if let Some(msg) = channel
                             .messages
                             .iter_mut()
@@ -171,7 +189,7 @@ impl Client {
                         let disp = channel.messages.len();
                         if channel.looking_at_message >= disp.saturating_sub(SHOWN_MSGS_LIMIT) {
                             channel.looking_at_message = disp.saturating_sub(1);
-                            return PostProcessEvent::GoToFirstMsgOnChannel(channel_id);
+                            post.push(PostProcessEvent::GoToFirstMsgOnChannel(channel_id));
                         }
                     }
                 }
@@ -203,6 +221,49 @@ impl Client {
                     {
                         if message_updated.update_content {
                             msg.content = message_updated.content;
+                        }
+                        if message_updated.update_attachments {
+                            msg.attachments = message_updated
+                                .attachments
+                                .into_iter()
+                                .flat_map(|attachment| {
+                                    Some(Attachment {
+                                        id: FileId::from_str(&attachment.id).ok()?,
+                                        kind: ContentType::new(&attachment.r#type),
+                                        name: attachment.name,
+                                        size: attachment.size as u32,
+                                    })
+                                })
+                                .collect();
+                            for attachment in &msg.attachments {
+                                if attachment.is_thumbnail() {
+                                    post.push(PostProcessEvent::FetchThumbnail(
+                                        attachment.id.clone(),
+                                    ));
+                                }
+                            }
+                        }
+                        if message_updated.update_overrides {
+                            if let Some((parsed, overrides)) =
+                                message_updated.overrides.map(|overrides| {
+                                    let parsed = FileId::from_str(&overrides.avatar).ok();
+                                    (
+                                        parsed.clone(),
+                                        Override {
+                                            avatar_url: parsed,
+                                            name: overrides.name,
+                                            reason: overrides.reason,
+                                        },
+                                    )
+                                })
+                            {
+                                msg.overrides = Some(overrides);
+                                if let Some(id) = parsed {
+                                    post.push(PostProcessEvent::FetchThumbnail(id));
+                                }
+                            } else {
+                                msg.overrides = None;
+                            }
                         }
                     }
                 }
@@ -255,7 +316,7 @@ impl Client {
                 let member_id = member_joined.member_id;
 
                 if member_id == 0 {
-                    return PostProcessEvent::Nothing;
+                    return post;
                 }
 
                 if let Some(guild) = self.get_guild(guild_id) {
@@ -263,7 +324,7 @@ impl Client {
                 }
 
                 if !self.members.contains_key(&member_id) {
-                    return PostProcessEvent::FetchProfile(member_id);
+                    post.push(PostProcessEvent::FetchProfile(member_id));
                 }
             }
             Event::LeftMember(member_left) => {
@@ -291,14 +352,14 @@ impl Client {
                     let parsed = FileId::from_str(&profile_updated.new_avatar).ok();
                     member.avatar_url = parsed.clone();
                     if let Some(id) = parsed {
-                        return PostProcessEvent::FetchThumbnails(vec![id]);
+                        post.push(PostProcessEvent::FetchThumbnail(id));
                     }
                 };
             }
             Event::GuildAddedToList(guild_added) => {
                 let guild_id = guild_added.guild_id;
                 self.guilds.insert(guild_id, Default::default());
-                return PostProcessEvent::FetchGuildData(guild_id);
+                post.push(PostProcessEvent::FetchGuildData(guild_id));
             }
             Event::GuildRemovedFromList(guild_removed) => {
                 self.guilds.remove(&guild_removed.guild_id);
@@ -317,14 +378,14 @@ impl Client {
                     let parsed = FileId::from_str(&guild_updated.picture).ok();
                     guild.picture = parsed.clone();
                     if let Some(id) = parsed {
-                        return PostProcessEvent::FetchThumbnails(vec![id]);
+                        post.push(PostProcessEvent::FetchThumbnail(id));
                     }
                 }
             }
             x => todo!("implement {:?}", x),
         }
 
-        PostProcessEvent::Nothing
+        post
     }
 
     pub fn process_get_message_history_response(
@@ -333,13 +394,28 @@ impl Client {
         channel_id: u64,
         messages: Vec<HarmonyMessage>,
         _reached_top: bool,
-    ) {
+    ) -> Vec<PostProcessEvent> {
+        let mut post = Vec::new();
         let mut messages = harmony_messages_to_ui_messages(messages);
+
+        for attachment in messages.iter().flat_map(|msg| &msg.attachments) {
+            if attachment.is_thumbnail() {
+                post.push(PostProcessEvent::FetchThumbnail(attachment.id.clone()));
+            }
+        }
+
+        for overrides in messages.iter().flat_map(|msg| msg.overrides.as_ref()) {
+            if let Some(id) = overrides.avatar_url.clone() {
+                post.push(PostProcessEvent::FetchThumbnail(id));
+            }
+        }
 
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             messages.append(&mut channel.messages);
             channel.messages = messages;
         }
+
+        post
     }
 
     pub fn subscribe_to(&self) -> Vec<EventSource> {

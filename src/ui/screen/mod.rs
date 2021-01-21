@@ -171,6 +171,78 @@ impl ScreenManager {
             thumbnail_cache: ThumbnailCache::default(),
         }
     }
+
+    fn process_post_event(&mut self, post: PostProcessEvent) -> Command<Message> {
+        if let Some(client) = self.client.as_mut() {
+            match post {
+                PostProcessEvent::FetchThumbnail(id) => {
+                    return make_thumbnail_command(client, id, &self.thumbnail_cache);
+                }
+                PostProcessEvent::FetchProfile(user_id) => {
+                    let inner = client.inner().clone();
+                    return Command::perform(
+                        async move {
+                            let profile = get_user(&inner, UserId::new(user_id)).await?;
+                            let event = Event::ProfileUpdated(ProfileUpdated {
+                                user_id,
+                                new_avatar: profile.user_avatar,
+                                new_status: profile.user_status,
+                                new_username: profile.user_name,
+                                is_bot: profile.is_bot,
+                                update_is_bot: true,
+                                update_status: true,
+                                update_avatar: true,
+                                update_username: true,
+                            });
+                            Ok(event)
+                        },
+                        |result| match result {
+                            Ok(event) => Message::EventsReceived(vec![event]),
+                            Err(err) => Message::Error(Box::new(err)),
+                        },
+                    );
+                }
+                PostProcessEvent::GoToFirstMsgOnChannel(channel_id) => {
+                    if let Some(Screen::Main(screen)) = self
+                        .screens
+                        .stack
+                        .iter_mut()
+                        .find(|screen| matches!(screen, Screen::Main(_)))
+                    {
+                        return screen.update(
+                            main::Message::ScrollToBottom(channel_id),
+                            client,
+                            &self.thumbnail_cache,
+                        );
+                    }
+                }
+                PostProcessEvent::FetchGuildData(guild_id) => {
+                    let inner = client.inner().clone();
+                    return Command::perform(
+                        async move {
+                            let guild_data = get_guild(&inner, GuildId::new(guild_id)).await?;
+                            let event = Event::EditedGuild(GuildUpdated {
+                                guild_id,
+                                metadata: guild_data.metadata,
+                                name: guild_data.guild_name,
+                                picture: guild_data.guild_picture,
+                                update_name: true,
+                                update_picture: true,
+                                update_metadata: true,
+                            });
+                            Ok(event)
+                        },
+                        |result| match result {
+                            Ok(event) => Message::EventsReceived(vec![event]),
+                            Err(err) => Message::Error(Box::new(err)),
+                        },
+                    );
+                }
+                PostProcessEvent::Nothing => {}
+            }
+        }
+        Command::none()
+    }
 }
 
 impl Application for ScreenManager {
@@ -391,88 +463,13 @@ impl Application for ScreenManager {
             }
             Message::EventsReceived(events) => {
                 if let Some(client) = self.client.as_mut() {
-                    let mut cmds = Vec::with_capacity(events.len());
-
-                    for result in events
+                    let cmds = events
                         .into_iter()
-                        .map(|event| client.process_event(event))
+                        .flat_map(|event| client.process_event(event))
                         .collect::<Vec<_>>()
-                    {
-                        match result {
-                            PostProcessEvent::FetchThumbnails(ids) => {
-                                for id in ids {
-                                    cmds.push(make_thumbnail_command(
-                                        client,
-                                        id,
-                                        &self.thumbnail_cache,
-                                    ));
-                                }
-                            }
-                            PostProcessEvent::FetchProfile(user_id) => {
-                                let inner = client.inner().clone();
-                                cmds.push(Command::perform(
-                                    async move {
-                                        let profile =
-                                            get_user(&inner, UserId::new(user_id)).await?;
-                                        let event = Event::ProfileUpdated(ProfileUpdated {
-                                            user_id,
-                                            new_avatar: profile.user_avatar,
-                                            new_status: profile.user_status,
-                                            new_username: profile.user_name,
-                                            is_bot: profile.is_bot,
-                                            update_is_bot: true,
-                                            update_status: true,
-                                            update_avatar: true,
-                                            update_username: true,
-                                        });
-                                        Ok(event)
-                                    },
-                                    |result| match result {
-                                        Ok(event) => Message::EventsReceived(vec![event]),
-                                        Err(err) => Message::Error(Box::new(err)),
-                                    },
-                                ));
-                            }
-                            PostProcessEvent::GoToFirstMsgOnChannel(channel_id) => {
-                                if let Some(Screen::Main(screen)) = self
-                                    .screens
-                                    .stack
-                                    .iter_mut()
-                                    .find(|screen| matches!(screen, Screen::Main(_)))
-                                {
-                                    cmds.push(screen.update(
-                                        main::Message::ScrollToBottom(channel_id),
-                                        client,
-                                        &self.thumbnail_cache,
-                                    ));
-                                }
-                            }
-                            PostProcessEvent::FetchGuildData(guild_id) => {
-                                let inner = client.inner().clone();
-                                cmds.push(Command::perform(
-                                    async move {
-                                        let guild_data =
-                                            get_guild(&inner, GuildId::new(guild_id)).await?;
-                                        let event = Event::EditedGuild(GuildUpdated {
-                                            guild_id,
-                                            metadata: guild_data.metadata,
-                                            name: guild_data.guild_name,
-                                            picture: guild_data.guild_picture,
-                                            update_name: true,
-                                            update_picture: true,
-                                            update_metadata: true,
-                                        });
-                                        Ok(event)
-                                    },
-                                    |result| match result {
-                                        Ok(event) => Message::EventsReceived(vec![event]),
-                                        Err(err) => Message::Error(Box::new(err)),
-                                    },
-                                ));
-                            }
-                            PostProcessEvent::Nothing => {}
-                        }
-                    }
+                        .into_iter()
+                        .map(|post| self.process_post_event(post))
+                        .collect::<Vec<_>>();
 
                     return Command::batch(cmds);
                 }
@@ -483,20 +480,25 @@ impl Application for ScreenManager {
                 guild_id,
                 channel_id,
             } => {
-                if let Some(client) = self.client.as_mut() {
-                    client.process_get_message_history_response(
-                        guild_id,
-                        channel_id,
-                        messages,
-                        reached_top,
-                    );
+                let posts = if let Some(client) = self.client.as_mut() {
                     // Safe unwrap
                     client
                         .get_channel(guild_id, channel_id)
                         .unwrap()
                         .loading_messages_history = false;
-                    //return make_thumbnail_commands(client, thumbnail_urls, &self.thumbnail_cache);
-                }
+                    client.process_get_message_history_response(
+                        guild_id,
+                        channel_id,
+                        messages,
+                        reached_top,
+                    )
+                } else {
+                    Vec::new()
+                };
+
+                let cmds = posts.into_iter().map(|post| self.process_post_event(post));
+
+                return Command::batch(cmds);
             }
             Message::Error(err) => {
                 log::error!("{}", err);

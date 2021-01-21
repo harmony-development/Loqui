@@ -114,6 +114,7 @@ fn get_image_size_from_handle(handle: &ImageHandle) -> Option<u64> {
     }
 }
 
+pub const MAX_THUMB_SIZE: u64 = 1000 * 500; // 500kb
 #[derive(Debug)]
 pub struct ThumbnailCache {
     thumbnails: IndexMap<String, ImageHandle>,

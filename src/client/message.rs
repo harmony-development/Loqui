@@ -6,7 +6,7 @@ use harmony_rust_sdk::{
 use std::{str::FromStr, time::UNIX_EPOCH};
 use uuid::Uuid;
 
-use super::content::ContentType;
+use super::content::{ContentType, MAX_THUMB_SIZE};
 
 pub type Messages = Vec<Message>;
 
@@ -16,6 +16,12 @@ pub struct Attachment {
     pub name: String,
     pub id: FileId,
     pub size: u32,
+}
+
+impl Attachment {
+    pub fn is_thumbnail(&self) -> bool {
+        matches!(self.kind, ContentType::Image) && (self.size as u64) < MAX_THUMB_SIZE
+    }
 }
 
 #[derive(Debug, Default, Clone)]
