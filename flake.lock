@@ -17,34 +17,36 @@
     },
     "naersk": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": [
+          "nixpkgs"
+        ]
       },
       "locked": {
-        "lastModified": 1610184163,
-        "narHash": "sha256-Uj/x2NchvcU9UEGSd/rm6PT+Tar2t+qEZiFODmcBuWA=",
-        "owner": "yusdacra",
+        "lastModified": 1610977739,
+        "narHash": "sha256-W+uzJ49g/koyX30g/24OVehw5iG54klR0pFwFLuuzHw=",
+        "owner": "nmattia",
         "repo": "naersk",
-        "rev": "7f85c3639803bb0cb834b59ebba1de8d6deeaa14",
+        "rev": "79a613f3b5b6ca73eb25d02051192b8aeddfdb53",
         "type": "github"
       },
       "original": {
-        "owner": "yusdacra",
-        "ref": "extract-rev-cargolock",
+        "owner": "nmattia",
         "repo": "naersk",
         "type": "github"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1610277507,
-        "narHash": "sha256-xh/XcH1++RIXa6O/lT4y11ZGT3wQVr6GcseHpuZUaIY=",
+        "lastModified": 1611139841,
+        "narHash": "sha256-So2BN2p3vgPd7hSfOX4c8hLGyU4322k942HggsWTYnI=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "d25225b014a04031260d91a03329ea0bd73c2441",
+        "rev": "92c884dfd7140a6c3e6c717cf8990f7a78524331",
         "type": "github"
       },
       "original": {
         "id": "nixpkgs",
+        "ref": "nixpkgs-unstable",
         "type": "indirect"
       }
     },
@@ -64,26 +66,11 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
-      "locked": {
-        "lastModified": 1610277507,
-        "narHash": "sha256-xh/XcH1++RIXa6O/lT4y11ZGT3wQVr6GcseHpuZUaIY=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "d25225b014a04031260d91a03329ea0bd73c2441",
-        "type": "github"
-      },
-      "original": {
-        "id": "nixpkgs",
-        "ref": "nixpkgs-unstable",
-        "type": "indirect"
-      }
-    },
     "root": {
       "inputs": {
         "flakeUtils": "flakeUtils",
         "naersk": "naersk",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs",
         "nixpkgsMoz": "nixpkgsMoz"
       }
     }
