@@ -5,11 +5,11 @@ authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
 edition = "2018"
 
 [profile.dev]
-opt-level = 2
+opt-level = 0
 overflow-checks = true
 debug-assertions = true
 debug = false
-codegen-units = 8
+codegen-units = 256
 lto = false
 incremental = true
 
