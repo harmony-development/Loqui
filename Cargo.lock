@@ -1353,7 +1353,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git#b34069b8688d0abe5696c5624176d7ecb601136f"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git#1e17261d75853000006b3353a1a332735c1324cc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1363,7 +1363,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.3.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git#b34069b8688d0abe5696c5624176d7ecb601136f"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git#1e17261d75853000006b3353a1a332735c1324cc"
 dependencies = [
  "assign",
  "async-mutex",
@@ -2676,9 +2676,9 @@ dependencies = [
 
 [[package]]
 name = "rfd"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4985da2dd561e54e7834f494f4e6a9f2b4710e5f9032418e0c99368019d7e169"
+checksum = "13a9d4c75452b7bc41aeceec8c168330410961c990606bb59ece68439f138e45"
 dependencies = [
  "block",
  "cocoa-foundation",
@@ -3354,9 +3354,9 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "855703d368d4c9321ccc1efe1b0fe436c3f20b102b25060707ebe6b4502bdefb"
+checksum = "5fd7b451959622e21de79261673d658a0944b835012c58c51878ea55957fb51a"
 dependencies = [
  "futures-core",
  "futures-util",
