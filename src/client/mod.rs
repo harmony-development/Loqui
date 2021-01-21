@@ -14,20 +14,26 @@ pub use harmony_rust_sdk::{
     client::{api::auth::Session as InnerSession, AuthStatus, Client as InnerClient},
 };
 use harmony_rust_sdk::{
-    api::{chat::event::Event, harmonytypes::Message as HarmonyMessage},
+    api::{
+        chat::event::Event,
+        harmonytypes::{Message as HarmonyMessage, UserStatus},
+    },
     client::api::{chat::EventSource, rest::FileId},
 };
 
 use content::ContentStore;
 use error::{ClientError, ClientResult};
-use member::Member;
+use member::{Member, Members};
 use message::{harmony_messages_to_ui_messages, MessageId};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug, Formatter},
     path::PathBuf,
+    str::FromStr,
     sync::{atomic::AtomicBool, Arc},
 };
+
+use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
 
 use self::{guild::Guilds, message::Message};
 
@@ -57,9 +63,18 @@ impl Into<InnerSession> for Session {
     }
 }
 
+#[derive(Debug)]
+pub enum PostProcessEvent {
+    FetchNewMember(u64),
+    FetchThumbnails(Vec<FileId>),
+    HistoryScrollToBottom(u64),
+    Nothing,
+}
+
 pub struct Client {
     inner: InnerClient,
     pub guilds: Guilds,
+    pub members: Members,
     pub user_id: Option<u64>,
     pub should_subscribe_to_events: AtomicBool,
     content_store: Arc<ContentStore>,
@@ -88,6 +103,7 @@ impl Client {
     ) -> ClientResult<Self> {
         Ok(Self {
             guilds: Guilds::new(),
+            members: Members::new(),
             user_id: session.as_ref().map(|s| s.user_id),
             should_subscribe_to_events: AtomicBool::new(false),
             content_store,
@@ -126,13 +142,11 @@ impl Client {
             .flatten()
     }
 
-    pub fn get_member(&mut self, guild_id: u64, user_id: u64) -> Option<&mut Member> {
-        self.get_guild(guild_id)
-            .map(|guild| guild.members.get_member_mut(&user_id))
-            .flatten()
+    pub fn get_member(&mut self, user_id: u64) -> Option<&mut Member> {
+        self.members.get_mut(&user_id)
     }
 
-    pub fn process_event(&mut self, event: Event) -> Vec<FileId> {
+    pub fn process_event(&mut self, event: Event) -> PostProcessEvent {
         match event {
             Event::SentMessage(message_sent) => {
                 let echo_id = message_sent.echo_id;
@@ -151,6 +165,12 @@ impl Client {
                             *msg = message;
                         } else {
                             channel.messages.push(message);
+                        }
+
+                        let disp = channel.messages.len();
+                        if channel.looking_at_message >= disp.saturating_sub(SHOWN_MSGS_LIMIT) {
+                            channel.looking_at_message = disp.saturating_sub(1);
+                            return PostProcessEvent::HistoryScrollToBottom(channel_id);
                         }
                     }
                 }
@@ -222,18 +242,62 @@ impl Client {
                 }
             }
             Event::Typing(typing) => {
-                let guild_id = typing.guild_id;
                 let channel_id = typing.channel_id;
                 let user_id = typing.user_id;
 
-                if let Some(member) = self.get_member(guild_id, user_id) {
+                if let Some(member) = self.get_member(user_id) {
                     member.typing_in_channel = Some(channel_id);
                 }
+            }
+            Event::JoinedMember(member_joined) => {
+                let guild_id = member_joined.guild_id;
+                let member_id = member_joined.member_id;
+
+                if member_id == 0 {
+                    return PostProcessEvent::Nothing;
+                }
+
+                if let Some(guild) = self.get_guild(guild_id) {
+                    guild.members.insert(member_id);
+                }
+
+                if !self.members.contains_key(&member_id) {
+                    return PostProcessEvent::FetchNewMember(member_id);
+                }
+            }
+            Event::LeftMember(member_left) => {
+                let guild_id = member_left.guild_id;
+                let member_id = member_left.member_id;
+
+                if let Some(guild) = self.get_guild(guild_id) {
+                    guild.members.remove(&member_id);
+                }
+            }
+            Event::ProfileUpdated(profile_updated) => {
+                let user_id = profile_updated.user_id;
+
+                let member = self.members.entry(user_id).or_default();
+
+                if profile_updated.update_username {
+                    member.username = profile_updated.new_username;
+                }
+
+                if profile_updated.update_status {
+                    member.status = UserStatus::from_i32(profile_updated.new_status).unwrap();
+                }
+
+                if profile_updated.update_avatar {
+                    let parsed = FileId::from_str(&profile_updated.new_avatar).ok();
+                    member.avatar_url = parsed.clone();
+                    if let Some(id) = parsed {
+                        return PostProcessEvent::FetchThumbnails(vec![id]);
+                    }
+                };
             }
             x => todo!("implement {:?}", x),
         }
 
-        Vec::new()
+        PostProcessEvent::Nothing
     }
 
     pub fn process_get_message_history_response(
@@ -242,15 +306,13 @@ impl Client {
         channel_id: u64,
         messages: Vec<HarmonyMessage>,
         _reached_top: bool,
-    ) -> Vec<FileId> {
+    ) {
         let mut messages = harmony_messages_to_ui_messages(messages);
 
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             messages.append(&mut channel.messages);
             channel.messages = messages;
         }
-
-        Vec::new()
     }
 
     pub fn subscribe_to(&self) -> Vec<EventSource> {

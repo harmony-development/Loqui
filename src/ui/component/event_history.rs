@@ -73,6 +73,9 @@ pub fn build_event_history<'a>(
             message.sender
         };
 
+        let name_to_use = members
+            .get(&id_to_use)
+            .map_or_else(String::default, |member| member.username.clone());
         let override_reason = message
             .overrides
             .as_ref()
@@ -80,25 +83,25 @@ pub fn build_event_history<'a>(
             .flatten()
             .map(|reason| match reason {
                 Reason::Bridge(_) => {
-                    format!("bridged by {}", members.get_user_display_name(&id_to_use))
+                    format!("bridged by {}", name_to_use)
                 }
                 Reason::SystemMessage(_) => "system message".to_string(),
                 Reason::UserDefined(reason) => reason.to_string(),
                 Reason::Webhook(_) => {
-                    format!("webhook by {}", members.get_user_display_name(&id_to_use))
+                    format!("webhook by {}", name_to_use)
                 }
                 _ => todo!("plurality"),
             });
         let sender_display_name = if let Some(overrides) = &message.overrides {
             overrides.name.clone()
         } else {
-            members.get_user_display_name(&id_to_use)
+            name_to_use
         };
         let sender_avatar_url = if let Some(overrides) = &message.overrides {
             overrides.avatar_url.as_ref()
         } else {
             members
-                .get_member(&id_to_use)
+                .get(&id_to_use)
                 .map(|m| m.avatar_url.as_ref())
                 .flatten()
         };

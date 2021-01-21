@@ -12,15 +12,20 @@ use crate::{
         style::{Theme, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
-use channel::GetChannelMessages;
+use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use content::ContentType;
-use harmony_rust_sdk::client::api::{
-    chat::{
-        self,
-        channel::{self, GetChannelMessagesSelfBuilder},
+use harmony_rust_sdk::{
+    api::chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
+    client::api::{
+        chat::{
+            self,
+            channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
+            guild::get_guild_members,
+            GuildId,
+        },
+        rest::{download, upload_extract_id, FileId},
     },
-    rest::{download, upload_extract_id, FileId},
 };
 use room_list::build_guild_list;
 
@@ -38,7 +43,7 @@ pub enum Message {
     },
     /// Sent when user makes a change to the message they are composing.
     MessageChanged(String),
-    ScrollToBottom,
+    ScrollToBottom(u64),
     OpenContent {
         content_url: FileId,
         is_thumbnail: bool,
@@ -144,7 +149,11 @@ impl MainScreen {
                 .spacing(SPACING * 2)
                 .padding(PADDING);
 
-            let mut sorted_members = guild.members.members().iter().collect::<Vec<_>>();
+            let mut sorted_members = guild
+                .members
+                .iter()
+                .flat_map(|id| Some((id, client.members.get(id)?)))
+                .collect::<Vec<_>>();
             sorted_members.sort_unstable_by_key(|(_, member)| member.username.as_str());
 
             for (state, (user_id, member)) in self
@@ -251,7 +260,7 @@ impl MainScreen {
                     client.content_store(),
                     thumbnail_cache,
                     channel,
-                    &guild.members,
+                    &client.members,
                     current_user_id,
                     channel.looking_at_message,
                     &mut self.event_history_state,
@@ -259,22 +268,32 @@ impl MainScreen {
                     theme,
                 );
 
-                let members = &guild.members;
                 let mut typing_users_combined = String::new();
-                let mut typing_members = members.typing_members(channel_id);
-                // Remove own user id from the list (if its there)
-                if let Some(index) = typing_members.iter().position(|id| id == &current_user_id) {
-                    typing_members.remove(index);
-                }
-                let typing_members_count = typing_members.len();
+                let typing_names = sorted_members
+                    .iter()
+                    .flat_map(|(id, member)| {
+                        // Remove own user id from the list (if its there)
+                        if **id == current_user_id {
+                            return None;
+                        }
 
-                for (index, member_id) in typing_members.iter().enumerate() {
+                        if member.typing_in_channel == Some(channel_id) {
+                            Some(member.username.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let typing_members_count = typing_names.len();
+
+                for (index, member_name) in typing_names.iter().enumerate() {
                     if index > 2 {
                         typing_users_combined += " and others are typing...";
                         break;
                     }
 
-                    typing_users_combined += members.get_user_display_name(member_id).as_str();
+                    typing_users_combined += member_name;
 
                     typing_users_combined += match typing_members_count {
                         x if x > index + 1 => ", ",
@@ -315,7 +334,7 @@ impl MainScreen {
                             label("↡").size((PADDING / 4) * 3 + MESSAGE_SIZE),
                         )
                         .style(theme.secondary())
-                        .on_press(Message::ScrollToBottom)
+                        .on_press(Message::ScrollToBottom(channel_id))
                         .into(),
                     );
                 }
@@ -499,12 +518,14 @@ impl MainScreen {
                     );
                 }
             }
-            Message::ScrollToBottom => {
+            Message::ScrollToBottom(sent_channel_id) => {
                 if let (Some(guild_id), Some(channel_id)) =
                     (self.current_guild_id, self.current_channel_id)
                 {
-                    scroll_to_bottom(client, guild_id, channel_id);
-                    self.event_history_state.scroll_to_bottom();
+                    if sent_channel_id == channel_id {
+                        scroll_to_bottom(client, guild_id, channel_id);
+                        self.event_history_state.scroll_to_bottom();
+                    }
                 }
             }
             Message::OpenContent {
@@ -688,8 +709,48 @@ impl MainScreen {
             }
             Message::GuildChanged(guild_id) => {
                 self.current_guild_id = Some(guild_id);
+                if client
+                    .get_guild(guild_id)
+                    .map_or(false, |guild| guild.channels.is_empty())
+                {
+                    let inner = client.inner().clone();
+
+                    return Command::perform(
+                        async move {
+                            let guildid = GuildId::new(guild_id);
+                            let channels_list = get_guild_channels(&inner, guildid).await?.channels;
+                            let mut events = Vec::with_capacity(channels_list.len());
+                            for channel in channels_list {
+                                events.push(Event::CreatedChannel(ChannelCreated {
+                                    guild_id,
+                                    channel_id: channel.channel_id,
+                                    is_category: channel.is_category,
+                                    name: channel.channel_name,
+                                    metadata: channel.metadata,
+                                    ..Default::default()
+                                }));
+                            }
+
+                            let members = get_guild_members(&inner, guildid).await?.members;
+                            events.reserve(members.len());
+                            for member_id in members {
+                                events.push(Event::JoinedMember(MemberJoined {
+                                    guild_id,
+                                    member_id,
+                                }));
+                            }
+
+                            Ok(events)
+                        },
+                        |result| match result {
+                            Ok(events) => super::Message::SyncResponse(events),
+                            Err(err) => super::Message::MatrixError(Box::new(err)),
+                        },
+                    );
+                }
             }
             Message::ChannelChanged(channel_id) => {
+                self.current_channel_id = Some(channel_id);
                 if let Some((disp, disp_at)) = self
                     .current_guild_id
                     .map(|guild_id| client.get_channel(guild_id, channel_id))
@@ -700,8 +761,36 @@ impl MainScreen {
                         *disp_at = disp.saturating_sub(1);
                         self.event_history_state.scroll_to_bottom();
                     }
+                    if disp == 0 {
+                        let inner = client.inner().clone();
+                        let guild_id = self.current_guild_id.unwrap();
+                        return Command::perform(
+                            async move {
+                                let messages = get_channel_messages(
+                                    &inner,
+                                    GetChannelMessages::new(guild_id, channel_id),
+                                )
+                                .await?
+                                .messages;
+                                let events = messages
+                                    .into_iter()
+                                    .map(|msg| {
+                                        Event::SentMessage(Box::new(MessageSent {
+                                            message: Some(msg),
+                                            ..Default::default()
+                                        }))
+                                    })
+                                    .rev()
+                                    .collect();
+                                Ok(events)
+                            },
+                            |result| match result {
+                                Ok(events) => super::Message::SyncResponse(events),
+                                Err(err) => super::Message::MatrixError(Box::new(err)),
+                            },
+                        );
+                    }
                 }
-                self.current_channel_id = Some(channel_id);
             }
         }
 

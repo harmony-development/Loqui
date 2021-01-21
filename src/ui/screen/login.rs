@@ -83,7 +83,16 @@ impl LoginScreen {
 
         let mut widgets = Vec::with_capacity(self.fields.len() + 1);
         if !self.current_error.is_empty() {
-            let error_text = label(&self.current_error).color(ERROR_COLOR).size(18);
+            let error_text = label(
+                self.current_error
+                    .as_str()
+                    .chars()
+                    .take(100)
+                    .collect::<String>()
+                    + "...",
+            )
+            .color(ERROR_COLOR)
+            .size(18);
             widgets.push(error_text.into());
         }
 

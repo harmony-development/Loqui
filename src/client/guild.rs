@@ -1,14 +1,14 @@
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use harmony_rust_sdk::client::api::rest::FileId;
 
-use super::{channel::Channels, member::Members};
+use super::channel::Channels;
 
 pub type Guilds = AHashMap<u64, Guild>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Guild {
     pub name: String,
     pub picture: Option<FileId>,
     pub channels: Channels,
-    pub members: Members,
+    pub members: AHashSet<u64>,
 }
