@@ -17,7 +17,7 @@ pub enum Message {
 }
 
 #[derive(Default, Debug)]
-pub struct RoomDiscovery {
+pub struct GuildDiscovery {
     direct_join_textedit_state: text_input::State,
     direct_join_but_state: button::State,
     join_room_back_but_state: button::State,
@@ -26,7 +26,7 @@ pub struct RoomDiscovery {
     joining_room: Option<String>,
 }
 
-impl RoomDiscovery {
+impl GuildDiscovery {
     pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {
         let mut text_edit = TextInput::new(
             &mut self.direct_join_textedit_state,
@@ -119,9 +119,9 @@ impl RoomDiscovery {
                 return Command::perform(
                     async move { guild::join_guild(&inner, invite).await },
                     |result| match result {
-                        Ok(response) => super::Message::RoomDiscoveryScreen(Message::JoinedRoom(
-                            response.guild_id,
-                        )),
+                        Ok(response) => {
+                            super::Message::GuildDiscovery(Message::JoinedRoom(response.guild_id))
+                        }
                         Err(e) => super::Message::Error(Box::new(e.into())),
                     },
                 );

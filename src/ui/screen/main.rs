@@ -97,21 +97,6 @@ impl MainScreen {
     ) -> Element<Message> {
         let guilds = &client.guilds;
 
-        /*// Build the top menu
-        // TODO: show user avatar next to name
-        let menu = PickList::new(
-            &mut self.menu_state,
-            vec![
-                "User".to_string(),
-                "Join Room".to_string(),
-                "Logout".to_string(),
-            ],
-            Some("User".to_string()),
-            Message::SelectedMenuOption,
-        )
-        .width(Length::Fill)
-        .style(theme);*/
-
         // Resize and (if extended) initialize new button states for new rooms
         self.guilds_buts_state
             .resize_with(guilds.len(), Default::default);
@@ -142,6 +127,26 @@ impl MainScreen {
             .map(|id| Some((guilds.get(id)?, *id)))
             .flatten()
         {
+            let current_user_id = client.user_id.unwrap();
+            let current_username = client
+                .members
+                .get(&current_user_id)
+                .map_or_else(|| String::from("unknown"), |member| member.username.clone());
+
+            // TODO: show user avatar next to name
+            let menu = PickList::new(
+                &mut self.menu_state,
+                vec![
+                    current_username.clone(),
+                    "Join Room".to_string(),
+                    "Logout".to_string(),
+                ],
+                Some(current_username),
+                Message::SelectedMenuOption,
+            )
+            .width(Length::Fill)
+            .style(theme);
+
             self.members_buts_state
                 .resize_with(guild.members.len(), Default::default);
 
@@ -253,9 +258,7 @@ impl MainScreen {
                     channel_id,
                 });
 
-                let current_user_id = client.user_id.unwrap();
                 let message_count = channel.messages.len();
-
                 let message_history_list = build_event_history(
                     client.content_store(),
                     thumbnail_cache,
@@ -364,11 +367,15 @@ impl MainScreen {
                 screen_widgets.push(no_selected_channel_warning.into());
             }
             screen_widgets.push(
-                Container::new(members_list)
-                    .width(Length::Units(200))
-                    .height(Length::Fill)
-                    .style(theme)
-                    .into(),
+                Container::new(
+                    Column::with_children(vec![menu.into(), members_list.into()])
+                        .width(Length::Fill)
+                        .height(Length::Fill),
+                )
+                .width(Length::Units(200))
+                .height(Length::Fill)
+                .style(theme)
+                .into(),
             );
         } else {
             let no_selected_guild_warning = fill_container(
@@ -483,23 +490,21 @@ impl MainScreen {
             Message::SelectedMember(user_id) => {
                 log::trace!("member: {}", user_id);
             }
-            Message::SelectedMenuOption(option) => match option.as_str() {
-                "Logout" => {
-                    return Command::perform(async {}, |_| {
+            Message::SelectedMenuOption(option) => {
+                return match option.as_str() {
+                    "Logout" => Command::perform(async {}, |_| {
                         super::Message::PushScreen(Box::new(super::Screen::Logout(
                             super::LogoutScreen::default(),
                         )))
-                    })
-                }
-                "Join Room" => {
-                    return Command::perform(async {}, |_| {
-                        super::Message::PushScreen(Box::new(super::Screen::RoomDiscovery(
-                            super::RoomDiscoveryScreen::default(),
+                    }),
+                    "Join Room" => Command::perform(async {}, |_| {
+                        super::Message::PushScreen(Box::new(super::Screen::GuildDiscovery(
+                            super::GuildDiscovery::default(),
                         )))
-                    })
+                    }),
+                    _ => Command::none(),
                 }
-                _ => unreachable!(),
-            },
+            }
             Message::ComposerMessageChanged(new_msg) => {
                 self.message = new_msg;
 

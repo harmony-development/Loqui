@@ -1,20 +1,24 @@
+pub mod guild_discovery;
 pub mod login;
 pub mod logout;
 pub mod main;
-pub mod room_discovery;
 
-use flume::Receiver;
-use futures::channel::mpsc::unbounded;
+pub use guild_discovery::GuildDiscovery;
 pub use login::LoginScreen;
 pub use logout::Logout as LogoutScreen;
 pub use main::MainScreen;
-pub use room_discovery::RoomDiscovery as RoomDiscoveryScreen;
 
-use client::{
-    guild::{Guild, Guilds},
-    message::{Message as IcyMessage, MessageId},
+use crate::{
+    client::{
+        content::{ContentStore, ImageHandle, ThumbnailCache},
+        error::{ClientError, ClientResult},
+        message::{Message as IcyMessage, MessageId},
+        Client, PostProcessEvent, Session,
+    },
+    ui::style::Theme,
 };
 
+use flume::Receiver;
 use harmony_rust_sdk::{
     api::{
         chat::{
@@ -38,38 +42,16 @@ use harmony_rust_sdk::{
         error::ClientError as InnerClientError,
     },
 };
-use tokio::sync::Mutex;
-
-use crate::{
-    client::{
-        self,
-        content::{ContentStore, ImageHandle, ThumbnailCache},
-        error::{ClientError, ClientResult},
-        message::harmony_messages_to_ui_messages,
-        Client, InnerClient, PostProcessEvent, Session,
-    },
-    ui::style::Theme,
-};
-use iced::{
-    executor,
-    futures::{self, channel::mpsc::UnboundedReceiver, StreamExt},
-    Application, Command, Element, Subscription,
-};
+use iced::{executor, Application, Command, Element, Subscription};
 use iced_futures::BoxStream;
-use std::{
-    hash::Hash,
-    hash::Hasher,
-    str::FromStr,
-    sync::{atomic::Ordering, Arc},
-    time::Duration,
-};
+use std::{hash::Hash, hash::Hasher, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum Message {
     LoginScreen(login::Message),
     LogoutScreen(logout::Message),
     MainScreen(main::Message),
-    RoomDiscoveryScreen(room_discovery::Message),
+    GuildDiscovery(guild_discovery::Message),
     PopScreen,
     PushScreen(Box<Screen>),
     LoginComplete(Option<Client>),
@@ -107,7 +89,7 @@ pub enum Screen {
     Logout(LogoutScreen),
     Login(LoginScreen),
     Main(Box<MainScreen>),
-    RoomDiscovery(RoomDiscoveryScreen),
+    GuildDiscovery(GuildDiscovery),
 }
 
 impl Screen {
@@ -253,8 +235,8 @@ impl Application for ScreenManager {
                     return screen.update(msg, client);
                 }
             }
-            Message::RoomDiscoveryScreen(msg) => {
-                if let (Screen::RoomDiscovery(screen), Some(client)) =
+            Message::GuildDiscovery(msg) => {
+                if let (Screen::GuildDiscovery(screen), Some(client)) =
                     (self.screens.current_mut(), &self.client)
                 {
                     return screen.update(msg, client);
@@ -581,9 +563,9 @@ impl Application for ScreenManager {
                     &self.thumbnail_cache,
                 )
                 .map(Message::MainScreen),
-            Screen::RoomDiscovery(screen) => screen
+            Screen::GuildDiscovery(screen) => screen
                 .view(self.theme, self.client.as_ref().unwrap()) // This will not panic cause [ref:client_set_before_main_view]
-                .map(Message::RoomDiscoveryScreen),
+                .map(Message::GuildDiscovery),
         }
     }
 }
