@@ -1,7 +1,7 @@
 { common }:
 with common; with pkgs;
 mkShell {
-  name = "rucies-devShell";
+  name = "crust-devShell";
   nativeBuildInputs =
     [ git nixpkgs-fmt rustc cachix ]
     ++ crateDeps.nativeBuildInputs;

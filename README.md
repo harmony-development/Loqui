@@ -1,8 +1,8 @@
-`rucies` is a Harmony client written in Rust using the `iced` GUI library.
+Crust is a Harmony client written in Rust using the `iced` GUI library.
 
 It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 
-![rucies](resources/screenshot.png)
+![Crust](resources/screenshot.png)
 
 ## Requirements
 - Current stable Rust and Cargo.
@@ -15,15 +15,15 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 
 ## Building
 
-- Clone the repo, and switch the working directory to it: `git clone https://github.com/harmony-development/rucies.git && cd rucies`
+- Clone the repo, and switch the working directory to it: `git clone https://github.com/harmony-development/crust.git && cd crust`
 - To build and run the project with debug info / checks use `cargo run`. Use `cargo run --release` for an optimized release build.
 
 ### Nix
-- `nix build .#rucies-debug` to compile a debug build.
-- `nix build .#rucies` to compile a release build.
+- `nix build .#crust-debug` to compile a debug build.
+- `nix build .#crust` to compile a release build.
 - If you don't have flakes enabled, `nix-build` will give you a release build.
 
 ## Installing
 
 ### Nix
-- For flakes: `nix profile install github:harmony-development/rucies`
+- For flakes: `nix profile install github:harmony-development/crust`

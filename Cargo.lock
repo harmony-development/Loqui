@@ -549,6 +549,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "crust"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "chrono",
+ "directories-next",
+ "flume",
+ "fuzzy-matcher",
+ "harmony_rust_sdk",
+ "iced",
+ "iced_futures",
+ "iced_native",
+ "image",
+ "indexmap",
+ "infer",
+ "log",
+ "open",
+ "rfd",
+ "serde",
+ "simplelog",
+ "tokio",
+ "toml",
+ "uuid",
+]
+
+[[package]]
 name = "d3d12"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2707,32 +2733,6 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "rucies"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "chrono",
- "directories-next",
- "flume",
- "fuzzy-matcher",
- "harmony_rust_sdk",
- "iced",
- "iced_futures",
- "iced_native",
- "image",
- "indexmap",
- "infer",
- "log",
- "open",
- "rfd",
- "serde",
- "simplelog",
- "tokio",
- "toml",
- "uuid",
 ]
 
 [[package]]

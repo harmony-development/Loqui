@@ -1,5 +1,5 @@
 {
-  description = "Flake for rucies, a Harmony client written in Rust";
+  description = "Flake for crust, a Harmony client written in Rust";
 
   inputs = {
     naersk = {
@@ -23,17 +23,17 @@
         };
 
         packages = {
-          rucies = import ./nix/build.nix { inherit common; release = true; };
-          rucies-debug = import ./nix/build.nix { inherit common; };
+          crust = import ./nix/build.nix { inherit common; release = true; };
+          crust-debug = import ./nix/build.nix { inherit common; };
         };
-        apps = builtins.mapAttrs (n: v: mkApp { name = n; drv = v; exePath = "/bin/rucies"; }) packages;
+        apps = builtins.mapAttrs (n: v: mkApp { name = n; drv = v; exePath = "/bin/crust"; }) packages;
       in
       {
         inherit packages apps;
 
-        defaultPackage = packages.rucies;
+        defaultPackage = packages.crust;
 
-        defaultApp = apps.rucies;
+        defaultApp = apps.crust;
 
         devShell = import ./nix/devShell.nix { inherit common; };
       }

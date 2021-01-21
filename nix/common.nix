@@ -30,7 +30,7 @@ in
 with pkgs; {
   inherit pkgs;
 
-  # Libraries needed to run rucies (graphics stuff)
+  # Libraries needed to run crust (graphics stuff)
   neededLibs = (with xorg; [ libX11 libXcursor libXrandr libXi ])
     ++ [ vulkan-loader wayland wayland-protocols libxkbcommon ];
 
