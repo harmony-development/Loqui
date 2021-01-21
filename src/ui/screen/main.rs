@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{cmp::Ordering, time::Duration};
 
 use crate::{
     client::{
@@ -16,7 +16,10 @@ use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use content::ContentType;
 use harmony_rust_sdk::{
-    api::chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
+    api::{
+        chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
+        harmonytypes::UserStatus,
+    },
     client::api::{
         chat::{
             self,
@@ -159,17 +162,31 @@ impl MainScreen {
                 .iter()
                 .flat_map(|id| Some((id, client.members.get(id)?)))
                 .collect::<Vec<_>>();
-            sorted_members.sort_unstable_by_key(|(_, member)| member.username.as_str());
+            sorted_members.sort_by_key(|(_, member)| member.username.as_str());
+            sorted_members.sort_by(|(_, member), (_, other_member)| {
+                let offline = matches!(member.status, UserStatus::Offline);
+                let other_offline = matches!(other_member.status, UserStatus::Offline);
+
+                if !offline && other_offline {
+                    Ordering::Less
+                } else if offline && !other_offline {
+                    Ordering::Greater
+                } else {
+                    Ordering::Equal
+                }
+            });
 
             for (state, (user_id, member)) in self
                 .members_buts_state
                 .iter_mut()
                 .zip(sorted_members.iter())
             {
-                let mut content: Vec<Element<Message>> = vec![
-                    label(&member.username).into(),
-                    Space::with_width(Length::Fill).into(),
-                ];
+                let mut username = label(&member.username);
+                if matches!(member.status, UserStatus::Offline) {
+                    username = username.color(color!(128, 128, 128));
+                }
+                let mut content: Vec<Element<Message>> =
+                    vec![username.into(), Space::with_width(Length::Fill).into()];
                 if let Some(handle) = member
                     .avatar_url
                     .as_ref()
