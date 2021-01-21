@@ -143,10 +143,14 @@ impl MainScreen {
             let mut members_list = Scrollable::new(&mut self.members_list_state)
                 .spacing(SPACING * 2)
                 .padding(PADDING);
+
+            let mut sorted_members = guild.members.members().iter().collect::<Vec<_>>();
+            sorted_members.sort_unstable_by_key(|(_, member)| member.username.as_str());
+
             for (state, (user_id, member)) in self
                 .members_buts_state
                 .iter_mut()
-                .zip(guild.members.members())
+                .zip(sorted_members.iter())
             {
                 let mut content: Vec<Element<Message>> = vec![
                     label(&member.username).into(),
@@ -188,7 +192,7 @@ impl MainScreen {
                         Row::with_children(content).align_items(Align::Center),
                     )
                     .style(theme.secondary())
-                    .on_press(Message::SelectedMember(*user_id))
+                    .on_press(Message::SelectedMember(**user_id))
                     .width(Length::Fill),
                 );
             }
