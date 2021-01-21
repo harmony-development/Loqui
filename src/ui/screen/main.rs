@@ -111,20 +111,19 @@ impl MainScreen {
         self.guilds_buts_state
             .resize_with(guilds.len(), Default::default);
 
-        let (mut guilds_list, first_guild_id) = build_guild_list(
-            guilds,
-            thumbnail_cache,
-            self.current_guild_id,
-            "",
-            &mut self.guilds_list_state,
-            &mut self.guilds_buts_state,
-            Message::GuildChanged,
-            theme,
-        );
-
-        if first_guild_id.is_none() {
-            guilds_list = fill_container(label("No guilds found")).style(theme).into();
-        }
+        let guilds_list = if guilds.is_empty() {
+            fill_container(label("No guilds found")).style(theme).into()
+        } else {
+            build_guild_list(
+                guilds,
+                thumbnail_cache,
+                self.current_guild_id,
+                &mut self.guilds_list_state,
+                &mut self.guilds_buts_state,
+                Message::GuildChanged,
+                theme,
+            )
+        };
 
         let mut screen_widgets = vec![Container::new(guilds_list)
             .width(Length::Units(64))
@@ -198,21 +197,20 @@ impl MainScreen {
                 .resize_with(guild.channels.len(), Default::default);
 
             // Build the room list
-            let (mut channels_list, first_room_id) = build_channel_list(
-                &guild.channels,
-                self.current_channel_id,
-                "",
-                &mut self.channels_list_state,
-                &mut self.channels_buts_state,
-                Message::ChannelChanged,
-                theme,
-            );
-
-            if first_room_id.is_none() {
+            let channels_list = if guild.channels.is_empty() {
                 // if first_room_id is None, then that means no room found (either cause of filter, or the user aren't in any room)
                 // reusing the room_list variable here
-                channels_list = fill_container(label("No room found")).style(theme).into();
-            }
+                fill_container(label("No room found")).style(theme).into()
+            } else {
+                build_channel_list(
+                    &guild.channels,
+                    self.current_channel_id,
+                    &mut self.channels_list_state,
+                    &mut self.channels_buts_state,
+                    Message::ChannelChanged,
+                    theme,
+                )
+            };
 
             screen_widgets.push(
                 Container::new(channels_list)
