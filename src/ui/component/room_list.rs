@@ -1,5 +1,6 @@
 use crate::{
     client::{channel::Channels, content::ThumbnailCache, guild::Guilds},
+    label,
     ui::{
         component::*,
         style::{Theme, PADDING, SPACING},
@@ -18,8 +19,8 @@ pub fn build_channel_list<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     let mut channel_list = Scrollable::new(state)
         .style(theme)
-        .align_items(Align::Start)
-        .height(Length::Fill)
+        .align_items(align!(|<))
+        .height(length!(+))
         .spacing(SPACING * 2)
         .padding(PADDING / 4);
 
@@ -35,10 +36,10 @@ pub fn build_channel_list<'a, Message: Clone + 'a>(
     for ((channel_id, channel), button_state) in channels.iter().zip(buttons_state.iter_mut()) {
         let channel_name_prefix = if channel.is_category { "+" } else { "#" };
         let channel_name_formatted = format!("{}{}", channel_name_prefix, channel.name);
-        let content = label(channel_name_formatted);
+        let content = label!(channel_name_formatted);
 
         let mut but = Button::new(button_state, content)
-            .width(Length::Fill)
+            .width(length!(+))
             .style(theme.secondary());
 
         if !is_current_channel(*channel_id) {
@@ -63,8 +64,8 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     let mut guild_list = Scrollable::new(state)
         .style(theme)
-        .align_items(Align::Start)
-        .height(Length::Fill)
+        .align_items(align!(|<))
+        .height(length!(+))
         .spacing(SPACING * 2)
         .padding(PADDING / 4);
 
@@ -79,30 +80,27 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
 
     for ((guild_id, guild), button_state) in guilds.into_iter().zip(buttons_state.iter_mut()) {
         let content = fill_container(
-            if let Some(handle) = guild
+            match guild
                 .picture
                 .as_ref()
                 .map(|guild_picture| thumbnail_cache.get_thumbnail(&guild_picture))
                 .flatten()
             {
-                Element::from(Image::new(handle.clone()))
-            } else {
-                Element::from(
-                    label(
-                        guild
-                            .name
-                            .chars()
-                            .next()
-                            .unwrap_or('u')
-                            .to_ascii_uppercase(),
-                    )
+                Some(handle) => Element::from(Image::new(handle.clone())),
+                None => Element::from(
+                    label!(guild
+                        .name
+                        .chars()
+                        .next()
+                        .unwrap_or('u')
+                        .to_ascii_uppercase())
                     .size(30),
-                )
+                ),
             },
         );
 
         let mut but = Button::new(button_state, content)
-            .width(Length::Fill)
+            .width(length!(+))
             .style(theme.secondary());
 
         if !is_current_guild(*guild_id) {

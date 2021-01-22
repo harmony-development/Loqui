@@ -1,5 +1,6 @@
 use crate::{
     client::{content::ContentStore, error::ClientError, Client, Session},
+    label, label_button, length, space,
     ui::{
         component::*,
         style::{Theme, ERROR_COLOR, PADDING},
@@ -75,20 +76,20 @@ impl LoginScreen {
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
         if self.waiting {
-            return fill_container(label("Please wait...").size(30))
+            return fill_container(label!("Please wait...").size(30))
                 .style(theme)
                 .into();
         }
 
         let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 1);
         if !self.current_error.is_empty() {
-            let error_text = label(
+            let error_text = label!(
                 self.current_error
                     .as_str()
                     .chars()
                     .take(100)
                     .collect::<String>()
-                    + "...",
+                    + "..."
             )
             .color(ERROR_COLOR)
             .size(18);
@@ -118,7 +119,7 @@ impl LoginScreen {
             sorted_choices.sort_unstable_by_key(|(name, _)| name.as_str());
             for (name, state) in &mut self.choices {
                 widgets.push(
-                    Button::new(state, label(name))
+                    Button::new(state, label!(name))
                         .on_press(Message::ProceedWithChoice(name.clone()))
                         .style(theme)
                         .into(),
@@ -130,7 +131,7 @@ impl LoginScreen {
             || matches!(self.current_step, AuthPart::Homeserver)
         {
             widgets.push(
-                label_button(&mut self.proceed, "Proceed")
+                label_button!(&mut self.proceed, "Proceed")
                     .on_press(Message::Proceed)
                     .style(theme)
                     .into(),
@@ -139,7 +140,7 @@ impl LoginScreen {
 
         if self.can_go_back {
             widgets.push(
-                label_button(&mut self.back, "Back")
+                label_button!(&mut self.back, "Back")
                     .on_press(Message::GoBack)
                     .style(theme)
                     .into(),
@@ -149,11 +150,11 @@ impl LoginScreen {
         let field_panel = column(widgets);
 
         let padded_panel = row(vec![
-            wspace(3).into(),
-            field_panel.width(Length::FillPortion(4)).into(),
-            wspace(3).into(),
+            space!(w = 3).into(),
+            field_panel.width(length!(% 4)).into(),
+            space!(w = 3).into(),
         ])
-        .height(Length::Fill);
+        .height(length!(+));
 
         fill_container(padded_panel).style(theme).into()
     }

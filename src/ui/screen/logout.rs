@@ -1,5 +1,6 @@
 use crate::{
     client::{error::ClientError, Client},
+    label, label_button, length, space,
     ui::{
         component::*,
         style::{Theme, ERROR_COLOR},
@@ -19,37 +20,37 @@ pub struct Logout {
 impl Logout {
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
         if self.confirmation {
-            fill_container(label("Logging out...").size(30))
+            fill_container(label!("Logging out...").size(30))
                 .style(theme)
                 .into()
         } else {
             let make_button = |state, confirm| {
                 let text = if confirm { "Yes" } else { "No" };
 
-                label_button(state, text).style(theme).on_press(confirm)
+                label_button!(state, text).style(theme).on_press(confirm)
             };
 
             let logout_confirm_panel = column(
                     vec![
-                        label("Do you want to logout?").into(),
-                        label("This will delete your current session and you will need to login with your password.")
+                        label!("Do you want to logout?").into(),
+                        label!("This will delete your current session and you will need to login with your password.")
                             .color(ERROR_COLOR)
                             .into(),
                         row(
                             vec![
-                                make_button(&mut self.logout_approve_but_state, true).width(Length::FillPortion(1)).into(),
-                                wspace(1).into(),
-                                make_button(&mut self.logout_cancel_but_state, false).width(Length::FillPortion(1)).into(),
+                                make_button(&mut self.logout_approve_but_state, true).width(length!(+)).into(),
+                                space!(w+).into(),
+                                make_button(&mut self.logout_cancel_but_state, false).width(length!(+)).into(),
                         ])
-                        .width(Length::Fill)
+                        .width(length!(+))
                         .into(),
                     ])
                     .spacing(12);
 
             let padded_panel = row(vec![
-                wspace(3).into(),
-                logout_confirm_panel.width(Length::FillPortion(4)).into(),
-                wspace(3).into(),
+                space!(w % 3).into(),
+                logout_confirm_panel.width(length!(% 4)).into(),
+                space!(w % 3).into(),
             ]);
 
             fill_container(padded_panel).style(theme).into()

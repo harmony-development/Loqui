@@ -7,9 +7,10 @@ use crate::{
         message::{Attachment, Message as IcyMessage},
         Client,
     },
+    label, length, space,
     ui::{
         component::{event_history::SHOWN_MSGS_LIMIT, *},
-        style::{Theme, MESSAGE_SIZE, PADDING, SPACING},
+        style::{Theme, ALT_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
 use channel::{get_channel_messages, GetChannelMessages};
@@ -105,7 +106,9 @@ impl MainScreen {
             .resize_with(guilds.len(), Default::default);
 
         let guilds_list = if guilds.is_empty() {
-            fill_container(label("No guilds found")).style(theme).into()
+            fill_container(label!("No guilds found"))
+                .style(theme)
+                .into()
         } else {
             build_guild_list(
                 guilds,
@@ -119,8 +122,8 @@ impl MainScreen {
         };
 
         let mut screen_widgets = vec![Container::new(guilds_list)
-            .width(Length::Units(64))
-            .height(Length::Fill)
+            .width(length!(= 64))
+            .height(length!(+))
             .style(theme)
             .into()];
 
@@ -147,7 +150,7 @@ impl MainScreen {
                 Some(current_username),
                 Message::SelectedMenuOption,
             )
-            .width(Length::Fill)
+            .width(length!(+))
             .style(theme);
 
             self.members_buts_state
@@ -181,12 +184,11 @@ impl MainScreen {
                 .iter_mut()
                 .zip(sorted_members.iter())
             {
-                let mut username = label(&member.username);
+                let mut username = label!(&member.username);
                 if matches!(member.status, UserStatus::Offline) {
-                    username = username.color(color!(128, 128, 128));
+                    username = username.color(ALT_COLOR);
                 }
-                let mut content: Vec<Element<Message>> =
-                    vec![username.into(), Space::with_width(Length::Fill).into()];
+                let mut content: Vec<Element<Message>> = vec![username.into(), space!(w+).into()];
                 if let Some(handle) = member
                     .avatar_url
                     .as_ref()
@@ -194,37 +196,32 @@ impl MainScreen {
                     .flatten()
                 {
                     content.push(
-                        fill_container(Image::new(handle.clone()).width(Length::Fill))
-                            .width(Length::Units(32))
-                            .height(Length::Units(32))
+                        fill_container(Image::new(handle.clone()).width(length!(+)))
+                            .width(length!(= 32))
+                            .height(length!(= 32))
                             .style(theme.round())
                             .into(),
                     );
                 } else {
                     content.push(
-                        fill_container(label(
-                            member
-                                .username
-                                .chars()
-                                .next()
-                                .unwrap_or('u')
-                                .to_ascii_uppercase(),
-                        ))
-                        .width(Length::Units(32))
-                        .height(Length::Units(32))
+                        fill_container(label!(member
+                            .username
+                            .chars()
+                            .next()
+                            .unwrap_or('u')
+                            .to_ascii_uppercase()))
+                        .width(length!(= 32))
+                        .height(length!(= 32))
                         .style(theme.round())
                         .into(),
                     );
                 }
 
                 members_list = members_list.push(
-                    Button::new(
-                        state,
-                        Row::with_children(content).align_items(Align::Center),
-                    )
-                    .style(theme.secondary())
-                    .on_press(Message::SelectedMember(**user_id))
-                    .width(Length::Fill),
+                    Button::new(state, Row::with_children(content).align_items(align!(|)))
+                        .style(theme.secondary())
+                        .on_press(Message::SelectedMember(**user_id))
+                        .width(length!(+)),
                 );
             }
 
@@ -235,7 +232,7 @@ impl MainScreen {
             let channels_list = if guild.channels.is_empty() {
                 // if first_room_id is None, then that means no room found (either cause of filter, or the user aren't in any room)
                 // reusing the room_list variable here
-                fill_container(label("No room found")).style(theme).into()
+                fill_container(label!("No room found")).style(theme).into()
             } else {
                 build_channel_list(
                     &guild.channels,
@@ -249,8 +246,8 @@ impl MainScreen {
 
             screen_widgets.push(
                 Container::new(channels_list)
-                    .width(Length::Units(200))
-                    .height(Length::Fill)
+                    .width(length!(= 200))
+                    .height(length!(+))
                     .style(theme)
                     .into(),
             );
@@ -323,18 +320,18 @@ impl MainScreen {
                 }
 
                 let typing_users = Column::with_children(vec![
-                    awspace(6).into(),
+                    space!(w = 6).into(),
                     Row::with_children(vec![
-                        awspace(9).into(),
-                        label(typing_users_combined).size(14).into(),
+                        space!(w = 9).into(),
+                        label!(typing_users_combined).size(14).into(),
                     ])
                     .into(),
                 ])
-                .height(Length::Units(14));
+                .height(length!(= 14));
 
                 let send_file_button = Button::new(
                     &mut self.send_file_but_state,
-                    label("↑").size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                    label!("↑").size((PADDING / 4) * 3 + MESSAGE_SIZE),
                 )
                 .style(theme.secondary())
                 .on_press(Message::SendFiles {
@@ -344,14 +341,14 @@ impl MainScreen {
 
                 let mut bottom_area_widgets = vec![
                     send_file_button.into(),
-                    message_composer.width(Length::Fill).into(),
+                    message_composer.width(length!(+)).into(),
                 ];
 
                 if channel.looking_at_message < message_count.saturating_sub(SHOWN_MSGS_LIMIT) {
                     bottom_area_widgets.push(
                         Button::new(
                             &mut self.scroll_to_bottom_but_state,
-                            label("↡").size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                            label!("↡").size((PADDING / 4) * 3 + MESSAGE_SIZE),
                         )
                         .style(theme.secondary())
                         .on_press(Message::ScrollToBottom(channel_id))
@@ -365,49 +362,43 @@ impl MainScreen {
                     Container::new(
                         Row::with_children(bottom_area_widgets)
                             .spacing(SPACING * 2)
-                            .width(Length::Fill),
+                            .width(length!(+)),
                     )
-                    .width(Length::Fill)
+                    .width(length!(+))
                     .padding(PADDING / 2)
                     .into(),
                 ]);
 
                 screen_widgets.push(fill_container(message_area).style(theme.secondary()).into());
             } else {
-                let no_selected_channel_warning = fill_container(
-                    label("Select a channel")
-                        .size(35)
-                        .color(color!(128, 128, 128)),
-                )
-                .style(theme.secondary());
+                let no_selected_channel_warning =
+                    fill_container(label!("Select a channel").size(35).color(ALT_COLOR))
+                        .style(theme.secondary());
 
                 screen_widgets.push(no_selected_channel_warning.into());
             }
             screen_widgets.push(
                 Container::new(
                     Column::with_children(vec![menu.into(), members_list.into()])
-                        .width(Length::Fill)
-                        .height(Length::Fill),
+                        .width(length!(+))
+                        .height(length!(+)),
                 )
-                .width(Length::Units(200))
-                .height(Length::Fill)
+                .width(length!(= 200))
+                .height(length!(+))
                 .style(theme)
                 .into(),
             );
         } else {
-            let no_selected_guild_warning = fill_container(
-                label("Select / join a guild")
-                    .size(35)
-                    .color(color!(128, 128, 128)),
-            )
-            .style(theme.secondary());
+            let no_selected_guild_warning =
+                fill_container(label!("Select / join a guild").size(35).color(ALT_COLOR))
+                    .style(theme.secondary());
 
             screen_widgets.push(no_selected_guild_warning.into());
         }
 
         Row::with_children(screen_widgets)
-            .height(Length::Fill)
-            .width(Length::Fill)
+            .height(length!(+))
+            .width(length!(+))
             .into()
     }
 

@@ -12,8 +12,9 @@ pub const DATE_SEPERATOR_SIZE: u16 = 22;
 pub const PADDING: u16 = 16;
 pub const SPACING: u16 = 4;
 
-pub const ERROR_COLOR: Color = color!(255, 0, 0);
-pub const SUCCESS_COLOR: Color = color!(0, 255, 0);
+pub const ERROR_COLOR: Color = color!(. 1.0, 0.0, 0.0);
+pub const SUCCESS_COLOR: Color = color!(. 0.0, 1.0, 0.0);
+pub const ALT_COLOR: Color = color!(. 0.5, 0.5, 0.5);
 
 pub const AVATAR_WIDTH: u16 = 32;
 
@@ -300,7 +301,7 @@ mod dark {
         }
 
         fn placeholder_color(&self) -> Color {
-            Color::from_rgb(0.4, 0.4, 0.4)
+            color!(. 0.4, 0.4, 0.4)
         }
 
         fn value_color(&self) -> Color {

@@ -2,6 +2,7 @@ use harmony_rust_sdk::{api::chat::InviteId, client::api::chat::*};
 
 use crate::{
     client::{error::ClientError, Client},
+    label, label_button, length, space,
     ui::{
         component::*,
         style::{Theme, ERROR_COLOR, PADDING, SUCCESS_COLOR},
@@ -37,9 +38,9 @@ impl GuildDiscovery {
         .padding(PADDING / 2)
         .style(theme);
 
-        let mut join = label_button(&mut self.direct_join_but_state, "Join").style(theme);
+        let mut join = label_button!(&mut self.direct_join_but_state, "Join").style(theme);
 
-        let back = label_button(&mut self.join_room_back_but_state, "Back")
+        let back = label_button!(&mut self.join_room_back_but_state, "Back")
             .style(theme)
             .on_press(Message::GoBack);
 
@@ -63,7 +64,7 @@ impl GuildDiscovery {
             Err(e) => {
                 if !self.invite.is_empty() {
                     log::debug!("{}", e); // We don't print this as an error since it'll spam the logs
-                    widgets.push(label(e.to_string()).color(ERROR_COLOR).into());
+                    widgets.push(label!(e.to_string()).color(ERROR_COLOR).into());
                 }
             }
         }
@@ -75,33 +76,33 @@ impl GuildDiscovery {
             .flatten()
         {
             widgets.push(
-                label(format!("Successfully joined guild {}", name))
+                label!("Successfully joined guild {}", name)
                     .color(SUCCESS_COLOR)
                     .into(),
             );
         }
 
         if let Some(name) = self.joining_room.as_ref() {
-            widgets.push(label(format!("Joining guild {}", name)).into());
+            widgets.push(label!("Joining guild {}", name).into());
         }
 
         widgets.push(text_edit.into());
         widgets.push(
             row(vec![
-                join.width(Length::FillPortion(1)).into(),
-                wspace(1).into(),
-                back.width(Length::FillPortion(1)).into(),
+                join.width(length!(+)).into(),
+                space!(w+).into(),
+                back.width(length!(+)).into(),
             ])
-            .width(Length::Fill)
+            .width(length!(+))
             .into(),
         );
 
         let padded_panel = row(vec![
-            wspace(3).into(),
-            column(widgets).width(Length::FillPortion(4)).into(),
-            wspace(3).into(),
+            space!(w % 3).into(),
+            column(widgets).width(length!(% 4)).into(),
+            space!(w % 3).into(),
         ])
-        .width(Length::Fill);
+        .width(length!(+));
 
         fill_container(padded_panel).style(theme).into()
     }
