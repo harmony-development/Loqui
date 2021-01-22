@@ -25,13 +25,17 @@ harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_
 
 iced = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix", features = ["tokio", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
+iced_graphics = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
 iced_futures = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
+iced_wgpu = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
 
 open = "1.4.0"
 infer = "0.3.4"
-rfd = "0.1.1"
+rfd = "0.1.2"
 image = "0.23.12"
 directories-next = "2.0.0"
+comrak = "0.9"
+html_parser = "0.6"
 
 flume = "0.10.1"
 tokio = { version = "1.0.2", features = ["rt-multi-thread", "parking_lot", "time", "fs"] }

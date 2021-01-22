@@ -1,5 +1,6 @@
 pub mod event_history;
 pub mod room_list;
+pub mod markdown;
 
 pub use crate::color;
 pub use event_history::build_event_history;

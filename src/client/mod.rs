@@ -35,7 +35,7 @@ use std::{
 
 use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
 
-use self::{content::MAX_THUMB_SIZE, guild::Guilds, message::Message};
+use self::{guild::Guilds, message::Message};
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
 #[derive(Clone, Deserialize, Serialize)]
