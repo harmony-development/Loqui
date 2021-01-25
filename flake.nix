@@ -8,9 +8,9 @@
     };
     flakeUtils.url = "github:numtide/flake-utils";
     nixpkgs.url = "nixpkgs/nixpkgs-unstable";
-    nixpkgsMoz = {
-      url = "github:mozilla/nixpkgs-mozilla";
-      flake = false;
+    rustOverlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
@@ -18,7 +18,7 @@
     eachSystem [ "x86_64-linux" ] (system:
       let
         common = import ./nix/common.nix {
-          sources = { inherit naersk nixpkgs nixpkgsMoz; };
+          sources = { inherit naersk nixpkgs rustOverlay; };
           inherit system;
         };
 
