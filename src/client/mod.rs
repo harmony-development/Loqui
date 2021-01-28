@@ -10,7 +10,7 @@ pub mod message;
 use channel::Channel;
 use guild::Guild;
 pub use harmony_rust_sdk::{
-    api::exports::http::Uri,
+    api::exports::url::Url,
     client::{api::auth::Session as InnerSession, AuthStatus, Client as InnerClient},
 };
 use harmony_rust_sdk::{
@@ -98,7 +98,7 @@ impl Debug for Client {
 
 impl Client {
     pub async fn new(
-        homeserver_url: Uri,
+        homeserver_url: Url,
         session: Option<InnerSession>,
         content_store: Arc<ContentStore>,
     ) -> ClientResult<Self> {

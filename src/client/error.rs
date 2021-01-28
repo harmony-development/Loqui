@@ -1,5 +1,5 @@
 use harmony_rust_sdk::{
-    api::exports::http::{uri::InvalidUri, Uri},
+    api::exports::url::{ParseError, Url},
     client::error::{ClientError as InnerClientError, HmcParseError},
 };
 use std::fmt::{self, Display};
@@ -11,9 +11,9 @@ pub enum ClientError {
     /// Error occurred during an IO operation.
     IOError(std::io::Error),
     /// Error occurred while parsing a string as URL.
-    URLParse(String, InvalidUri),
+    URLParse(String, ParseError),
     /// Error occurred while parsing an URL as HMC.
-    HmcParse(Uri, HmcParseError),
+    HmcParse(Url, HmcParseError),
     /// Error occurred in the Harmony client library.
     Internal(InnerClientError),
     /// The user is already logged in.

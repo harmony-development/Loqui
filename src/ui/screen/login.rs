@@ -9,7 +9,7 @@ use crate::{
 use harmony_rust_sdk::{
     api::{
         auth::{auth_step::Step, next_step_request::form_fields::Field},
-        exports::http::Uri,
+        exports::url::Url,
     },
     client::{
         api::auth::{AuthStep, AuthStepResponse},
@@ -230,7 +230,7 @@ impl LoginScreen {
                         .get("homeserver")
                         .map(|(_, homeserver, _)| homeserver.clone())
                     {
-                        return match homeserver.parse::<Uri>() {
+                        return match homeserver.parse::<Url>() {
                             Ok(uri) => {
                                 let content_store = content_store.clone();
                                 self.waiting = true;
