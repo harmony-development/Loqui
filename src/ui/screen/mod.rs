@@ -25,6 +25,7 @@ use harmony_rust_sdk::{
             event::{Event, GuildAddedToList, GuildUpdated, ProfileUpdated},
             GetGuildListRequest,
         },
+        exports::url::Url,
         harmonytypes::Override,
     },
     client::{
@@ -44,7 +45,12 @@ use harmony_rust_sdk::{
 };
 use iced::{executor, Application, Command, Element, Subscription};
 use iced_futures::BoxStream;
-use std::{hash::Hash, hash::Hasher, sync::Arc, time::Duration};
+use std::{
+    hash::Hash,
+    hash::Hasher,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
 
 #[derive(Debug)]
 pub enum Message {
@@ -264,7 +270,7 @@ impl Application for ScreenManager {
                     let session: Session = toml::de::from_slice(&session_raw)
                         .map_err(|_| ClientError::MissingLoginInfo)?;
                     Client::new(
-                        session.homeserver.parse().unwrap(),
+                        session.homeserver.parse::<Url>().unwrap(),
                         Some(session.into()),
                         content_store.clone(),
                     )
@@ -503,12 +509,12 @@ impl Application for ScreenManager {
             Message::Error(err) => {
                 log::error!("{}", err);
 
-                if let ClientError::Internal(InnerClientError::Grpc(status)) = err.as_ref() {
+                /*if let ClientError::Internal(InnerClientError::Grpc(status)) = err.as_ref() {
                     if status.message() == "invalid-session" {
                         self.screens
                             .clear(Screen::Login(LoginScreen::new(self.content_store.clone())));
                     }
-                }
+                }*/
 
                 return self.screens.current_mut().on_error(*err);
             }
@@ -519,7 +525,7 @@ impl Application for ScreenManager {
     fn subscription(&self) -> Subscription<Self::Message> {
         let mut sub = Subscription::none();
 
-        /*if let Some(client) = &self.client {
+        if let Some(client) = &self.client {
             if client.auth_status().is_authenticated()
                 && client.should_subscribe_to_events.load(Ordering::Relaxed)
             {
@@ -528,6 +534,8 @@ impl Application for ScreenManager {
                 let (tx, rx) = flume::unbounded();
 
                 tokio::task::spawn_blocking(|| async move {
+                    use iced::futures::StreamExt;
+
                     let mut events = inner.subscribe_events(sources).await.unwrap().0;
 
                     loop {
@@ -540,8 +548,8 @@ impl Application for ScreenManager {
                 sub = Subscription::batch(vec![
                     sub,
                     Subscription::from_recipe(SyncRecipe { chan: rx }).map(|result| match result {
-                        Ok(response) => Message::SyncResponse(response),
-                        Err(err) => Message::MatrixError(Box::new(err)),
+                        Ok(response) => Message::EventsReceived(vec![response]),
+                        Err(err) => Message::Error(Box::new(err)),
                     }),
                 ]);
 
@@ -549,7 +557,7 @@ impl Application for ScreenManager {
                     .should_subscribe_to_events
                     .store(false, Ordering::Relaxed);
             }
-        }*/
+        }
 
         sub
     }
