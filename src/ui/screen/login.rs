@@ -9,7 +9,7 @@ use crate::{
 use harmony_rust_sdk::{
     api::{
         auth::{auth_step::Step, next_step_request::form_fields::Field},
-        exports::url::Url,
+        exports::hrpc::url::Url,
     },
     client::{
         api::auth::{AuthStep, AuthStepResponse},
