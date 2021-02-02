@@ -1,5 +1,5 @@
 use harmony_rust_sdk::{
-    api::exports::url::{ParseError, Url},
+    api::exports::hrpc::url::{ParseError, Url},
     client::error::{ClientError as InnerClientError, HmcParseError},
 };
 use std::fmt::{self, Display};

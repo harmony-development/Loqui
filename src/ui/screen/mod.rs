@@ -25,7 +25,7 @@ use harmony_rust_sdk::{
             event::{Event, GuildAddedToList, GuildUpdated, ProfileUpdated},
             GetGuildListRequest,
         },
-        exports::url::Url,
+        exports::hrpc::url::Url,
         harmonytypes::Override,
     },
     client::{

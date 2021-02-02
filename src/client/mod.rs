@@ -10,7 +10,7 @@ pub mod message;
 use channel::Channel;
 use guild::Guild;
 pub use harmony_rust_sdk::{
-    api::exports::url::Url,
+    api::exports::hrpc::url::Url,
     client::{api::auth::Session as InnerSession, AuthStatus, Client as InnerClient},
 };
 use harmony_rust_sdk::{

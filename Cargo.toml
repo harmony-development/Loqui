@@ -29,7 +29,7 @@ iced_futures = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix"
 
 open = "1.4.0"
 infer = "0.3.4"
-rfd = "0.1.2"
+rfd = "0.2.0"
 image = "0.23.12"
 directories-next = "2.0.0"
 
@@ -42,6 +42,6 @@ indexmap = "1.6.1"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.5"
 chrono = "0.4.19"
-log = "0.4.11"
+log = "0.4.14"
 simplelog = "0.9.0"
 fuzzy-matcher = "0.3.7"
