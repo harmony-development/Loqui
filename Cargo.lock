@@ -1375,7 +1375,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=feat/hrpc#5c0c0b151d857fa88e77ce4981aa537ec0ef397a"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=feat/hrpc#79c919f221342178589f0193fc41a2697a3f3a64"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1385,7 +1385,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.3.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=feat/hrpc#5c0c0b151d857fa88e77ce4981aa537ec0ef397a"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=feat/hrpc#79c919f221342178589f0193fc41a2697a3f3a64"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1432,7 +1432,7 @@ dependencies = [
 [[package]]
 name = "hrpc"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/hrpc-rs.git#f4a54bd3a39e1c88071a348c40b0d8d5ba98a157"
+source = "git+https://github.com/harmony-development/hrpc-rs.git#8fef8bb9780ab979c771b6e006da5c410e6ed59c"
 dependencies = [
  "bytes",
  "futures-util",
@@ -1446,7 +1446,7 @@ dependencies = [
 [[package]]
 name = "hrpc-build"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/hrpc-rs.git#f4a54bd3a39e1c88071a348c40b0d8d5ba98a157"
+source = "git+https://github.com/harmony-development/hrpc-rs.git#8fef8bb9780ab979c771b6e006da5c410e6ed59c"
 dependencies = [
  "proc-macro2",
  "prost",
