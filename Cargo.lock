@@ -98,6 +98,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-tungstenite"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e00550829ef8e2c4115250d0ee43305649b0fa95f78a32ce5b07da0b73d95c5c"
+dependencies = [
+ "futures-io",
+ "futures-util",
+ "log",
+ "pin-project-lite",
+ "tokio",
+ "tokio-rustls",
+ "tungstenite",
+ "webpki-roots",
+]
+
+[[package]]
 name = "atk-sys"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1375,7 +1391,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=feat/hrpc#afa8d9bcf8e2a0ed9c317fde5d8f01ea59f267a1"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=feat/hrpc#7c34eb4a870beeda81528dc80c4610098a68aef2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1385,7 +1401,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.3.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=feat/hrpc#afa8d9bcf8e2a0ed9c317fde5d8f01ea59f267a1"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=feat/hrpc#7c34eb4a870beeda81528dc80c4610098a68aef2"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1432,21 +1448,22 @@ dependencies = [
 [[package]]
 name = "hrpc"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/hrpc-rs.git#9ab0d47845ec41e7854a78d246605ac06ee06a5c"
+source = "git+https://github.com/harmony-development/hrpc-rs.git#8af3323b05d33360c362256a4eb733dc3e5829bb"
 dependencies = [
+ "async-tungstenite",
  "bytes",
  "futures-util",
  "prost",
  "reqwest",
  "tokio",
- "tokio-tungstenite",
+ "tokio-rustls",
  "url",
 ]
 
 [[package]]
 name = "hrpc-build"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/hrpc-rs.git#9ab0d47845ec41e7854a78d246605ac06ee06a5c"
+source = "git+https://github.com/harmony-development/hrpc-rs.git#8af3323b05d33360c362256a4eb733dc3e5829bb"
 dependencies = [
  "proc-macro2",
  "prost",
@@ -3324,19 +3341,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-tungstenite"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1a5f475f1b9d077ea1017ecbc60890fda8e54942d680ca0b1d2b47cfa2d861b"
-dependencies = [
- "futures-util",
- "log",
- "pin-project 1.0.5",
- "tokio",
- "tungstenite",
-]
-
-[[package]]
 name = "tokio-util"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3737,6 +3741,15 @@ checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
 dependencies = [
  "ring",
  "untrusted",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82015b7e0b8bad8185994674a13a93306bea76cf5a16c5a181382fd3a5ec2376"
+dependencies = [
+ "webpki",
 ]
 
 [[package]]
