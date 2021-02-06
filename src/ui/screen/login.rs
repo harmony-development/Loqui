@@ -310,6 +310,7 @@ impl LoginScreen {
 
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
         self.waiting = false;
+        self.can_go_back = false;
         self.current_error = error.to_string();
         self.current_step = AuthPart::Homeserver;
         self.fields.clear();
