@@ -6,7 +6,8 @@ use ui::screen::ScreenManager;
 pub mod client;
 pub mod ui;
 
-pub fn main() {
+#[tokio::main]
+async fn main() {
     // Create the content store
     let content_store = ContentStore::default();
     content_store.create_req_dirs().unwrap();

@@ -21,7 +21,7 @@ lto = "thin"
 debug = false
 
 [dependencies]
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "feat/hrpc", features = ["client"] }
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", features = ["client"] }
 
 iced = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix", features = ["tokio", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
@@ -29,12 +29,12 @@ iced_futures = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix"
 
 open = "1.4.0"
 infer = "0.3.4"
-rfd = "0.2.0"
-image = "0.23.12"
+rfd = "0.2.1"
+image = "0.23.13"
 directories-next = "2.0.0"
 
-flume = "0.10.1"
-tokio = { version = "1.1", features = ["rt-multi-thread", "parking_lot", "time", "fs"] }
+async-mutex = "1.4.0"
+tokio = { version = "1.2.0", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
 uuid = { version = "0.8.2", features = ["v4"] }
 ahash = "0.7"
 indexmap = "1.6.1"
