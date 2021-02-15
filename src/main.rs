@@ -22,7 +22,11 @@ async fn main() {
         .build();
 
     let show_debug = std::env::args().nth(1).map_or(false, |s| s == "-d");
-    let show_trace = std::env::args().nth(1).map_or(false, |s| s == "-v");
+    let show_trace = if show_debug {
+        false
+    } else {
+        std::env::args().nth(1).map_or(false, |s| s == "-v")
+    };
     let filter_level = if show_trace {
         LevelFilter::Trace
     } else if show_debug {
@@ -43,6 +47,7 @@ async fn main() {
 
     let mut settings = Settings::with_flags(content_store);
     settings.window.size = (1280, 720);
+    settings.antialiasing = true;
 
     ScreenManager::run(settings).unwrap();
 }
