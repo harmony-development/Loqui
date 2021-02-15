@@ -30,12 +30,12 @@ use std::{
     fmt::{self, Debug, Formatter},
     path::PathBuf,
     str::FromStr,
-    sync::{atomic::AtomicBool, Arc},
+    sync::Arc,
 };
 
 use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
 
-use self::{content::MAX_THUMB_SIZE, guild::Guilds, message::Message};
+use self::{guild::Guilds, message::Message};
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
 #[derive(Clone, Deserialize, Serialize)]
@@ -77,7 +77,6 @@ pub struct Client {
     pub guilds: Guilds,
     pub members: Members,
     pub user_id: Option<u64>,
-    pub should_subscribe_to_events: AtomicBool,
     content_store: Arc<ContentStore>,
 }
 
@@ -106,7 +105,6 @@ impl Client {
             guilds: Guilds::new(),
             members: Members::new(),
             user_id: session.as_ref().map(|s| s.user_id),
-            should_subscribe_to_events: AtomicBool::new(false),
             content_store,
             inner: InnerClient::new(homeserver_url, session).await?,
         })

@@ -14,7 +14,7 @@ let
     categories = "Network;";
   };
 
-  meta = with pkgs.stdenv.lib; {
+  meta = with pkgs.lib; {
     description = "Crust is a Harmony client written in Rust.";
     longDescription = ''
       Crust is a Harmony client written in Rust using the iced GUI library.

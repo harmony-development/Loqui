@@ -18,7 +18,6 @@ use crate::{
     ui::style::Theme,
 };
 
-use flume::Receiver;
 use harmony_rust_sdk::{
     api::{
         chat::{
@@ -40,15 +39,15 @@ use harmony_rust_sdk::{
             harmonytypes::Message as HarmonyMessage,
             rest::FileId,
         },
-        error::ClientError as InnerClientError,
+        EventsSocket,
     },
 };
-use iced::{executor, Application, Command, Element, Subscription};
+use iced::{executor, futures, Application, Command, Element, Subscription};
 use iced_futures::BoxStream;
 use std::{
-    hash::Hash,
-    hash::Hasher,
-    sync::{atomic::Ordering, Arc},
+    cell::RefCell,
+    hash::{Hash, Hasher},
+    sync::Arc,
     time::Duration,
 };
 
@@ -68,6 +67,7 @@ pub enum Message {
         thumbnail: ImageHandle,
     },
     EventsReceived(Vec<Event>),
+    NewSocket(Box<EventsSocket>),
     GetEventsBackwardsResponse {
         messages: Vec<HarmonyMessage>,
         reached_top: bool,
@@ -163,6 +163,7 @@ pub struct ScreenManager {
     theme: Theme,
     screens: ScreenStack,
     client: Option<Client>,
+    socket: RefCell<Option<EventsSocket>>,
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
 }
@@ -172,6 +173,7 @@ impl ScreenManager {
         Self {
             theme: Theme::default(),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new(content_store.clone()))),
+            socket: None.into(),
             client: None,
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
@@ -334,6 +336,11 @@ impl Application for ScreenManager {
                     },
                 );
             }
+            Message::NewSocket(socket) => {
+                if self.client.is_some() {
+                    *self.socket.borrow_mut() = Some(*socket);
+                }
+            }
             Message::LoginComplete(maybe_client) => {
                 if let Some(client) = maybe_client {
                     self.client = Some(client); // This is the only place we set a main screen [tag:client_set_before_main_view]
@@ -469,13 +476,34 @@ impl Application for ScreenManager {
             }
             Message::EventsReceived(events) => {
                 if let Some(client) = self.client.as_mut() {
-                    let cmds = events
+                    let processed = events
                         .into_iter()
                         .flat_map(|event| client.process_event(event))
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<_>>();
+
+                    let mut cmds = Vec::with_capacity(processed.len());
+
+                    if processed
+                        .iter()
+                        .any(|post| matches!(post, PostProcessEvent::FetchGuildData(_)))
+                    {
+                        let sources = client.subscribe_to();
+                        let inner = client.inner().clone();
+                        cmds.push(Command::perform(
+                            async move { inner.subscribe_events(sources).await },
+                            |result| match result {
+                                Ok(socket) => Message::NewSocket(socket.into()),
+                                Err(err) => Message::Error(Box::new(err.into())),
+                            },
+                        ));
+                    }
+
+                    for cmd in processed
                         .into_iter()
                         .map(|post| self.process_post_event(post))
-                        .collect::<Vec<_>>();
+                    {
+                        cmds.push(cmd);
+                    }
 
                     return Command::batch(cmds);
                 }
@@ -525,37 +553,18 @@ impl Application for ScreenManager {
     fn subscription(&self) -> Subscription<Self::Message> {
         let mut sub = Subscription::none();
 
-        if let Some(client) = &self.client {
-            if client.auth_status().is_authenticated()
-                && client.should_subscribe_to_events.load(Ordering::Relaxed)
-            {
-                let sources = client.subscribe_to();
-                let inner = client.inner().clone();
-                let (tx, rx) = flume::unbounded();
-
-                tokio::task::spawn_blocking(|| async move {
-                    use iced::futures::StreamExt;
-
-                    let mut events = inner.subscribe_events(sources).await.unwrap().0;
-
-                    loop {
-                        if let Some(event) = events.next().await {
-                            tx.send(event.map_err(ClientError::Internal)).unwrap();
-                        }
-                    }
-                });
-
+        if self.client.is_some() {
+            if let Some(socket) = self.socket.borrow_mut().take() {
                 sub = Subscription::batch(vec![
                     sub,
-                    Subscription::from_recipe(SyncRecipe { chan: rx }).map(|result| match result {
-                        Ok(response) => Message::EventsReceived(vec![response]),
-                        Err(err) => Message::Error(Box::new(err)),
+                    Subscription::from_recipe(SyncRecipe { socket }).map(|result| match result {
+                        Some(result) => match result {
+                            Ok(response) => Message::EventsReceived(vec![response]),
+                            Err(err) => Message::Error(Box::new(err)),
+                        },
+                        None => Message::Nothing,
                     }),
                 ]);
-
-                client
-                    .should_subscribe_to_events
-                    .store(false, Ordering::Relaxed);
             }
         }
 
@@ -581,21 +590,25 @@ impl Application for ScreenManager {
 }
 
 pub struct SyncRecipe {
-    chan: Receiver<ClientResult<Event>>,
+    socket: EventsSocket,
 }
 
 impl<H, I> iced_futures::subscription::Recipe<H, I> for SyncRecipe
 where
     H: Hasher,
 {
-    type Output = ClientResult<Event>;
+    type Output = Option<ClientResult<Event>>;
 
     fn hash(&self, state: &mut H) {
         std::any::TypeId::of::<Self>().hash(state);
     }
 
     fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
-        Box::pin(self.chan.into_stream())
+        let events = futures::stream::unfold(self.socket, |mut socket| async move {
+            let event = socket.get_event().await;
+            Some((event.map(|r| r.map_err(Into::into)), socket))
+        });
+        Box::pin(events)
     }
 }
 
