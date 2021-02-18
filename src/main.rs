@@ -21,19 +21,13 @@ async fn main() {
         .add_filter_ignore_str("tracing")
         .build();
 
-    let show_debug = std::env::args().nth(1).map_or(false, |s| s == "-d");
-    let show_trace = if show_debug {
-        false
-    } else {
-        std::env::args().nth(1).map_or(false, |s| s == "-v")
-    };
-    let filter_level = if show_trace {
-        LevelFilter::Trace
-    } else if show_debug {
-        LevelFilter::Debug
-    } else {
-        LevelFilter::Info
-    };
+    let filter_level = std::env::args()
+        .nth(1)
+        .map_or(LevelFilter::Info, |s| match s.as_str() {
+            "-v" | "--verbose" => LevelFilter::Trace,
+            "-d" | "--debug" => LevelFilter::Debug,
+            _ => LevelFilter::Info,
+        });
 
     CombinedLogger::init(vec![
         TermLogger::new(filter_level, config.clone(), TerminalMode::Mixed),
