@@ -80,23 +80,25 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
 
     for ((guild_id, guild), button_state) in guilds.into_iter().zip(buttons_state.iter_mut()) {
         let content = fill_container(
-            match guild
+            guild
                 .picture
                 .as_ref()
                 .map(|guild_picture| thumbnail_cache.get_thumbnail(&guild_picture))
                 .flatten()
-            {
-                Some(handle) => Element::from(Image::new(handle.clone())),
-                None => Element::from(
-                    label!(guild
-                        .name
-                        .chars()
-                        .next()
-                        .unwrap_or('u')
-                        .to_ascii_uppercase())
-                    .size(30),
+                .map_or_else(
+                    || {
+                        Element::from(
+                            label!(guild
+                                .name
+                                .chars()
+                                .next()
+                                .unwrap_or('u')
+                                .to_ascii_uppercase())
+                            .size(30),
+                        )
+                    },
+                    |handle| Element::from(Image::new(handle.clone())),
                 ),
-            },
         );
 
         let mut but = Button::new(button_state, content)

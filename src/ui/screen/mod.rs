@@ -383,19 +383,20 @@ impl Application for ScreenManager {
                 guild_id,
                 channel_id,
             } => {
-                if let Some(channel) = self
+                if let Some(msg) = self
                     .client
                     .as_mut()
                     .map(|client| client.get_channel(guild_id, channel_id))
                     .flatten()
+                    .map(|channel| {
+                        channel
+                            .messages
+                            .iter_mut()
+                            .find(|msg| msg.id.transaction_id() == Some(transaction_id))
+                    })
+                    .flatten()
                 {
-                    if let Some(msg) = channel
-                        .messages
-                        .iter_mut()
-                        .find(|msg| msg.id.transaction_id() == Some(transaction_id))
-                    {
-                        msg.id = MessageId::Ack(message_id);
-                    }
+                    msg.id = MessageId::Ack(message_id);
                 }
             }
             Message::SendMessage {

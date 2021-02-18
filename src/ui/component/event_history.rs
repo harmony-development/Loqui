@@ -254,7 +254,6 @@ pub fn build_event_history<'a>(
             .into();
         let mut message_row = Vec::with_capacity(2);
 
-        // FIXME: doesnt work properly
         if is_sender_different || last_timestamp.minute() != message.timestamp.minute() {
             let message_timestamp = message.timestamp.format("%H:%M").to_string();
 

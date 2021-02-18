@@ -135,10 +135,7 @@ impl LoginScreen {
             }
         }
 
-        if matches!(
-            self.current_step,
-            AuthPart::Step(AuthType::Form) | AuthPart::Homeserver
-        ) {
+        if let AuthPart::Step(AuthType::Form) | AuthPart::Homeserver = self.current_step {
             widgets.push(
                 label_button!(&mut self.proceed, "Proceed")
                     .on_press(Message::Proceed)

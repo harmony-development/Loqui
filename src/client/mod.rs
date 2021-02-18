@@ -115,22 +115,27 @@ impl Client {
         Ok(())
     }
 
+    #[inline(always)]
     pub fn content_store(&self) -> &ContentStore {
         &self.content_store
     }
 
+    #[inline(always)]
     pub fn content_store_arc(&self) -> Arc<ContentStore> {
         self.content_store.clone()
     }
 
+    #[inline(always)]
     pub fn auth_status(&self) -> AuthStatus {
         self.inner.auth_status()
     }
 
+    #[inline(always)]
     pub fn inner(&self) -> &InnerClient {
         &self.inner
     }
 
+    #[inline(always)]
     pub fn get_guild(&mut self, guild_id: u64) -> Option<&mut Guild> {
         self.guilds.get_mut(&guild_id)
     }
@@ -141,6 +146,7 @@ impl Client {
             .flatten()
     }
 
+    #[inline(always)]
     pub fn get_member(&mut self, user_id: u64) -> Option<&mut Member> {
         self.members.get_mut(&user_id)
     }
