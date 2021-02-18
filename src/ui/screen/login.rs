@@ -57,21 +57,29 @@ pub struct LoginScreen {
 
 impl LoginScreen {
     pub fn new(content_store: Arc<ContentStore>) -> Self {
-        Self {
+        let mut screen = Self {
             content_store,
-            fields: {
-                let mut map = HashMap::with_capacity(2);
-                map.insert("homeserver".to_string(), Default::default());
-                map
-            },
-            choices: HashMap::new(),
+            fields: Default::default(),
+            choices: Default::default(),
             proceed: Default::default(),
             back: Default::default(),
             current_step: AuthPart::Homeserver,
             can_go_back: false,
             current_error: Default::default(),
             waiting: false,
-        }
+        };
+        screen.reset_to_first_step();
+        screen
+    }
+
+    pub fn reset_to_first_step(&mut self) {
+        self.waiting = false;
+        self.can_go_back = false;
+        self.current_step = AuthPart::Homeserver;
+        self.fields.clear();
+        self.choices.clear();
+        self.fields
+            .insert("homeserver".to_string(), Default::default());
     }
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
@@ -127,9 +135,10 @@ impl LoginScreen {
             }
         }
 
-        if matches!(self.current_step, AuthPart::Step(AuthType::Form))
-            || matches!(self.current_step, AuthPart::Homeserver)
-        {
+        if matches!(
+            self.current_step,
+            AuthPart::Step(AuthType::Form) | AuthPart::Homeserver
+        ) {
             widgets.push(
                 label_button!(&mut self.proceed, "Proceed")
                     .on_press(Message::Proceed)
@@ -279,6 +288,9 @@ impl LoginScreen {
                 }
                 None => {
                     self.waiting = true;
+                    // If these unwraps fail, then something is very wrong, so we abort here.
+                    // (How can there be no client, but we get authenticated?)
+                    // We *can* recover from here but it's not worth the effort
                     let auth_status = client.unwrap().auth_status();
                     let homeserver = client.unwrap().inner().homeserver_url().to_string();
                     let session_file = content_store.session_file().to_path_buf();
@@ -291,6 +303,7 @@ impl LoginScreen {
                                     user_id: session.user_id,
                                 };
 
+                                // This should never ever fail in our case, if it does something is very very very wrong
                                 let ser = toml::ser::to_vec(&session).unwrap();
                                 tokio::fs::write(session_file, ser).await
                             } else {
@@ -309,15 +322,8 @@ impl LoginScreen {
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
-        self.waiting = false;
-        self.can_go_back = false;
         self.current_error = error.to_string();
-        self.current_step = AuthPart::Homeserver;
-        self.fields.clear();
-        self.choices.clear();
-
-        self.fields
-            .insert("homeserver".to_string(), Default::default());
+        self.reset_to_first_step();
 
         Command::none()
     }
