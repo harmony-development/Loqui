@@ -65,9 +65,11 @@ impl Logout {
                     client.inner().clone(),
                     client.content_store().session_file().to_path_buf(),
                 ),
-                |result| match result {
-                    Ok(_) => super::Message::PopScreen,
-                    Err(err) => super::Message::Error(Box::new(err)),
+                |result| {
+                    result.map_or_else(
+                        |err| super::Message::Error(Box::new(err)),
+                        |_| super::Message::PopScreen,
+                    )
                 },
             )
         } else {

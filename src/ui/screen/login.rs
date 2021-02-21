@@ -180,9 +180,11 @@ impl LoginScreen {
             let inner = client.inner().clone();
             Command::perform(
                 async move { inner.next_auth_step(response).await },
-                |result| match result {
-                    Err(err) => super::Message::Error(Box::new(err.into())),
-                    Ok(step) => super::Message::LoginScreen(Message::AuthStep(step)),
+                |result| {
+                    result.map_or_else(
+                        |err| super::Message::Error(Box::new(err.into())),
+                        |step| super::Message::LoginScreen(Message::AuthStep(step)),
+                    )
                 },
             )
         }
@@ -199,9 +201,11 @@ impl LoginScreen {
                     let inner = client.inner().clone();
                     return Command::perform(
                         async move { inner.prev_auth_step().await },
-                        |result| match result {
-                            Ok(step) => super::Message::LoginScreen(Message::AuthStep(Some(step))),
-                            Err(err) => super::Message::Error(Box::new(err.into())),
+                        |result| {
+                            result.map_or_else(
+                                |err| super::Message::Error(Box::new(err.into())),
+                                |step| super::Message::LoginScreen(Message::AuthStep(Some(step))),
+                            )
                         },
                     );
                 }
@@ -241,10 +245,10 @@ impl LoginScreen {
                                 let content_store = content_store.clone();
                                 self.waiting = true;
                                 Command::perform(Client::new(uri, None, content_store), |result| {
-                                    match result {
-                                        Err(err) => super::Message::Error(Box::new(err)),
-                                        Ok(client) => super::Message::ClientCreated(client),
-                                    }
+                                    result.map_or_else(
+                                        |err| super::Message::Error(Box::new(err)),
+                                        super::Message::ClientCreated,
+                                    )
                                 })
                             }
                             Err(err) => {
@@ -302,15 +306,11 @@ impl LoginScreen {
 
                                 // This should never ever fail in our case, if it does something is very very very wrong
                                 let ser = toml::ser::to_vec(&session).unwrap();
-                                tokio::fs::write(session_file, ser).await
-                            } else {
-                                Ok(())
+                                tokio::fs::write(session_file, ser).await?;
                             }
+                            Ok(super::Message::LoginComplete(None))
                         },
-                        |result| match result {
-                            Ok(_) => super::Message::LoginComplete(None),
-                            Err(err) => super::Message::Error(Box::new(err.into())),
-                        },
+                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
                     );
                 }
             },

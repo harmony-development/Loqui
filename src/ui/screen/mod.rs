@@ -202,11 +202,13 @@ impl ScreenManager {
                                 update_avatar: true,
                                 update_username: true,
                             });
-                            Ok(event)
+                            Ok(vec![event])
                         },
-                        |result| match result {
-                            Ok(event) => Message::EventsReceived(vec![event]),
-                            Err(err) => Message::Error(Box::new(err)),
+                        |result| {
+                            result.map_or_else(
+                                |err| Message::Error(Box::new(err)),
+                                Message::EventsReceived,
+                            )
                         },
                     );
                 }
@@ -238,11 +240,13 @@ impl ScreenManager {
                                 update_picture: true,
                                 update_metadata: true,
                             });
-                            Ok(event)
+                            Ok(vec![event])
                         },
-                        |result| match result {
-                            Ok(event) => Message::EventsReceived(vec![event]),
-                            Err(err) => Message::Error(Box::new(err)),
+                        |result| {
+                            result.map_or_else(
+                                |err| Message::Error(Box::new(err)),
+                                Message::EventsReceived,
+                            )
                         },
                     );
                 }
@@ -278,9 +282,11 @@ impl Application for ScreenManager {
                     )
                     .await
                 },
-                |result| match result {
-                    Ok(client) => Message::LoginComplete(Some(client)),
-                    Err(err) => Message::Error(Box::new(err)),
+                |result| {
+                    result.map_or_else(
+                        |err| Message::Error(err.into()),
+                        |client| Message::LoginComplete(Some(client)),
+                    )
                 },
             )
         } else {
@@ -330,9 +336,11 @@ impl Application for ScreenManager {
                         inner.begin_auth().await?;
                         inner.next_auth_step(AuthStepResponse::Initial).await
                     },
-                    |result| match result {
-                        Ok(step) => Message::LoginScreen(login::Message::AuthStep(step)),
-                        Err(err) => Message::Error(Box::new(err.into())),
+                    |result| {
+                        result.map_or_else(
+                            |err| Message::Error(Box::new(err.into())),
+                            |step| Message::LoginScreen(login::Message::AuthStep(step)),
+                        )
                     },
                 );
             }
@@ -365,9 +373,11 @@ impl Application for ScreenManager {
                             .collect();
                         Ok(events)
                     },
-                    |result| match result {
-                        Err(err) => Message::Error(Box::new(err)),
-                        Ok(events) => Message::EventsReceived(events),
+                    |result| {
+                        result.map_or_else(
+                            |err| Message::Error(Box::new(err)),
+                            Message::EventsReceived,
+                        )
                     },
                 );
             }
@@ -495,9 +505,11 @@ impl Application for ScreenManager {
                         let inner = client.inner().clone();
                         cmds.push(Command::perform(
                             async move { inner.subscribe_events(sources).await },
-                            |result| match result {
-                                Ok(socket) => Message::NewSocket(socket.into()),
-                                Err(err) => Message::Error(Box::new(err.into())),
+                            |result| {
+                                result.map_or_else(
+                                    |err| Message::Error(Box::new(err.into())),
+                                    |socket| Message::NewSocket(socket.into()),
+                                )
                             },
                         ));
                     }
@@ -629,7 +641,10 @@ fn make_thumbnail_command(
         Command::perform(
             async move {
                 match tokio::fs::read(&content_path).await {
-                    Ok(raw) => Ok((thumbnail_url, ImageHandle::from_memory(raw))),
+                    Ok(raw) => Ok(Message::DownloadedThumbnail {
+                        thumbnail_url,
+                        thumbnail: ImageHandle::from_memory(raw),
+                    }),
                     Err(err) => {
                         log::warn!("couldn't read thumbnail from disk: {}", err);
                         let download_task = harmony_rust_sdk::client::api::rest::download(
@@ -638,26 +653,22 @@ fn make_thumbnail_command(
                         );
                         let resp = download_task.await?;
                         match resp.bytes().await {
-                            Ok(raw_data) => tokio::fs::write(content_path, &raw_data)
-                                .await
-                                .map(|_| {
-                                    (thumbnail_url, ImageHandle::from_memory(raw_data.to_vec()))
+                            Ok(raw_data) => {
+                                tokio::fs::write(content_path, &raw_data).await?;
+                                Ok(Message::DownloadedThumbnail {
+                                    thumbnail_url,
+                                    thumbnail: ImageHandle::from_memory(raw_data.to_vec()),
                                 })
-                                .map_err(Into::into),
-                            Err(err) => Err(err)
-                                .map_err(harmony_rust_sdk::client::error::ClientError::Reqwest)
-                                .map_err(Into::into),
+                            }
+                            Err(err) => {
+                                Err(harmony_rust_sdk::client::error::ClientError::Reqwest(err)
+                                    .into())
+                            }
                         }
                     }
                 }
             },
-            |result| match result {
-                Ok((thumbnail_id, thumbnail)) => Message::DownloadedThumbnail {
-                    thumbnail_url: thumbnail_id,
-                    thumbnail,
-                },
-                Err(err) => Message::Error(Box::new(err)),
-            },
+            |msg| msg.unwrap_or_else(|err| Message::Error(Box::new(err))),
         )
     } else {
         Command::none()

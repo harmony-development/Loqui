@@ -119,11 +119,15 @@ impl GuildDiscovery {
 
                 return Command::perform(
                     async move { guild::join_guild(&inner, invite).await },
-                    |result| match result {
-                        Ok(response) => {
-                            super::Message::GuildDiscovery(Message::JoinedRoom(response.guild_id))
-                        }
-                        Err(e) => super::Message::Error(Box::new(e.into())),
+                    |result| {
+                        result.map_or_else(
+                            |e| super::Message::Error(Box::new(e.into())),
+                            |response| {
+                                super::Message::GuildDiscovery(Message::JoinedRoom(
+                                    response.guild_id,
+                                ))
+                            },
+                        )
                     },
                 );
             }

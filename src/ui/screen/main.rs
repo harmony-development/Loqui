@@ -463,19 +463,17 @@ impl MainScreen {
                                                 .before_message(oldest_msg_id.unwrap_or_default()),
                                         )
                                         .await
-                                    },
-                                    move |result| match result {
-                                        Ok(response) => {
-                                            super::Message::GetEventsBackwardsResponse {
+                                        .map_or_else(
+                                            |err| super::Message::Error(Box::new(err.into())),
+                                            |response| super::Message::GetEventsBackwardsResponse {
                                                 messages: response.messages,
                                                 reached_top: response.reached_top,
                                                 guild_id,
                                                 channel_id,
-                                            }
-                                        }
-
-                                        Err(err) => super::Message::Error(Box::new(err.into())),
+                                            },
+                                        )
                                     },
+                                    |result| result,
                                 );
                             }
                         }
@@ -522,9 +520,11 @@ impl MainScreen {
                     let inner = client.inner().clone();
                     return Command::perform(
                         async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
-                        |result| match result {
-                            Ok(_) => super::Message::Nothing,
-                            Err(err) => super::Message::Error(Box::new(err.into())),
+                        |result| {
+                            result.map_or_else(
+                                |err| super::Message::Error(Box::new(err.into())),
+                                |_| super::Message::Nothing,
+                            )
                         },
                     );
                 }
@@ -548,27 +548,19 @@ impl MainScreen {
                 return if content_path.exists() {
                     Command::perform(
                         async move {
-                            let thumbnail = if is_thumbnail && !thumbnail_exists {
-                                tokio::fs::read(&content_path)
-                                    .await
-                                    .map_or(None, |data| Some((data, content_url)))
-                            } else {
-                                None
-                            };
+                            open::that_in_background(&content_path);
+                            Ok(if is_thumbnail && !thumbnail_exists {
+                                let data = tokio::fs::read(&content_path).await?;
 
-                            (content_path, thumbnail)
-                        },
-                        |(content_path, thumbnail)| {
-                            open::that_in_background(content_path);
-                            if let Some((data, thumbnail_url)) = thumbnail {
                                 super::Message::DownloadedThumbnail {
-                                    thumbnail_url,
+                                    thumbnail_url: content_url,
                                     thumbnail: ImageHandle::from_memory(data),
                                 }
                             } else {
                                 super::Message::Nothing
-                            }
+                            })
                         },
+                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
                     )
                 } else {
                     let inner = client.inner().clone();
@@ -583,29 +575,17 @@ impl MainScreen {
                                 .await
                                 .map_err(InnerClientError::Reqwest)?;
                             tokio::fs::write(&content_path, &raw_data).await?;
-                            Ok((
-                                content_path,
-                                if is_thumbnail && !thumbnail_exists {
-                                    Some((content_url, raw_data))
-                                } else {
-                                    None
-                                },
-                            ))
-                        },
-                        |result| match result {
-                            Ok((content_path, thumbnail)) => {
-                                open::that_in_background(content_path);
-                                if let Some((content_url, raw_data)) = thumbnail {
-                                    super::Message::DownloadedThumbnail {
-                                        thumbnail_url: content_url,
-                                        thumbnail: ImageHandle::from_memory(raw_data.to_vec()),
-                                    }
-                                } else {
-                                    super::Message::Nothing
+                            open::that_in_background(content_path);
+                            Ok(if is_thumbnail && !thumbnail_exists {
+                                super::Message::DownloadedThumbnail {
+                                    thumbnail_url: content_url,
+                                    thumbnail: ImageHandle::from_memory(raw_data.to_vec()),
                                 }
-                            }
-                            Err(err) => super::Message::Error(Box::new(err)),
+                            } else {
+                                super::Message::Nothing
+                            })
                         },
+                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
                     )
                 };
             }
@@ -621,14 +601,17 @@ impl MainScreen {
                     };
                     scroll_to_bottom(client, guild_id, channel_id);
                     self.event_history_state.scroll_to_bottom();
-                    return Command::perform(async move { message }, move |message| {
-                        super::Message::SendMessage {
-                            message,
-                            retry_after: Duration::from_secs(0),
-                            guild_id,
-                            channel_id,
-                        }
-                    });
+                    return Command::perform(
+                        async move {
+                            super::Message::SendMessage {
+                                message,
+                                retry_after: Duration::from_secs(0),
+                                guild_id,
+                                channel_id,
+                            }
+                        },
+                        |msg| msg,
+                    );
                 }
             }
             Message::SendFiles {
@@ -693,12 +676,9 @@ impl MainScreen {
                                 }
                             }
                         }
-                        Ok(ids)
-                    },
-                    move |result| match result {
-                        Ok(hmcs) => super::Message::SendMessage {
+                        Ok(super::Message::SendMessage {
                             message: IcyMessage {
-                                attachments: hmcs
+                                attachments: ids
                                     .into_iter()
                                     .map(|(id, kind, name, size)| Attachment {
                                         id,
@@ -713,9 +693,9 @@ impl MainScreen {
                             retry_after: Duration::from_secs(0),
                             guild_id,
                             channel_id,
-                        },
-                        Err(err) => super::Message::Error(Box::new(err)),
+                        })
                     },
+                    |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
                 );
             }
             Message::GuildChanged(guild_id) => {
@@ -753,9 +733,11 @@ impl MainScreen {
 
                             Ok(events)
                         },
-                        |result| match result {
-                            Ok(events) => super::Message::EventsReceived(events),
-                            Err(err) => super::Message::Error(Box::new(err)),
+                        |result| {
+                            result.map_or_else(
+                                |err| super::Message::Error(Box::new(err)),
+                                super::Message::EventsReceived,
+                            )
                         },
                     );
                 }
@@ -795,9 +777,11 @@ impl MainScreen {
                                     .collect();
                                 Ok(events)
                             },
-                            |result| match result {
-                                Ok(events) => super::Message::EventsReceived(events),
-                                Err(err) => super::Message::Error(Box::new(err)),
+                            |result| {
+                                result.map_or_else(
+                                    |err| super::Message::Error(Box::new(err)),
+                                    super::Message::EventsReceived,
+                                )
                             },
                         );
                     }
