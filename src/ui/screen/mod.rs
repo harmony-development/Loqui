@@ -457,12 +457,15 @@ impl Application for ScreenManager {
                                     channel_id,
                                     guild_id,
                                 },
-                                Err(_) => Message::SendMessage {
-                                    message,
-                                    retry_after: retry_after + Duration::from_secs(1),
-                                    channel_id,
-                                    guild_id,
-                                },
+                                Err(err) => {
+                                    log::error!("error occured when sending message: {}", err);
+                                    Message::SendMessage {
+                                        message,
+                                        retry_after: retry_after + Duration::from_secs(1),
+                                        channel_id,
+                                        guild_id,
+                                    }
+                                }
                             }
                         },
                         |retry| retry,
@@ -627,7 +630,8 @@ fn make_thumbnail_command(
             async move {
                 match tokio::fs::read(&content_path).await {
                     Ok(raw) => Ok((thumbnail_url, ImageHandle::from_memory(raw))),
-                    Err(_) => {
+                    Err(err) => {
+                        log::warn!("couldn't read thumbnail from disk: {}", err);
                         let download_task = harmony_rust_sdk::client::api::rest::download(
                             &inner,
                             thumbnail_url.clone(),
