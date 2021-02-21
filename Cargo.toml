@@ -15,10 +15,12 @@ incremental = true
 
 [profile.release]
 opt-level = 3
+lto = "thin"
 overflow-checks = false
 debug-assertions = false
-lto = "thin"
 debug = false
+codegen-units = 1
+panic = 'abort'
 
 [dependencies]
 harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client"] }
