@@ -149,13 +149,11 @@ impl ScreenStack {
 
     pub fn pop(&mut self) -> Option<Screen> {
         // There must at least one screen remain to ensure [tag:screenstack_cant_become_empty]
-        if self.stack.len() > 1 {
+        (self.stack.len() > 1).then(|| {
             let screen = self.stack.pop();
             log::debug!("Popping a screen {:?}", screen);
-            screen
-        } else {
-            None
-        }
+            screen.unwrap()
+        })
     }
 }
 
