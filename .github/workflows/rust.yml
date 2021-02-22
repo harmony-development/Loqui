@@ -77,3 +77,35 @@ jobs:
       with:
         name: build-win
         path: target/debug/crust.exe
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+
+    - name: Install rust
+      uses: actions-rs/toolchain@v1.0.6
+      with:
+        toolchain: 1.50.0
+        default: true
+        override: true
+        components: rustfmt,clippy
+
+    - name: Cache rust
+      uses: Swatinem/rust-cache@v1
+
+    - name: Clippy
+      uses: actions-rs/clippy-check@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: clippy-mac
+
+    - name: Build
+      run: cargo build
+    
+    - name: Artifact
+      uses: actions/upload-artifact@v2.2.2
+      with:
+        name: build-mac
+        path: target/debug/crust
