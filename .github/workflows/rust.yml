@@ -44,6 +44,12 @@ jobs:
 
     - name: Build
       run: cargo build
+    
+    - name: Artifact
+      uses: actions/upload-artifact@v2.2.2
+      with:
+        name: build-linux
+        path: target/debug/crust
 
   build-win:
     runs-on: windows-latest
@@ -65,3 +71,9 @@ jobs:
 
     - name: Build
       run: cargo build
+    
+    - name: Artifact
+      uses: actions/upload-artifact@v2.2.2
+      with:
+        name: build-win
+        path: target/debug/crust.exe
