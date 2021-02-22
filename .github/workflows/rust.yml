@@ -40,6 +40,7 @@ jobs:
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        name: clippy-linux
 
     - name: Build
       run: cargo build
@@ -60,6 +61,7 @@ jobs:
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        name: clippy-win
 
     - name: Build
       run: cargo build
