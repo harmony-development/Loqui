@@ -42,6 +42,7 @@ async fn main() {
     let mut settings = Settings::with_flags(content_store);
     settings.window.size = (1280, 720);
     settings.antialiasing = true;
+    settings.default_font = Some(include_bytes!("NotoSans-Regular.ttf"));
 
     ScreenManager::run(settings).unwrap();
 }
