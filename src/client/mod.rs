@@ -161,6 +161,7 @@ impl Client {
                 if let Some(message) = message_sent.message {
                     let guild_id = message.guild_id;
                     let channel_id = message.channel_id;
+                    let message_id = message.message_id;
 
                     if let Some(channel) = self.get_channel(guild_id, channel_id) {
                         let message = Message::from(message);
@@ -183,7 +184,13 @@ impl Client {
                         if let Some(msg) = channel
                             .messages
                             .iter_mut()
-                            .find(|message| message.id == MessageId::Unack(echo_id))
+                            .find(|omsg| omsg.id == MessageId::Unack(echo_id))
+                        {
+                            *msg = message;
+                        } else if let Some(msg) = channel
+                            .messages
+                            .iter_mut()
+                            .find(|omsg| omsg.id == MessageId::Ack(message_id))
                         {
                             *msg = message;
                         } else {
