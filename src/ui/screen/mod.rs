@@ -11,7 +11,7 @@ pub use main::MainScreen;
 use crate::{
     client::{
         content::{ContentStore, ImageHandle, ThumbnailCache},
-        error::{ClientError, ClientResult},
+        error::ClientError,
         message::{Message as IcyMessage, MessageId},
         Client, PostProcessEvent, Session,
     },
@@ -42,14 +42,8 @@ use harmony_rust_sdk::{
         EventsSocket,
     },
 };
-use iced::{executor, futures, Application, Command, Element, Subscription};
-use iced_futures::BoxStream;
-use std::{
-    cell::RefCell,
-    hash::{Hash, Hasher},
-    sync::Arc,
-    time::Duration,
-};
+use iced::{executor, Application, Command, Element, Subscription};
+use std::{sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum Message {
@@ -67,7 +61,11 @@ pub enum Message {
         thumbnail: ImageHandle,
     },
     EventsReceived(Vec<Event>),
-    NewSocket(Box<EventsSocket>),
+    SocketEvent {
+        socket: Box<EventsSocket>,
+        event: Option<harmony_rust_sdk::client::error::ClientResult<Event>>,
+        id: usize,
+    },
     GetEventsBackwardsResponse {
         messages: Vec<HarmonyMessage>,
         reached_top: bool,
@@ -161,7 +159,7 @@ pub struct ScreenManager {
     theme: Theme,
     screens: ScreenStack,
     client: Option<Client>,
-    socket: RefCell<Option<EventsSocket>>,
+    socket_id: usize,
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
 }
@@ -171,8 +169,8 @@ impl ScreenManager {
         Self {
             theme: Theme::default(),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new(content_store.clone()))),
-            socket: None.into(),
             client: None,
+            socket_id: 0,
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
         }
@@ -342,9 +340,39 @@ impl Application for ScreenManager {
                     },
                 );
             }
-            Message::NewSocket(socket) => {
+            Message::SocketEvent {
+                mut socket,
+                event,
+                id,
+            } => {
                 if self.client.is_some() {
-                    *self.socket.borrow_mut() = Some(*socket);
+                    let mut cmds = Vec::with_capacity(2);
+
+                    if let Some(ev) = event {
+                        let cmd = match ev {
+                            Ok(ev) => self.update(Message::EventsReceived(vec![ev])),
+                            Err(err) => self.update(Message::Error(Box::new(err.into()))),
+                        };
+                        cmds.push(cmd);
+                    }
+
+                    if self.socket_id == id {
+                        cmds.push(Command::perform(
+                            async move {
+                                let event = socket.get_event().await;
+                                Message::SocketEvent { socket, event, id }
+                            },
+                            |msg| msg,
+                        ));
+                    } else {
+                        log::warn!(
+                            "dropping event socket with id {} since our current id is {}",
+                            id,
+                            self.socket_id
+                        );
+                    }
+
+                    return Command::batch(cmds);
                 }
             }
             Message::LoginComplete(maybe_client) => {
@@ -501,14 +529,18 @@ impl Application for ScreenManager {
                     {
                         let sources = client.subscribe_to();
                         let inner = client.inner().clone();
+                        self.socket_id += 1;
+                        let id = self.socket_id;
                         cmds.push(Command::perform(
-                            async move { inner.subscribe_events(sources).await },
-                            |result| {
-                                result.map_or_else(
-                                    |err| Message::Error(Box::new(err.into())),
-                                    |socket| Message::NewSocket(socket.into()),
-                                )
+                            async move {
+                                let socket = inner.subscribe_events(sources.clone()).await?;
+                                Ok(Message::SocketEvent {
+                                    socket: socket.into(),
+                                    event: None,
+                                    id,
+                                })
                             },
+                            |result| result.unwrap_or_else(|err| Message::Error(Box::new(err))),
                         ));
                     }
 
@@ -549,14 +581,36 @@ impl Application for ScreenManager {
                 return Command::batch(cmds);
             }
             Message::Error(err) => {
-                log::error!("{}", err);
+                log::error!("\n{}\n{:?}", err, err);
 
-                /*if let ClientError::Internal(InnerClientError::Grpc(status)) = err.as_ref() {
-                    if status.message() == "invalid-session" {
+                if matches!(
+                    &*err,
+                    ClientError::Internal(harmony_rust_sdk::client::error::ClientError::Internal(
+                        harmony_rust_sdk::api::exports::hrpc::ClientError::SocketError(_)
+                    ))
+                ) {
+                    self.socket_id -= 1;
+                }
+
+                if let ClientError::Internal(
+                    harmony_rust_sdk::client::error::ClientError::Internal(
+                        harmony_rust_sdk::api::exports::hrpc::ClientError::EndpointError {
+                            raw_error,
+                            ..
+                        },
+                    ),
+                ) = err.as_ref()
+                {
+                    if raw_error
+                        .iter()
+                        .map(|b| *b as char)
+                        .collect::<String>()
+                        .contains("invalid-session")
+                    {
                         self.screens
                             .clear(Screen::Login(LoginScreen::new(self.content_store.clone())));
                     }
-                }*/
+                }
 
                 return self.screens.current_mut().on_error(*err);
             }
@@ -565,24 +619,7 @@ impl Application for ScreenManager {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        let mut sub = Subscription::none();
-
-        if self.client.is_some() {
-            if let Some(socket) = self.socket.borrow_mut().take() {
-                sub = Subscription::batch(vec![
-                    sub,
-                    Subscription::from_recipe(SyncRecipe { socket }).map(|result| match result {
-                        Some(result) => match result {
-                            Ok(response) => Message::EventsReceived(vec![response]),
-                            Err(err) => Message::Error(Box::new(err)),
-                        },
-                        None => Message::Nothing,
-                    }),
-                ]);
-            }
-        }
-
-        sub
+        Subscription::none()
     }
 
     fn view(&mut self) -> Element<Self::Message> {
@@ -600,29 +637,6 @@ impl Application for ScreenManager {
                 .view(self.theme, self.client.as_ref().unwrap()) // This will not panic cause [ref:client_set_before_main_view]
                 .map(Message::GuildDiscovery),
         }
-    }
-}
-
-pub struct SyncRecipe {
-    socket: EventsSocket,
-}
-
-impl<H, I> iced_futures::subscription::Recipe<H, I> for SyncRecipe
-where
-    H: Hasher,
-{
-    type Output = Option<ClientResult<Event>>;
-
-    fn hash(&self, state: &mut H) {
-        std::any::TypeId::of::<Self>().hash(state);
-    }
-
-    fn stream(self: Box<Self>, _input: BoxStream<I>) -> BoxStream<Self::Output> {
-        let events = futures::stream::unfold(self.socket, |mut socket| async move {
-            let event = socket.get_event().await;
-            Some((event.map(|r| r.map_err(Into::into)), socket))
-        });
-        Box::pin(events)
     }
 }
 
