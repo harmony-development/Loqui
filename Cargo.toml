@@ -47,3 +47,8 @@ chrono = "0.4.19"
 log = "0.4.14"
 simplelog = "0.9.0"
 fuzzy-matcher = "0.3.7"
+
+[dependencies.hrpc]
+version = "0.3"
+default-features = false
+features = ["client"]

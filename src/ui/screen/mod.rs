@@ -586,7 +586,7 @@ impl Application for ScreenManager {
                 if matches!(
                     &*err,
                     ClientError::Internal(harmony_rust_sdk::client::error::ClientError::Internal(
-                        harmony_rust_sdk::api::exports::hrpc::ClientError::SocketError(_)
+                        harmony_rust_sdk::api::exports::hrpc::client::ClientError::SocketError(_)
                     ))
                 ) {
                     self.socket_id -= 1;
@@ -594,7 +594,7 @@ impl Application for ScreenManager {
 
                 if let ClientError::Internal(
                     harmony_rust_sdk::client::error::ClientError::Internal(
-                        harmony_rust_sdk::api::exports::hrpc::ClientError::EndpointError {
+                        harmony_rust_sdk::api::exports::hrpc::client::ClientError::EndpointError {
                             raw_error,
                             ..
                         },
