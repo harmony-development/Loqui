@@ -7,6 +7,8 @@ use crate::{
     },
 };
 
+use iced::{tooltip::Position, Tooltip};
+
 /// Builds a room list.
 #[allow(clippy::clippy::too_many_arguments)]
 pub fn build_channel_list<'a, Message: Clone + 'a>(
@@ -109,7 +111,11 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
             but = but.on_press(on_button_press(*guild_id));
         }
 
-        guild_list = guild_list.push(but);
+        let tooltip = Tooltip::new(but, &guild.name, Position::Bottom)
+            .gap(8)
+            .style(theme.secondary());
+
+        guild_list = guild_list.push(tooltip);
     }
 
     guild_list.into()

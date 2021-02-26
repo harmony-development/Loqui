@@ -18,9 +18,9 @@ checksum = "d9fe5e32de01730eb1f6b7f5b51c17e03e2325bf40a74f754f04f130043affff"
 
 [[package]]
 name = "adler"
-version = "0.2.3"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee2a4ec343196209d6594e19543ae87a39f96d5534d7174822a3ad825dd6ed7e"
+checksum = "bedc89c5c7b5550ffb9372eb5c5ffc7f9f705cc3f4a128bd4669b9745f555093"
 
 [[package]]
 name = "adler32"
@@ -524,28 +524,26 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.2"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d60ab4a8dba064f2fbb5aa270c28da5cf4bbd0e72dae1140a6b0353a779dbe00"
+checksum = "2584f639eb95fea8c798496315b297cf81b9b58b6d30ab066a75455333cf4b12"
 dependencies = [
  "cfg-if 1.0.0",
  "crossbeam-utils",
  "lazy_static",
- "loom",
  "memoffset",
  "scopeguard",
 ]
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bae8f328835f8f5a6ceb6a7842a7f2d0c03692adb5c889347235d59194731fe3"
+checksum = "e7e9d99fa91428effe99c5c6d4634cdeba32b8cf784fc428a2a687f61a952c49"
 dependencies = [
  "autocfg",
  "cfg-if 1.0.0",
  "lazy_static",
- "loom",
 ]
 
 [[package]]
@@ -558,7 +556,6 @@ dependencies = [
  "directories-next",
  "fuzzy-matcher",
  "harmony_rust_sdk",
- "hrpc",
  "iced",
  "iced_futures",
  "iced_native",
@@ -1061,19 +1058,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generator"
-version = "0.6.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9fed24fd1e18827652b4d55652899a1e9da8e54d91624dc3437a5bc3a9f9a9c"
-dependencies = [
- "cc",
- "libc",
- "log",
- "rustversion",
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1404,7 +1388,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#8ccd7c0bcfda2ed623273711fe1f5741fa5f4eb1"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#d1dd268356de32cf63c0f57691b7405bf3ffbf45"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1413,8 +1397,8 @@ dependencies = [
 
 [[package]]
 name = "harmony_rust_sdk"
-version = "0.4.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#8ccd7c0bcfda2ed623273711fe1f5741fa5f4eb1"
+version = "0.4.1"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#d1dd268356de32cf63c0f57691b7405bf3ffbf45"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1458,9 +1442,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4b830025c885c0fa4864da7310d779b80ce5ba16ed76c06f4679854cb8a49a2"
+checksum = "3dbadff9ce6de69acf8bdfb53d666fc60ba57747ffad552db6da171bca30a0b5"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1476,9 +1460,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc-build"
-version = "0.2.3"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73437cf6df3d806863ff34c02d15251b4ac72517419d1dc3d6f87661da996f38"
+checksum = "d883876ed4002502cf0e90f1a34205362ef41bd374a7ee9fefb717faf6b494b6"
 dependencies = [
  "proc-macro2",
  "prost",
@@ -1562,7 +1546,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1575,12 +1559,12 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 
 [[package]]
 name = "iced_futures"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 dependencies = [
  "futures",
  "log",
@@ -1591,7 +1575,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 dependencies = [
  "bytemuck",
  "font-kit",
@@ -1605,7 +1589,7 @@ dependencies = [
 [[package]]
 name = "iced_native"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1617,7 +1601,7 @@ dependencies = [
 [[package]]
 name = "iced_style"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 dependencies = [
  "iced_core",
 ]
@@ -1625,7 +1609,7 @@ dependencies = [
 [[package]]
 name = "iced_web"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 dependencies = [
  "dodrio",
  "iced_core",
@@ -1641,7 +1625,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 dependencies = [
  "bytemuck",
  "futures",
@@ -1659,7 +1643,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#8db31c442e6b1c307b963f93a871a6a9e7b1757a"
 dependencies = [
  "iced_futures",
  "iced_graphics",
@@ -1879,17 +1863,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3bd0dd2cd90571056fdb71f6275fada10131182f84899f4b2a916e565d81d86"
 
 [[package]]
-name = "loom"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d44c73b4636e497b4917eb21c33539efa3816741a2d3ff26c6316f1b529481a4"
-dependencies = [
- "cfg-if 1.0.0",
- "generator",
- "scoped-tls",
-]
-
-[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1975,9 +1948,9 @@ dependencies = [
 
 [[package]]
 name = "miniz_oxide"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f2d26ec3309788e423cfbf68ad1800f061638098d76a83681af979dc4eda19d"
+checksum = "a92518e98c078586bc6c934028adcca4c92a53d6a958196de835170a01d84e4b"
 dependencies = [
  "adler",
  "autocfg",
@@ -2872,12 +2845,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustversion"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb5d2a036dc6d2d8fd16fde3498b04306e29bd193bf306a57427019b823d5acd"
-
-[[package]]
 name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2932,9 +2899,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6af1b6204f89cf0069736daf8b852573e3bc34898eee600e95d3dd855c12e81"
+checksum = "2dfd318104249865096c8da1dfabf09ddbb6d0330ea176812a62ec75e40c4166"
 dependencies = [
  "bitflags",
  "core-foundation 0.9.1",
@@ -2945,9 +2912,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework-sys"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31531d257baab426203cf81c5ce1b0b55159dda7ed602ac81b582ccd62265741"
+checksum = "dee48cdde5ed250b0d3252818f646e174ab414036edb884dde62d80a3ac6082d"
 dependencies = [
  "core-foundation-sys 0.8.2",
  "libc",
@@ -2990,9 +2957,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.62"
+version = "1.0.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea1c6153794552ea7cf7cf63b1231a25de00ec90db326ba6264440fa08e31486"
+checksum = "43535db9747a4ba938c0ce0a98cc631a46ebf943c9e1d604e091df6007620bf6"
 dependencies = [
  "itoa",
  "ryu",
@@ -3289,7 +3256,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a53f4706d65497df0c4349241deddf35f84cee19c87ed86ea8ca590f4464437"
 dependencies = [
  "jpeg-decoder",
- "miniz_oxide 0.4.3",
+ "miniz_oxide 0.4.4",
  "weezl",
 ]
 
