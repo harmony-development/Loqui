@@ -42,7 +42,7 @@ pub enum Message {
 
 #[derive(Debug)]
 pub struct LoginScreen {
-    fields: HashMap<String, (text_input::State, String, String)>,
+    fields: Vec<(String, (text_input::State, String, String))>,
     choices: HashMap<String, button::State>,
     proceed: button::State,
     back: button::State,
@@ -79,7 +79,7 @@ impl LoginScreen {
         self.fields.clear();
         self.choices.clear();
         self.fields
-            .insert("homeserver".to_string(), Default::default());
+            .push(("homeserver".to_string(), Default::default()));
     }
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
@@ -105,9 +105,7 @@ impl LoginScreen {
         }
 
         if !self.fields.is_empty() {
-            let mut sorted_fields = self.fields.iter_mut().collect::<Vec<_>>();
-            sorted_fields.sort_unstable_by_key(|(name, _)| name.as_str());
-            for (name, (state, value, r#type)) in sorted_fields {
+            for (name, (state, value, r#type)) in self.fields.iter_mut() {
                 let namee = name.clone();
                 let mut input = TextInput::new(state, name, value, move |new| {
                     Message::FieldChanged(namee.clone(), new)
@@ -191,8 +189,10 @@ impl LoginScreen {
 
         match msg {
             Message::FieldChanged(field, value) => {
-                if let Some((_, val, _)) = self.fields.get_mut(&field) {
-                    *val = value;
+                if let Some(index) = self.fields.iter().position(|(key, _)| key == &field) {
+                    if let Some((_, (_, val, _))) = self.fields.get_mut(index) {
+                        *val = value;
+                    }
                 }
             }
             Message::GoBack => {
@@ -235,26 +235,32 @@ impl LoginScreen {
                     };
                     return respond(self, client, response);
                 } else if let AuthPart::Homeserver = &self.current_step {
-                    if let Some(homeserver) = self
-                        .fields
-                        .get("homeserver")
-                        .map(|(_, homeserver, _)| homeserver.clone())
+                    if let Some(index) = self.fields.iter().position(|(key, _)| key == "homeserver")
                     {
-                        return match homeserver.parse::<Url>() {
-                            Ok(uri) => {
-                                let content_store = content_store.clone();
-                                self.waiting = true;
-                                Command::perform(Client::new(uri, None, content_store), |result| {
-                                    result.map_or_else(
-                                        |err| super::Message::Error(Box::new(err)),
-                                        super::Message::ClientCreated,
+                        if let Some(homeserver) = self
+                            .fields
+                            .get(index)
+                            .map(|(_, (_, homeserver, _))| homeserver.clone())
+                        {
+                            return match homeserver.parse::<Url>() {
+                                Ok(uri) => {
+                                    let content_store = content_store.clone();
+                                    self.waiting = true;
+                                    Command::perform(
+                                        Client::new(uri, None, content_store),
+                                        |result| {
+                                            result.map_or_else(
+                                                |err| super::Message::Error(Box::new(err)),
+                                                super::Message::ClientCreated,
+                                            )
+                                        },
                                     )
-                                })
-                            }
-                            Err(err) => {
-                                self.on_error(ClientError::URLParse(homeserver.clone(), err))
-                            }
-                        };
+                                }
+                                Err(err) => {
+                                    self.on_error(ClientError::URLParse(homeserver.clone(), err))
+                                }
+                            };
+                        }
                     }
                 }
             }
@@ -276,10 +282,10 @@ impl LoginScreen {
                             }
                             Step::Form(form) => {
                                 for field in form.fields {
-                                    self.fields.insert(
+                                    self.fields.push((
                                         field.name,
                                         (Default::default(), Default::default(), field.r#type),
-                                    );
+                                    ));
                                 }
                                 self.current_step = AuthPart::Step(AuthType::Form);
                             }
