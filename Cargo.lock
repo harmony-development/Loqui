@@ -1396,7 +1396,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#19c0b29a2b95cac5ae9daa5fee8b06d7f5a6c713"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#f66414139827a4aa31893ec10425d0d815a6fc0d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1405,8 +1405,8 @@ dependencies = [
 
 [[package]]
 name = "harmony_rust_sdk"
-version = "0.4.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#19c0b29a2b95cac5ae9daa5fee8b06d7f5a6c713"
+version = "0.5.0"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#f66414139827a4aa31893ec10425d0d815a6fc0d"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1450,9 +1450,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "198cb57c9fae0aa54e5272457af163534ddf73b48bcb6146f64611c0887faa96"
+checksum = "91a3cba5f5eebde023bf87e04bb069c8d8457374fbbaa6a692b9413c6eba1502"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1469,9 +1469,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc-build"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "273e0aa104f232dde40ba7b4fb0b77c435a947903ef9cc1a294e553a0e0f4aa1"
+checksum = "24444e8c30d64118479132c9a7df9edb0f4f05bc355610bd133db504668b2287"
 dependencies = [
  "proc-macro2",
  "prost",
@@ -2298,10 +2298,11 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "open"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c283bf0114efea9e42f1a60edea9859e8c47528eae09d01df4b29c1e489cc48"
+checksum = "8e288ead50d896dde82f3c18b64e40a2bf3e941225aa5c6b35a3e8e7b6b21d6f"
 dependencies = [
+ "which",
  "winapi 0.3.9",
 ]
 
@@ -2976,9 +2977,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.63"
+version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43535db9747a4ba938c0ce0a98cc631a46ebf943c9e1d604e091df6007620bf6"
+checksum = "799e97dc9fdae36a5c8b8f2cae9ce2ee9fdce2058c57a93e6099d919fd982f79"
 dependencies = [
  "itoa",
  "ryu",
