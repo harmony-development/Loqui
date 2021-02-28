@@ -59,7 +59,7 @@ impl Display for ClientError {
                 write!(fmt, "Could not parse string '{}' as URL: {}", string, err)
             }
             ClientError::Internal(err) => {
-                write!(fmt, "An internal error occurred: {}", err)
+                write!(fmt, "{}", err)
             }
             ClientError::IOError(err) => write!(fmt, "An IO error occurred: {}", err),
             ClientError::AlreadyLoggedIn => write!(fmt, "Already logged in with another user."),
