@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, time::Duration};
+use std::{
+    cmp::Ordering,
+    time::{Duration, Instant},
+};
 
 use crate::{
     client::{
@@ -294,7 +297,9 @@ impl MainScreen {
                             return None;
                         }
 
-                        if member.typing_in_channel == Some(channel_id) {
+                        if member.typing_in_channel.map(|(g, c, _)| (g, c))
+                            == Some((guild_id, channel_id))
+                        {
                             Some(member.username.as_str())
                         } else {
                             None
@@ -514,19 +519,31 @@ impl MainScreen {
             Message::ComposerMessageChanged(new_msg) => {
                 self.message = new_msg;
 
-                if let (Some(guild_id), Some(channel_id)) =
-                    (self.current_guild_id, self.current_channel_id)
-                {
-                    let inner = client.inner().clone();
-                    return Command::perform(
-                        async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
-                        |result| {
-                            result.map_or_else(
-                                |err| super::Message::Error(Box::new(err.into())),
-                                |_| super::Message::Nothing,
-                            )
-                        },
-                    );
+                if let (Some(guild_id), Some(channel_id), Some(typing)) = (
+                    self.current_guild_id,
+                    self.current_channel_id,
+                    client
+                        .user_id
+                        .map(|id| client.get_member(id))
+                        .flatten()
+                        .map(|member| &mut member.typing_in_channel),
+                ) {
+                    if Some((guild_id, channel_id)) != typing.map(|(g, c, _)| (g, c))
+                        || typing.map_or(false, |(_, _, since)| since.elapsed().as_secs() >= 5)
+                    {
+                        *typing = Some((guild_id, channel_id, Instant::now()));
+                        log::info!("sending typing");
+                        let inner = client.inner().clone();
+                        return Command::perform(
+                            async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
+                            |result| {
+                                result.map_or_else(
+                                    |err| super::Message::Error(Box::new(err.into())),
+                                    |_| super::Message::Nothing,
+                                )
+                            },
+                        );
+                    }
                 }
             }
             Message::ScrollToBottom(sent_channel_id) => {

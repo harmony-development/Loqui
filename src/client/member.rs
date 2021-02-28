@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use ahash::AHashMap;
 use harmony_rust_sdk::{api::harmonytypes::UserStatus, client::api::rest::FileId};
 
@@ -8,7 +10,7 @@ pub struct Member {
     pub avatar_url: Option<FileId>,
     pub username: String,
     pub display_user: bool,
-    pub typing_in_channel: Option<u64>,
+    pub typing_in_channel: Option<(u64, u64, Instant)>,
     pub status: UserStatus,
 }
 

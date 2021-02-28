@@ -31,6 +31,7 @@ use std::{
     path::PathBuf,
     str::FromStr,
     sync::Arc,
+    time::Instant,
 };
 
 use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
@@ -315,11 +316,12 @@ impl Client {
                 }
             }
             Event::Typing(typing) => {
+                let guild_id = typing.guild_id;
                 let channel_id = typing.channel_id;
                 let user_id = typing.user_id;
 
                 if let Some(member) = self.get_member(user_id) {
-                    member.typing_in_channel = Some(channel_id);
+                    member.typing_in_channel = Some((guild_id, channel_id, Instant::now()));
                 }
             }
             Event::JoinedMember(member_joined) => {
