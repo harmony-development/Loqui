@@ -111,4 +111,4 @@ jobs:
       uses: actions/upload-artifact@v2.2.2
       with:
         name: build-mac
-        path: target/debug/Crust.app
+        path: target/debug/bundle/osx/Crust.app
