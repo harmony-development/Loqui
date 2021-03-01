@@ -7,7 +7,6 @@ edition = "2018"
 [package.metadata.bundle]
 name = "Crust"
 identifier = "nodomain.yusdacra.crust"
-category = "Harmony Client"
 short_description = "Rust client for the Harmony protocol."
 
 [profile.dev]
