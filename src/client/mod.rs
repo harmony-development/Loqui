@@ -432,9 +432,12 @@ impl Client {
     }
 
     pub fn subscribe_to(&self) -> Vec<EventSource> {
-        self.guilds
+        let mut subs = self
+            .guilds
             .keys()
             .map(|guild_id| EventSource::Guild(*guild_id))
-            .collect()
+            .collect::<Vec<_>>();
+        subs.push(EventSource::Homeserver);
+        subs
     }
 }

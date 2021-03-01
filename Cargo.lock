@@ -1396,7 +1396,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#e234ab63efa7fa109a45d3c844eee35ec219373f"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#f49998aebdba89638cf5ac4828e87db2b461fad9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1406,7 +1406,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.5.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#e234ab63efa7fa109a45d3c844eee35ec219373f"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#f49998aebdba89638cf5ac4828e87db2b461fad9"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1450,9 +1450,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.6.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91a3cba5f5eebde023bf87e04bb069c8d8457374fbbaa6a692b9413c6eba1502"
+checksum = "7fc736346b9ad80d048afcb79318be8124c3be7df390d0620dabbc37cd827205"
 dependencies = [
  "async-trait",
  "async-tungstenite",

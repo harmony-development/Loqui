@@ -1,8 +1,10 @@
+pub mod create_channel;
 pub mod guild_discovery;
 pub mod login;
 pub mod logout;
 pub mod main;
 
+pub use create_channel::ChannelCreation;
 pub use guild_discovery::GuildDiscovery;
 use iced_futures::subscription::Recipe;
 pub use login::LoginScreen;
@@ -35,7 +37,7 @@ use harmony_rust_sdk::{
                 guild::{get_guild, get_guild_list},
                 message::{SendMessage, SendMessageSelfBuilder},
                 profile::get_user,
-                GuildId, UserId,
+                EventSource, GuildId, UserId,
             },
             harmonytypes::Message as HarmonyMessage,
             rest::FileId,
@@ -56,6 +58,7 @@ pub enum Message {
     LogoutScreen(logout::Message),
     MainScreen(main::Message),
     GuildDiscovery(guild_discovery::Message),
+    ChannelCreation(create_channel::Message),
     PopScreen,
     PushScreen(Box<Screen>),
     LoginComplete(Option<Client>),
@@ -70,7 +73,6 @@ pub enum Message {
     SocketEvent {
         socket: Box<EventsSocket>,
         event: Option<harmony_rust_sdk::client::error::ClientResult<Event>>,
-        id: usize,
     },
     GetEventsBackwardsResponse {
         messages: Vec<HarmonyMessage>,
@@ -100,6 +102,7 @@ pub enum Screen {
     Login(LoginScreen),
     Main(Box<MainScreen>),
     GuildDiscovery(GuildDiscovery),
+    ChannelCreation(ChannelCreation),
 }
 
 impl Screen {
@@ -107,6 +110,8 @@ impl Screen {
         match self {
             Screen::Login(screen) => screen.on_error(error),
             Screen::Logout(screen) => screen.on_error(error),
+            Screen::GuildDiscovery(screen) => screen.on_error(error),
+            Screen::ChannelCreation(screen) => screen.on_error(error),
             _ => Command::none(),
         }
     }
@@ -165,9 +170,9 @@ pub struct ScreenManager {
     theme: Theme,
     screens: ScreenStack,
     client: Option<Client>,
-    socket_id: usize,
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
+    sources_to_add: Vec<EventSource>,
 }
 
 impl ScreenManager {
@@ -176,9 +181,9 @@ impl ScreenManager {
             theme: Theme::default(),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new(content_store.clone()))),
             client: None,
-            socket_id: 0,
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
+            sources_to_add: vec![],
         }
     }
 
@@ -330,6 +335,13 @@ impl Application for ScreenManager {
                     return screen.update(msg, client);
                 }
             }
+            Message::ChannelCreation(msg) => {
+                if let (Screen::ChannelCreation(screen), Some(client)) =
+                    (self.screens.current_mut(), &self.client)
+                {
+                    return screen.update(msg, client);
+                }
+            }
             Message::ClientCreated(client) => {
                 self.client = Some(client);
                 let inner = self.client.as_ref().unwrap().inner().clone();
@@ -346,11 +358,7 @@ impl Application for ScreenManager {
                     },
                 );
             }
-            Message::SocketEvent {
-                mut socket,
-                event,
-                id,
-            } => {
+            Message::SocketEvent { mut socket, event } => {
                 if self.client.is_some() {
                     let mut cmds = Vec::with_capacity(2);
 
@@ -362,21 +370,19 @@ impl Application for ScreenManager {
                         cmds.push(cmd);
                     }
 
-                    if self.socket_id == id {
-                        cmds.push(Command::perform(
-                            async move {
-                                let event = socket.get_event().await;
-                                Message::SocketEvent { socket, event, id }
-                            },
-                            |msg| msg,
-                        ));
-                    } else {
-                        log::warn!(
-                            "dropping event socket with id {} since our current id is {}",
-                            id,
-                            self.socket_id
-                        );
-                    }
+                    let subs = self.sources_to_add.drain(..).collect::<Vec<_>>();
+                    cmds.push(Command::perform(
+                        async move {
+                            for sub in subs {
+                                if let Err(err) = socket.add_source(sub).await {
+                                    log::error!("can't sub to source: {}", err);
+                                }
+                            }
+                            let event = socket.get_event().await;
+                            Message::SocketEvent { socket, event }
+                        },
+                        |msg| msg,
+                    ));
 
                     return Command::batch(cmds);
                 }
@@ -389,12 +395,28 @@ impl Application for ScreenManager {
                     .push(Screen::Main(Box::new(MainScreen::default())));
 
                 let client = self.client.as_mut().unwrap();
+                let sources = client.subscribe_to();
+                let inner = client.inner().clone();
+                let ws_cmd = Command::perform(
+                    async move { inner.subscribe_events(sources).await },
+                    |result| {
+                        result.map_or_else(
+                            |err| Message::Error(Box::new(err.into())),
+                            |socket| Message::SocketEvent {
+                                socket: socket.into(),
+                                event: None,
+                            },
+                        )
+                    },
+                );
                 let inner = client.inner().clone();
                 client.user_id = Some(inner.auth_status().session().unwrap().user_id);
-                return Command::perform(
+                let self_id = client.user_id.unwrap();
+                let init = Command::perform(
                     async move {
+                        let self_profile = get_user(&inner, UserId::new(self_id)).await?;
                         let guilds = get_guild_list(&inner, GetGuildListRequest {}).await?.guilds;
-                        let events = guilds
+                        let mut events = guilds
                             .into_iter()
                             .map(|guild| {
                                 Event::GuildAddedToList(GuildAddedToList {
@@ -402,7 +424,18 @@ impl Application for ScreenManager {
                                     homeserver: guild.host,
                                 })
                             })
-                            .collect();
+                            .collect::<Vec<_>>();
+                        events.push(Event::ProfileUpdated(ProfileUpdated {
+                            update_avatar: true,
+                            update_is_bot: true,
+                            update_status: true,
+                            update_username: true,
+                            is_bot: self_profile.is_bot,
+                            new_avatar: self_profile.user_avatar,
+                            new_status: self_profile.user_status,
+                            new_username: self_profile.user_name,
+                            user_id: self_id,
+                        }));
                         Ok(events)
                     },
                     |result| {
@@ -412,6 +445,7 @@ impl Application for ScreenManager {
                         )
                     },
                 );
+                return Command::batch(vec![ws_cmd, init]);
             }
             Message::PopScreen => {
                 self.screens.pop();
@@ -542,25 +576,14 @@ impl Application for ScreenManager {
 
                     let mut cmds = Vec::with_capacity(processed.len());
 
-                    if processed
-                        .iter()
-                        .any(|post| matches!(post, PostProcessEvent::FetchGuildData(_)))
-                    {
-                        let sources = client.subscribe_to();
-                        let inner = client.inner().clone();
-                        self.socket_id += 1;
-                        let id = self.socket_id;
-                        cmds.push(Command::perform(
-                            async move {
-                                let socket = inner.subscribe_events(sources.clone()).await?;
-                                Ok(Message::SocketEvent {
-                                    socket: socket.into(),
-                                    event: None,
-                                    id,
-                                })
-                            },
-                            |result| result.unwrap_or_else(|err| Message::Error(Box::new(err))),
-                        ));
+                    for sub in processed.iter().flat_map(|post| {
+                        if let PostProcessEvent::FetchGuildData(id) = post {
+                            Some(EventSource::Guild(*id))
+                        } else {
+                            None
+                        }
+                    }) {
+                        self.sources_to_add.push(sub);
                     }
 
                     for cmd in processed
@@ -607,9 +630,7 @@ impl Application for ScreenManager {
                     ClientError::Internal(harmony_rust_sdk::client::error::ClientError::Internal(
                         harmony_rust_sdk::api::exports::hrpc::client::ClientError::SocketError(_)
                     ))
-                ) {
-                    self.socket_id -= 1;
-                }
+                ) {}
 
                 if let ClientError::Internal(
                     harmony_rust_sdk::client::error::ClientError::Internal(
@@ -666,6 +687,9 @@ impl Application for ScreenManager {
             Screen::GuildDiscovery(screen) => screen
                 .view(self.theme, self.client.as_ref().unwrap()) // This will not panic cause [ref:client_set_before_main_view]
                 .map(Message::GuildDiscovery),
+            Screen::ChannelCreation(screen) => screen
+                .view(self.theme, self.client.as_ref().unwrap()) // This will not panic cause [ref:client_set_before_main_view]
+                .map(Message::ChannelCreation),
         }
     }
 }

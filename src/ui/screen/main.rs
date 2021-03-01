@@ -66,6 +66,7 @@ pub enum Message {
     },
     /// Sent when the user selects an option from the bottom menu.
     SelectedMenuOption(String),
+    SelectedChannelMenuOption(String),
     SelectedMember(u64),
 }
 
@@ -79,6 +80,7 @@ pub struct MainScreen {
     scroll_to_bottom_but_state: button::State,
 
     // Room area state
+    channel_menu_state: pick_list::State<String>,
     menu_state: pick_list::State<String>,
     guilds_list_state: scrollable::State,
     guilds_buts_state: Vec<button::State>,
@@ -130,32 +132,32 @@ impl MainScreen {
             .style(theme)
             .into()];
 
+        let current_user_id = client.user_id.unwrap();
+        let current_username = client
+            .members
+            .get(&current_user_id)
+            .map_or_else(|| String::from("unknown"), |member| member.username.clone());
+
+        // TODO: show user avatar next to name
+        let menu = PickList::new(
+            &mut self.menu_state,
+            vec![
+                current_username.clone(),
+                "Join / Create a Guild".to_string(),
+                "Logout".to_string(),
+            ],
+            Some(current_username),
+            Message::SelectedMenuOption,
+        )
+        .width(length!(+))
+        .style(theme);
+
         if let Some((guild, guild_id)) = self
             .current_guild_id
             .as_ref()
             .map(|id| Some((guilds.get(id)?, *id)))
             .flatten()
         {
-            let current_user_id = client.user_id.unwrap();
-            let current_username = client
-                .members
-                .get(&current_user_id)
-                .map_or_else(|| String::from("unknown"), |member| member.username.clone());
-
-            // TODO: show user avatar next to name
-            let menu = PickList::new(
-                &mut self.menu_state,
-                vec![
-                    current_username.clone(),
-                    "Join Room".to_string(),
-                    "Logout".to_string(),
-                ],
-                Some(current_username),
-                Message::SelectedMenuOption,
-            )
-            .width(length!(+))
-            .style(theme);
-
             self.members_buts_state
                 .resize_with(guild.members.len(), Default::default);
 
@@ -228,11 +230,21 @@ impl MainScreen {
                 );
             }
 
+            // TODO: show user avatar next to name
+            let channel_menu = PickList::new(
+                &mut self.channel_menu_state,
+                vec![guild.name.clone(), "New Channel".to_string()],
+                Some(guild.name.clone()),
+                Message::SelectedChannelMenuOption,
+            )
+            .width(length!(+))
+            .style(theme);
+
             self.channels_buts_state
                 .resize_with(guild.channels.len(), Default::default);
 
             // Build the room list
-            let channels_list = if guild.channels.is_empty() {
+            let mut channels_list = if guild.channels.is_empty() {
                 // if first_room_id is None, then that means no room found (either cause of filter, or the user aren't in any room)
                 // reusing the room_list variable here
                 fill_container(label!("No room found")).style(theme).into()
@@ -246,6 +258,8 @@ impl MainScreen {
                     theme,
                 )
             };
+
+            channels_list = Column::with_children(vec![channel_menu.into(), channels_list]).into();
 
             screen_widgets.push(
                 Container::new(channels_list)
@@ -399,6 +413,18 @@ impl MainScreen {
                     .style(theme.secondary());
 
             screen_widgets.push(no_selected_guild_warning.into());
+
+            screen_widgets.push(
+                Container::new(
+                    Column::with_children(vec![menu.into()])
+                        .width(length!(+))
+                        .height(length!(+)),
+                )
+                .width(length!(= 200))
+                .height(length!(+))
+                .style(theme)
+                .into(),
+            );
         }
 
         Row::with_children(screen_widgets)
@@ -501,6 +527,25 @@ impl MainScreen {
             Message::SelectedMember(user_id) => {
                 log::trace!("member: {}", user_id);
             }
+            Message::SelectedChannelMenuOption(option) => match option.as_str() {
+                "New Channel" => {
+                    if let Some(guild_id) = self.current_guild_id {
+                        return Command::perform(
+                            async move {
+                                let mut screen = super::ChannelCreation::default();
+                                screen.guild_id = guild_id;
+                                screen
+                            },
+                            |screen| {
+                                super::Message::PushScreen(Box::new(
+                                    super::Screen::ChannelCreation(screen),
+                                ))
+                            },
+                        );
+                    }
+                }
+                _ => {}
+            },
             Message::SelectedMenuOption(option) => {
                 return match option.as_str() {
                     "Logout" => Command::perform(async {}, |_| {
@@ -508,7 +553,7 @@ impl MainScreen {
                             super::LogoutScreen::default(),
                         )))
                     }),
-                    "Join Room" => Command::perform(async {}, |_| {
+                    "Join / Create a Guild" => Command::perform(async {}, |_| {
                         super::Message::PushScreen(Box::new(super::Screen::GuildDiscovery(
                             super::GuildDiscovery::default(),
                         )))
