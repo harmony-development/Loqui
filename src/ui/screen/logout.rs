@@ -7,6 +7,8 @@ use crate::{
     },
 };
 
+use super::{LoginScreen, Screen};
+
 pub type Message = bool;
 
 #[derive(Debug, Default)]
@@ -60,17 +62,23 @@ impl Logout {
     pub fn update(&mut self, msg: Message, client: &mut Client) -> Command<super::Message> {
         if msg {
             self.confirmation = true;
+            let content_store = client.content_store_arc();
+            let inner = client.inner().clone();
             Command::perform(
-                Client::logout(
-                    client.inner().clone(),
-                    client.content_store().session_file().to_path_buf(),
-                ),
-                |result| {
+                async move {
+                    let result =
+                        Client::logout(inner, content_store.session_file().to_path_buf()).await;
+
                     result.map_or_else(
                         |err| super::Message::Error(Box::new(err)),
-                        |_| super::Message::PopScreen,
+                        |_| {
+                            super::Message::Logout(
+                                Screen::Login(LoginScreen::new(content_store)).into(),
+                            )
+                        },
                     )
                 },
+                |msg| msg,
             )
         } else {
             Command::perform(async {}, |_| super::Message::PopScreen)

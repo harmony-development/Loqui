@@ -527,8 +527,8 @@ impl MainScreen {
             Message::SelectedMember(user_id) => {
                 log::trace!("member: {}", user_id);
             }
-            Message::SelectedChannelMenuOption(option) => match option.as_str() {
-                "New Channel" => {
+            Message::SelectedChannelMenuOption(option) => {
+                if let "New Channel" = option.as_str() {
                     if let Some(guild_id) = self.current_guild_id {
                         return Command::perform(
                             async move {
@@ -544,8 +544,7 @@ impl MainScreen {
                         );
                     }
                 }
-                _ => {}
-            },
+            }
             Message::SelectedMenuOption(option) => {
                 return match option.as_str() {
                     "Logout" => Command::perform(async {}, |_| {

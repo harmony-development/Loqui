@@ -61,6 +61,7 @@ pub enum Message {
     ChannelCreation(create_channel::Message),
     PopScreen,
     PushScreen(Box<Screen>),
+    Logout(Box<Screen>),
     LoginComplete(Option<Client>),
     ClientCreated(Client),
     Nothing,
@@ -173,6 +174,7 @@ pub struct ScreenManager {
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
     sources_to_add: Vec<EventSource>,
+    socket_reset: bool,
 }
 
 impl ScreenManager {
@@ -184,6 +186,7 @@ impl ScreenManager {
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
             sources_to_add: vec![],
+            socket_reset: false,
         }
     }
 
@@ -370,19 +373,38 @@ impl Application for ScreenManager {
                         cmds.push(cmd);
                     }
 
-                    let subs = self.sources_to_add.drain(..).collect::<Vec<_>>();
-                    cmds.push(Command::perform(
-                        async move {
-                            for sub in subs {
-                                if let Err(err) = socket.add_source(sub).await {
-                                    log::error!("can't sub to source: {}", err);
+                    if !self.socket_reset {
+                        let subs = self.sources_to_add.drain(..).collect::<Vec<_>>();
+                        cmds.push(Command::perform(
+                            async move {
+                                for sub in subs {
+                                    if let Err(err) = socket.add_source(sub).await {
+                                        log::error!("can't sub to source: {}", err);
+                                    }
                                 }
-                            }
-                            let event = socket.get_event().await;
-                            Message::SocketEvent { socket, event }
-                        },
-                        |msg| msg,
-                    ));
+                                let event = socket.get_event().await;
+                                Message::SocketEvent { socket, event }
+                            },
+                            |msg| msg,
+                        ));
+                    } else {
+                        let client = self.client.as_ref().unwrap();
+                        let sources = client.subscribe_to();
+                        let inner = client.inner().clone();
+                        cmds.push(Command::perform(
+                            async move { inner.subscribe_events(sources).await },
+                            |result| {
+                                result.map_or_else(
+                                    |err| Message::Error(Box::new(err.into())),
+                                    |socket| Message::SocketEvent {
+                                        socket: socket.into(),
+                                        event: None,
+                                    },
+                                )
+                            },
+                        ));
+                        self.socket_reset = false;
+                    }
 
                     return Command::batch(cmds);
                 }
@@ -452,6 +474,11 @@ impl Application for ScreenManager {
             }
             Message::PushScreen(screen) => {
                 self.screens.push(*screen);
+            }
+            Message::Logout(screen) => {
+                self.client = None;
+                self.socket_reset = false;
+                self.screens.clear(*screen);
             }
             Message::MessageSent {
                 message_id,
@@ -630,7 +657,14 @@ impl Application for ScreenManager {
                     ClientError::Internal(harmony_rust_sdk::client::error::ClientError::Internal(
                         harmony_rust_sdk::api::exports::hrpc::client::ClientError::SocketError(_)
                     ))
-                ) {}
+                ) {
+                    self.socket_reset = true;
+                }
+
+                if err.to_string().contains("connect error") {
+                    self.screens
+                        .clear(Screen::Login(LoginScreen::new(self.content_store.clone())));
+                }
 
                 if let ClientError::Internal(
                     harmony_rust_sdk::client::error::ClientError::Internal(
