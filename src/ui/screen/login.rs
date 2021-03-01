@@ -78,8 +78,14 @@ impl LoginScreen {
         self.current_step = AuthPart::Homeserver;
         self.fields.clear();
         self.choices.clear();
-        self.fields
-            .push(("homeserver".to_string(), Default::default()));
+        self.fields.push((
+            "homeserver".to_string(),
+            (
+                Default::default(),
+                "https://chat.harmonyapp.io:2289".to_string(),
+                "text".to_string(),
+            ),
+        ));
     }
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
