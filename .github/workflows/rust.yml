@@ -100,12 +100,15 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         name: clippy-mac
+    
+    - name: Install cargo bundle
+      run: cargo install cargo-bundle
 
     - name: Build
-      run: cargo build
+      run: cargo bundle
     
     - name: Artifact
       uses: actions/upload-artifact@v2.2.2
       with:
         name: build-mac
-        path: target/debug/crust
+        path: target/debug/bundle/osx/Crust.app
