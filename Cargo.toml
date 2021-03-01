@@ -4,6 +4,12 @@ version = "0.1.0"
 authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
 edition = "2018"
 
+[package.metadata.bundle]
+name = "Crust"
+identifier = "nodomain.yusdacra.crust"
+category = "Harmony Client"
+short_description = "Rust client for the Harmony protocol."
+
 [profile.dev]
 opt-level = 2
 overflow-checks = true
