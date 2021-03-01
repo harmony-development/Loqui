@@ -91,14 +91,12 @@ impl LoginScreen {
 
         let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 1);
         if !self.current_error.is_empty() {
-            let error_text = label!(
-                self.current_error
-                    .as_str()
-                    .chars()
-                    .take(100)
-                    .collect::<String>()
-                    + "..."
-            )
+            let error_text = label!(self
+                .current_error
+                .as_str()
+                .chars()
+                .take(250)
+                .collect::<String>())
             .color(ERROR_COLOR)
             .size(18);
             widgets.push(error_text.into());
@@ -307,7 +305,7 @@ impl LoginScreen {
                                 let session = Session {
                                     homeserver,
                                     session_token: session.session_token,
-                                    user_id: session.user_id,
+                                    user_id: session.user_id.to_string(),
                                 };
 
                                 // This should never ever fail in our case, if it does something is very very very wrong

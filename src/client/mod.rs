@@ -42,14 +42,14 @@ use self::{guild::Guilds, message::Message};
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Session {
     pub session_token: String,
-    pub user_id: u64,
+    pub user_id: String,
     pub homeserver: String,
 }
 
 impl Debug for Session {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session")
-            .field("user_id", &self.user_id.to_string())
+            .field("user_id", &self.user_id)
             .field("homeserver", &self.homeserver)
             .finish()
     }
@@ -58,7 +58,7 @@ impl Debug for Session {
 impl Into<InnerSession> for Session {
     fn into(self) -> InnerSession {
         InnerSession {
-            user_id: self.user_id,
+            user_id: self.user_id.parse().unwrap(),
             session_token: self.session_token,
         }
     }

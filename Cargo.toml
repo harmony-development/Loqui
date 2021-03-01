@@ -29,7 +29,7 @@ iced = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix", featur
 iced_native = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
 iced_futures = { git = "https://github.com/yusdacra/iced", branch = "icy_matrix" }
 
-open = "1.4.0"
+open = "1.5.0"
 infer = "0.3.4"
 rfd = "0.2.1"
 image = "0.23.13"
