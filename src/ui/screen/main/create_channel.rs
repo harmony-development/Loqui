@@ -132,7 +132,7 @@ impl ChannelCreationModal {
         msg: Message,
         guild_id: u64,
         client: &Client,
-    ) -> (Command<super::Message>, bool) {
+    ) -> (Command<super::super::Message>, bool) {
         let mut go_back = false;
         match msg {
             super::create_channel::Message::ChannelNameChanged(new_name) => {
@@ -160,10 +160,10 @@ impl ChannelCreationModal {
                             )
                             .await;
                             result.map_or_else(
-                                |e| super::Message::Error(Box::new(e.into())),
+                                |e| super::super::Message::Error(Box::new(e.into())),
                                 |response| {
-                                    super::Message::MainScreen(
-                                        super::main::Message::ChannelCreationMessage(
+                                    super::super::Message::MainScreen(
+                                        super::Message::ChannelCreationMessage(
                                             Message::CreatedChannel {
                                                 guild_id,
                                                 channel_id: response.channel_id,
@@ -200,7 +200,7 @@ impl ChannelCreationModal {
         (Command::none(), go_back)
     }
 
-    pub fn on_error(&mut self, error: &ClientError) -> Command<super::Message> {
+    pub fn on_error(&mut self, error: &ClientError) -> Command<super::super::Message> {
         self.error_text = error.to_string();
         self.channel_creation_state = ChannelState::None;
 

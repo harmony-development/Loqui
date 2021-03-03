@@ -1,7 +1,5 @@
-pub mod create_channel;
 pub mod guild_discovery;
 pub mod login;
-pub mod logout;
 pub mod main;
 
 pub use guild_discovery::GuildDiscovery;
@@ -64,6 +62,7 @@ pub enum Message {
     DownloadedThumbnail {
         thumbnail_url: FileId,
         thumbnail: ImageHandle,
+        open: bool,
     },
     EventsReceived(Vec<Event>),
     UpdateTypings(Vec<TypingMember>),
@@ -556,8 +555,18 @@ impl Application for ScreenManager {
             Message::DownloadedThumbnail {
                 thumbnail_url,
                 thumbnail,
+                open,
             } => {
-                self.thumbnail_cache.put_thumbnail(thumbnail_url, thumbnail);
+                let path = self.content_store.content_path(&thumbnail_url);
+                self.thumbnail_cache
+                    .put_thumbnail(thumbnail_url, thumbnail.clone());
+                if open {
+                    if let Screen::Main(screen) = self.screens.current_mut() {
+                        screen.image_viewer_modal.inner_mut().image_handle =
+                            Some((thumbnail, path));
+                        screen.image_viewer_modal.show(true);
+                    }
+                }
             }
             Message::UpdateTypings(typing_members) => {
                 if let Some(client) = self.client.as_mut() {
@@ -759,6 +768,7 @@ fn make_thumbnail_command(
                     Ok(raw) => Ok(Message::DownloadedThumbnail {
                         thumbnail_url,
                         thumbnail: ImageHandle::from_memory(raw),
+                        open: false,
                     }),
                     Err(err) => {
                         tracing::warn!("couldn't read thumbnail from disk: {}", err);
@@ -773,6 +783,7 @@ fn make_thumbnail_command(
                                 Ok(Message::DownloadedThumbnail {
                                     thumbnail_url,
                                     thumbnail: ImageHandle::from_memory(raw_data.to_vec()),
+                                    open: false,
                                 })
                             }
                             Err(err) => {

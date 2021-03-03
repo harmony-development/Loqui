@@ -1,9 +1,13 @@
+pub mod create_channel;
+pub mod image_viewer;
+pub mod logout;
+
 use std::{
     cmp::Ordering,
+    path::PathBuf,
     time::{Duration, Instant},
 };
 
-use super::{create_channel::ChannelCreationModal, logout::LogoutModal};
 use crate::{
     client::{
         content::{self, ImageHandle, ThumbnailCache},
@@ -20,6 +24,7 @@ use crate::{
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use content::ContentType;
+use create_channel::ChannelCreationModal;
 use harmony_rust_sdk::{
     api::{
         chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
@@ -36,6 +41,8 @@ use harmony_rust_sdk::{
     },
 };
 use iced_aw::{modal, Modal};
+use image_viewer::ImageViewerModal;
+use logout::LogoutModal;
 use room_list::build_guild_list;
 
 #[derive(Debug, Clone)]
@@ -57,6 +64,10 @@ pub enum Message {
         content_url: FileId,
         is_thumbnail: bool,
     },
+    OpenImageView {
+        handle: ImageHandle,
+        path: PathBuf,
+    },
     /// Sent when the user selects a different guild.
     GuildChanged(u64),
     /// Sent twhen the user selects a different channel.
@@ -71,10 +82,11 @@ pub enum Message {
     SelectedChannelMenuOption(String),
     SelectedMember(u64),
     LogoutChoice(bool),
-    ChannelCreationMessage(super::create_channel::Message),
+    ChannelCreationMessage(create_channel::Message),
+    ImageViewMessage(image_viewer::Message),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MainScreen {
     // Event history area state
     event_history_state: scrollable::State,
@@ -95,6 +107,7 @@ pub struct MainScreen {
 
     logout_modal: modal::State<LogoutModal>,
     create_channel_modal: modal::State<ChannelCreationModal>,
+    pub image_viewer_modal: modal::State<ImageViewerModal>,
 
     // Join room screen state
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
@@ -102,31 +115,6 @@ pub struct MainScreen {
     current_channel_id: Option<u64>,
     /// The message the user is currently typing.
     message: String,
-}
-
-impl Default for MainScreen {
-    fn default() -> Self {
-        Self {
-            event_history_state: Default::default(),
-            content_open_buts_state: Default::default(),
-            send_file_but_state: Default::default(),
-            composer_state: Default::default(),
-            scroll_to_bottom_but_state: Default::default(),
-            channel_menu_state: Default::default(),
-            menu_state: Default::default(),
-            guilds_list_state: scrollable::State::default(),
-            guilds_buts_state: Default::default(),
-            channels_list_state: scrollable::State::default(),
-            channels_buts_state: Default::default(),
-            members_buts_state: Default::default(),
-            members_list_state: scrollable::State::default(),
-            logout_modal: modal::State::new(LogoutModal::default()),
-            current_guild_id: None,
-            current_channel_id: None,
-            message: Default::default(),
-            create_channel_modal: modal::State::new(ChannelCreationModal::default()),
-        }
-    }
 }
 
 impl MainScreen {
@@ -474,21 +462,33 @@ impl MainScreen {
         .backdrop(Message::LogoutChoice(false))
         .on_esc(Message::LogoutChoice(false));
 
-        if self.current_guild_id.is_some() {
-            Modal::new(&mut self.create_channel_modal, content, move |state| {
+        let content = if self.current_guild_id.is_some() {
+            let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
                 state.view(theme).map(Message::ChannelCreationMessage)
             })
             .style(theme)
             .backdrop(Message::ChannelCreationMessage(
-                super::create_channel::Message::GoBack,
+                create_channel::Message::GoBack,
             ))
             .on_esc(Message::ChannelCreationMessage(
-                super::create_channel::Message::GoBack,
-            ))
-            .into()
+                create_channel::Message::GoBack,
+            ));
+            if self.current_channel_id.is_some() {
+                Modal::new(&mut self.image_viewer_modal, content, move |state| {
+                    state.view(theme).map(Message::ImageViewMessage)
+                })
+                .style(theme)
+                .backdrop(Message::ImageViewMessage(image_viewer::Message::Close))
+                .on_esc(Message::ImageViewMessage(image_viewer::Message::Close))
+                .into()
+            } else {
+                content.into()
+            }
         } else {
             content.into()
-        }
+        };
+
+        content
     }
 
     pub fn update(
@@ -510,6 +510,19 @@ impl MainScreen {
         }
 
         match msg {
+            Message::OpenImageView { handle, path } => {
+                self.image_viewer_modal.show(true);
+                self.image_viewer_modal.inner_mut().image_handle = Some((handle, path));
+            }
+            Message::ImageViewMessage(msg) => {
+                let (cmd, go_back) = self.image_viewer_modal.inner_mut().update(msg);
+
+                if go_back {
+                    self.image_viewer_modal.show(false);
+                }
+
+                return cmd;
+            }
             Message::ChannelCreationMessage(msg) => {
                 let (cmd, go_back) = self.create_channel_modal.inner_mut().update(
                     msg,
@@ -664,20 +677,26 @@ impl MainScreen {
                 content_url,
                 is_thumbnail,
             } => {
-                let thumbnail_exists = thumbnail_cache.has_thumbnail(&content_url);
+                let maybe_thumb = thumbnail_cache.get_thumbnail(&content_url).cloned();
                 let content_path = client.content_store().content_path(&content_url);
                 return if content_path.exists() {
                     Command::perform(
                         async move {
-                            open::that_in_background(&content_path);
-                            Ok(if is_thumbnail && !thumbnail_exists {
+                            Ok(if is_thumbnail && maybe_thumb.is_none() {
                                 let data = tokio::fs::read(&content_path).await?;
 
                                 super::Message::DownloadedThumbnail {
                                     thumbnail_url: content_url,
                                     thumbnail: ImageHandle::from_memory(data),
+                                    open: true,
                                 }
+                            } else if is_thumbnail {
+                                super::Message::MainScreen(Message::OpenImageView {
+                                    handle: maybe_thumb.unwrap(),
+                                    path: content_path,
+                                })
                             } else {
+                                open::that_in_background(content_path);
                                 super::Message::Nothing
                             })
                         },
@@ -696,13 +715,19 @@ impl MainScreen {
                                 .await
                                 .map_err(InnerClientError::Reqwest)?;
                             tokio::fs::write(&content_path, &raw_data).await?;
-                            open::that_in_background(content_path);
-                            Ok(if is_thumbnail && !thumbnail_exists {
+                            Ok(if is_thumbnail && maybe_thumb.is_none() {
                                 super::Message::DownloadedThumbnail {
                                     thumbnail_url: content_url,
                                     thumbnail: ImageHandle::from_memory(raw_data.to_vec()),
+                                    open: true,
                                 }
+                            } else if is_thumbnail {
+                                super::Message::MainScreen(Message::OpenImageView {
+                                    handle: maybe_thumb.unwrap(),
+                                    path: content_path,
+                                })
                             } else {
+                                open::that_in_background(content_path);
                                 super::Message::Nothing
                             })
                         },
