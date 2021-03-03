@@ -301,8 +301,13 @@ impl Client {
             Event::CreatedChannel(channel_created) => {
                 let guild_id = channel_created.guild_id;
                 let channel_id = channel_created.channel_id;
+                let prev_id = channel_created.previous_id;
+                let next_id = channel_created.next_id;
 
                 if let Some(guild) = self.get_guild(guild_id) {
+                    let prev_pos = guild.channels.keys().position(|id| *id == prev_id);
+                    let next_pos = guild.channels.keys().position(|id| *id == next_id);
+
                     guild.channels.insert(
                         channel_id,
                         Channel {
@@ -313,6 +318,25 @@ impl Client {
                             messages: Vec::new(),
                         },
                     );
+
+                    if let Some(pos) = prev_pos {
+                        if pos != guild.channels.len() - 1 {
+                            guild
+                                .channels
+                                .swap_indices(pos + 1, guild.channels.len() - 1);
+                        }
+                    } else if let Some(pos) = next_pos {
+                        if pos != 0 {
+                            guild
+                                .channels
+                                .swap_indices(pos - 1, guild.channels.len() - 1);
+                        } else {
+                            let (k, v) = guild.channels.pop().unwrap();
+                            guild.channels.reverse();
+                            guild.channels.insert(k, v);
+                            guild.channels.reverse();
+                        }
+                    }
                 }
             }
             Event::Typing(typing) => {
