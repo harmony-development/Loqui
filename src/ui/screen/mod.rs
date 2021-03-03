@@ -4,7 +4,6 @@ pub mod login;
 pub mod logout;
 pub mod main;
 
-pub use create_channel::ChannelCreation;
 pub use guild_discovery::GuildDiscovery;
 use iced_futures::subscription::Recipe;
 pub use login::LoginScreen;
@@ -56,7 +55,6 @@ pub enum Message {
     LoginScreen(login::Message),
     MainScreen(main::Message),
     GuildDiscovery(guild_discovery::Message),
-    ChannelCreation(create_channel::Message),
     PopScreen,
     PushScreen(Box<Screen>),
     Logout(Box<Screen>),
@@ -100,7 +98,6 @@ pub enum Screen {
     Login(LoginScreen),
     Main(Box<MainScreen>),
     GuildDiscovery(GuildDiscovery),
-    ChannelCreation(ChannelCreation),
 }
 
 impl Screen {
@@ -108,7 +105,6 @@ impl Screen {
         match self {
             Screen::Login(screen) => screen.on_error(error),
             Screen::GuildDiscovery(screen) => screen.on_error(error),
-            Screen::ChannelCreation(screen) => screen.on_error(error),
             Screen::Main(screen) => screen.on_error(error),
         }
     }
@@ -322,13 +318,6 @@ impl Application for ScreenManager {
             }
             Message::GuildDiscovery(msg) => {
                 if let (Screen::GuildDiscovery(screen), Some(client)) =
-                    (self.screens.current_mut(), &self.client)
-                {
-                    return screen.update(msg, client);
-                }
-            }
-            Message::ChannelCreation(msg) => {
-                if let (Screen::ChannelCreation(screen), Some(client)) =
                     (self.screens.current_mut(), &self.client)
                 {
                     return screen.update(msg, client);
@@ -709,9 +698,6 @@ impl Application for ScreenManager {
             Screen::GuildDiscovery(screen) => screen
                 .view(self.theme, self.client.as_ref().unwrap()) // This will not panic cause [ref:client_set_before_main_view]
                 .map(Message::GuildDiscovery),
-            Screen::ChannelCreation(screen) => screen
-                .view(self.theme, self.client.as_ref().unwrap()) // This will not panic cause [ref:client_set_before_main_view]
-                .map(Message::ChannelCreation),
         }
     }
 }

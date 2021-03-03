@@ -57,7 +57,7 @@ impl LogoutModal {
                         .into(),
                     space!(h % 4).into(),
                 ])
-                .width(length!(% 3))
+                .width(length!(% 4))
                 .height(length!(+))
                 .into(),
                 space!(w % 3).into(),
