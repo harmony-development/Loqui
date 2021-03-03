@@ -176,6 +176,16 @@ impl From<Theme> for Box<dyn rule::StyleSheet> {
     }
 }
 
+impl From<Theme> for Box<dyn iced_aw::modal::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        if theme.dark {
+            dark::Modal.into()
+        } else {
+            Default::default()
+        }
+    }
+}
+
 pub struct TransparentButton;
 
 impl From<TransparentButton> for Box<dyn button::StyleSheet> {
@@ -217,10 +227,25 @@ mod dark {
         button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
         text_input, Color,
     };
+    use iced_aw::modal;
 
     const DARK_BG: Color = color!(0x36, 0x39, 0x3F);
     const BRIGHT_BG: Color = color!(0x44, 0x48, 0x4F);
     const ACCENT: Color = color!(0x60, 0x64, 0x6B);
+
+    pub struct Modal;
+
+    impl modal::StyleSheet for Modal {
+        fn active(&self) -> modal::Style {
+            modal::Style {
+                background: Color {
+                    a: 0.7,
+                    ..Color::BLACK
+                }
+                .into(),
+            }
+        }
+    }
 
     pub struct Container;
 

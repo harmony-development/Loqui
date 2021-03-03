@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use super::{create_channel::ChannelCreationModal, logout::LogoutModal};
 use crate::{
     client::{
         content::{self, ImageHandle, ThumbnailCache},
@@ -36,11 +37,6 @@ use harmony_rust_sdk::{
 };
 use iced_aw::{modal, Modal};
 use room_list::build_guild_list;
-
-use super::{
-    create_channel::{ChannelCreationModal, ChannelState},
-    logout::LogoutModal,
-};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -98,11 +94,7 @@ pub struct MainScreen {
     members_list_state: scrollable::State,
 
     logout_modal: modal::State<LogoutModal>,
-    logout_confirm: bool,
-
     create_channel_modal: modal::State<ChannelCreationModal>,
-    channel_creation_state: ChannelState,
-    creation_channel_name: String,
 
     // Join room screen state
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
@@ -110,7 +102,6 @@ pub struct MainScreen {
     current_channel_id: Option<u64>,
     /// The message the user is currently typing.
     message: String,
-    error_text: String,
 }
 
 impl Default for MainScreen {
@@ -130,14 +121,10 @@ impl Default for MainScreen {
             members_buts_state: Default::default(),
             members_list_state: scrollable::State::default(),
             logout_modal: modal::State::new(LogoutModal::default()),
-            logout_confirm: false,
             current_guild_id: None,
             current_channel_id: None,
             message: Default::default(),
-            error_text: Default::default(),
-            channel_creation_state: Default::default(),
             create_channel_modal: modal::State::new(ChannelCreationModal::default()),
-            creation_channel_name: Default::default(),
         }
     }
 }
@@ -395,7 +382,9 @@ impl MainScreen {
 
                 let send_file_button = Button::new(
                     &mut self.send_file_but_state,
-                    label!("↑").size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                    label!(iced_aw::Icon::Upload)
+                        .font(iced_aw::ICON_FONT)
+                        .size((PADDING / 4) * 3 + MESSAGE_SIZE),
                 )
                 .style(theme.secondary())
                 .on_press(Message::SendFiles {
@@ -412,7 +401,9 @@ impl MainScreen {
                     bottom_area_widgets.push(
                         Button::new(
                             &mut self.scroll_to_bottom_but_state,
-                            label!("↡").size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                            label!(iced_aw::Icon::ArrowDown)
+                                .font(iced_aw::ICON_FONT)
+                                .size((PADDING / 4) * 3 + MESSAGE_SIZE),
                         )
                         .style(theme.secondary())
                         .on_press(Message::ScrollToBottom(channel_id))
@@ -476,20 +467,18 @@ impl MainScreen {
             .height(length!(+))
             .width(length!(+));
 
+        let content = Modal::new(&mut self.logout_modal, content, move |state| {
+            state.view(theme).map(Message::LogoutChoice)
+        })
+        .style(theme)
+        .backdrop(Message::LogoutChoice(false))
+        .on_esc(Message::LogoutChoice(false));
+
         if self.current_guild_id.is_some() {
-            let channel_creation_state = self.channel_creation_state.clone();
-            let channel_name_field = self.creation_channel_name.clone();
-            let error_text = self.error_text.clone();
             Modal::new(&mut self.create_channel_modal, content, move |state| {
-                state
-                    .view(
-                        theme,
-                        channel_creation_state.clone(),
-                        channel_name_field.clone(),
-                        error_text.clone(),
-                    )
-                    .map(Message::ChannelCreationMessage)
+                state.view(theme).map(Message::ChannelCreationMessage)
             })
+            .style(theme)
             .backdrop(Message::ChannelCreationMessage(
                 super::create_channel::Message::GoBack,
             ))
@@ -498,13 +487,7 @@ impl MainScreen {
             ))
             .into()
         } else {
-            let logout_confirm = self.logout_confirm;
-            Modal::new(&mut self.logout_modal, content, move |state| {
-                state.view(theme, logout_confirm).map(Message::LogoutChoice)
-            })
-            .backdrop(Message::LogoutChoice(false))
-            .on_esc(Message::LogoutChoice(false))
-            .into()
+            content.into()
         }
     }
 
@@ -527,90 +510,22 @@ impl MainScreen {
         }
 
         match msg {
-            Message::ChannelCreationMessage(msg) => match msg {
-                super::create_channel::Message::ChannelNameChanged(new_name) => {
-                    self.creation_channel_name = new_name;
-                }
-                super::create_channel::Message::CreateChannel => {
-                    let channel_name = self.creation_channel_name.clone();
-                    let guild_id = self.current_guild_id.unwrap();
+            Message::ChannelCreationMessage(msg) => {
+                let (cmd, go_back) = self.create_channel_modal.inner_mut().update(
+                    msg,
+                    self.current_guild_id.unwrap(),
+                    &client,
+                );
 
-                    self.error_text.clear();
-                    self.channel_creation_state = ChannelState::Creating {
-                        name: channel_name.clone(),
-                    };
-                    let inner = client.inner().clone();
-
-                    return Command::perform(
-                        async move {
-                            let result = channel::create_channel(
-                                &inner,
-                                channel::CreateChannel::new(
-                                    guild_id,
-                                    channel_name,
-                                    harmony_rust_sdk::api::chat::Place::Top { before: 0 },
-                                ),
-                            )
-                            .await;
-                            result.map_or_else(
-                                |e| super::Message::Error(Box::new(e.into())),
-                                |response| {
-                                    super::Message::MainScreen(Message::ChannelCreationMessage(
-                                        super::create_channel::Message::CreatedChannel {
-                                            guild_id,
-                                            channel_id: response.channel_id,
-                                        },
-                                    ))
-                                },
-                            )
-                        },
-                        |msg| msg,
-                    );
-                }
-                super::create_channel::Message::CreatedChannel {
-                    guild_id,
-                    channel_id,
-                } => {
-                    self.channel_creation_state = ChannelState::Created {
-                        guild_id,
-                        channel_id,
-                        name: self.creation_channel_name.clone(),
-                    };
-                    self.creation_channel_name.clear();
-                }
-                super::create_channel::Message::GoBack => {
+                if go_back {
                     self.create_channel_modal.show(false);
-                    self.channel_creation_state = ChannelState::None;
-                    self.creation_channel_name.clear();
                 }
-            },
-            Message::LogoutChoice(confirm) => {
-                self.logout_confirm = confirm;
-                self.logout_modal.show(false);
-                if confirm {
-                    let content_store = client.content_store_arc();
-                    let inner = client.inner().clone();
-                    return Command::perform(
-                        async move {
-                            let result =
-                                Client::logout(inner, content_store.session_file().to_path_buf())
-                                    .await;
 
-                            result.map_or_else(
-                                |err| super::Message::Error(Box::new(err)),
-                                |_| {
-                                    super::Message::Logout(
-                                        super::Screen::Login(super::LoginScreen::new(
-                                            content_store,
-                                        ))
-                                        .into(),
-                                    )
-                                },
-                            )
-                        },
-                        |msg| msg,
-                    );
-                }
+                return cmd;
+            }
+            Message::LogoutChoice(confirm) => {
+                self.logout_modal.show(false);
+                return self.logout_modal.inner_mut().update(confirm, client);
             }
             Message::MessageHistoryScrolled {
                 prev_scroll_perc,
@@ -690,14 +605,10 @@ impl MainScreen {
             Message::SelectedChannelMenuOption(option) => {
                 if let "New Channel" = option.as_str() {
                     self.create_channel_modal.show(true);
-                    self.channel_creation_state = ChannelState::None;
-                    self.creation_channel_name.clear();
-                    self.error_text.clear();
                 }
             }
             Message::SelectedMenuOption(option) => match option.as_str() {
                 "Logout" => {
-                    self.logout_confirm = false;
                     self.logout_modal.show(true);
                 }
                 "Join / Create a Guild" => {
@@ -1004,10 +915,9 @@ impl MainScreen {
 
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
         self.logout_modal.show(false);
-        self.logout_confirm = false;
-        self.error_text = error.to_string();
-        self.channel_creation_state = ChannelState::None;
+        let cmd = self.create_channel_modal.inner_mut().on_error(&error);
+        let cmd = Command::batch(vec![cmd, self.logout_modal.inner_mut().on_error(&error)]);
 
-        Command::none()
+        cmd
     }
 }

@@ -1565,7 +1565,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1578,7 +1578,7 @@ dependencies = [
 [[package]]
 name = "iced_aw"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced_aw.git?branch=main#15632aa14942ae7e8406976b46e5e857c56e2a3b"
+source = "git+https://github.com/yusdacra/iced_aw.git?branch=main#00f8e9549fb93c3c7c39871363b80146bf2c2fa5"
 dependencies = [
  "dodrio",
  "iced_graphics",
@@ -1592,12 +1592,12 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 
 [[package]]
 name = "iced_futures"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 dependencies = [
  "futures",
  "log",
@@ -1608,7 +1608,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 dependencies = [
  "bytemuck",
  "font-kit",
@@ -1623,7 +1623,7 @@ dependencies = [
 [[package]]
 name = "iced_native"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1635,7 +1635,7 @@ dependencies = [
 [[package]]
 name = "iced_style"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 dependencies = [
  "iced_core",
 ]
@@ -1643,7 +1643,7 @@ dependencies = [
 [[package]]
 name = "iced_web"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 dependencies = [
  "dodrio",
  "iced_core",
@@ -1659,7 +1659,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 dependencies = [
  "bytemuck",
  "futures",
@@ -1677,7 +1677,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
+source = "git+https://github.com/yusdacra/iced.git?branch=icy_matrix#2f2f78c013169cfa04ead897c8e1c7dd3f47c4a7"
 dependencies = [
  "iced_futures",
  "iced_graphics",
