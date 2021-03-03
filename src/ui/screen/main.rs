@@ -34,7 +34,10 @@ use harmony_rust_sdk::{
         rest::{download, upload_extract_id, FileId},
     },
 };
+use iced_aw::{modal, Modal};
 use room_list::build_guild_list;
+
+use super::logout::LogoutModal;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -68,9 +71,10 @@ pub enum Message {
     SelectedMenuOption(String),
     SelectedChannelMenuOption(String),
     SelectedMember(u64),
+    LogoutChoice(bool),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct MainScreen {
     // Event history area state
     event_history_state: scrollable::State,
@@ -89,12 +93,40 @@ pub struct MainScreen {
     members_buts_state: Vec<button::State>,
     members_list_state: scrollable::State,
 
+    logout_modal: modal::State<LogoutModal>,
+    logout_confirm: bool,
+
     // Join room screen state
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
     current_guild_id: Option<u64>,
     current_channel_id: Option<u64>,
     /// The message the user is currently typing.
     message: String,
+}
+
+impl Default for MainScreen {
+    fn default() -> Self {
+        Self {
+            event_history_state: Default::default(),
+            content_open_buts_state: Default::default(),
+            send_file_but_state: Default::default(),
+            composer_state: Default::default(),
+            scroll_to_bottom_but_state: Default::default(),
+            channel_menu_state: Default::default(),
+            menu_state: Default::default(),
+            guilds_list_state: scrollable::State::default(),
+            guilds_buts_state: Default::default(),
+            channels_list_state: scrollable::State::default(),
+            channels_buts_state: Default::default(),
+            members_buts_state: Default::default(),
+            members_list_state: scrollable::State::default(),
+            logout_modal: modal::State::new(LogoutModal::default()),
+            logout_confirm: false,
+            current_guild_id: None,
+            current_channel_id: None,
+            message: Default::default(),
+        }
+    }
 }
 
 impl MainScreen {
@@ -427,10 +459,17 @@ impl MainScreen {
             );
         }
 
-        Row::with_children(screen_widgets)
+        let content = Row::with_children(screen_widgets)
             .height(length!(+))
-            .width(length!(+))
-            .into()
+            .width(length!(+));
+
+        let logout_confirm = self.logout_confirm;
+        Modal::new(&mut self.logout_modal, content, move |state| {
+            state.view(theme, logout_confirm).map(Message::LogoutChoice)
+        })
+        .backdrop(Message::LogoutChoice(false))
+        .on_esc(Message::LogoutChoice(false))
+        .into()
     }
 
     pub fn update(
@@ -452,6 +491,34 @@ impl MainScreen {
         }
 
         match msg {
+            Message::LogoutChoice(confirm) => {
+                self.logout_confirm = confirm;
+                self.logout_modal.show(false);
+                if confirm {
+                    let content_store = client.content_store_arc();
+                    let inner = client.inner().clone();
+                    return Command::perform(
+                        async move {
+                            let result =
+                                Client::logout(inner, content_store.session_file().to_path_buf())
+                                    .await;
+
+                            result.map_or_else(
+                                |err| super::Message::Error(Box::new(err)),
+                                |_| {
+                                    super::Message::Logout(
+                                        super::Screen::Login(super::LoginScreen::new(
+                                            content_store,
+                                        ))
+                                        .into(),
+                                    )
+                                },
+                            )
+                        },
+                        |msg| msg,
+                    );
+                }
+            }
             Message::MessageHistoryScrolled {
                 prev_scroll_perc,
                 scroll_perc,
@@ -545,21 +612,20 @@ impl MainScreen {
                     }
                 }
             }
-            Message::SelectedMenuOption(option) => {
-                return match option.as_str() {
-                    "Logout" => Command::perform(async {}, |_| {
-                        super::Message::PushScreen(Box::new(super::Screen::Logout(
-                            super::LogoutScreen::default(),
-                        )))
-                    }),
-                    "Join / Create a Guild" => Command::perform(async {}, |_| {
+            Message::SelectedMenuOption(option) => match option.as_str() {
+                "Logout" => {
+                    self.logout_confirm = false;
+                    self.logout_modal.show(true);
+                }
+                "Join / Create a Guild" => {
+                    return Command::perform(async {}, |_| {
                         super::Message::PushScreen(Box::new(super::Screen::GuildDiscovery(
                             super::GuildDiscovery::default(),
                         )))
-                    }),
-                    _ => Command::none(),
+                    })
                 }
-            }
+                _ => {}
+            },
             Message::ComposerMessageChanged(new_msg) => {
                 self.message = new_msg;
 
@@ -849,6 +915,13 @@ impl MainScreen {
                 }
             }
         }
+
+        Command::none()
+    }
+
+    pub fn on_error(&mut self, _error: ClientError) -> Command<super::Message> {
+        self.logout_modal.show(false);
+        self.logout_confirm = false;
 
         Command::none()
     }

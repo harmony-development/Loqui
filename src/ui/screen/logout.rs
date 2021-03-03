@@ -1,5 +1,4 @@
 use crate::{
-    client::{error::ClientError, Client},
     label, label_button, length, space,
     ui::{
         component::*,
@@ -7,21 +6,17 @@ use crate::{
     },
 };
 
-use super::{LoginScreen, Screen};
-
 pub type Message = bool;
 
 #[derive(Debug, Default)]
-pub struct Logout {
+pub struct LogoutModal {
     logout_approve_but_state: button::State,
     logout_cancel_but_state: button::State,
-
-    confirmation: bool,
 }
 
-impl Logout {
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
-        if self.confirmation {
+impl LogoutModal {
+    pub fn view(&mut self, theme: Theme, confirmation: bool) -> Element<Message> {
+        if confirmation {
             fill_container(label!("Logging out...").size(30))
                 .style(theme)
                 .into()
@@ -29,7 +24,10 @@ impl Logout {
             let make_button = |state, confirm| {
                 let text = if confirm { "Yes" } else { "No" };
 
-                label_button!(state, text).style(theme).on_press(confirm)
+                label_button!(state, text)
+                    .style(theme)
+                    .on_press(confirm)
+                    .width(length!(+))
             };
 
             let logout_confirm_panel = column(
@@ -40,53 +38,33 @@ impl Logout {
                             .into(),
                         row(
                             vec![
-                                make_button(&mut self.logout_approve_but_state, true).width(length!(+)).into(),
+                                make_button(&mut self.logout_approve_but_state, true).into(),
                                 space!(w+).into(),
-                                make_button(&mut self.logout_cancel_but_state, false).width(length!(+)).into(),
+                                make_button(&mut self.logout_cancel_but_state, false).into(),
                         ])
                         .width(length!(+))
                         .into(),
                     ])
                     .spacing(12);
 
-            let padded_panel = row(vec![
+            row(vec![
                 space!(w % 3).into(),
-                logout_confirm_panel.width(length!(% 4)).into(),
+                column(vec![
+                    space!(h % 4).into(),
+                    fill_container(logout_confirm_panel.width(length!(+)).height(length!(+)))
+                        .height(length!(% 3))
+                        .style(theme.round())
+                        .into(),
+                    space!(h % 4).into(),
+                ])
+                .width(length!(% 3))
+                .height(length!(+))
+                .into(),
                 space!(w % 3).into(),
-            ]);
-
-            fill_container(padded_panel).style(theme).into()
+            ])
+            .height(length!(+))
+            .width(length!(+))
+            .into()
         }
-    }
-
-    pub fn update(&mut self, msg: Message, client: &mut Client) -> Command<super::Message> {
-        if msg {
-            self.confirmation = true;
-            let content_store = client.content_store_arc();
-            let inner = client.inner().clone();
-            Command::perform(
-                async move {
-                    let result =
-                        Client::logout(inner, content_store.session_file().to_path_buf()).await;
-
-                    result.map_or_else(
-                        |err| super::Message::Error(Box::new(err)),
-                        |_| {
-                            super::Message::Logout(
-                                Screen::Login(LoginScreen::new(content_store)).into(),
-                            )
-                        },
-                    )
-                },
-                |msg| msg,
-            )
-        } else {
-            Command::perform(async {}, |_| super::Message::PopScreen)
-        }
-    }
-
-    pub fn on_error(&mut self, _: ClientError) -> Command<super::Message> {
-        self.confirmation = false;
-        Command::none()
     }
 }

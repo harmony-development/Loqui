@@ -8,7 +8,6 @@ pub use create_channel::ChannelCreation;
 pub use guild_discovery::GuildDiscovery;
 use iced_futures::subscription::Recipe;
 pub use login::LoginScreen;
-pub use logout::Logout as LogoutScreen;
 pub use main::MainScreen;
 
 use crate::{
@@ -55,7 +54,6 @@ use std::{
 #[derive(Debug)]
 pub enum Message {
     LoginScreen(login::Message),
-    LogoutScreen(logout::Message),
     MainScreen(main::Message),
     GuildDiscovery(guild_discovery::Message),
     ChannelCreation(create_channel::Message),
@@ -99,7 +97,6 @@ pub enum Message {
 
 #[derive(Debug)]
 pub enum Screen {
-    Logout(LogoutScreen),
     Login(LoginScreen),
     Main(Box<MainScreen>),
     GuildDiscovery(GuildDiscovery),
@@ -110,10 +107,9 @@ impl Screen {
     fn on_error(&mut self, error: ClientError) -> Command<Message> {
         match self {
             Screen::Login(screen) => screen.on_error(error),
-            Screen::Logout(screen) => screen.on_error(error),
             Screen::GuildDiscovery(screen) => screen.on_error(error),
             Screen::ChannelCreation(screen) => screen.on_error(error),
-            _ => Command::none(),
+            Screen::Main(screen) => screen.on_error(error),
         }
     }
 }
@@ -322,13 +318,6 @@ impl Application for ScreenManager {
                     (self.screens.current_mut(), &mut self.client)
                 {
                     return screen.update(msg, client, &self.thumbnail_cache);
-                }
-            }
-            Message::LogoutScreen(msg) => {
-                if let (Screen::Logout(screen), Some(client)) =
-                    (self.screens.current_mut(), &mut self.client)
-                {
-                    return screen.update(msg, client);
                 }
             }
             Message::GuildDiscovery(msg) => {
@@ -710,7 +699,6 @@ impl Application for ScreenManager {
     fn view(&mut self) -> Element<Self::Message> {
         match self.screens.current_mut() {
             Screen::Login(screen) => screen.view(self.theme).map(Message::LoginScreen),
-            Screen::Logout(screen) => screen.view(self.theme).map(Message::LogoutScreen),
             Screen::Main(screen) => screen
                 .view(
                     self.theme,
