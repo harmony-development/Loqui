@@ -139,7 +139,7 @@ impl ScreenStack {
     }
 
     pub fn clear(&mut self, screen: Screen) -> Vec<Screen> {
-        log::debug!(
+        tracing::debug!(
             "Clearing all screens in the stack and replacing it with {:?}",
             screen
         );
@@ -153,7 +153,7 @@ impl ScreenStack {
     }
 
     pub fn push(&mut self, screen: Screen) {
-        log::debug!("Pushing a screen onto stack {:?}", screen);
+        tracing::debug!("Pushing a screen onto stack {:?}", screen);
         self.stack.push(screen)
     }
 
@@ -161,7 +161,7 @@ impl ScreenStack {
         // There must at least one screen remain to ensure [tag:screenstack_cant_become_empty]
         (self.stack.len() > 1).then(|| {
             let screen = self.stack.pop();
-            log::debug!("Popping a screen {:?}", screen);
+            tracing::debug!("Popping a screen {:?}", screen);
             screen.unwrap()
         })
     }
@@ -379,7 +379,7 @@ impl Application for ScreenManager {
                             async move {
                                 for sub in subs {
                                     if let Err(err) = socket.add_source(sub).await {
-                                        log::error!("can't sub to source: {}", err);
+                                        tracing::error!("can't sub to source: {}", err);
                                     }
                                 }
                                 let event = socket.get_event().await;
@@ -561,7 +561,7 @@ impl Application for ScreenManager {
                                     guild_id,
                                 },
                                 Err(err) => {
-                                    log::error!("error occured when sending message: {}", err);
+                                    tracing::error!("error occured when sending message: {}", err);
                                     Message::SendMessage {
                                         message,
                                         retry_after: retry_after + Duration::from_secs(1),
@@ -650,7 +650,7 @@ impl Application for ScreenManager {
                 return Command::batch(cmds);
             }
             Message::Error(err) => {
-                log::error!("\n{}\n{:?}", err, err);
+                tracing::error!("\n{}\n{:?}", err, err);
 
                 if matches!(
                     &*err,
@@ -787,7 +787,7 @@ fn make_thumbnail_command(
                         thumbnail: ImageHandle::from_memory(raw),
                     }),
                     Err(err) => {
-                        log::warn!("couldn't read thumbnail from disk: {}", err);
+                        tracing::warn!("couldn't read thumbnail from disk: {}", err);
                         let download_task = harmony_rust_sdk::client::api::rest::download(
                             &inner,
                             thumbnail_url.clone(),

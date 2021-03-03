@@ -525,7 +525,7 @@ impl MainScreen {
                 }
             }
             Message::SelectedMember(user_id) => {
-                log::trace!("member: {}", user_id);
+                tracing::trace!("member: {}", user_id);
             }
             Message::SelectedChannelMenuOption(option) => {
                 if let "New Channel" = option.as_str() {
@@ -576,7 +576,7 @@ impl MainScreen {
                         || typing.map_or(false, |(_, _, since)| since.elapsed().as_secs() >= 5)
                     {
                         *typing = Some((guild_id, channel_id, Instant::now()));
-                        log::info!("sending typing");
+                        tracing::info!("sending typing");
                         let inner = client.inner().clone();
                         return Command::perform(
                             async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
@@ -717,12 +717,12 @@ impl MainScreen {
                                             )
                                             .await
                                             {
-                                                log::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
+                                                tracing::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
                                             }
                                             ids.push((id, file_mimetype, filename, filesize));
                                         }
                                         Err(err) => {
-                                            log::error!(
+                                            tracing::error!(
                                                 "An error occured while trying to upload a file: {}",
                                                 err
                                             );
@@ -730,7 +730,7 @@ impl MainScreen {
                                     }
                                 }
                                 Err(err) => {
-                                    log::error!(
+                                    tracing::error!(
                                         "An IO error occured while trying to upload a file: {}",
                                         err
                                     );

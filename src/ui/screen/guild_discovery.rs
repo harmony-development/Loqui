@@ -86,7 +86,7 @@ impl GuildDiscovery {
                 }
                 Err(e) => {
                     if !self.invite.is_empty() {
-                        log::debug!("{}", e); // We don't print this as an error since it'll spam the logs
+                        tracing::debug!("{}", e); // We don't print this as an error since it'll spam the logs
                         texts.push(label!(e.to_string()).color(ERROR_COLOR).into());
                     }
                 }
