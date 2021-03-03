@@ -72,6 +72,8 @@ impl ImageViewerModal {
                 can_go_back = false;
             }
             Message::Close => {
+                // clear viewer state
+                self.viewer_state = Default::default();
                 can_go_back = true;
             }
         }
