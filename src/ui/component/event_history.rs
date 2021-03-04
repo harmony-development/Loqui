@@ -60,7 +60,8 @@ pub fn build_event_history<'a>(
     } else {
         return event_history.into();
     };
-    let mut last_sender = None;
+    let mut last_sender_id = None;
+    let mut last_sender_name = None;
     let mut message_group = vec![];
 
     for (message, media_open_button_state) in displayable_events
@@ -140,9 +141,9 @@ pub fn build_event_history<'a>(
             row(widgets).spacing(MSG_LR_PADDING).padding(0)
         };
 
-        let mut is_sender_different = false;
-        if last_sender.as_ref() != Some(&sender_display_name) {
-            is_sender_different = true;
+        let is_sender_different = last_sender_id.as_ref() != Some(&id_to_use)
+            || last_sender_name.as_ref() != Some(&sender_display_name);
+        if is_sender_different {
             if !message_group.is_empty() {
                 event_history = event_history.push(
                     Container::new(
@@ -277,7 +278,8 @@ pub fn build_event_history<'a>(
 
         message_group.push(row(message_row).padding(0).into());
 
-        last_sender = Some(sender_display_name);
+        last_sender_id = Some(id_to_use);
+        last_sender_name = Some(sender_display_name);
         last_timestamp = message.timestamp;
     }
     if !message_group.is_empty() {
