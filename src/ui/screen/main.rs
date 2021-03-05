@@ -477,7 +477,7 @@ impl MainScreen {
                             .style(theme.secondary())
                             .into(),
                     ])
-                    .padding(PADDING / 2),
+                    .padding(PADDING / 4),
                 )
                 .style(theme)
                 .height(length!(-))
@@ -881,7 +881,16 @@ impl MainScreen {
                             channel_id,
                         })
                     },
-                    |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
+                    |result| {
+                        result.unwrap_or_else(|err| {
+                            if matches!(err, ClientError::Custom(_)) {
+                                tracing::error!("{}", err);
+                                super::Message::Nothing
+                            } else {
+                                super::Message::Error(Box::new(err))
+                            }
+                        })
+                    },
                 );
             }
             Message::GuildChanged(guild_id) => {
