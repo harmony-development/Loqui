@@ -59,7 +59,34 @@ impl Display for ClientError {
                 write!(fmt, "Could not parse string '{}' as URL: {}", string, err)
             }
             ClientError::Internal(err) => {
-                write!(fmt, "{}", err)
+                if let InnerClientError::Internal(
+                    harmony_rust_sdk::api::exports::hrpc::client::ClientError::EndpointError {
+                        raw_error,
+                        ..
+                    },
+                ) = err
+                {
+                    write!(
+                        fmt,
+                        "API error: {}",
+                        raw_error
+                            .into_iter()
+                            .filter_map(|b| {
+                                let c = *b as char;
+                                if c.is_ascii_alphanumeric()
+                                    || c.is_ascii_punctuation()
+                                    || c.is_ascii_whitespace()
+                                {
+                                    Some(c)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<String>()
+                    )
+                } else {
+                    write!(fmt, "{}", err)
+                }
             }
             ClientError::IOError(err) => write!(fmt, "An IO error occurred: {}", err),
             ClientError::AlreadyLoggedIn => write!(fmt, "Already logged in with another user."),
