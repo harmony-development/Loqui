@@ -4,6 +4,7 @@ pub mod logout;
 
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -47,6 +48,7 @@ use room_list::build_guild_list;
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    QuickSwitch,
     EditMessage(Option<u64>),
     ClearError,
     /// Sent when the user wants to send a message.
@@ -116,6 +118,7 @@ pub struct MainScreen {
 
     // Join room screen state
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
+    guild_last_channels: HashMap<u64, u64>,
     current_guild_id: Option<u64>,
     current_channel_id: Option<u64>,
     editing_message: Option<u64>,
@@ -550,6 +553,9 @@ impl MainScreen {
         }
 
         match msg {
+            Message::QuickSwitch => {
+                tracing::info!("quick");
+            }
             Message::EditMessage(id) => {
                 if self.editing_message.is_some() && self.editing_message == id {
                     self.editing_message = None;
@@ -948,51 +954,63 @@ impl MainScreen {
                 );
             }
             Message::GuildChanged(guild_id) => {
+                self.editing_message = None;
+                self.message.clear();
                 self.current_guild_id = Some(guild_id);
-                if client
-                    .get_guild(guild_id)
-                    .map_or(false, |guild| guild.channels.is_empty())
-                {
-                    let inner = client.inner().clone();
+                if let Some(guild) = client.get_guild(guild_id) {
+                    if guild.channels.is_empty() {
+                        let inner = client.inner().clone();
 
-                    return Command::perform(
-                        async move {
-                            let guildid = GuildId::new(guild_id);
-                            let channels_list = get_guild_channels(&inner, guildid).await?.channels;
-                            let mut events = Vec::with_capacity(channels_list.len());
-                            for channel in channels_list {
-                                events.push(Event::CreatedChannel(ChannelCreated {
-                                    guild_id,
-                                    channel_id: channel.channel_id,
-                                    is_category: channel.is_category,
-                                    name: channel.channel_name,
-                                    metadata: channel.metadata,
-                                    ..Default::default()
-                                }));
-                            }
+                        return Command::perform(
+                            async move {
+                                let guildid = GuildId::new(guild_id);
+                                let channels_list =
+                                    get_guild_channels(&inner, guildid).await?.channels;
+                                let mut events = Vec::with_capacity(channels_list.len());
+                                for channel in channels_list {
+                                    events.push(Event::CreatedChannel(ChannelCreated {
+                                        guild_id,
+                                        channel_id: channel.channel_id,
+                                        is_category: channel.is_category,
+                                        name: channel.channel_name,
+                                        metadata: channel.metadata,
+                                        ..Default::default()
+                                    }));
+                                }
 
-                            let members = get_guild_members(&inner, guildid).await?.members;
-                            events.reserve(members.len());
-                            for member_id in members {
-                                events.push(Event::JoinedMember(MemberJoined {
-                                    guild_id,
-                                    member_id,
-                                }));
-                            }
+                                let members = get_guild_members(&inner, guildid).await?.members;
+                                events.reserve(members.len());
+                                for member_id in members {
+                                    events.push(Event::JoinedMember(MemberJoined {
+                                        guild_id,
+                                        member_id,
+                                    }));
+                                }
 
-                            Ok(events)
-                        },
-                        |result| {
-                            result.map_or_else(
-                                |err| super::Message::Error(Box::new(err)),
-                                super::Message::EventsReceived,
-                            )
-                        },
-                    );
+                                Ok(events)
+                            },
+                            |result| {
+                                result.map_or_else(
+                                    |err| super::Message::Error(Box::new(err)),
+                                    super::Message::EventsReceived,
+                                )
+                            },
+                        );
+                    } else {
+                        self.current_channel_id = self
+                            .guild_last_channels
+                            .get(&guild_id)
+                            .copied()
+                            .or_else(|| Some(*guild.channels.first().unwrap().0));
+                    }
                 }
             }
             Message::ChannelChanged(channel_id) => {
+                self.editing_message = None;
+                self.message.clear();
                 self.current_channel_id = Some(channel_id);
+                self.guild_last_channels
+                    .insert(self.current_guild_id.unwrap(), channel_id);
                 if let Some((disp, disp_at)) = self
                     .current_guild_id
                     .map(|guild_id| client.get_channel(guild_id, channel_id))
@@ -1042,18 +1060,27 @@ impl MainScreen {
     }
 
     pub fn subscription(&self) -> Subscription<super::Message> {
-        fn filter_events(
-            ev: iced_native::Event,
-            _status: iced_native::event::Status,
-        ) -> Option<super::Message> {
-            if let iced_native::Event::Keyboard(iced::keyboard::Event::KeyReleased {
-                key_code: iced_native::keyboard::KeyCode::Escape,
+        use iced_native::{
+            keyboard::{self, KeyCode},
+            Event,
+        };
+
+        fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<super::Message> {
+            if let Event::Keyboard(keyboard::Event::KeyReleased {
+                key_code: KeyCode::Escape,
                 ..
             }) = ev
             {
-                return Some(super::Message::MainScreen(Message::EditMessage(None)));
+                Some(super::Message::MainScreen(Message::EditMessage(None)))
+            } else if let Event::Keyboard(keyboard::Event::KeyReleased {
+                key_code: KeyCode::K,
+                modifiers: keyboard::Modifiers { control: true, .. },
+            }) = ev
+            {
+                Some(super::Message::MainScreen(Message::QuickSwitch))
+            } else {
+                None
             }
-            None
         }
 
         iced_native::subscription::events_with(filter_events)

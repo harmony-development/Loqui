@@ -114,6 +114,13 @@ impl Screen {
             Screen::Main(screen) => screen.on_error(error),
         }
     }
+
+    fn subscription(&self) -> Subscription<Message> {
+        match self {
+            Screen::Main(screen) => screen.subscription(),
+            _ => Subscription::none(),
+        }
+    }
 }
 
 pub struct ScreenStack {
@@ -718,7 +725,10 @@ impl Application for ScreenManager {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        iced::time::every(Duration::from_secs(5)).map(|_| Message::Nothing)
+        let time_sub = iced::time::every(Duration::from_secs(5)).map(|_| Message::Nothing);
+        let main_sub = self.screens.current().subscription();
+
+        Subscription::batch(vec![time_sub, main_sub])
     }
 
     fn view(&mut self) -> Element<Self::Message> {
