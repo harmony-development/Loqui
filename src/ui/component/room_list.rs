@@ -3,7 +3,7 @@ use crate::{
     label,
     ui::{
         component::*,
-        style::{Theme, PADDING, SPACING},
+        style::{Theme, DEF_SIZE, PADDING, SPACING},
     },
 };
 
@@ -38,7 +38,7 @@ pub fn build_channel_list<'a, Message: Clone + 'a>(
     for ((channel_id, channel), button_state) in channels.iter().zip(buttons_state.iter_mut()) {
         let channel_name_prefix = if channel.is_category { "+" } else { "#" };
         let channel_name_formatted = format!("{}{}", channel_name_prefix, channel.name);
-        let content = label!(channel_name_formatted);
+        let content = label!(channel_name_formatted).size(DEF_SIZE - 2);
 
         let mut but = Button::new(button_state, content)
             .width(length!(+))

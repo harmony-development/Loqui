@@ -4,10 +4,11 @@ use iced::{
     text_input, Color,
 };
 
-pub const MESSAGE_TIMESTAMP_SIZE: u16 = 13;
-pub const MESSAGE_SIZE: u16 = 16;
-pub const MESSAGE_SENDER_SIZE: u16 = 19;
-pub const DATE_SEPERATOR_SIZE: u16 = 22;
+pub const DEF_SIZE: u16 = 20;
+pub const MESSAGE_TIMESTAMP_SIZE: u16 = 14;
+pub const MESSAGE_SIZE: u16 = 18;
+pub const MESSAGE_SENDER_SIZE: u16 = 21;
+pub const DATE_SEPERATOR_SIZE: u16 = 24;
 
 pub const PADDING: u16 = 16;
 pub const SPACING: u16 = 4;
@@ -49,6 +50,22 @@ impl Theme {
     pub const fn round(mut self) -> Self {
         self.round = true;
         self
+    }
+
+    pub fn with_border_color(self, color: Color) -> Box<dyn container::StyleSheet> {
+        struct TempBorderColor(container::Style);
+
+        impl container::StyleSheet for TempBorderColor {
+            fn style(&self) -> container::Style {
+                self.0
+            }
+        }
+
+        let style: Box<dyn container::StyleSheet> = self.into();
+        let mut style = style.style();
+        style.border_color = color;
+        style.border_width = 1.0;
+        TempBorderColor(style).into()
     }
 }
 
@@ -183,14 +200,6 @@ impl From<Theme> for Box<dyn iced_aw::modal::StyleSheet> {
         } else {
             Default::default()
         }
-    }
-}
-
-pub struct TransparentButton;
-
-impl From<TransparentButton> for Box<dyn button::StyleSheet> {
-    fn from(_: TransparentButton) -> Self {
-        dark::TransparentButton.into()
     }
 }
 
@@ -416,33 +425,6 @@ mod dark {
 
         fn disabled(&self) -> button::Style {
             self.hovered()
-        }
-    }
-
-    pub struct TransparentButton;
-
-    impl button::StyleSheet for TransparentButton {
-        fn active(&self) -> button::Style {
-            button::Style {
-                background: None,
-                border_color: Color::TRANSPARENT,
-                border_radius: 0.0,
-                border_width: 0.0,
-                text_color: Color::WHITE,
-                ..button::Style::default()
-            }
-        }
-
-        fn hovered(&self) -> button::Style {
-            self.active()
-        }
-
-        fn pressed(&self) -> button::Style {
-            self.active()
-        }
-
-        fn disabled(&self) -> button::Style {
-            self.active()
         }
     }
 

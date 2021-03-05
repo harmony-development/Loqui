@@ -34,10 +34,10 @@ impl LogoutModal {
 
             let logout_confirm_panel = column(
                     vec![
-                        label!("Do you want to logout?").size(18).height(length!(%2)).into(),
+                        label!("Do you want to logout?").size(22).height(length!(%2)).into(),
                         label!("This will delete your current session and you will need to login with your password.")
                             .color(ERROR_COLOR)
-                            .size(18)
+                            .size(22)
                             .height(length!(%3))
                             .into(),
                         row(vec![
@@ -45,7 +45,7 @@ impl LogoutModal {
                             space!(w+).into(),
                             make_button(&mut self.logout_cancel_but_state, false).into(),
                         ])
-                        .height(length!(%6))
+                        .height(length!(%3))
                         .width(length!(+))
                         .into(),
                     ])

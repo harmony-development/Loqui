@@ -98,6 +98,7 @@ pub fn build_event_history<'a>(
         } else {
             name_to_use
         };
+        let sender_color = theme.calculate_sender_color(sender_display_name.len());
         let sender_avatar_url = if let Some(overrides) = &message.overrides {
             overrides.avatar_url.as_ref()
         } else {
@@ -121,7 +122,7 @@ pub fn build_event_history<'a>(
             widgets.push(
                 Container::new(
                     label!("[{}]", sender_display_name)
-                        .color(theme.calculate_sender_color(sender_display_name.len()))
+                        .color(sender_color)
                         .size(MESSAGE_SENDER_SIZE),
                 )
                 .align_x(align!(|<))
@@ -255,25 +256,25 @@ pub fn build_event_history<'a>(
             .into();
         let mut message_row = Vec::with_capacity(2);
 
-        if is_sender_different || last_timestamp.minute() != message.timestamp.minute() {
+        let maybe_timestamp = if is_sender_different
+            || last_timestamp.minute() != message.timestamp.minute()
+        {
             let message_timestamp = message.timestamp.format("%H:%M").to_string();
 
             let timestamp_label = label!(message_timestamp)
                 .size(MESSAGE_TIMESTAMP_SIZE)
                 .color(color!(160, 160, 160));
 
-            message_row.push(
-                Column::with_children(vec![
-                    space!(h = PADDING / 8).into(),
-                    Row::with_children(vec![
-                        timestamp_label.into(),
-                        space!(h = PADDING / 4).into(),
-                    ])
+            Column::with_children(vec![
+                space!(h = PADDING / 8).into(),
+                Row::with_children(vec![timestamp_label.into(), space!(h = PADDING / 2).into()])
                     .into(),
-                ])
-                .into(),
-            );
-        }
+            ])
+            .into()
+        } else {
+            space!(w = PADDING * 2 - (PADDING / 4 + PADDING / 16)).into()
+        };
+        message_row.push(maybe_timestamp);
         message_row.push(msg_body);
 
         message_group.push(row(message_row).padding(0).into());

@@ -1,6 +1,8 @@
+#![windows_subsystem = "windows"]
+
 use client::content::ContentStore;
 use iced::{Application, Settings};
-use ui::screen::ScreenManager;
+use ui::{screen::ScreenManager, style::DEF_SIZE};
 
 pub mod client;
 pub mod ui;
@@ -20,6 +22,7 @@ async fn main() {
     settings.window.size = (1280, 720);
     settings.antialiasing = true;
     settings.default_font = Some(include_bytes!("NotoSans-Regular.ttf"));
+    settings.default_text_size = DEF_SIZE;
 
     ScreenManager::run(settings).unwrap();
 }

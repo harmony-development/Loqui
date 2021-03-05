@@ -16,7 +16,7 @@ use super::style::{PADDING, SPACING};
 pub fn column<M>(children: Vec<Element<M>>) -> Column<M> {
     Column::with_children(children)
         .align_items(align!(|))
-        .padding(PADDING)
+        .padding(PADDING / 2)
         .spacing(SPACING)
 }
 
@@ -24,7 +24,7 @@ pub fn column<M>(children: Vec<Element<M>>) -> Column<M> {
 pub fn row<M>(children: Vec<Element<M>>) -> Row<M> {
     Row::with_children(children)
         .align_items(align!(|))
-        .padding(PADDING)
+        .padding(PADDING / 2)
         .spacing(SPACING)
 }
 

@@ -18,7 +18,7 @@ use crate::{
     label, length, space,
     ui::{
         component::{event_history::SHOWN_MSGS_LIMIT, *},
-        style::{Theme, ALT_COLOR, MESSAGE_SIZE, PADDING, SPACING},
+        style::{Theme, ALT_COLOR, DEF_SIZE, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
 use channel::{get_channel_messages, GetChannelMessages};
