@@ -626,7 +626,8 @@ impl Application for ScreenManager {
                 return Command::batch(cmds);
             }
             Message::Error(err) => {
-                tracing::error!("\n{}\n{:?}", err, err);
+                let err_disp = err.to_string();
+                tracing::error!("{}\n{:?}", err_disp, err);
 
                 if matches!(
                     &*err,
@@ -637,31 +638,10 @@ impl Application for ScreenManager {
                     self.socket_reset = true;
                 }
 
-                if err.to_string().contains("connect error") {
+                if err_disp.contains("invalid-session") || err_disp.contains("connect error") {
                     self.update(Message::Logout(
                         Screen::Login(LoginScreen::new(self.content_store.clone())).into(),
                     ));
-                }
-
-                if let ClientError::Internal(
-                    harmony_rust_sdk::client::error::ClientError::Internal(
-                        harmony_rust_sdk::api::exports::hrpc::client::ClientError::EndpointError {
-                            raw_error,
-                            ..
-                        },
-                    ),
-                ) = err.as_ref()
-                {
-                    if raw_error
-                        .iter()
-                        .map(|b| *b as char)
-                        .collect::<String>()
-                        .contains("invalid-session")
-                    {
-                        self.update(Message::Logout(
-                            Screen::Login(LoginScreen::new(self.content_store.clone())).into(),
-                        ));
-                    }
                 }
 
                 return self.screens.current_mut().on_error(*err);
