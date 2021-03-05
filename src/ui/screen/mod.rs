@@ -638,8 +638,9 @@ impl Application for ScreenManager {
                 }
 
                 if err.to_string().contains("connect error") {
-                    self.screens
-                        .clear(Screen::Login(LoginScreen::new(self.content_store.clone())));
+                    self.update(Message::Logout(
+                        Screen::Login(LoginScreen::new(self.content_store.clone())).into(),
+                    ));
                 }
 
                 if let ClientError::Internal(
@@ -657,8 +658,9 @@ impl Application for ScreenManager {
                         .collect::<String>()
                         .contains("invalid-session")
                     {
-                        self.screens
-                            .clear(Screen::Login(LoginScreen::new(self.content_store.clone())));
+                        self.update(Message::Logout(
+                            Screen::Login(LoginScreen::new(self.content_store.clone())).into(),
+                        ));
                     }
                 }
 
