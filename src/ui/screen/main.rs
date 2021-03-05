@@ -1,10 +1,10 @@
 pub mod create_channel;
 pub mod image_viewer;
 pub mod logout;
+pub mod quick_switcher;
 
 use std::{
     cmp::Ordering,
-    collections::HashMap,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -43,8 +43,11 @@ use harmony_rust_sdk::{
 };
 use iced_aw::{modal, Modal};
 use image_viewer::ImageViewerModal;
+use indexmap::IndexMap;
 use logout::LogoutModal;
 use room_list::build_guild_list;
+
+use self::quick_switcher::QuickSwitcherModal;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -89,6 +92,7 @@ pub enum Message {
     LogoutChoice(bool),
     ChannelCreationMessage(create_channel::Message),
     ImageViewMessage(image_viewer::Message),
+    QuickSwitchMsg(quick_switcher::Message),
 }
 
 #[derive(Debug, Default)]
@@ -115,10 +119,11 @@ pub struct MainScreen {
     logout_modal: modal::State<LogoutModal>,
     create_channel_modal: modal::State<ChannelCreationModal>,
     pub image_viewer_modal: modal::State<ImageViewerModal>,
+    quick_switcher_modal: modal::State<QuickSwitcherModal>,
 
     // Join room screen state
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
-    guild_last_channels: HashMap<u64, u64>,
+    guild_last_channels: IndexMap<u64, u64>,
     current_guild_id: Option<u64>,
     current_channel_id: Option<u64>,
     editing_message: Option<u64>,
@@ -498,6 +503,13 @@ impl MainScreen {
             .into()
         };
 
+        let content = Modal::new(&mut self.quick_switcher_modal, content, move |state| {
+            state.view(theme).map(Message::QuickSwitchMsg)
+        })
+        .style(theme)
+        .backdrop(Message::QuickSwitch)
+        .on_esc(Message::QuickSwitch);
+
         let content = Modal::new(&mut self.logout_modal, content, move |state| {
             state.view(theme).map(Message::LogoutChoice)
         })
@@ -554,8 +566,120 @@ impl MainScreen {
 
         match msg {
             Message::QuickSwitch => {
-                tracing::info!("quick");
+                self.quick_switcher_modal
+                    .show(!self.quick_switcher_modal.is_shown());
+                let cmd = self.update(Message::EditMessage(None), client, thumbnail_cache);
+                let cmd2 = self.update(
+                    Message::QuickSwitchMsg(quick_switcher::Message::SearchTermChanged(
+                        self.quick_switcher_modal.inner().search_value.clone(),
+                    )),
+                    client,
+                    thumbnail_cache,
+                );
+                return Command::batch(vec![cmd, cmd2]);
             }
+            Message::QuickSwitchMsg(msg) => match msg {
+                quick_switcher::Message::SwitchToChannel {
+                    guild_id,
+                    channel_id,
+                } => {
+                    let cmd = self.update(Message::GuildChanged(guild_id), client, thumbnail_cache);
+                    let cmd2 =
+                        self.update(Message::ChannelChanged(channel_id), client, thumbnail_cache);
+                    self.quick_switcher_modal.show(false);
+                    self.quick_switcher_modal.inner_mut().search_value.clear();
+                    return Command::batch(vec![cmd, cmd2]);
+                }
+                quick_switcher::Message::SwitchToGuild(guild_id) => {
+                    let cmd = self.update(Message::GuildChanged(guild_id), client, thumbnail_cache);
+                    self.quick_switcher_modal.show(false);
+                    self.quick_switcher_modal.inner_mut().search_value.clear();
+                    return cmd;
+                }
+                quick_switcher::Message::SearchTermChanged(new_term) => {
+                    let guild = |pattern: &str| {
+                        let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+                        let mut guilds = client
+                            .guilds
+                            .iter()
+                            .map(|(id, g)| (*id, g.name.as_str()))
+                            .flat_map(|(id, name)| {
+                                Some((matcher.fuzzy(name, pattern, false)?.0, id, name))
+                            })
+                            .collect::<Vec<_>>();
+                        guilds.sort_unstable_by_key(|(score, _, _)| *score);
+                        guilds
+                            .into_iter()
+                            .rev()
+                            .map(|(_, id, name)| quick_switcher::SearchResult::Guild {
+                                id,
+                                name: name.to_string(),
+                            })
+                            .collect::<Vec<_>>()
+                    };
+
+                    let channel = |pattern: &str| {
+                        let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+                        let mut channels = client
+                            .guilds
+                            .iter()
+                            .flat_map(|(gid, g)| {
+                                g.channels
+                                    .iter()
+                                    .map(move |(cid, c)| (*gid, *cid, c.name.as_str()))
+                                    .flat_map(|(gid, cid, name)| {
+                                        Some((
+                                            matcher.fuzzy(name, pattern, false)?.0,
+                                            gid,
+                                            cid,
+                                            name,
+                                        ))
+                                    })
+                            })
+                            .collect::<Vec<_>>();
+                        channels.sort_unstable_by_key(|(score, _, _, _)| *score);
+                        channels
+                            .into_iter()
+                            .rev()
+                            .map(
+                                |(_, gid, cid, name)| quick_switcher::SearchResult::Channel {
+                                    guild_id: gid,
+                                    id: cid,
+                                    name: name.to_string(),
+                                },
+                            )
+                            .collect()
+                    };
+
+                    let term_trimmed = new_term.trim();
+                    if term_trimmed.is_empty() {
+                        self.quick_switcher_modal.inner_mut().results = self
+                            .guild_last_channels
+                            .iter()
+                            .map(|(gid, cid)| quick_switcher::SearchResult::Channel {
+                                guild_id: *gid,
+                                id: *cid,
+                                name: client
+                                    .get_channel(*gid, *cid)
+                                    .map(|c| c.name.clone())
+                                    .unwrap_or_else(|| "unknown".to_string()),
+                            })
+                            .collect();
+                    } else if let Some(pattern) = new_term.strip_prefix("*").map(str::trim) {
+                        self.quick_switcher_modal.inner_mut().results = guild(pattern);
+                    } else if let Some(pattern) = new_term.strip_prefix("#").map(str::trim) {
+                        self.quick_switcher_modal.inner_mut().results = channel(pattern);
+                    } else {
+                        self.quick_switcher_modal.inner_mut().results = guild(term_trimmed);
+                        let mut channels = channel(term_trimmed);
+                        self.quick_switcher_modal
+                            .inner_mut()
+                            .results
+                            .append(&mut channels);
+                    }
+                    self.quick_switcher_modal.inner_mut().search_value = new_term;
+                }
+            },
             Message::EditMessage(id) => {
                 if self.editing_message.is_some() && self.editing_message == id {
                     self.editing_message = None;
@@ -588,6 +712,7 @@ impl MainScreen {
             Message::OpenImageView { handle, path } => {
                 self.image_viewer_modal.show(true);
                 self.image_viewer_modal.inner_mut().image_handle = Some((handle, path));
+                return self.update(Message::EditMessage(None), client, thumbnail_cache);
             }
             Message::ImageViewMessage(msg) => {
                 let (cmd, go_back) = self.image_viewer_modal.inner_mut().update(msg);
@@ -693,11 +818,13 @@ impl MainScreen {
             Message::SelectedChannelMenuOption(option) => {
                 if let "New Channel" = option.as_str() {
                     self.create_channel_modal.show(true);
+                    return self.update(Message::EditMessage(None), client, thumbnail_cache);
                 }
             }
             Message::SelectedMenuOption(option) => match option.as_str() {
                 "Logout" => {
                     self.logout_modal.show(true);
+                    return self.update(Message::EditMessage(None), client, thumbnail_cache);
                 }
                 "Join / Create a Guild" => {
                     return Command::perform(async {}, |_| {
@@ -1089,9 +1216,10 @@ impl MainScreen {
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
         self.error_text = error.to_string().replace('\n', "");
         self.logout_modal.show(false);
-        let cmd = self.create_channel_modal.inner_mut().on_error(&error);
-        let cmd = Command::batch(vec![cmd, self.logout_modal.inner_mut().on_error(&error)]);
 
-        cmd
+        Command::batch(vec![
+            self.create_channel_modal.inner_mut().on_error(&error),
+            self.logout_modal.inner_mut().on_error(&error),
+        ])
     }
 }
