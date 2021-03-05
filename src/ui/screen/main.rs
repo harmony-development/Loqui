@@ -47,6 +47,7 @@ use room_list::build_guild_list;
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    EditMessage(Option<u64>),
     ClearError,
     /// Sent when the user wants to send a message.
     SendMessageComposer {
@@ -93,6 +94,7 @@ pub struct MainScreen {
     // Event history area state
     event_history_state: scrollable::State,
     content_open_buts_state: [button::State; SHOWN_MSGS_LIMIT],
+    edit_buts_sate: [button::State; SHOWN_MSGS_LIMIT],
     send_file_but_state: button::State,
     composer_state: text_input::State,
     scroll_to_bottom_but_state: button::State,
@@ -116,6 +118,7 @@ pub struct MainScreen {
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
     current_guild_id: Option<u64>,
     current_channel_id: Option<u64>,
+    editing_message: Option<u64>,
     /// The message the user is currently typing.
     message: String,
     error_text: String,
@@ -325,6 +328,8 @@ impl MainScreen {
                     &mut self.event_history_state,
                     &mut self.content_open_buts_state,
                     &mut self.embed_buttons_state,
+                    &mut self.edit_buts_sate,
+                    self.editing_message,
                     theme,
                 );
 
@@ -545,6 +550,29 @@ impl MainScreen {
         }
 
         match msg {
+            Message::EditMessage(id) => {
+                if self.editing_message.is_some() && self.editing_message == id {
+                    self.editing_message = None;
+                    self.message.clear();
+                } else {
+                    self.editing_message = id;
+                    if let (Some(gid), Some(cid), Some(mid)) =
+                        (self.current_guild_id, self.current_channel_id, id)
+                    {
+                        self.composer_state.focus();
+                        if let Some(msg) = client
+                            .get_channel(gid, cid)
+                            .map(|c| c.messages.iter_mut().rev().find(|m| m.id.id() == Some(mid)))
+                            .flatten()
+                        {
+                            self.message = msg.content.clone();
+                        }
+                    } else {
+                        self.composer_state.unfocus();
+                        self.message.clear();
+                    }
+                }
+            }
             Message::ClearError => {
                 self.error_text.clear();
             }
@@ -779,25 +807,51 @@ impl MainScreen {
                 guild_id,
                 channel_id,
             } => {
-                if !self.message.is_empty() {
-                    let message = IcyMessage {
-                        content: self.message.drain(..).collect::<String>(),
-                        sender: client.user_id.unwrap(),
-                        ..Default::default()
+                if !self.message.trim().is_empty() {
+                    return if let Some(id) = self.editing_message {
+                        let new_content: String =
+                            self.message.drain(..).collect::<String>().trim().into();
+                        if let Some(msg) = client
+                            .get_channel(guild_id, channel_id)
+                            .map(|c| c.messages.iter_mut().find(|m| m.id.id() == Some(id)))
+                            .flatten()
+                        {
+                            msg.being_edited = Some(new_content.clone());
+                        }
+                        self.editing_message = None;
+                        Command::perform(
+                            async move {
+                                super::Message::EditMessage {
+                                    guild_id,
+                                    channel_id,
+                                    message_id: id,
+                                    new_content,
+                                }
+                            },
+                            |msg| msg,
+                        )
+                    } else {
+                        let message = IcyMessage {
+                            content: self.message.drain(..).collect::<String>().trim().into(),
+                            sender: client.user_id.unwrap(),
+                            ..Default::default()
+                        };
+                        scroll_to_bottom(client, guild_id, channel_id);
+                        self.event_history_state.scroll_to_bottom();
+                        Command::perform(
+                            async move {
+                                super::Message::SendMessage {
+                                    message,
+                                    retry_after: Duration::from_secs(0),
+                                    guild_id,
+                                    channel_id,
+                                }
+                            },
+                            |msg| msg,
+                        )
                     };
-                    scroll_to_bottom(client, guild_id, channel_id);
-                    self.event_history_state.scroll_to_bottom();
-                    return Command::perform(
-                        async move {
-                            super::Message::SendMessage {
-                                message,
-                                retry_after: Duration::from_secs(0),
-                                guild_id,
-                                channel_id,
-                            }
-                        },
-                        |msg| msg,
-                    );
+                } else {
+                    self.editing_message = None;
                 }
             }
             Message::SendFiles {
@@ -985,6 +1039,24 @@ impl MainScreen {
         }
 
         Command::none()
+    }
+
+    pub fn subscription(&self) -> Subscription<super::Message> {
+        fn filter_events(
+            ev: iced_native::Event,
+            _status: iced_native::event::Status,
+        ) -> Option<super::Message> {
+            if let iced_native::Event::Keyboard(iced::keyboard::Event::KeyReleased {
+                key_code: iced_native::keyboard::KeyCode::Escape,
+                ..
+            }) = ev
+            {
+                return Some(super::Message::MainScreen(Message::EditMessage(None)));
+            }
+            None
+        }
+
+        iced_native::subscription::events_with(filter_events)
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {

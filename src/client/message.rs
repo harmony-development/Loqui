@@ -108,6 +108,7 @@ pub struct Message {
     pub attachments: Vec<Attachment>,
     pub overrides: Option<Override>,
     pub embeds: Vec<Embed>,
+    pub being_edited: Option<String>,
 }
 
 impl Default for Message {
@@ -123,6 +124,7 @@ impl Default for Message {
             attachments: Default::default(),
             overrides: None,
             embeds: Default::default(),
+            being_edited: None,
         }
     }
 }
@@ -203,6 +205,7 @@ impl From<HarmonyMessage> for Message {
                 .into_iter()
                 .flat_map(Attachment::from_harmony_attachment)
                 .collect(),
+            being_edited: None,
         }
     }
 }

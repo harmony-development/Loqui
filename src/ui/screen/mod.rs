@@ -5,6 +5,7 @@ pub mod main;
 pub use guild_discovery::GuildDiscovery;
 pub use login::LoginScreen;
 pub use main::MainScreen;
+use message::UpdateMessage;
 
 use crate::{
     client::{
@@ -30,7 +31,7 @@ use harmony_rust_sdk::{
             auth::AuthStepResponse,
             chat::{
                 guild::{get_guild, get_guild_list},
-                message::{SendMessage, SendMessageSelfBuilder},
+                message::{self, SendMessage, SendMessageSelfBuilder},
                 profile::get_user,
                 EventSource, GuildId, UserId,
             },
@@ -81,6 +82,18 @@ pub enum Message {
         retry_after: Duration,
         guild_id: u64,
         channel_id: u64,
+    },
+    MessageEdited {
+        guild_id: u64,
+        channel_id: u64,
+        message_id: u64,
+        err: Option<Box<ClientError>>,
+    },
+    EditMessage {
+        guild_id: u64,
+        channel_id: u64,
+        message_id: u64,
+        new_content: String,
     },
     /// Sent whenever an error occurs.
     Error(Box<ClientError>),
@@ -481,6 +494,65 @@ impl Application for ScreenManager {
                     msg.id = MessageId::Ack(message_id);
                 }
             }
+            Message::MessageEdited {
+                guild_id,
+                channel_id,
+                message_id,
+                err,
+            } => {
+                let client = self.client.as_mut().unwrap();
+
+                if let Some(msg) = client
+                    .get_channel(guild_id, channel_id)
+                    .map(|c| {
+                        c.messages
+                            .iter_mut()
+                            .find(|m| m.id.id() == Some(message_id))
+                    })
+                    .flatten()
+                {
+                    msg.being_edited = None;
+                }
+
+                if let Some(err) = err {
+                    return self.update(Message::Error(err));
+                }
+            }
+            Message::EditMessage {
+                guild_id,
+                channel_id,
+                message_id,
+                new_content,
+            } => {
+                let inner = self.client.as_ref().unwrap().inner().clone();
+
+                return Command::perform(
+                    async move {
+                        let result = message::update_message(
+                            &inner,
+                            UpdateMessage::new(guild_id, channel_id, message_id)
+                                .new_content(new_content),
+                        )
+                        .await;
+
+                        result.map_or_else(
+                            |err| Message::MessageEdited {
+                                guild_id,
+                                channel_id,
+                                message_id,
+                                err: Some(Box::new(err.into())),
+                            },
+                            |_| Message::MessageEdited {
+                                guild_id,
+                                channel_id,
+                                message_id,
+                                err: None,
+                            },
+                        )
+                    },
+                    |m| m,
+                );
+            }
             Message::SendMessage {
                 message,
                 retry_after,
@@ -525,12 +597,7 @@ impl Application for ScreenManager {
                                         }
                                     }));
 
-                            let send_result =
-                                harmony_rust_sdk::client::api::chat::message::send_message(
-                                    &inner,
-                                    send_message,
-                                )
-                                .await;
+                            let send_result = message::send_message(&inner, send_message).await;
 
                             match send_result {
                                 Ok(resp) => Message::MessageSent {

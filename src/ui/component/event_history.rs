@@ -10,8 +10,8 @@ use crate::{
         component::*,
         screen::main::Message,
         style::{
-            Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, MESSAGE_SENDER_SIZE,
-            MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
+            Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR,
+            MESSAGE_SENDER_SIZE, MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
         },
     },
 };
@@ -33,6 +33,8 @@ pub fn build_event_history<'a>(
     scrollable_state: &'a mut scrollable::State,
     content_open_buttons: &'a mut [button::State; SHOWN_MSGS_LIMIT],
     embed_buttons: &'a mut [[(button::State, button::State); SHOWN_MSGS_LIMIT]; SHOWN_MSGS_LIMIT],
+    edit_buts_sate: &'a mut [button::State; SHOWN_MSGS_LIMIT],
+    editing_msg: Option<u64>,
     theme: Theme,
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
@@ -66,10 +68,11 @@ pub fn build_event_history<'a>(
     let mut last_sender_name = None;
     let mut message_group = vec![];
 
-    for ((message, media_open_button_state), embed_buts) in displayable_events
+    for (((message, media_open_button_state), embed_buts), edit_but_state) in displayable_events
         .iter()
         .zip(content_open_buttons.iter_mut())
         .zip(embed_buttons.iter_mut())
+        .zip(edit_buts_sate.iter_mut())
     {
         let id_to_use = if !message.id.is_ack() {
             current_user_id
@@ -184,15 +187,19 @@ pub fn build_event_history<'a>(
 
         let mut message_body_widgets = Vec::with_capacity(2);
 
-        if !message.content.is_empty() {
-            let mut message_text = label!(&message.content).size(MESSAGE_SIZE);
+        let mut message_text = label!(message
+            .being_edited
+            .as_deref()
+            .unwrap_or_else(|| message.content.as_str()))
+        .size(MESSAGE_SIZE);
 
-            if !message.id.is_ack() {
-                message_text = message_text.color(color!(200, 200, 200));
-            }
-
-            message_body_widgets.push(message_text.into());
+        if !message.id.is_ack() || message.being_edited.is_some() {
+            message_text = message_text.color(color!(200, 200, 200));
+        } else if editing_msg == message.id.id() {
+            message_text = message_text.color(ERROR_COLOR);
         }
+
+        message_body_widgets.push(message_text.into());
 
         for (e, (h_but_state, f_but_state)) in message.embeds.iter().zip(embed_buts.iter_mut()) {
             let put_heading = |embed: &mut Vec<Element<'a, Message>>,
@@ -353,8 +360,7 @@ pub fn build_event_history<'a>(
         let msg_body = column(message_body_widgets)
             .align_items(Align::Start)
             .padding(0)
-            .spacing(MSG_LR_PADDING)
-            .into();
+            .spacing(MSG_LR_PADDING);
         let mut message_row = Vec::with_capacity(2);
 
         let maybe_timestamp = if is_sender_different
@@ -376,7 +382,15 @@ pub fn build_event_history<'a>(
             space!(w = PADDING * 2 - (PADDING / 4 + PADDING / 16)).into()
         };
         message_row.push(maybe_timestamp);
-        message_row.push(msg_body);
+        let mut but = Button::new(edit_but_state, msg_body)
+            .padding(1)
+            .style(theme.embed());
+        if current_user_id == message.sender {
+            if let Some(id) = message.id.id() {
+                but = but.on_press(Message::EditMessage(Some(id)));
+            }
+        }
+        message_row.push(but.into());
 
         message_group.push(row(message_row).padding(0).into());
 
