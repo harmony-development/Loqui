@@ -43,13 +43,13 @@ jobs:
         name: clippy-linux
 
     - name: Build
-      run: cargo build
+      run: cargo build --release
     
     - name: Artifact
       uses: actions/upload-artifact@v2.2.2
       with:
         name: build-linux
-        path: target/debug/crust
+        path: target/release/crust
 
   build-win:
     runs-on: windows-latest
@@ -70,13 +70,13 @@ jobs:
         name: clippy-win
 
     - name: Build
-      run: cargo build
+      run: cargo build --release
     
     - name: Artifact
       uses: actions/upload-artifact@v2.2.2
       with:
         name: build-win
-        path: target/debug/crust.exe
+        path: target/release/crust.exe
 
   build-mac:
     runs-on: macos-latest
@@ -105,10 +105,10 @@ jobs:
       run: cargo install cargo-bundle
 
     - name: Build
-      run: cargo bundle
+      run: cargo bundle --release
     
     - name: Artifact
       uses: actions/upload-artifact@v2.2.2
       with:
         name: build-mac
-        path: target/debug/bundle/osx/Crust.app
+        path: target/release/bundle/osx/Crust.app
