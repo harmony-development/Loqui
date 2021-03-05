@@ -3,7 +3,7 @@ use crate::{
     label, label_button, length, space,
     ui::{
         component::*,
-        style::{Theme, ERROR_COLOR},
+        style::{Theme, DEF_SIZE, ERROR_COLOR},
     },
 };
 
@@ -34,10 +34,10 @@ impl LogoutModal {
 
             let logout_confirm_panel = column(
                     vec![
-                        label!("Do you want to logout?").size(22).height(length!(%2)).into(),
+                        label!("Do you want to logout?").size(DEF_SIZE + 2).height(length!(%2)).into(),
                         label!("This will delete your current session and you will need to login with your password.")
                             .color(ERROR_COLOR)
-                            .size(22)
+                            .size(DEF_SIZE + 2)
                             .height(length!(%3))
                             .into(),
                         row(vec![

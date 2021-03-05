@@ -120,26 +120,26 @@ pub fn build_event_history<'a>(
             }
 
             widgets.push(
-                Container::new(
-                    label!("[{}]", sender_display_name)
-                        .color(sender_color)
-                        .size(MESSAGE_SENDER_SIZE),
-                )
-                .align_x(align!(|<))
-                .align_y(align!(>|))
-                .into(),
+                label!("[{}]", sender_display_name)
+                    .color(sender_color)
+                    .size(MESSAGE_SENDER_SIZE)
+                    .into(),
             );
 
             if let Some(reason) = &override_reason {
                 widgets.push(
-                    Container::new(label!(reason).color(ALT_COLOR).size(MESSAGE_SIZE))
-                        .align_x(align!(|<))
-                        .align_y(align!(>|))
+                    label!(reason)
+                        .color(ALT_COLOR)
+                        .size(MESSAGE_SIZE)
+                        .width(length!(-))
                         .into(),
                 );
             }
 
-            row(widgets).spacing(MSG_LR_PADDING).padding(0)
+            row(widgets)
+                .max_height(AVATAR_WIDTH as u32)
+                .spacing(MSG_LR_PADDING)
+                .padding(0)
         };
 
         let is_sender_different = last_sender_id.as_ref() != Some(&id_to_use)
@@ -156,6 +156,17 @@ pub fn build_event_history<'a>(
             message_group.push(sender_body_creator(&sender_display_name).into());
         }
 
+        if message.timestamp.day() != last_timestamp.day() {
+            let date_time_seperator = fill_container(
+                label!(message.timestamp.format("[%d %B %Y]").to_string())
+                    .size(DATE_SEPERATOR_SIZE)
+                    .color(color!(153, 153, 153)),
+            )
+            .height(length!(-));
+
+            event_history = event_history.push(date_time_seperator);
+        }
+
         if !is_sender_different
             && !message_group.is_empty()
             && last_timestamp.signed_duration_since(message.timestamp)
@@ -165,16 +176,6 @@ pub fn build_event_history<'a>(
                 Container::new(column(message_group.drain(..).collect()).align_items(align!(|<)))
                     .style(theme.round()),
             );
-            if message.timestamp.day() != last_timestamp.day() {
-                let date_time_seperator = fill_container(
-                    label!(message.timestamp.format("[%d %B %Y]").to_string())
-                        .size(DATE_SEPERATOR_SIZE)
-                        .color(color!(153, 153, 153)),
-                )
-                .height(length!(-));
-
-                event_history = event_history.push(date_time_seperator);
-            }
             message_group.push(sender_body_creator(&sender_display_name).into());
         }
 

@@ -34,7 +34,7 @@ impl ImageViewerModal {
                         .into(),
                     space!(w % 1).into(),
                 ])
-                .height(length!(%18))
+                .height(length!(%26))
                 .into(),
                 row(vec![
                     label_button!(&mut self.external_but_state, "Open externally")
@@ -53,8 +53,6 @@ impl ImageViewerModal {
                 .height(length!(%2))
                 .into(),
             ])
-            .width(length!(+))
-            .height(length!(+))
             .into()
         } else {
             fill_container(space!(w+)).into()

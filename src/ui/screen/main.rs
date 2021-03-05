@@ -18,7 +18,7 @@ use crate::{
     label, length, space,
     ui::{
         component::{event_history::SHOWN_MSGS_LIMIT, *},
-        style::{Theme, ALT_COLOR, MESSAGE_SIZE, PADDING, SPACING},
+        style::{Theme, ALT_COLOR, AVATAR_WIDTH, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
 use channel::{get_channel_messages, GetChannelMessages};
@@ -222,8 +222,8 @@ impl MainScreen {
                 {
                     content.push(
                         fill_container(Image::new(handle.clone()).width(length!(+)))
-                            .width(length!(= 32))
-                            .height(length!(= 32))
+                            .width(length!(= AVATAR_WIDTH))
+                            .height(length!(= AVATAR_WIDTH))
                             .style(theme.round())
                             .into(),
                     );
@@ -235,8 +235,8 @@ impl MainScreen {
                             .next()
                             .unwrap_or('u')
                             .to_ascii_uppercase()))
-                        .width(length!(= 32))
-                        .height(length!(= 32))
+                        .width(length!(= AVATAR_WIDTH))
+                        .height(length!(= AVATAR_WIDTH))
                         .style(theme.round())
                         .into(),
                     );

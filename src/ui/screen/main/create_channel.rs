@@ -95,7 +95,6 @@ impl ChannelCreationModal {
             create_widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
         }
 
-        create_widgets.push(space!(h+).into());
         create_widgets.push(create_text_edit.into());
         create_widgets.push(
             row(vec![
@@ -110,20 +109,17 @@ impl ChannelCreationModal {
         row(vec![
             space!(w % 3).into(),
             column(vec![
-                space!(h % 3).into(),
-                fill_container(column(create_widgets).width(length!(+)).height(length!(+)))
-                    .height(length!(% 4))
+                space!(h % 4).into(),
+                fill_container(column(create_widgets).width(length!(+)))
                     .style(theme.round())
+                    .height(length!(% 3))
                     .into(),
-                space!(h % 3).into(),
+                space!(h % 4).into(),
             ])
             .width(length!(% 4))
-            .height(length!(+))
             .into(),
             space!(w % 3).into(),
         ])
-        .height(length!(+))
-        .width(length!(+))
         .into()
     }
 
