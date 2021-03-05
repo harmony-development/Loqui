@@ -24,6 +24,7 @@ pub struct Theme {
     dark: bool,
     secondary: bool,
     round: bool,
+    embed: bool,
 }
 
 impl Theme {
@@ -52,6 +53,11 @@ impl Theme {
         self
     }
 
+    pub const fn embed(mut self) -> Self {
+        self.embed = true;
+        self
+    }
+
     pub fn with_border_color(self, color: Color) -> Box<dyn container::StyleSheet> {
         struct TempBorderColor(container::Style);
 
@@ -64,7 +70,6 @@ impl Theme {
         let style: Box<dyn container::StyleSheet> = self.into();
         let mut style = style.style();
         style.border_color = color;
-        style.border_width = 1.0;
         TempBorderColor(style).into()
     }
 }
@@ -75,6 +80,7 @@ impl Default for Theme {
             dark: true,
             secondary: false,
             round: false,
+            embed: false,
         }
     }
 }
@@ -83,7 +89,11 @@ impl From<Theme> for Box<dyn container::StyleSheet> {
     fn from(theme: Theme) -> Self {
         if theme.dark {
             if theme.secondary {
-                dark::BrightContainer.into()
+                if theme.round {
+                    dark::BrightRoundContainer.into()
+                } else {
+                    dark::BrightContainer.into()
+                }
             } else if theme.round {
                 dark::RoundContainer.into()
             } else {
@@ -124,6 +134,8 @@ impl From<Theme> for Box<dyn button::StyleSheet> {
         if theme.dark {
             if theme.secondary {
                 dark::DarkButton.into()
+            } else if theme.embed {
+                dark::EmbedButton.into()
             } else {
                 dark::Button.into()
             }
@@ -275,8 +287,21 @@ mod dark {
             container::Style {
                 border_color: DARK_BG,
                 border_radius: 8.0,
-                border_width: 1.0,
+                border_width: 2.0,
                 ..Container.style()
+            }
+        }
+    }
+
+    pub struct BrightRoundContainer;
+
+    impl container::StyleSheet for BrightRoundContainer {
+        fn style(&self) -> container::Style {
+            container::Style {
+                border_color: BRIGHT_BG,
+                border_radius: 8.0,
+                border_width: 2.0,
+                ..BrightContainer.style()
             }
         }
     }
@@ -425,6 +450,26 @@ mod dark {
 
         fn disabled(&self) -> button::Style {
             self.hovered()
+        }
+    }
+
+    pub struct EmbedButton;
+
+    impl button::StyleSheet for EmbedButton {
+        fn active(&self) -> button::Style {
+            DarkButton.active()
+        }
+
+        fn hovered(&self) -> button::Style {
+            DarkButton.hovered()
+        }
+
+        fn pressed(&self) -> button::Style {
+            DarkButton.pressed()
+        }
+
+        fn disabled(&self) -> button::Style {
+            DarkButton.active()
         }
     }
 

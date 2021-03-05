@@ -1,8 +1,10 @@
 #![windows_subsystem = "windows"]
 
 use client::content::ContentStore;
-use iced::{Application, Settings};
 use ui::{screen::ScreenManager, style::DEF_SIZE};
+
+use iced::{Application, Settings};
+use tracing_subscriber::EnvFilter;
 
 pub mod client;
 pub mod ui;
@@ -14,7 +16,12 @@ async fn main() {
     content_store.create_req_dirs().unwrap();
 
     tracing_subscriber::fmt()
-        .with_env_filter("info,wgpu_core=off,iced_wgpu=off")
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+            .unwrap_or_else( |_|
+                EnvFilter::from("info,wgpu_core=off,iced_wgpu=off,gfx_memory=off,gfx_descriptor=off,gfx_backend_vulkan=off")
+            )
+        )
         .pretty()
         .init();
 

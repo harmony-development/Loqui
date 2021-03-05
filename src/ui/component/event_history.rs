@@ -3,14 +3,15 @@ use crate::{
         channel::Channel,
         content::{ContentStore, ContentType, ThumbnailCache},
         member::Members,
+        message::EmbedHeading,
     },
     color, label, space,
     ui::{
         component::*,
         screen::main::Message,
         style::{
-            Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
-            MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
+            Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, MESSAGE_SENDER_SIZE,
+            MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
         },
     },
 };
@@ -31,6 +32,7 @@ pub fn build_event_history<'a>(
     looking_at_message: usize,
     scrollable_state: &'a mut scrollable::State,
     content_open_buttons: &'a mut [button::State; SHOWN_MSGS_LIMIT],
+    embed_buttons: &'a mut [[(button::State, button::State); SHOWN_MSGS_LIMIT]; SHOWN_MSGS_LIMIT],
     theme: Theme,
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
@@ -64,9 +66,10 @@ pub fn build_event_history<'a>(
     let mut last_sender_name = None;
     let mut message_group = vec![];
 
-    for (message, media_open_button_state) in displayable_events
+    for ((message, media_open_button_state), embed_buts) in displayable_events
         .iter()
         .zip(content_open_buttons.iter_mut())
+        .zip(embed_buttons.iter_mut())
     {
         let id_to_use = if !message.id.is_ack() {
             current_user_id
@@ -179,13 +182,109 @@ pub fn build_event_history<'a>(
             message_group.push(sender_body_creator(&sender_display_name).into());
         }
 
-        let mut message_text = label!(&message.content).size(MESSAGE_SIZE);
+        let mut message_body_widgets = Vec::with_capacity(2);
 
-        if !message.id.is_ack() {
-            message_text = message_text.color(color!(200, 200, 200));
+        if !message.content.is_empty() {
+            let mut message_text = label!(&message.content).size(MESSAGE_SIZE);
+
+            if !message.id.is_ack() {
+                message_text = message_text.color(color!(200, 200, 200));
+            }
+
+            message_body_widgets.push(message_text.into());
         }
 
-        let mut message_body_widgets = vec![message_text.into()];
+        for (e, (h_but_state, f_but_state)) in message.embeds.iter().zip(embed_buts.iter_mut()) {
+            let put_heading = |embed: &mut Vec<Element<'a, Message>>,
+                               h: &EmbedHeading,
+                               state: &'a mut button::State| {
+                if !(h.text.is_empty() && h.subtext.is_empty()) {
+                    let mut heading = Vec::with_capacity(3);
+
+                    if let Some(img_url) = &h.icon {
+                        if let Some(handle) = thumbnail_cache.get_thumbnail(img_url) {
+                            heading.push(
+                                Image::new(handle.clone())
+                                    .height(length!(=24))
+                                    .width(length!(=24))
+                                    .into(),
+                            );
+                        }
+                    }
+
+                    heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
+                    heading.push(
+                        label!(&h.subtext)
+                            .size(DEF_SIZE - 6)
+                            .color(color!(200, 200, 200))
+                            .into(),
+                    );
+
+                    let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING))
+                        .style(theme.embed());
+
+                    if let Some(url) = &h.url {
+                        but = but.on_press(Message::OpenUrl(url.clone()));
+                    }
+
+                    embed.push(but.into());
+                }
+            };
+
+            let mut embed = Vec::with_capacity(5);
+
+            if let Some(h) = &e.header {
+                put_heading(&mut embed, h, h_but_state);
+            }
+
+            embed.push(label!(&e.title).size(DEF_SIZE + 2).into());
+            embed.push(
+                label!(&e.body)
+                    .color(color!(220, 220, 220))
+                    .size(DEF_SIZE - 2)
+                    .into(),
+            );
+
+            for f in &e.fields {
+                // TODO: handle presentation
+                let mut field = Vec::with_capacity(2);
+
+                field.push(label!(&f.title).size(DEF_SIZE - 1).into());
+                field.push(label!(&f.subtitle).size(DEF_SIZE - 3).into());
+                field.push(
+                    label!(&f.body)
+                        .color(color!(220, 220, 220))
+                        .size(DEF_SIZE - 3)
+                        .into(),
+                );
+
+                embed.push(
+                    Container::new(
+                        column(field)
+                            .padding(PADDING / 4)
+                            .spacing(SPACING / 4)
+                            .align_items(Align::Start),
+                    )
+                    .style(theme.round())
+                    .into(),
+                );
+            }
+
+            if let Some(h) = &e.footer {
+                put_heading(&mut embed, h, f_but_state);
+            }
+
+            message_body_widgets.push(
+                Container::new(
+                    column(embed)
+                        .padding(PADDING / 2)
+                        .spacing(SPACING / 2)
+                        .align_items(Align::Start),
+                )
+                .style(theme.round().secondary().with_border_color(e.color))
+                .into(),
+            );
+        }
 
         if let Some(attachment) = message.attachments.first() {
             fn create_button<'a>(
@@ -252,6 +351,7 @@ pub fn build_event_history<'a>(
         }
 
         let msg_body = column(message_body_widgets)
+            .align_items(Align::Start)
             .padding(0)
             .spacing(MSG_LR_PADDING)
             .into();

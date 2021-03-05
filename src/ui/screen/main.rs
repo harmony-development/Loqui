@@ -28,6 +28,7 @@ use create_channel::ChannelCreationModal;
 use harmony_rust_sdk::{
     api::{
         chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
+        exports::hrpc::url::Url,
         harmonytypes::UserStatus,
     },
     client::api::{
@@ -68,6 +69,7 @@ pub enum Message {
         handle: ImageHandle,
         path: PathBuf,
     },
+    OpenUrl(Url),
     /// Sent when the user selects a different guild.
     GuildChanged(u64),
     /// Sent twhen the user selects a different channel.
@@ -94,6 +96,7 @@ pub struct MainScreen {
     send_file_but_state: button::State,
     composer_state: text_input::State,
     scroll_to_bottom_but_state: button::State,
+    embed_buttons_state: [[(button::State, button::State); SHOWN_MSGS_LIMIT]; SHOWN_MSGS_LIMIT],
 
     // Room area state
     channel_menu_state: pick_list::State<String>,
@@ -319,6 +322,7 @@ impl MainScreen {
                     channel.looking_at_message,
                     &mut self.event_history_state,
                     &mut self.content_open_buts_state,
+                    &mut self.embed_buttons_state,
                     theme,
                 );
 
@@ -510,6 +514,9 @@ impl MainScreen {
         }
 
         match msg {
+            Message::OpenUrl(url) => {
+                open::that_in_background(url.to_string());
+            }
             Message::OpenImageView { handle, path } => {
                 self.image_viewer_modal.show(true);
                 self.image_viewer_modal.inner_mut().image_handle = Some((handle, path));

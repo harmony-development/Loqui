@@ -21,10 +21,10 @@ use harmony_rust_sdk::{
     client::api::{chat::EventSource, rest::FileId},
 };
 
-use content::{ContentStore, ContentType};
+use content::ContentStore;
 use error::{ClientError, ClientResult};
 use member::{Member, Members};
-use message::{harmony_messages_to_ui_messages, Attachment, MessageId, Override};
+use message::{harmony_messages_to_ui_messages, Attachment, Embed, MessageId, Override};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -36,7 +36,10 @@ use std::{
 
 use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
 
-use self::{guild::Guilds, message::Message};
+use self::{
+    guild::Guilds,
+    message::{EmbedHeading, Message},
+};
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
 #[derive(Clone, Deserialize, Serialize)]
@@ -182,6 +185,10 @@ impl Client {
                             }
                         }
 
+                        for embed in &message.embeds {
+                            post_heading(&mut post, &embed);
+                        }
+
                         if let Some(msg) = channel
                             .messages
                             .iter_mut()
@@ -238,14 +245,7 @@ impl Client {
                             msg.attachments = message_updated
                                 .attachments
                                 .into_iter()
-                                .flat_map(|attachment| {
-                                    Some(Attachment {
-                                        id: FileId::from_str(&attachment.id).ok()?,
-                                        kind: ContentType::new(&attachment.r#type),
-                                        name: attachment.name,
-                                        size: attachment.size as u32,
-                                    })
-                                })
+                                .flat_map(Attachment::from_harmony_attachment)
                                 .collect();
                             for attachment in &msg.attachments {
                                 if attachment.is_thumbnail() {
@@ -256,25 +256,19 @@ impl Client {
                             }
                         }
                         if message_updated.update_overrides {
-                            if let Some((parsed, overrides)) =
-                                message_updated.overrides.map(|overrides| {
-                                    let parsed = FileId::from_str(&overrides.avatar).ok();
-                                    (
-                                        parsed.clone(),
-                                        Override {
-                                            avatar_url: parsed,
-                                            name: overrides.name,
-                                            reason: overrides.reason,
-                                        },
-                                    )
-                                })
-                            {
-                                msg.overrides = Some(overrides);
-                                if let Some(id) = parsed {
+                            msg.overrides = message_updated.overrides.map(|overrides| {
+                                let overrides: Override = overrides.into();
+                                if let Some(id) = overrides.avatar_url.clone() {
                                     post.push(PostProcessEvent::FetchThumbnail(id));
                                 }
-                            } else {
-                                msg.overrides = None;
+                                overrides
+                            });
+                        }
+                        if message_updated.update_embeds {
+                            msg.embeds =
+                                message_updated.embeds.into_iter().map(From::from).collect();
+                            for embed in &msg.embeds {
+                                post_heading(&mut post, &embed);
                             }
                         }
                     }
@@ -447,6 +441,10 @@ impl Client {
             }
         }
 
+        for embed in messages.iter().flat_map(|msg| &msg.embeds) {
+            post_heading(&mut post, &embed);
+        }
+
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             messages.append(&mut channel.messages);
             channel.messages = messages;
@@ -464,4 +462,14 @@ impl Client {
         subs.push(EventSource::Homeserver);
         subs
     }
+}
+
+fn post_heading(post: &mut Vec<PostProcessEvent>, embed: &Embed) {
+    let mut inner = |h: Option<&EmbedHeading>| {
+        if let Some(id) = h.map(|h| h.icon.clone()).flatten() {
+            post.push(PostProcessEvent::FetchThumbnail(id));
+        }
+    };
+    inner(embed.header.as_ref());
+    inner(embed.footer.as_ref());
 }
