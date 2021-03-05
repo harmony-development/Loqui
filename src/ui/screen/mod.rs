@@ -291,7 +291,7 @@ impl Application for ScreenManager {
     }
 
     fn title(&self) -> String {
-        String::from("Crust")
+        "Crust".into()
     }
 
     fn update(&mut self, msg: Self::Message) -> Command<Self::Message> {

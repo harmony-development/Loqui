@@ -15,10 +15,10 @@ use crate::{
         message::{Attachment, Message as IcyMessage},
         Client,
     },
-    label, length, space,
+    label, label_button, length, space,
     ui::{
         component::{event_history::SHOWN_MSGS_LIMIT, *},
-        style::{Theme, ALT_COLOR, AVATAR_WIDTH, MESSAGE_SIZE, PADDING, SPACING},
+        style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
 use channel::{get_channel_messages, GetChannelMessages};
@@ -47,6 +47,7 @@ use room_list::build_guild_list;
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    ClearError,
     /// Sent when the user wants to send a message.
     SendMessageComposer {
         guild_id: u64,
@@ -117,6 +118,8 @@ pub struct MainScreen {
     current_channel_id: Option<u64>,
     /// The message the user is currently typing.
     message: String,
+    error_text: String,
+    error_close_but_state: button::State,
 }
 
 impl MainScreen {
@@ -458,6 +461,35 @@ impl MainScreen {
             .height(length!(+))
             .width(length!(+));
 
+        let content: Element<Message> = if self.error_text.is_empty() {
+            content.into()
+        } else {
+            Column::with_children(vec![
+                fill_container(
+                    Row::with_children(vec![
+                        label!(&self.error_text)
+                            .color(ERROR_COLOR)
+                            .width(length!(+))
+                            .into(),
+                        space!(w+).into(),
+                        label_button!(&mut self.error_close_but_state, "Close")
+                            .on_press(Message::ClearError)
+                            .style(theme.secondary())
+                            .into(),
+                    ])
+                    .padding(PADDING / 2),
+                )
+                .style(theme)
+                .height(length!(-))
+                .into(),
+                content.into(),
+            ])
+            .width(length!(+))
+            .height(length!(+))
+            .align_items(Align::Center)
+            .into()
+        };
+
         let content = Modal::new(&mut self.logout_modal, content, move |state| {
             state.view(theme).map(Message::LogoutChoice)
         })
@@ -513,6 +545,9 @@ impl MainScreen {
         }
 
         match msg {
+            Message::ClearError => {
+                self.error_text.clear();
+            }
             Message::OpenUrl(url) => {
                 open::that_in_background(url);
             }
@@ -944,6 +979,7 @@ impl MainScreen {
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
+        self.error_text = error.to_string().replace('\n', "");
         self.logout_modal.show(false);
         let cmd = self.create_channel_modal.inner_mut().on_error(&error);
         let cmd = Command::batch(vec![cmd, self.logout_modal.inner_mut().on_error(&error)]);
