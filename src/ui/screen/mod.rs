@@ -3,7 +3,6 @@ pub mod login;
 pub mod main;
 
 pub use guild_discovery::GuildDiscovery;
-use iced_futures::subscription::Recipe;
 pub use login::LoginScreen;
 pub use main::MainScreen;
 
@@ -41,12 +40,8 @@ use harmony_rust_sdk::{
         EventsSocket,
     },
 };
-use iced::{executor, futures, Application, Command, Element, Subscription};
-use std::{
-    hash::Hasher,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use iced::{executor, Application, Command, Element, Subscription};
+use std::{sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum Message {
@@ -65,7 +60,6 @@ pub enum Message {
         open: bool,
     },
     EventsReceived(Vec<Event>),
-    UpdateTypings(Vec<TypingMember>),
     SocketEvent {
         socket: Box<EventsSocket>,
         event: Option<harmony_rust_sdk::client::error::ClientResult<Event>>,
@@ -301,6 +295,14 @@ impl Application for ScreenManager {
     }
 
     fn update(&mut self, msg: Self::Message) -> Command<Self::Message> {
+        if let Some(client) = self.client.as_mut() {
+            for member in client.members.values_mut() {
+                member.typing_in_channel = member
+                    .typing_in_channel
+                    .filter(|(_, _, since)| since.elapsed().as_secs() < 5);
+            }
+        }
+
         match msg {
             Message::Nothing => {}
             Message::LoginScreen(msg) => {
@@ -568,19 +570,6 @@ impl Application for ScreenManager {
                     }
                 }
             }
-            Message::UpdateTypings(typing_members) => {
-                if let Some(client) = self.client.as_mut() {
-                    client.members.values_mut().for_each(|member| {
-                        member.typing_in_channel = None;
-                    });
-
-                    for (id, typing) in typing_members {
-                        if let Some(member) = client.get_member(id) {
-                            member.typing_in_channel = Some(typing);
-                        }
-                    }
-                }
-            }
             Message::EventsReceived(events) => {
                 if let Some(client) = self.client.as_mut() {
                     let processed = events
@@ -680,18 +669,7 @@ impl Application for ScreenManager {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        if let Some(client) = self.client.as_ref() {
-            Subscription::from_recipe(ProcessTyping {
-                typing: client
-                    .members
-                    .iter()
-                    .filter_map(|(id, member)| Some((*id, member.typing_in_channel?)))
-                    .collect(),
-            })
-            .map(Message::UpdateTypings)
-        } else {
-            Subscription::none()
-        }
+        iced::time::every(Duration::from_secs(5)).map(|_| Message::Nothing)
     }
 
     fn view(&mut self) -> Element<Self::Message> {
@@ -708,47 +686,6 @@ impl Application for ScreenManager {
                 .view(self.theme, self.client.as_ref().unwrap()) // This will not panic cause [ref:client_set_before_main_view]
                 .map(Message::GuildDiscovery),
         }
-    }
-}
-
-type TypingMember = (u64, (u64, u64, Instant));
-
-pub struct ProcessTyping {
-    typing: Vec<TypingMember>,
-}
-
-impl<H: Hasher, I> Recipe<H, I> for ProcessTyping {
-    type Output = Vec<TypingMember>;
-
-    fn hash(&self, state: &mut H) {
-        use std::hash::Hash;
-
-        for typing in &self.typing {
-            let (id, (g, c, since)) = typing;
-            id.hash(state);
-            g.hash(state);
-            c.hash(state);
-            since.hash(state);
-        }
-    }
-
-    fn stream(
-        self: Box<Self>,
-        _: iced_futures::BoxStream<I>,
-    ) -> iced_futures::BoxStream<Self::Output> {
-        let still_typing = self
-            .typing
-            .into_iter()
-            .filter_map(|(id, (g, c, since))| {
-                if since.elapsed().as_secs() >= 5 {
-                    None
-                } else {
-                    Some((id, (g, c, since)))
-                }
-            })
-            .collect::<Vec<_>>();
-
-        Box::pin(futures::stream::once(async move { still_typing }))
     }
 }
 
