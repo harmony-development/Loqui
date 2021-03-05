@@ -1,9 +1,6 @@
 use chrono::NaiveDateTime;
 use harmony_rust_sdk::{
-    api::{
-        exports::hrpc::url::Url,
-        harmonytypes::{self, r#override::Reason, FieldPresentation, Message as HarmonyMessage},
-    },
+    api::harmonytypes::{self, r#override::Reason, FieldPresentation, Message as HarmonyMessage},
     client::api::rest::FileId,
 };
 use std::{str::FromStr, time::UNIX_EPOCH};
@@ -23,7 +20,7 @@ pub struct EmbedField {
 
 #[derive(Debug, Clone)]
 pub struct EmbedHeading {
-    pub url: Option<Url>,
+    pub url: Option<String>,
     pub icon: Option<FileId>,
     pub text: String,
     pub subtext: String,
@@ -144,23 +141,30 @@ impl From<harmonytypes::Override> for Override {
     }
 }
 
+impl From<harmonytypes::EmbedHeading> for EmbedHeading {
+    fn from(h: harmonytypes::EmbedHeading) -> Self {
+        EmbedHeading {
+            text: h.text,
+            subtext: h.subtext,
+            url: {
+                if h.url.is_empty() {
+                    None
+                } else {
+                    Some(h.url)
+                }
+            },
+            icon: FileId::from_str(&h.icon).ok(),
+        }
+    }
+}
+
 impl From<harmonytypes::Embed> for Embed {
     fn from(e: harmonytypes::Embed) -> Self {
         Embed {
             title: e.title,
             body: e.body,
-            footer: e.footer.map(|h| EmbedHeading {
-                text: h.text,
-                subtext: h.subtext,
-                url: h.url.parse().ok(),
-                icon: FileId::from_str(&h.icon).ok(),
-            }),
-            header: e.header.map(|h| EmbedHeading {
-                text: h.text,
-                subtext: h.subtext,
-                url: h.url.parse().ok(),
-                icon: FileId::from_str(&h.icon).ok(),
-            }),
+            footer: e.footer.map(From::from),
+            header: e.header.map(From::from),
             fields: e
                 .fields
                 .into_iter()

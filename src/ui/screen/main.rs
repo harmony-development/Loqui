@@ -28,7 +28,6 @@ use create_channel::ChannelCreationModal;
 use harmony_rust_sdk::{
     api::{
         chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
-        exports::hrpc::url::Url,
         harmonytypes::UserStatus,
     },
     client::api::{
@@ -69,7 +68,7 @@ pub enum Message {
         handle: ImageHandle,
         path: PathBuf,
     },
-    OpenUrl(Url),
+    OpenUrl(String),
     /// Sent when the user selects a different guild.
     GuildChanged(u64),
     /// Sent twhen the user selects a different channel.
@@ -515,7 +514,7 @@ impl MainScreen {
 
         match msg {
             Message::OpenUrl(url) => {
-                open::that_in_background(url.to_string());
+                open::that_in_background(url);
             }
             Message::OpenImageView { handle, path } => {
                 self.image_viewer_modal.show(true);
@@ -656,7 +655,6 @@ impl MainScreen {
                         || typing.map_or(false, |(_, _, since)| since.elapsed().as_secs() >= 5)
                     {
                         *typing = Some((guild_id, channel_id, Instant::now()));
-                        tracing::info!("sending typing");
                         let inner = client.inner().clone();
                         return Command::perform(
                             async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
