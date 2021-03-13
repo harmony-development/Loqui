@@ -287,15 +287,21 @@ impl Client {
                 channel_id,
                 name,
                 update_name,
-                previous_id: _,
-                next_id: _,
-                update_order: _,
+                previous_id,
+                next_id,
+                update_order,
                 metadata: _,
                 update_metadata: _,
             }) => {
                 if let Some(channel) = self.get_channel(guild_id, channel_id) {
                     if update_name {
                         channel.name = name;
+                    }
+                }
+
+                if update_order {
+                    if let Some(guild) = self.get_guild(guild_id) {
+                        guild.update_channel_order(previous_id, next_id, channel_id);
                     }
                 }
             }
@@ -309,9 +315,6 @@ impl Client {
                 metadata: _,
             }) => {
                 if let Some(guild) = self.get_guild(guild_id) {
-                    let prev_pos = guild.channels.keys().position(|id| *id == previous_id);
-                    let next_pos = guild.channels.keys().position(|id| *id == next_id);
-
                     guild.channels.insert(
                         channel_id,
                         Channel {
@@ -322,25 +325,7 @@ impl Client {
                             messages: Vec::new(),
                         },
                     );
-
-                    if let Some(pos) = prev_pos {
-                        if pos != guild.channels.len() - 1 {
-                            guild
-                                .channels
-                                .swap_indices(pos + 1, guild.channels.len() - 1);
-                        }
-                    } else if let Some(pos) = next_pos {
-                        if pos != 0 {
-                            guild
-                                .channels
-                                .swap_indices(pos - 1, guild.channels.len() - 1);
-                        } else {
-                            let (k, v) = guild.channels.pop().unwrap();
-                            guild.channels.reverse();
-                            guild.channels.insert(k, v);
-                            guild.channels.reverse();
-                        }
-                    }
+                    guild.update_channel_order(previous_id, next_id, channel_id);
                 }
             }
             Event::Typing(Typing {
