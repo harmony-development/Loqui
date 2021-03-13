@@ -32,7 +32,7 @@ use harmony_rust_sdk::{
             chat::{
                 guild::{get_guild, get_guild_list},
                 message::{self, SendMessage, SendMessageSelfBuilder},
-                profile::get_user,
+                profile::{get_user, get_user_bulk},
                 EventSource, GuildId, UserId,
             },
             harmonytypes::Message as HarmonyMessage,
@@ -645,10 +645,10 @@ impl Application for ScreenManager {
                 }
             }
             Message::EventsReceived(events) => {
-                if let Some(client) = self.client.as_mut() {
+                if self.client.is_some() {
                     let processed = events
                         .into_iter()
-                        .flat_map(|event| client.process_event(event))
+                        .flat_map(|event| self.client.as_mut().unwrap().process_event(event))
                         .collect::<Vec<_>>();
 
                     let mut cmds = Vec::with_capacity(processed.len());
@@ -663,11 +663,50 @@ impl Application for ScreenManager {
                         self.sources_to_add.push(sub);
                     }
 
-                    for cmd in processed
-                        .into_iter()
-                        .map(|post| self.process_post_event(post))
-                    {
-                        cmds.push(cmd);
+                    let mut fetch_users = Vec::with_capacity(64);
+
+                    for post in processed {
+                        if let PostProcessEvent::FetchProfile(user_id) = post {
+                            fetch_users.push(user_id);
+                        } else {
+                            cmds.push(self.process_post_event(post));
+                        }
+                    }
+
+                    for chunk in fetch_users.chunks(64).map(|c| c.to_vec()) {
+                        if !chunk.is_empty() {
+                            let inner = self.client.as_ref().unwrap().inner().clone();
+                            let fetch_users_cmd = Command::perform(
+                                async move {
+                                    let profiles = get_user_bulk(&inner, chunk.clone()).await?;
+                                    Ok(profiles
+                                        .users
+                                        .into_iter()
+                                        .zip(chunk.into_iter())
+                                        .map(|(profile, user_id)| {
+                                            Event::ProfileUpdated(ProfileUpdated {
+                                                user_id,
+                                                new_avatar: profile.user_avatar,
+                                                new_status: profile.user_status,
+                                                new_username: profile.user_name,
+                                                is_bot: profile.is_bot,
+                                                update_is_bot: true,
+                                                update_status: true,
+                                                update_avatar: true,
+                                                update_username: true,
+                                            })
+                                        })
+                                        .collect::<Vec<_>>())
+                                },
+                                |result| {
+                                    result.map_or_else(
+                                        |err| Message::Error(Box::new(err)),
+                                        Message::EventsReceived,
+                                    )
+                                },
+                            );
+                            cmds.push(fetch_users_cmd);
+                        }
                     }
 
                     return Command::batch(cmds);
