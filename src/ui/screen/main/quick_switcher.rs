@@ -69,11 +69,11 @@ impl QuickSwitcherModal {
 
         for (result, but_stt) in self.results.iter().zip(self.results_buts_state.iter_mut()) {
             let widget = match result {
-                SearchResult::Guild { id, name } => label_button!(but_stt, &format!("* {}", name))
+                SearchResult::Guild { id, name } => label_button!(but_stt, &format!("*{}", name))
                     .style(theme)
                     .on_press(Message::SwitchToGuild(*id)),
                 SearchResult::Channel { guild_id, id, name } => {
-                    label_button!(but_stt, &format!("# {}", name))
+                    label_button!(but_stt, &format!("#{}", name))
                         .style(theme)
                         .on_press(Message::SwitchToChannel {
                             guild_id: *guild_id,

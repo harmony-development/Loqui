@@ -358,7 +358,7 @@ pub fn build_event_history<'a>(
         }
 
         let msg_body = column(message_body_widgets)
-            .align_items(Align::Start)
+            .align_items(align!(|<))
             .padding(0)
             .spacing(MSG_LR_PADDING);
         let mut message_row = Vec::with_capacity(2);
@@ -392,7 +392,7 @@ pub fn build_event_history<'a>(
         }
         message_row.push(but.into());
 
-        message_group.push(row(message_row).padding(0).into());
+        message_group.push(row(message_row).align_items(align!(|<)).padding(0).into());
 
         last_sender_id = Some(id_to_use);
         last_sender_name = Some(sender_display_name);

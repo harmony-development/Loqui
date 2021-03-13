@@ -198,7 +198,7 @@ impl MainScreen {
                 .resize_with(guild.members.len(), Default::default);
 
             let mut members_list = Scrollable::new(&mut self.members_list_state)
-                .spacing(SPACING * 2)
+                .spacing(SPACING)
                 .padding(PADDING);
 
             let mut sorted_members = guild
