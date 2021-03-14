@@ -187,17 +187,18 @@ pub fn build_event_history<'a>(
 
         let mut message_body_widgets = Vec::with_capacity(2);
 
-        let mut message_text = label!(message
+        let message_plain_text = message
             .being_edited
             .as_deref()
-            .unwrap_or_else(|| message.content.as_str()))
-        .size(MESSAGE_SIZE);
+            .unwrap_or_else(|| message.content.as_str());
 
-        if !message.id.is_ack() || message.being_edited.is_some() {
+        let mut message_text = markdown::MarkdownRenderer::new(message_plain_text);
+
+        /*if !message.id.is_ack() || message.being_edited.is_some() {
             message_text = message_text.color(color!(200, 200, 200));
         } else if editing_msg == message.id.id() {
             message_text = message_text.color(ERROR_COLOR);
-        }
+        }*/
 
         message_body_widgets.push(message_text.into());
 

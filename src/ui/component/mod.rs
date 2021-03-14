@@ -1,4 +1,5 @@
 pub mod event_history;
+pub mod markdown;
 pub mod room_list;
 
 use crate::length;

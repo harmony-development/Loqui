@@ -568,10 +568,13 @@ dependencies = [
  "iced",
  "iced_aw",
  "iced_futures",
+ "iced_graphics",
  "iced_native",
+ "iced_wgpu",
  "image",
  "indexmap",
  "infer",
+ "linemd",
  "open",
  "rfd",
  "serde",
@@ -580,7 +583,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "zerocopy",
 ]
 
 [[package]]
@@ -1738,9 +1740,9 @@ dependencies = [
 
 [[package]]
 name = "infer"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34ad0755c42f65a1374dcd0aae07e03dfefc911eceb3f409d2b4a888189447e6"
+checksum = "0803735b9511d0956c68902a6513ca867819d6e43397adb6a5e903e2f09db734"
 
 [[package]]
 name = "inplace_it"
@@ -1876,6 +1878,11 @@ dependencies = [
  "cfg-if 1.0.0",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "linemd"
+version = "0.1.0"
+source = "git+https://github.com/yusdacra/linemd.git?branch=master#5b1293c2f02099d384b7f68095051f19cc815d13"
 
 [[package]]
 name = "linked-hash-map"
