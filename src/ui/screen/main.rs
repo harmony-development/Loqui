@@ -22,6 +22,7 @@ use crate::{
         style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
+use chan_guild_list::build_guild_list;
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use content::ContentType;
@@ -45,7 +46,6 @@ use iced_aw::{modal, Modal};
 use image_viewer::ImageViewerModal;
 use indexmap::IndexMap;
 use logout::LogoutModal;
-use room_list::build_guild_list;
 
 use self::quick_switcher::QuickSwitcherModal;
 

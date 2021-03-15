@@ -1,14 +1,14 @@
+pub mod chan_guild_list;
 pub mod event_history;
-pub mod room_list;
 
 use crate::length;
 pub use crate::{align, color, label};
+pub use chan_guild_list::build_channel_list;
 pub use event_history::build_event_history;
 pub use iced::{
     button, pick_list, scrollable, text_input, Align, Button, Color, Column, Command, Container,
     Element, Image, Length, PickList, Row, Scrollable, Space, Subscription, Text, TextInput,
 };
-pub use room_list::build_channel_list;
 
 use super::style::{PADDING, SPACING};
 

@@ -23,7 +23,7 @@ pub fn build_channel_list<'a, Message: Clone + 'a>(
         .style(theme)
         .align_items(align!(|<))
         .height(length!(+))
-        .spacing(SPACING * 2)
+        .spacing(SPACING)
         .padding(PADDING / 4);
 
     let is_current_channel = |channel_id: u64| {
@@ -68,7 +68,7 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
         .style(theme)
         .align_items(align!(|<))
         .height(length!(+))
-        .spacing(SPACING * 2)
+        .spacing(SPACING)
         .padding(PADDING / 4);
 
     let is_current_guild = |room_id: u64| {
