@@ -8,7 +8,7 @@ use crate::{
     color, label, space,
     ui::{
         component::*,
-        screen::main::Message,
+        screen::main::{Message, Mode},
         style::{
             Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR,
             MESSAGE_SENDER_SIZE, MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
@@ -34,7 +34,7 @@ pub fn build_event_history<'a>(
     content_open_buttons: &'a mut [button::State; SHOWN_MSGS_LIMIT],
     embed_buttons: &'a mut [[(button::State, button::State); SHOWN_MSGS_LIMIT]; SHOWN_MSGS_LIMIT],
     edit_buts_sate: &'a mut [button::State; SHOWN_MSGS_LIMIT],
-    editing_msg: Option<u64>,
+    mode: Mode,
     theme: Theme,
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
@@ -195,7 +195,7 @@ pub fn build_event_history<'a>(
 
         if !message.id.is_ack() || message.being_edited.is_some() {
             message_text = message_text.color(color!(200, 200, 200));
-        } else if editing_msg == message.id.id() {
+        } else if mode == message.id.id().map_or(Mode::Normal, Mode::EditingMessage) {
             message_text = message_text.color(ERROR_COLOR);
         }
 
@@ -385,9 +385,9 @@ pub fn build_event_history<'a>(
         let mut but = Button::new(edit_but_state, msg_body)
             .padding(1)
             .style(theme.embed());
-        if current_user_id == message.sender {
+        if current_user_id == message.sender && Mode::EditMessage == mode {
             if let Some(id) = message.id.id() {
-                but = but.on_press(Message::EditMessage(Some(id)));
+                but = but.on_press(Message::ChangeMode(Mode::EditingMessage(id)));
             }
         }
         message_row.push(but.into());

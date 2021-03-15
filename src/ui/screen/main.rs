@@ -49,10 +49,23 @@ use logout::LogoutModal;
 
 use self::quick_switcher::QuickSwitcherModal;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Mode {
+    EditingMessage(u64),
+    EditMessage,
+    Normal,
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     QuickSwitch,
-    EditMessage(Option<u64>),
+    ChangeMode(Mode),
     ClearError,
     /// Sent when the user wants to send a message.
     SendMessageComposer {
@@ -126,11 +139,11 @@ pub struct MainScreen {
     guild_last_channels: IndexMap<u64, u64>,
     current_guild_id: Option<u64>,
     current_channel_id: Option<u64>,
-    editing_message: Option<u64>,
     /// The message the user is currently typing.
     message: String,
     error_text: String,
     error_close_but_state: button::State,
+    mode: Mode,
 }
 
 impl MainScreen {
@@ -311,20 +324,6 @@ impl MainScreen {
                 .map(|id| Some((guild.channels.get(id)?, *id)))
                 .flatten()
             {
-                let message_composer = TextInput::new(
-                    &mut self.composer_state,
-                    "Enter your message here...",
-                    self.message.as_str(),
-                    Message::ComposerMessageChanged,
-                )
-                .padding((PADDING / 4) * 3)
-                .size(MESSAGE_SIZE)
-                .style(theme.secondary())
-                .on_submit(Message::SendMessageComposer {
-                    guild_id,
-                    channel_id,
-                });
-
                 let message_count = channel.messages.len();
                 let message_history_list = build_event_history(
                     client.content_store(),
@@ -337,7 +336,7 @@ impl MainScreen {
                     &mut self.content_open_buts_state,
                     &mut self.embed_buttons_state,
                     &mut self.edit_buts_sate,
-                    self.editing_message,
+                    self.mode,
                     theme,
                 );
 
@@ -399,10 +398,30 @@ impl MainScreen {
                     channel_id,
                 });
 
-                let mut bottom_area_widgets = vec![
-                    send_file_button.into(),
-                    message_composer.width(length!(+)).into(),
-                ];
+                let message_composer = match self.mode {
+                    Mode::Normal | Mode::EditingMessage(_) => TextInput::new(
+                        &mut self.composer_state,
+                        "Enter your message here...",
+                        self.message.as_str(),
+                        Message::ComposerMessageChanged,
+                    )
+                    .padding((PADDING / 4) * 3)
+                    .size(MESSAGE_SIZE)
+                    .style(theme.secondary())
+                    .on_submit(Message::SendMessageComposer {
+                        guild_id,
+                        channel_id,
+                    })
+                    .width(length!(+))
+                    .into(),
+                    Mode::EditMessage => fill_container(label!("Select a message to edit..."))
+                        .padding((PADDING / 4) * 3)
+                        .height(length!(-))
+                        .style(theme.secondary())
+                        .into(),
+                };
+
+                let mut bottom_area_widgets = vec![send_file_button.into(), message_composer];
 
                 if channel.looking_at_message < message_count.saturating_sub(SHOWN_MSGS_LIMIT) {
                     bottom_area_widgets.push(
@@ -568,7 +587,7 @@ impl MainScreen {
             Message::QuickSwitch => {
                 self.quick_switcher_modal
                     .show(!self.quick_switcher_modal.is_shown());
-                let cmd = self.update(Message::EditMessage(None), client, thumbnail_cache);
+                let cmd = self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 let cmd2 = self.update(
                     Message::QuickSwitchMsg(quick_switcher::Message::SearchTermChanged(
                         self.quick_switcher_modal.inner().search_value.clone(),
@@ -680,14 +699,9 @@ impl MainScreen {
                     self.quick_switcher_modal.inner_mut().search_value = new_term;
                 }
             },
-            Message::EditMessage(id) => {
-                if self.editing_message.is_some() && self.editing_message == id {
-                    self.editing_message = None;
-                    self.message.clear();
-                } else {
-                    self.editing_message = id;
-                    if let (Some(gid), Some(cid), Some(mid)) =
-                        (self.current_guild_id, self.current_channel_id, id)
+            Message::ChangeMode(mode) => {
+                if let (Mode::EditMessage, Mode::EditingMessage(mid)) = (self.mode, mode) {
+                    if let (Some(gid), Some(cid)) = (self.current_guild_id, self.current_channel_id)
                     {
                         self.composer_state.focus();
                         if let Some(msg) = client
@@ -702,6 +716,11 @@ impl MainScreen {
                         self.message.clear();
                     }
                 }
+                if let (Mode::EditingMessage(_), Mode::Normal) = (self.mode, mode) {
+                    self.composer_state.unfocus();
+                    self.message.clear();
+                }
+                self.mode = mode;
             }
             Message::ClearError => {
                 self.error_text.clear();
@@ -712,7 +731,7 @@ impl MainScreen {
             Message::OpenImageView { handle, path } => {
                 self.image_viewer_modal.show(true);
                 self.image_viewer_modal.inner_mut().image_handle = Some((handle, path));
-                return self.update(Message::EditMessage(None), client, thumbnail_cache);
+                return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
             }
             Message::ImageViewMessage(msg) => {
                 let (cmd, go_back) = self.image_viewer_modal.inner_mut().update(msg);
@@ -818,13 +837,13 @@ impl MainScreen {
             Message::SelectedChannelMenuOption(option) => {
                 if let "New Channel" = option.as_str() {
                     self.create_channel_modal.show(true);
-                    return self.update(Message::EditMessage(None), client, thumbnail_cache);
+                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
             }
             Message::SelectedMenuOption(option) => match option.as_str() {
                 "Logout" => {
                     self.logout_modal.show(true);
-                    return self.update(Message::EditMessage(None), client, thumbnail_cache);
+                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
                 "Join / Create a Guild" => {
                     return Command::perform(async {}, |_| {
@@ -941,7 +960,7 @@ impl MainScreen {
                 channel_id,
             } => {
                 if !self.message.trim().is_empty() {
-                    return if let Some(id) = self.editing_message {
+                    if let Mode::EditingMessage(id) = self.mode {
                         let new_content: String =
                             self.message.drain(..).collect::<String>().trim().into();
                         if let Some(msg) = client
@@ -951,8 +970,8 @@ impl MainScreen {
                         {
                             msg.being_edited = Some(new_content.clone());
                         }
-                        self.editing_message = None;
-                        Command::perform(
+                        self.mode = Mode::Normal;
+                        return Command::perform(
                             async move {
                                 super::Message::EditMessage {
                                     guild_id,
@@ -962,8 +981,8 @@ impl MainScreen {
                                 }
                             },
                             |msg| msg,
-                        )
-                    } else {
+                        );
+                    } else if let Mode::Normal = self.mode {
                         let message = IcyMessage {
                             content: self.message.drain(..).collect::<String>().trim().into(),
                             sender: client.user_id.unwrap(),
@@ -971,7 +990,7 @@ impl MainScreen {
                         };
                         scroll_to_bottom(client, guild_id, channel_id);
                         self.event_history_state.scroll_to_bottom();
-                        Command::perform(
+                        return Command::perform(
                             async move {
                                 super::Message::SendMessage {
                                     message,
@@ -981,10 +1000,10 @@ impl MainScreen {
                                 }
                             },
                             |msg| msg,
-                        )
-                    };
+                        );
+                    }
                 } else {
-                    self.editing_message = None;
+                    self.mode = Mode::Normal;
                 }
             }
             Message::SendFiles {
@@ -1081,7 +1100,7 @@ impl MainScreen {
                 );
             }
             Message::GuildChanged(guild_id) => {
-                self.editing_message = None;
+                self.mode = Mode::Normal;
                 self.message.clear();
                 self.current_guild_id = Some(guild_id);
                 if let Some(guild) = client.get_guild(guild_id) {
@@ -1133,7 +1152,7 @@ impl MainScreen {
                 }
             }
             Message::ChannelChanged(channel_id) => {
-                self.editing_message = None;
+                self.mode = Mode::Normal;
                 self.message.clear();
                 self.current_channel_id = Some(channel_id);
                 self.guild_last_channels
@@ -1193,20 +1212,24 @@ impl MainScreen {
         };
 
         fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<super::Message> {
-            if let Event::Keyboard(keyboard::Event::KeyReleased {
-                key_code: KeyCode::Escape,
-                ..
-            }) = ev
-            {
-                Some(super::Message::MainScreen(Message::EditMessage(None)))
-            } else if let Event::Keyboard(keyboard::Event::KeyReleased {
-                key_code: KeyCode::K,
-                modifiers: keyboard::Modifiers { control: true, .. },
-            }) = ev
-            {
-                Some(super::Message::MainScreen(Message::QuickSwitch))
-            } else {
-                None
+            match ev {
+                Event::Keyboard(keyboard::Event::KeyReleased {
+                    key_code: KeyCode::Escape,
+                    ..
+                }) => Some(super::Message::MainScreen(Message::ChangeMode(
+                    Mode::Normal,
+                ))),
+                Event::Keyboard(keyboard::Event::KeyReleased {
+                    key_code: KeyCode::K,
+                    modifiers: keyboard::Modifiers { control: true, .. },
+                }) => Some(super::Message::MainScreen(Message::QuickSwitch)),
+                Event::Keyboard(keyboard::Event::KeyReleased {
+                    key_code: KeyCode::E,
+                    modifiers: keyboard::Modifiers { control: true, .. },
+                }) => Some(super::Message::MainScreen(Message::ChangeMode(
+                    Mode::EditMessage,
+                ))),
+                _ => None,
             }
         }
 
