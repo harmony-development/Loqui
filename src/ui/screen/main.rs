@@ -1214,7 +1214,7 @@ impl MainScreen {
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
-        self.error_text = error.to_string().replace('\n', "");
+        self.error_text = error.to_string();
         self.logout_modal.show(false);
 
         Command::batch(vec![

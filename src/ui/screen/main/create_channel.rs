@@ -55,22 +55,13 @@ impl ChannelCreationModal {
             Message::ChannelNameChanged,
         )
         .padding(PADDING / 2)
+        .width(length!(= 400))
         .style(theme);
 
         let mut create = label_button!(&mut self.channel_create_but_state, "Create").style(theme);
         let mut back = label_button!(&mut self.create_channel_back_but_state, "Back").style(theme);
 
-        let mut create_widgets = Vec::with_capacity(3);
-
-        if matches!(
-            self.channel_creation_state,
-            ChannelState::None
-                | ChannelState::Created {
-                    guild_id: _,
-                    channel_id: _,
-                    name: _
-                }
-        ) {
+        if let ChannelState::None | ChannelState::Created { .. } = &self.channel_creation_state {
             back = back.on_press(Message::GoBack);
 
             if !self.channel_name_field.is_empty() {
@@ -79,16 +70,19 @@ impl ChannelCreationModal {
             }
         }
 
-        if let ChannelState::Created { name, .. } = &self.channel_creation_state {
-            create_widgets.push(
-                label!("Successfully created channel {}", name)
-                    .color(SUCCESS_COLOR)
-                    .into(),
-            );
-        }
-
-        if let ChannelState::Creating { name } = &self.channel_creation_state {
-            create_widgets.push(label!("Creating channel {}", name).into());
+        let mut create_widgets = Vec::with_capacity(3);
+        match &self.channel_creation_state {
+            ChannelState::Created { name, .. } => {
+                create_widgets.push(
+                    label!("Successfully created channel {}", name)
+                        .color(SUCCESS_COLOR)
+                        .into(),
+                );
+            }
+            ChannelState::Creating { name } => {
+                create_widgets.push(label!("Creating channel {}", name).into())
+            }
+            _ => {}
         }
 
         if !self.error_text.is_empty() {
@@ -98,29 +92,18 @@ impl ChannelCreationModal {
         create_widgets.push(create_text_edit.into());
         create_widgets.push(
             row(vec![
-                create.width(length!(+)).into(),
-                space!(w+).into(),
-                back.width(length!(+)).into(),
+                create.width(length!(= 80)).into(),
+                space!(w = 200).into(),
+                back.width(length!(= 80)).into(),
             ])
-            .width(length!(+))
             .into(),
         );
 
-        row(vec![
-            space!(w % 3).into(),
-            column(vec![
-                space!(h % 4).into(),
-                fill_container(column(create_widgets).width(length!(+)))
-                    .style(theme.round())
-                    .height(length!(% 3))
-                    .into(),
-                space!(h % 4).into(),
-            ])
-            .width(length!(% 4))
-            .into(),
-            space!(w % 3).into(),
-        ])
-        .into()
+        Container::new(column(create_widgets))
+            .style(theme.round())
+            .center_x()
+            .center_y()
+            .into()
     }
 
     pub fn update(

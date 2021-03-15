@@ -69,20 +69,9 @@ impl Display for ClientError {
                     write!(
                         fmt,
                         "API error: {}",
-                        raw_error
-                            .into_iter()
-                            .filter_map(|b| {
-                                let c = *b as char;
-                                if c.is_ascii_alphanumeric()
-                                    || c.is_ascii_punctuation()
-                                    || c.is_ascii_whitespace()
-                                {
-                                    Some(c)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect::<String>()
+                        std::str::from_utf8(raw_error)
+                            .unwrap_or("couldn't parse error")
+                            .replace('\n', ""),
                     )
                 } else {
                     write!(fmt, "{}", err)

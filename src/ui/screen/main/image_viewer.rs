@@ -38,13 +38,13 @@ impl ImageViewerModal {
                 .into(),
                 row(vec![
                     label_button!(&mut self.external_but_state, "Open externally")
-                        .height(length!(+))
+                        .height(length!(= 40))
                         .style(theme)
                         .on_press(Message::OpenExternal)
                         .into(),
                     space!(w+).into(),
                     label_button!(&mut self.close_but_state, "Close")
-                        .height(length!(+))
+                        .height(length!(= 40))
                         .style(theme)
                         .on_press(Message::Close)
                         .into(),

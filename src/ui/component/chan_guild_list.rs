@@ -26,15 +26,6 @@ pub fn build_channel_list<'a, Message: Clone + 'a>(
         .spacing(SPACING)
         .padding(PADDING / 4);
 
-    let is_current_channel = |channel_id: u64| {
-        if let Some(id) = current_channel_id {
-            if channel_id == id {
-                return true;
-            }
-        }
-        false
-    };
-
     for ((channel_id, channel), button_state) in channels.iter().zip(buttons_state.iter_mut()) {
         let channel_name_prefix = if channel.is_category { "+" } else { "#" };
         let channel_name_formatted = format!("{}{}", channel_name_prefix, channel.name);
@@ -44,7 +35,7 @@ pub fn build_channel_list<'a, Message: Clone + 'a>(
             .width(length!(+))
             .style(theme.secondary());
 
-        if !is_current_channel(*channel_id) {
+        if current_channel_id != Some(*channel_id) {
             but = but.on_press(on_button_press(*channel_id));
         }
 
@@ -70,15 +61,6 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
         .height(length!(+))
         .spacing(SPACING)
         .padding(PADDING / 4);
-
-    let is_current_guild = |room_id: u64| {
-        if let Some(id) = current_guild_id {
-            if room_id == id {
-                return true;
-            }
-        }
-        false
-    };
 
     for ((guild_id, guild), button_state) in guilds.into_iter().zip(buttons_state.iter_mut()) {
         let content = fill_container(
@@ -107,7 +89,7 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
             .width(length!(+))
             .style(theme.secondary());
 
-        if !is_current_guild(*guild_id) {
+        if current_guild_id != Some(*guild_id) {
             but = but.on_press(on_button_press(*guild_id));
         }
 

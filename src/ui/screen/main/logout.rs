@@ -29,44 +29,29 @@ impl LogoutModal {
                 label_button!(state, text)
                     .style(theme)
                     .on_press(confirm)
-                    .width(length!(+))
+                    .width(length!(= 80))
             };
 
-            let logout_confirm_panel = column(
-                    vec![
-                        label!("Do you want to logout?").size(DEF_SIZE + 2).height(length!(%2)).into(),
-                        label!("This will delete your current session and you will need to login with your password.")
-                            .color(ERROR_COLOR)
-                            .size(DEF_SIZE + 2)
-                            .height(length!(%3))
-                            .into(),
-                        row(vec![
-                            make_button(&mut self.logout_approve_but_state, true).into(),
-                            space!(w+).into(),
-                            make_button(&mut self.logout_cancel_but_state, false).into(),
-                        ])
-                        .height(length!(%3))
-                        .width(length!(+))
-                        .into(),
-                    ])
-                    .spacing(12);
-
-            row(vec![
-                space!(w % 3).into(),
-                column(vec![
-                    space!(h % 4).into(),
-                    fill_container(logout_confirm_panel.width(length!(+)).height(length!(+)))
-                        .height(length!(% 3))
-                        .style(theme.round())
-                        .into(),
-                    space!(h % 4).into(),
+            let logout_confirm_panel = column(vec![
+                label!("Do you want to logout?").size(DEF_SIZE + 2).into(),
+                label!("This will delete your current session.")
+                    .color(ERROR_COLOR)
+                    .size(DEF_SIZE + 2)
+                    .into(),
+                row(vec![
+                    make_button(&mut self.logout_approve_but_state, true).into(),
+                    space!(w = 200).into(),
+                    make_button(&mut self.logout_cancel_but_state, false).into(),
                 ])
-                .width(length!(% 4))
-                .height(length!(+))
                 .into(),
-                space!(w % 3).into(),
             ])
-            .into()
+            .spacing(12);
+
+            Container::new(logout_confirm_panel)
+                .style(theme.round())
+                .center_x()
+                .center_y()
+                .into()
         }
     }
 
