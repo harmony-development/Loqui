@@ -314,7 +314,7 @@ impl Application for ScreenManager {
         "Crust".into()
     }
 
-    fn update(&mut self, msg: Self::Message) -> Command<Self::Message> {
+    fn update(&mut self, msg: Self::Message, clip: &mut iced::Clipboard) -> Command<Self::Message> {
         if let Some(client) = self.client.as_mut() {
             for member in client.members.values_mut() {
                 member.typing_in_channel = member
@@ -366,8 +366,8 @@ impl Application for ScreenManager {
 
                     if let Some(ev) = event {
                         let cmd = match ev {
-                            Ok(ev) => self.update(Message::EventsReceived(vec![ev])),
-                            Err(err) => self.update(Message::Error(Box::new(err.into()))),
+                            Ok(ev) => self.update(Message::EventsReceived(vec![ev]), clip),
+                            Err(err) => self.update(Message::Error(Box::new(err.into())), clip),
                         };
                         cmds.push(cmd);
                     }
@@ -522,7 +522,7 @@ impl Application for ScreenManager {
                 }
 
                 if let Some(err) = err {
-                    return self.update(Message::Error(err));
+                    return self.update(Message::Error(err), clip);
                 }
             }
             Message::EditMessage {
@@ -752,9 +752,12 @@ impl Application for ScreenManager {
                 }
 
                 if err_disp.contains("invalid-session") || err_disp.contains("connect error") {
-                    self.update(Message::Logout(
-                        Screen::Login(LoginScreen::new(self.content_store.clone())).into(),
-                    ));
+                    self.update(
+                        Message::Logout(
+                            Screen::Login(LoginScreen::new(self.content_store.clone())).into(),
+                        ),
+                        clip,
+                    );
                 }
 
                 return self.screens.current_mut().on_error(*err);
