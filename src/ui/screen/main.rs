@@ -960,47 +960,38 @@ impl MainScreen {
                 channel_id,
             } => {
                 if !self.message.trim().is_empty() {
-                    if let Mode::EditingMessage(id) = self.mode {
+                    if let Mode::EditingMessage(message_id) = self.mode {
                         let new_content: String =
                             self.message.drain(..).collect::<String>().trim().into();
                         if let Some(msg) = client
                             .get_channel(guild_id, channel_id)
-                            .map(|c| c.messages.iter_mut().find(|m| m.id.id() == Some(id)))
+                            .map(|c| {
+                                c.messages
+                                    .iter_mut()
+                                    .find(|m| m.id.id() == Some(message_id))
+                            })
                             .flatten()
                         {
                             msg.being_edited = Some(new_content.clone());
                         }
                         self.mode = Mode::Normal;
-                        return Command::perform(
-                            async move {
-                                super::Message::EditMessage {
-                                    guild_id,
-                                    channel_id,
-                                    message_id: id,
-                                    new_content,
-                                }
-                            },
-                            |msg| msg,
-                        );
+                        return client.edit_msg_cmd(guild_id, channel_id, message_id, new_content);
                     } else if let Mode::Normal = self.mode {
                         let message = IcyMessage {
                             content: self.message.drain(..).collect::<String>().trim().into(),
                             sender: client.user_id.unwrap(),
                             ..Default::default()
                         };
-                        scroll_to_bottom(client, guild_id, channel_id);
-                        self.event_history_state.scroll_to_bottom();
-                        return Command::perform(
-                            async move {
-                                super::Message::SendMessage {
-                                    message,
-                                    retry_after: Duration::from_secs(0),
-                                    guild_id,
-                                    channel_id,
-                                }
-                            },
-                            |msg| msg,
-                        );
+                        if let Some(cmd) = client.send_msg_cmd(
+                            guild_id,
+                            channel_id,
+                            Duration::from_secs(0),
+                            message,
+                        ) {
+                            scroll_to_bottom(client, guild_id, channel_id);
+                            self.event_history_state.scroll_to_bottom();
+                            return cmd;
+                        }
                     }
                 } else {
                     self.mode = Mode::Normal;

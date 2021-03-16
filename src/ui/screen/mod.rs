@@ -5,7 +5,6 @@ pub mod main;
 pub use guild_discovery::GuildDiscovery;
 pub use login::LoginScreen;
 pub use main::MainScreen;
-use message::UpdateMessage;
 
 use crate::{
     client::{
@@ -24,14 +23,12 @@ use harmony_rust_sdk::{
             GetGuildListRequest,
         },
         exports::hrpc::url::Url,
-        harmonytypes::Override,
     },
     client::{
         api::{
             auth::AuthStepResponse,
             chat::{
                 guild::{get_guild, get_guild_list},
-                message::{self, SendMessage, SendMessageSelfBuilder},
                 profile::{get_user, get_user_bulk},
                 EventSource, GuildId, UserId,
             },
@@ -88,12 +85,6 @@ pub enum Message {
         channel_id: u64,
         message_id: u64,
         err: Option<Box<ClientError>>,
-    },
-    EditMessage {
-        guild_id: u64,
-        channel_id: u64,
-        message_id: u64,
-        new_content: String,
     },
     /// Sent whenever an error occurs.
     Error(Box<ClientError>),
@@ -525,107 +516,19 @@ impl Application for ScreenManager {
                     return self.update(Message::Error(err), clip);
                 }
             }
-            Message::EditMessage {
-                guild_id,
-                channel_id,
-                message_id,
-                new_content,
-            } => {
-                let inner = self.client.as_ref().unwrap().inner().clone();
-
-                return Command::perform(
-                    async move {
-                        let result = message::update_message(
-                            &inner,
-                            UpdateMessage::new(guild_id, channel_id, message_id)
-                                .new_content(new_content),
-                        )
-                        .await;
-
-                        result.map_or_else(
-                            |err| Message::MessageEdited {
-                                guild_id,
-                                channel_id,
-                                message_id,
-                                err: Some(Box::new(err.into())),
-                            },
-                            |_| Message::MessageEdited {
-                                guild_id,
-                                channel_id,
-                                message_id,
-                                err: None,
-                            },
-                        )
-                    },
-                    |m| m,
-                );
-            }
             Message::SendMessage {
                 message,
                 retry_after,
                 guild_id,
                 channel_id,
             } => {
-                if let Some(channel) = self
+                if let Some(cmd) = self
                     .client
                     .as_mut()
-                    .map(|client| client.get_channel(guild_id, channel_id))
+                    .map(|c| c.send_msg_cmd(guild_id, channel_id, retry_after, message))
                     .flatten()
                 {
-                    if retry_after.as_secs() == 0 {
-                        channel.messages.push(message.clone());
-                    }
-
-                    let inner = self.client.as_ref().unwrap().inner().clone();
-
-                    return Command::perform(
-                        async move {
-                            tokio::time::sleep(retry_after).await;
-
-                            let send_message =
-                                SendMessage::new(guild_id, channel_id, message.content.clone())
-                                    .echo_id(message.id.transaction_id().unwrap())
-                                    .attachments(
-                                        message
-                                            .attachments
-                                            .clone()
-                                            .into_iter()
-                                            .map(|a| a.id)
-                                            .collect::<Vec<_>>(),
-                                    )
-                                    .overrides(message.overrides.as_ref().map(|o| {
-                                        Override {
-                                            avatar: o
-                                                .avatar_url
-                                                .as_ref()
-                                                .map_or_else(String::default, |id| id.to_string()),
-                                            name: o.name.clone(),
-                                            reason: o.reason.clone(),
-                                        }
-                                    }));
-
-                            let send_result = message::send_message(&inner, send_message).await;
-
-                            match send_result {
-                                Ok(resp) => Message::MessageSent {
-                                    message_id: resp.message_id,
-                                    transaction_id: message.id.transaction_id().unwrap(),
-                                    channel_id,
-                                    guild_id,
-                                },
-                                Err(err) => {
-                                    tracing::error!("error occured when sending message: {}", err);
-                                    Message::SendMessage {
-                                        message,
-                                        retry_after: retry_after + Duration::from_secs(1),
-                                        channel_id,
-                                        guild_id,
-                                    }
-                                }
-                            }
-                        },
-                        |retry| retry,
-                    );
+                    return cmd;
                 }
             }
             Message::DownloadedThumbnail {

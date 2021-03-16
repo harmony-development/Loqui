@@ -18,11 +18,20 @@ use harmony_rust_sdk::{
         chat::event::*,
         harmonytypes::{Message as HarmonyMessage, UserStatus},
     },
-    client::api::{chat::EventSource, rest::FileId},
+    client::api::{
+        chat::{
+            message::{
+                send_message, update_message, SendMessage, SendMessageSelfBuilder, UpdateMessage,
+            },
+            EventSource,
+        },
+        rest::FileId,
+    },
 };
 
 use content::ContentStore;
 use error::{ClientError, ClientResult};
+use iced::Command;
 use member::{Member, Members};
 use message::{harmony_messages_to_ui_messages, Attachment, Embed, MessageId, Override};
 use serde::{Deserialize, Serialize};
@@ -31,7 +40,7 @@ use std::{
     path::PathBuf,
     str::FromStr,
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
@@ -153,6 +162,111 @@ impl Client {
     #[inline(always)]
     pub fn get_member(&mut self, user_id: u64) -> Option<&mut Member> {
         self.members.get_mut(&user_id)
+    }
+
+    pub fn send_msg_cmd(
+        &mut self,
+        guild_id: u64,
+        channel_id: u64,
+        retry_after: Duration,
+        message: Message,
+    ) -> Option<Command<crate::ui::screen::Message>> {
+        use crate::ui::screen::Message;
+
+        if let Some(channel) = self.get_channel(guild_id, channel_id) {
+            if retry_after.as_secs() == 0 {
+                channel.messages.push(message.clone());
+            }
+
+            let inner = self.inner().clone();
+
+            Some(Command::perform(
+                async move {
+                    tokio::time::sleep(retry_after).await;
+
+                    let msg = SendMessage::new(guild_id, channel_id, message.content.clone())
+                        .echo_id(message.id.transaction_id().unwrap())
+                        .attachments(
+                            message
+                                .attachments
+                                .clone()
+                                .into_iter()
+                                .map(|a| a.id)
+                                .collect::<Vec<_>>(),
+                        )
+                        .overrides(message.overrides.as_ref().map(|o| {
+                            harmony_rust_sdk::api::harmonytypes::Override {
+                                avatar: o
+                                    .avatar_url
+                                    .as_ref()
+                                    .map_or_else(String::default, |id| id.to_string()),
+                                name: o.name.clone(),
+                                reason: o.reason.clone(),
+                            }
+                        }));
+
+                    let send_result = send_message(&inner, msg).await;
+
+                    match send_result {
+                        Ok(resp) => Message::MessageSent {
+                            message_id: resp.message_id,
+                            transaction_id: message.id.transaction_id().unwrap(),
+                            channel_id,
+                            guild_id,
+                        },
+                        Err(err) => {
+                            tracing::error!("error occured when sending message: {}", err);
+                            Message::SendMessage {
+                                message,
+                                retry_after: retry_after + Duration::from_secs(1),
+                                channel_id,
+                                guild_id,
+                            }
+                        }
+                    }
+                },
+                |retry| retry,
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn edit_msg_cmd(
+        &self,
+        guild_id: u64,
+        channel_id: u64,
+        message_id: u64,
+        new_content: String,
+    ) -> Command<crate::ui::screen::Message> {
+        let inner = self.inner().clone();
+        use crate::ui::screen::Message;
+
+        Command::perform(
+            async move {
+                let result = update_message(
+                    &inner,
+                    UpdateMessage::new(guild_id, channel_id, message_id).new_content(new_content),
+                )
+                .await;
+
+                result.map_or_else(
+                    |err| Message::MessageEdited {
+                        guild_id,
+                        channel_id,
+                        message_id,
+                        err: Some(Box::new(err.into())),
+                    },
+                    |_| Message::MessageEdited {
+                        guild_id,
+                        channel_id,
+                        message_id,
+                        err: None,
+                    },
+                )
+            },
+            |m| m,
+        )
     }
 
     pub fn process_event(&mut self, event: Event) -> Vec<PostProcessEvent> {
