@@ -15,13 +15,14 @@ pub use harmony_rust_sdk::{
 };
 use harmony_rust_sdk::{
     api::{
-        chat::event::*,
+        chat::{event::*, DeleteMessageRequest},
         harmonytypes::{Message as HarmonyMessage, UserStatus},
     },
     client::api::{
         chat::{
             message::{
-                send_message, update_message, SendMessage, SendMessageSelfBuilder, UpdateMessage,
+                delete_message, send_message, update_message, SendMessage, SendMessageSelfBuilder,
+                UpdateMessage,
             },
             EventSource,
         },
@@ -232,6 +233,37 @@ impl Client {
         }
     }
 
+    pub fn delete_msg_cmd(
+        &self,
+        guild_id: u64,
+        channel_id: u64,
+        message_id: u64,
+    ) -> Command<crate::ui::screen::Message> {
+        use crate::ui::screen::Message;
+
+        let inner = self.inner().clone();
+
+        Command::perform(
+            async move {
+                delete_message(
+                    &inner,
+                    DeleteMessageRequest {
+                        guild_id,
+                        channel_id,
+                        message_id,
+                    },
+                )
+                .await
+            },
+            |result| {
+                result.map_or_else(
+                    |err| Message::Error(Box::new(err.into())),
+                    |_| Message::Nothing,
+                )
+            },
+        )
+    }
+
     pub fn edit_msg_cmd(
         &self,
         guild_id: u64,
@@ -239,8 +271,9 @@ impl Client {
         message_id: u64,
         new_content: String,
     ) -> Command<crate::ui::screen::Message> {
-        let inner = self.inner().clone();
         use crate::ui::screen::Message;
+
+        let inner = self.inner().clone();
 
         Command::perform(
             async move {

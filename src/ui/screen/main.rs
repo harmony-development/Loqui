@@ -64,6 +64,7 @@ impl Default for Mode {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    EditLastMessage,
     QuickSwitch,
     ChangeMode(Mode),
     ClearError,
@@ -699,6 +700,33 @@ impl MainScreen {
                     self.quick_switcher_modal.inner_mut().search_value = new_term;
                 }
             },
+            Message::EditLastMessage => {
+                let current_user_id = client.user_id.expect("literally how?");
+                if let (Some(guild_id), Some(channel_id)) =
+                    (self.current_guild_id, self.current_channel_id)
+                {
+                    if let Some(mid) = client
+                        .get_channel(guild_id, channel_id)
+                        .map(|c| {
+                            c.messages.iter().rev().find_map(|m| {
+                                if m.sender == current_user_id && m.id.id().is_some() {
+                                    m.id.id()
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .flatten()
+                    {
+                        self.mode = Mode::EditMessage;
+                        return self.update(
+                            Message::ChangeMode(Mode::EditingMessage(mid)),
+                            client,
+                            thumbnail_cache,
+                        );
+                    }
+                }
+            }
             Message::ChangeMode(mode) => {
                 if let (Mode::EditMessage, Mode::EditingMessage(mid)) = (self.mode, mode) {
                     if let (Some(gid), Some(cid)) = (self.current_guild_id, self.current_channel_id)
@@ -993,8 +1021,9 @@ impl MainScreen {
                             return cmd;
                         }
                     }
-                } else {
+                } else if let Mode::EditingMessage(mid) = self.mode {
                     self.mode = Mode::Normal;
+                    return client.delete_msg_cmd(guild_id, channel_id, mid);
                 }
             }
             Message::SendFiles {
@@ -1220,6 +1249,10 @@ impl MainScreen {
                 }) => Some(super::Message::MainScreen(Message::ChangeMode(
                     Mode::EditMessage,
                 ))),
+                Event::Keyboard(keyboard::Event::KeyReleased {
+                    key_code: KeyCode::Up,
+                    ..
+                }) => Some(super::Message::MainScreen(Message::EditLastMessage)),
                 _ => None,
             }
         }
