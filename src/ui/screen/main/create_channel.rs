@@ -1,11 +1,12 @@
 use harmony_rust_sdk::client::api::chat::channel;
+use iced_aw::Card;
 
 use crate::{
     client::{error::ClientError, Client},
-    label, label_button, length, space,
+    label, label_button, length,
     ui::{
         component::*,
-        style::{Theme, ERROR_COLOR, PADDING, SUCCESS_COLOR},
+        style::{Theme, ERROR_COLOR, PADDING, SPACING, SUCCESS_COLOR},
     },
 };
 
@@ -55,22 +56,23 @@ impl ChannelCreationModal {
             Message::ChannelNameChanged,
         )
         .padding(PADDING / 2)
-        .width(length!(= 400))
+        .width(length!(= 300))
         .style(theme);
 
         let mut create = label_button!(&mut self.channel_create_but_state, "Create").style(theme);
-        let mut back = label_button!(&mut self.create_channel_back_but_state, "Back").style(theme);
 
         if let ChannelState::None | ChannelState::Created { .. } = &self.channel_creation_state {
-            back = back.on_press(Message::GoBack);
-
             if !self.channel_name_field.is_empty() {
                 create_text_edit = create_text_edit.on_submit(Message::CreateChannel);
                 create = create.on_press(Message::CreateChannel);
             }
         }
 
-        let mut create_widgets = Vec::with_capacity(3);
+        let mut enter = Vec::with_capacity(2);
+        enter.push(create_text_edit.into());
+        enter.push(create.width(length!(= 80)).into());
+
+        let mut create_widgets = Vec::with_capacity(2);
         match &self.channel_creation_state {
             ChannelState::Created { name, .. } => {
                 create_widgets.push(
@@ -88,22 +90,25 @@ impl ChannelCreationModal {
         if !self.error_text.is_empty() {
             create_widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
         }
-
-        create_widgets.push(create_text_edit.into());
         create_widgets.push(
-            row(vec![
-                create.width(length!(= 80)).into(),
-                space!(w = 200).into(),
-                back.width(length!(= 80)).into(),
-            ])
-            .into(),
+            Row::with_children(enter)
+                .align_items(align!(|))
+                .spacing(SPACING * 2)
+                .into(),
         );
 
-        Container::new(column(create_widgets))
+        Container::new(
+            Card::new(
+                label!("Create channel").width(length!(= 380 + PADDING + SPACING)),
+                column(create_widgets),
+            )
             .style(theme.round())
-            .center_x()
-            .center_y()
-            .into()
+            .on_close(Message::GoBack),
+        )
+        .style(theme.round())
+        .center_x()
+        .center_y()
+        .into()
     }
 
     pub fn update(

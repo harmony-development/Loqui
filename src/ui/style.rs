@@ -215,6 +215,16 @@ impl From<Theme> for Box<dyn iced_aw::modal::StyleSheet> {
     }
 }
 
+impl From<Theme> for Box<dyn iced_aw::card::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        if theme.dark {
+            dark::Card.into()
+        } else {
+            Default::default()
+        }
+    }
+}
+
 mod light {
     use crate::color;
     use iced::{button, Color, Vector};
@@ -248,11 +258,27 @@ mod dark {
         button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
         text_input, Color,
     };
-    use iced_aw::modal;
+    use iced_aw::{card, modal};
 
     const DARK_BG: Color = color!(0x36, 0x39, 0x3F);
     const BRIGHT_BG: Color = color!(0x44, 0x48, 0x4F);
     const ACCENT: Color = color!(0x60, 0x64, 0x6B);
+
+    pub struct Card;
+
+    impl card::StyleSheet for Card {
+        fn active(&self) -> card::Style {
+            card::Style {
+                background: DARK_BG.into(),
+                head_background: BRIGHT_BG.into(),
+                border_color: BRIGHT_BG,
+                head_text_color: Color::WHITE,
+                close_color: Color::WHITE,
+                border_width: 0.0,
+                ..Default::default()
+            }
+        }
+    }
 
     pub struct Modal;
 

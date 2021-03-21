@@ -256,7 +256,6 @@ impl ScreenManager {
                         },
                     );
                 }
-                PostProcessEvent::Nothing => {}
             }
         }
         Command::none()
@@ -537,12 +536,13 @@ impl Application for ScreenManager {
                 open,
             } => {
                 let path = self.content_store.content_path(&thumbnail_url);
+                let name = thumbnail_url.to_string();
                 self.thumbnail_cache
                     .put_thumbnail(thumbnail_url, thumbnail.clone());
                 if open {
                     if let Screen::Main(screen) = self.screens.current_mut() {
                         screen.image_viewer_modal.inner_mut().image_handle =
-                            Some((thumbnail, path));
+                            Some((thumbnail, (path, name)));
                         screen.image_viewer_modal.show(true);
                     }
                 }

@@ -39,7 +39,7 @@ use harmony_rust_sdk::{
             guild::get_guild_members,
             GuildId,
         },
-        rest::{download, upload_extract_id, FileId},
+        rest::{download_extract_file, upload_extract_id, FileId},
     },
 };
 use iced_aw::{modal, Modal};
@@ -88,6 +88,7 @@ pub enum Message {
     OpenImageView {
         handle: ImageHandle,
         path: PathBuf,
+        name: String,
     },
     OpenUrl(String),
     /// Sent when the user selects a different guild.
@@ -756,9 +757,9 @@ impl MainScreen {
             Message::OpenUrl(url) => {
                 open::that_in_background(url);
             }
-            Message::OpenImageView { handle, path } => {
+            Message::OpenImageView { handle, path, name } => {
                 self.image_viewer_modal.show(true);
-                self.image_viewer_modal.inner_mut().image_handle = Some((handle, path));
+                self.image_viewer_modal.inner_mut().image_handle = Some((handle, (path, name)));
                 return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
             }
             Message::ImageViewMessage(msg) => {
@@ -942,6 +943,7 @@ impl MainScreen {
                                 super::Message::MainScreen(Message::OpenImageView {
                                     handle: maybe_thumb.unwrap(),
                                     path: content_path,
+                                    name: content_url.to_string(),
                                 })
                             } else {
                                 open::that_in_background(content_path);
@@ -954,25 +956,23 @@ impl MainScreen {
                     let inner = client.inner().clone();
                     Command::perform(
                         async move {
-                            use harmony_rust_sdk::client::error::ClientError as InnerClientError;
-                            let download_task = download(&inner, content_url.clone());
+                            let downloaded_file =
+                                download_extract_file(&inner, content_url.clone()).await?;
 
-                            let raw_data = download_task
-                                .await?
-                                .bytes()
-                                .await
-                                .map_err(InnerClientError::Reqwest)?;
-                            tokio::fs::write(&content_path, &raw_data).await?;
+                            tokio::fs::write(&content_path, downloaded_file.data()).await?;
                             Ok(if is_thumbnail && maybe_thumb.is_none() {
                                 super::Message::DownloadedThumbnail {
                                     thumbnail_url: content_url,
-                                    thumbnail: ImageHandle::from_memory(raw_data.to_vec()),
+                                    thumbnail: ImageHandle::from_memory(
+                                        downloaded_file.data().to_vec(),
+                                    ),
                                     open: true,
                                 }
                             } else if is_thumbnail {
                                 super::Message::MainScreen(Message::OpenImageView {
                                     handle: maybe_thumb.unwrap(),
                                     path: content_path,
+                                    name: downloaded_file.name().to_string(),
                                 })
                             } else {
                                 open::that_in_background(content_path);

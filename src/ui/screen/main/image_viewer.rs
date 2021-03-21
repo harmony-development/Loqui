@@ -3,10 +3,14 @@ use std::path::PathBuf;
 use crate::{
     client::content::ImageHandle,
     label_button, length, space,
-    ui::{component::*, style::Theme},
+    ui::{
+        component::*,
+        style::{Theme, PADDING, SPACING},
+    },
 };
 
 use iced::image::{viewer, Viewer};
+use iced_aw::Card;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -16,7 +20,7 @@ pub enum Message {
 
 #[derive(Debug, Default, Clone)]
 pub struct ImageViewerModal {
-    pub image_handle: Option<(ImageHandle, PathBuf)>,
+    pub image_handle: Option<(ImageHandle, (PathBuf, String))>,
     viewer_state: viewer::State,
     external_but_state: button::State,
     close_but_state: button::State,
@@ -24,35 +28,33 @@ pub struct ImageViewerModal {
 
 impl ImageViewerModal {
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
-        if let Some(handle) = self.image_handle.as_ref().map(|(handle, _)| handle.clone()) {
-            column(vec![
-                row(vec![
-                    space!(w % 1).into(),
-                    Viewer::new(&mut self.viewer_state, handle)
-                        .height(length!(%8))
-                        .width(length!(%8))
-                        .into(),
-                    space!(w % 1).into(),
-                ])
-                .height(length!(%26))
-                .into(),
-                row(vec![
+        if let Some((handle, name)) = self
+            .image_handle
+            .as_ref()
+            .map(|(handle, (_, name))| (handle.clone(), name))
+        {
+            Container::new(
+                Card::new(
+                    label!(name).width(length!(= 720 - PADDING - SPACING)),
+                    Container::new(
+                        Viewer::new(&mut self.viewer_state, handle).width(length!(= 720)),
+                    )
+                    .center_x()
+                    .center_y()
+                    .width(length!(= 720)),
+                )
+                .foot(
                     label_button!(&mut self.external_but_state, "Open externally")
-                        .height(length!(= 40))
+                        .height(length!(= 50))
                         .style(theme)
-                        .on_press(Message::OpenExternal)
-                        .into(),
-                    space!(w+).into(),
-                    label_button!(&mut self.close_but_state, "Close")
-                        .height(length!(= 40))
-                        .style(theme)
-                        .on_press(Message::Close)
-                        .into(),
-                ])
-                .width(length!(+))
-                .height(length!(%2))
-                .into(),
-            ])
+                        .on_press(Message::OpenExternal),
+                )
+                .style(theme.round())
+                .on_close(Message::Close),
+            )
+            .style(theme.round())
+            .center_x()
+            .center_y()
             .into()
         } else {
             fill_container(space!(w+)).into()
@@ -64,7 +66,7 @@ impl ImageViewerModal {
 
         match msg {
             Message::OpenExternal => {
-                if let Some((_, path)) = self.image_handle.as_ref() {
+                if let Some((_, (path, _))) = self.image_handle.as_ref() {
                     open::that_in_background(path);
                 }
                 can_go_back = false;

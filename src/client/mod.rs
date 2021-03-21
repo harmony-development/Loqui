@@ -83,7 +83,6 @@ pub enum PostProcessEvent {
     FetchGuildData(u64),
     FetchThumbnail(FileId),
     GoToFirstMsgOnChannel(u64),
-    Nothing,
 }
 
 pub struct Client {
