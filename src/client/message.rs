@@ -45,6 +45,15 @@ pub struct Attachment {
 }
 
 impl Attachment {
+    pub fn new_unknown(id: FileId) -> Self {
+        Self {
+            id,
+            kind: ContentType::Other,
+            name: "unknown".to_string(),
+            size: 0,
+        }
+    }
+
     pub fn is_thumbnail(&self) -> bool {
         matches!(self.kind, ContentType::Image) && (self.size as u64) < MAX_THUMB_SIZE
     }

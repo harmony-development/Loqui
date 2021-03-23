@@ -47,6 +47,7 @@ use std::{
 use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
 
 use self::{
+    content::ContentType,
     guild::Guilds,
     message::{EmbedHeading, Message},
 };
@@ -81,7 +82,7 @@ impl Into<InnerSession> for Session {
 pub enum PostProcessEvent {
     FetchProfile(u64),
     FetchGuildData(u64),
-    FetchThumbnail(FileId),
+    FetchThumbnail(Attachment),
     GoToFirstMsgOnChannel(u64),
 }
 
@@ -322,12 +323,15 @@ impl Client {
                             .map(|overrides| overrides.avatar_url.clone())
                             .flatten()
                         {
-                            post.push(PostProcessEvent::FetchThumbnail(id));
+                            post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                                kind: ContentType::Image,
+                                ..Attachment::new_unknown(id)
+                            }));
                         }
 
                         for attachment in &message.attachments {
                             if attachment.is_thumbnail() {
-                                post.push(PostProcessEvent::FetchThumbnail(attachment.id.clone()));
+                                post.push(PostProcessEvent::FetchThumbnail(attachment.clone()));
                             }
                         }
 
@@ -395,9 +399,7 @@ impl Client {
                                 .collect();
                             for attachment in &msg.attachments {
                                 if attachment.is_thumbnail() {
-                                    post.push(PostProcessEvent::FetchThumbnail(
-                                        attachment.id.clone(),
-                                    ));
+                                    post.push(PostProcessEvent::FetchThumbnail(attachment.clone()));
                                 }
                             }
                         }
@@ -405,7 +407,10 @@ impl Client {
                             msg.overrides = message_updated.overrides.map(|overrides| {
                                 let overrides: Override = overrides.into();
                                 if let Some(id) = overrides.avatar_url.clone() {
-                                    post.push(PostProcessEvent::FetchThumbnail(id));
+                                    post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                                        kind: ContentType::Image,
+                                        ..Attachment::new_unknown(id)
+                                    }));
                                 }
                                 overrides
                             });
@@ -530,7 +535,10 @@ impl Client {
                     let parsed = FileId::from_str(&new_avatar).ok();
                     member.avatar_url = parsed.clone();
                     if let Some(id) = parsed {
-                        post.push(PostProcessEvent::FetchThumbnail(id));
+                        post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                            kind: ContentType::Image,
+                            ..Attachment::new_unknown(id)
+                        }));
                     }
                 };
             }
@@ -568,7 +576,10 @@ impl Client {
                     let parsed = FileId::from_str(&picture).ok();
                     guild.picture = parsed.clone();
                     if let Some(id) = parsed {
-                        post.push(PostProcessEvent::FetchThumbnail(id));
+                        post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                            kind: ContentType::Image,
+                            ..Attachment::new_unknown(id)
+                        }));
                     }
                 }
             }
@@ -590,13 +601,16 @@ impl Client {
 
         for attachment in messages.iter().flat_map(|msg| &msg.attachments) {
             if attachment.is_thumbnail() {
-                post.push(PostProcessEvent::FetchThumbnail(attachment.id.clone()));
+                post.push(PostProcessEvent::FetchThumbnail(attachment.clone()));
             }
         }
 
         for overrides in messages.iter().flat_map(|msg| msg.overrides.as_ref()) {
             if let Some(id) = overrides.avatar_url.clone() {
-                post.push(PostProcessEvent::FetchThumbnail(id));
+                post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                    kind: ContentType::Image,
+                    ..Attachment::new_unknown(id)
+                }));
             }
         }
 
@@ -626,7 +640,10 @@ impl Client {
 fn post_heading(post: &mut Vec<PostProcessEvent>, embed: &Embed) {
     let mut inner = |h: Option<&EmbedHeading>| {
         if let Some(id) = h.map(|h| h.icon.clone()).flatten() {
-            post.push(PostProcessEvent::FetchThumbnail(id));
+            post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                kind: ContentType::Image,
+                ..Attachment::new_unknown(id)
+            }));
         }
     };
     inner(embed.header.as_ref());

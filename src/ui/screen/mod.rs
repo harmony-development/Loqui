@@ -10,7 +10,7 @@ use crate::{
     client::{
         content::{ContentStore, ImageHandle, ThumbnailCache},
         error::ClientError,
-        message::{Message as IcyMessage, MessageId},
+        message::{Attachment, Message as IcyMessage, MessageId},
         Client, PostProcessEvent, Session,
     },
     ui::style::Theme,
@@ -33,7 +33,6 @@ use harmony_rust_sdk::{
                 EventSource, GuildId, UserId,
             },
             harmonytypes::Message as HarmonyMessage,
-            rest::FileId,
         },
         EventsSocket,
     },
@@ -53,7 +52,7 @@ pub enum Message {
     ClientCreated(Client),
     Nothing,
     DownloadedThumbnail {
-        thumbnail_url: FileId,
+        data: Attachment,
         thumbnail: ImageHandle,
         open: bool,
     },
@@ -531,18 +530,17 @@ impl Application for ScreenManager {
                 }
             }
             Message::DownloadedThumbnail {
-                thumbnail_url,
+                data,
                 thumbnail,
                 open,
             } => {
-                let path = self.content_store.content_path(&thumbnail_url);
-                let name = thumbnail_url.to_string();
+                let path = self.content_store.content_path(&data.id);
                 self.thumbnail_cache
-                    .put_thumbnail(thumbnail_url, thumbnail.clone());
+                    .put_thumbnail(data.id, thumbnail.clone());
                 if open {
                     if let Screen::Main(screen) = self.screens.current_mut() {
                         screen.image_viewer_modal.inner_mut().image_handle =
-                            Some((thumbnail, (path, name)));
+                            Some((thumbnail, (path, data.name)));
                         screen.image_viewer_modal.show(true);
                     }
                 }
@@ -695,11 +693,11 @@ impl Application for ScreenManager {
 
 fn make_thumbnail_command(
     client: &Client,
-    thumbnail_url: FileId,
+    data: Attachment,
     thumbnail_cache: &ThumbnailCache,
 ) -> Command<Message> {
-    if !thumbnail_cache.has_thumbnail(&thumbnail_url) {
-        let content_path = client.content_store().content_path(&thumbnail_url);
+    if !thumbnail_cache.has_thumbnail(&data.id) {
+        let content_path = client.content_store().content_path(&data.id);
 
         let inner = client.inner().clone();
 
@@ -707,22 +705,20 @@ fn make_thumbnail_command(
             async move {
                 match tokio::fs::read(&content_path).await {
                     Ok(raw) => Ok(Message::DownloadedThumbnail {
-                        thumbnail_url,
+                        data,
                         thumbnail: ImageHandle::from_memory(raw),
                         open: false,
                     }),
                     Err(err) => {
                         tracing::warn!("couldn't read thumbnail from disk: {}", err);
-                        let download_task = harmony_rust_sdk::client::api::rest::download(
-                            &inner,
-                            thumbnail_url.clone(),
-                        );
+                        let download_task =
+                            harmony_rust_sdk::client::api::rest::download(&inner, data.id.clone());
                         let resp = download_task.await?;
                         match resp.bytes().await {
                             Ok(raw_data) => {
                                 tokio::fs::write(content_path, &raw_data).await?;
                                 Ok(Message::DownloadedThumbnail {
-                                    thumbnail_url,
+                                    data,
                                     thumbnail: ImageHandle::from_memory(raw_data.to_vec()),
                                     open: false,
                                 })

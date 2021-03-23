@@ -3,7 +3,7 @@ use crate::{
         channel::Channel,
         content::{ContentStore, ContentType, ThumbnailCache},
         member::Members,
-        message::EmbedHeading,
+        message::{Attachment, EmbedHeading},
     },
     color, label, space,
     ui::{
@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use chrono::{Datelike, Timelike};
-use harmony_rust_sdk::{api::harmonytypes::r#override::Reason, client::api::rest::FileId};
+use harmony_rust_sdk::api::harmonytypes::r#override::Reason;
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
@@ -296,14 +296,14 @@ pub fn build_event_history<'a>(
         if let Some(attachment) = message.attachments.first() {
             fn create_button<'a>(
                 is_thumbnail: bool,
-                content_url: FileId,
+                attachment: Attachment,
                 content: impl Into<Element<'a, Message>>,
                 button_state: &'a mut button::State,
                 theme: Theme,
             ) -> Element<'a, Message> {
                 Button::new(button_state, content.into())
                     .on_press(Message::OpenContent {
-                        content_url,
+                        attachment,
                         is_thumbnail,
                     })
                     .style(theme.secondary())
@@ -321,19 +321,26 @@ pub fn build_event_history<'a>(
                 if does_content_exist {
                     message_body_widgets.push(create_button(
                         is_thumbnail,
-                        attachment.id.clone(),
-                        thumbnail_image,
+                        attachment.clone(),
+                        Column::with_children(vec![
+                            label!("{}", attachment.name).size(DEF_SIZE - 4).into(),
+                            thumbnail_image.into(),
+                        ])
+                        .spacing(SPACING),
                         media_open_button_state,
                         theme,
                     ));
                 } else {
                     let button = create_button(
                         is_thumbnail,
-                        attachment.id.clone(),
+                        attachment.clone(),
                         Column::with_children(vec![
-                            label!("Download content").into(),
+                            label!("Download {}", attachment.name)
+                                .size(DEF_SIZE - 4)
+                                .into(),
                             thumbnail_image.into(),
-                        ]),
+                        ])
+                        .spacing(SPACING),
                         media_open_button_state,
                         theme,
                     );
@@ -342,15 +349,15 @@ pub fn build_event_history<'a>(
                 }
             } else {
                 let text = if does_content_exist {
-                    "Open content"
+                    "Open"
                 } else {
-                    "Download content"
+                    "Download"
                 };
 
                 message_body_widgets.push(create_button(
                     is_thumbnail,
-                    attachment.id.clone(),
-                    label!(text),
+                    attachment.clone(),
+                    label!("{} {}", text, attachment.name),
                     media_open_button_state,
                     theme,
                 ));

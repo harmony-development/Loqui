@@ -82,7 +82,7 @@ pub enum Message {
     ComposerMessageChanged(String),
     ScrollToBottom(u64),
     OpenContent {
-        content_url: FileId,
+        attachment: Attachment,
         is_thumbnail: bool,
     },
     OpenImageView {
@@ -923,11 +923,11 @@ impl MainScreen {
                 }
             }
             Message::OpenContent {
-                content_url,
+                attachment,
                 is_thumbnail,
             } => {
-                let maybe_thumb = thumbnail_cache.get_thumbnail(&content_url).cloned();
-                let content_path = client.content_store().content_path(&content_url);
+                let maybe_thumb = thumbnail_cache.get_thumbnail(&attachment.id).cloned();
+                let content_path = client.content_store().content_path(&attachment.id);
                 return if content_path.exists() {
                     Command::perform(
                         async move {
@@ -935,7 +935,7 @@ impl MainScreen {
                                 let data = tokio::fs::read(&content_path).await?;
 
                                 super::Message::DownloadedThumbnail {
-                                    thumbnail_url: content_url,
+                                    data: attachment,
                                     thumbnail: ImageHandle::from_memory(data),
                                     open: true,
                                 }
@@ -943,7 +943,7 @@ impl MainScreen {
                                 super::Message::MainScreen(Message::OpenImageView {
                                     handle: maybe_thumb.unwrap(),
                                     path: content_path,
-                                    name: content_url.to_string(),
+                                    name: attachment.name,
                                 })
                             } else {
                                 open::that_in_background(content_path);
@@ -957,12 +957,12 @@ impl MainScreen {
                     Command::perform(
                         async move {
                             let downloaded_file =
-                                download_extract_file(&inner, content_url.clone()).await?;
+                                download_extract_file(&inner, attachment.id.clone()).await?;
 
                             tokio::fs::write(&content_path, downloaded_file.data()).await?;
                             Ok(if is_thumbnail && maybe_thumb.is_none() {
                                 super::Message::DownloadedThumbnail {
-                                    thumbnail_url: content_url,
+                                    data: attachment,
                                     thumbnail: ImageHandle::from_memory(
                                         downloaded_file.data().to_vec(),
                                     ),
@@ -972,7 +972,7 @@ impl MainScreen {
                                 super::Message::MainScreen(Message::OpenImageView {
                                     handle: maybe_thumb.unwrap(),
                                     path: content_path,
-                                    name: downloaded_file.name().to_string(),
+                                    name: attachment.name,
                                 })
                             } else {
                                 open::that_in_background(content_path);
