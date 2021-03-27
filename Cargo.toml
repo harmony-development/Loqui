@@ -34,10 +34,10 @@ panic = 'abort'
 [dependencies]
 harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client"] }
 
-iced = { git = "https://github.com/yusdacra/iced.git", rev = "fba8ae96bd60b125a93cb8df9f8a2f11203d5aaa", features = ["tokio", "image"] }
-iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "fba8ae96bd60b125a93cb8df9f8a2f11203d5aaa" }
-iced_futures = { git = "https://github.com/yusdacra/iced.git", rev = "fba8ae96bd60b125a93cb8df9f8a2f11203d5aaa" }
-iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", rev = "7c3f713ec7865fb5e14f61ca78cde5d9b8a3808f", default-features = false, features = [
+iced = { git = "https://github.com/yusdacra/iced.git", rev = "3778876c0050a91f2ab63f4d089736a0602cf7ef", features = ["tokio", "image"] }
+iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "3778876c0050a91f2ab63f4d089736a0602cf7ef" }
+iced_futures = { git = "https://github.com/yusdacra/iced.git", rev = "3778876c0050a91f2ab63f4d089736a0602cf7ef" }
+iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", branch = "icy_matrix", default-features = false, features = [
     "icons",
     "card",
     "colors",
