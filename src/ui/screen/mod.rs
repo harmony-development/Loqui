@@ -704,11 +704,18 @@ fn make_thumbnail_command(
         Command::perform(
             async move {
                 match tokio::fs::read(&content_path).await {
-                    Ok(raw) => Ok(Message::DownloadedThumbnail {
-                        data,
-                        thumbnail: ImageHandle::from_memory(raw),
-                        open: false,
-                    }),
+                    Ok(raw) => {
+                        let bgra = image::load_from_memory(&raw).unwrap().into_bgra8();
+                        Ok(Message::DownloadedThumbnail {
+                            data,
+                            thumbnail: ImageHandle::from_pixels(
+                                bgra.width(),
+                                bgra.height(),
+                                bgra.into_vec(),
+                            ),
+                            open: false,
+                        })
+                    }
                     Err(err) => {
                         tracing::warn!("couldn't read thumbnail from disk: {}", err);
                         let download_task =
@@ -717,9 +724,14 @@ fn make_thumbnail_command(
                         match resp.bytes().await {
                             Ok(raw_data) => {
                                 tokio::fs::write(content_path, &raw_data).await?;
+                                let bgra = image::load_from_memory(&raw_data).unwrap().into_bgra8();
                                 Ok(Message::DownloadedThumbnail {
                                     data,
-                                    thumbnail: ImageHandle::from_memory(raw_data.to_vec()),
+                                    thumbnail: ImageHandle::from_pixels(
+                                        bgra.width(),
+                                        bgra.height(),
+                                        bgra.into_vec(),
+                                    ),
                                     open: false,
                                 })
                             }

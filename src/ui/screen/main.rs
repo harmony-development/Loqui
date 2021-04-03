@@ -933,10 +933,15 @@ impl MainScreen {
                         async move {
                             Ok(if is_thumbnail && maybe_thumb.is_none() {
                                 let data = tokio::fs::read(&content_path).await?;
+                                let bgra = image::load_from_memory(&data).unwrap().into_bgra8();
 
                                 super::Message::DownloadedThumbnail {
                                     data: attachment,
-                                    thumbnail: ImageHandle::from_memory(data),
+                                    thumbnail: ImageHandle::from_pixels(
+                                        bgra.width(),
+                                        bgra.height(),
+                                        bgra.into_vec(),
+                                    ),
                                     open: true,
                                 }
                             } else if is_thumbnail {
@@ -958,13 +963,18 @@ impl MainScreen {
                         async move {
                             let downloaded_file =
                                 download_extract_file(&inner, attachment.id.clone()).await?;
-
                             tokio::fs::write(&content_path, downloaded_file.data()).await?;
+                            let bgra = image::load_from_memory(downloaded_file.data())
+                                .unwrap()
+                                .into_bgra8();
+
                             Ok(if is_thumbnail && maybe_thumb.is_none() {
                                 super::Message::DownloadedThumbnail {
                                     data: attachment,
-                                    thumbnail: ImageHandle::from_memory(
-                                        downloaded_file.data().to_vec(),
+                                    thumbnail: ImageHandle::from_pixels(
+                                        bgra.width(),
+                                        bgra.height(),
+                                        bgra.into_vec(),
                                     ),
                                     open: true,
                                 }
