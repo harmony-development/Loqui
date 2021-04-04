@@ -9,9 +9,9 @@ pub type ClientResult<T> = Result<T, ClientError>;
 #[derive(Debug)]
 pub enum ClientError {
     /// Error occurred during an IO operation.
-    IOError(std::io::Error),
+    IoError(std::io::Error),
     /// Error occurred while parsing a string as URL.
-    URLParse(String, ParseError),
+    UrlParse(String, ParseError),
     /// Error occurred while parsing an URL as HMC.
     HmcParse(Url, HmcParseError),
     /// Error occurred in the Harmony client library.
@@ -39,7 +39,7 @@ impl Clone for ClientError {
 
 impl From<std::io::Error> for ClientError {
     fn from(other: std::io::Error) -> Self {
-        Self::IOError(other)
+        Self::IoError(other)
     }
 }
 
@@ -55,7 +55,7 @@ impl Display for ClientError {
             ClientError::HmcParse(url, err) => {
                 write!(fmt, "Could not parse URL '{}' as HMC: {}", url, err)
             }
-            ClientError::URLParse(string, err) => {
+            ClientError::UrlParse(string, err) => {
                 write!(fmt, "Could not parse string '{}' as URL: {}", string, err)
             }
             ClientError::Internal(err) => {
@@ -77,7 +77,7 @@ impl Display for ClientError {
                     write!(fmt, "{}", err)
                 }
             }
-            ClientError::IOError(err) => write!(fmt, "An IO error occurred: {}", err),
+            ClientError::IoError(err) => write!(fmt, "An IO error occurred: {}", err),
             ClientError::AlreadyLoggedIn => write!(fmt, "Already logged in with another user."),
             ClientError::MissingLoginInfo => {
                 write!(fmt, "Missing required login information, can't login.")

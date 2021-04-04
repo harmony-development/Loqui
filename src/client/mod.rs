@@ -69,11 +69,11 @@ impl Debug for Session {
     }
 }
 
-impl Into<InnerSession> for Session {
-    fn into(self) -> InnerSession {
+impl From<Session> for InnerSession {
+    fn from(session: Session) -> Self {
         InnerSession {
-            user_id: self.user_id.parse().unwrap(),
-            session_token: self.session_token,
+            user_id: session.user_id.parse().unwrap(),
+            session_token: session.session_token,
         }
     }
 }

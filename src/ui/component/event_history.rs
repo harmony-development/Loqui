@@ -254,16 +254,14 @@ pub fn build_event_history<'a>(
 
             for f in &e.fields {
                 // TODO: handle presentation
-                let mut field = Vec::with_capacity(2);
-
-                field.push(label!(&f.title).size(DEF_SIZE - 1).into());
-                field.push(label!(&f.subtitle).size(DEF_SIZE - 3).into());
-                field.push(
+                let field = vec![
+                    label!(&f.title).size(DEF_SIZE - 1).into(),
+                    label!(&f.subtitle).size(DEF_SIZE - 3).into(),
                     label!(&f.body)
                         .color(color!(220, 220, 220))
                         .size(DEF_SIZE - 3)
                         .into(),
-                );
+                ];
 
                 embed.push(
                     Container::new(
@@ -308,7 +306,7 @@ pub fn build_event_history<'a>(
                     })
                     .style(theme.secondary())
                     .into()
-            };
+            }
 
             let is_thumbnail = matches!(attachment.kind, ContentType::Image);
             let does_content_exist = content_store.content_exists(&attachment.id);

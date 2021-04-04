@@ -261,7 +261,7 @@ impl LoginScreen {
                                     )
                                 }
                                 Err(err) => {
-                                    self.on_error(ClientError::URLParse(homeserver.clone(), err))
+                                    self.on_error(ClientError::UrlParse(homeserver.clone(), err))
                                 }
                             };
                         }

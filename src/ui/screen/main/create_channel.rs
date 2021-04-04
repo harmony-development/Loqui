@@ -68,10 +68,6 @@ impl ChannelCreationModal {
             }
         }
 
-        let mut enter = Vec::with_capacity(2);
-        enter.push(create_text_edit.into());
-        enter.push(create.width(length!(= 80)).into());
-
         let mut create_widgets = Vec::with_capacity(2);
         match &self.channel_creation_state {
             ChannelState::Created { name, .. } => {
@@ -91,10 +87,13 @@ impl ChannelCreationModal {
             create_widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
         }
         create_widgets.push(
-            Row::with_children(enter)
-                .align_items(align!(|))
-                .spacing(SPACING * 2)
-                .into(),
+            Row::with_children(vec![
+                create_text_edit.into(),
+                create.width(length!(= 80)).into(),
+            ])
+            .align_items(align!(|))
+            .spacing(SPACING * 2)
+            .into(),
         );
 
         Container::new(
