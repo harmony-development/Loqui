@@ -827,9 +827,9 @@ dependencies = [
 
 [[package]]
 name = "euclid"
-version = "0.22.2"
+version = "0.22.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51e5bac4ec41ece6346fd867815a57a221abdf48f4eb931b033789b5b4b6fc70"
+checksum = "536d206ede9fae5a338a1576623b04fd2459f6086e551d374ebf10e9b78bb4df"
 dependencies = [
  "num-traits",
 ]
@@ -1478,8 +1478,8 @@ dependencies = [
 
 [[package]]
 name = "harmony_derive"
-version = "0.1.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#b05f3e177a555a90681f88f3f99f3c3483a18602"
+version = "0.1.2"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#7643ef51261337107579bb68406373c01a837703"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1488,8 +1488,8 @@ dependencies = [
 
 [[package]]
 name = "harmony_rust_sdk"
-version = "0.5.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#b05f3e177a555a90681f88f3f99f3c3483a18602"
+version = "0.5.2"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#7643ef51261337107579bb68406373c01a837703"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1536,9 +1536,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96eea6719a6e03438b4de7bfb2de795e28ea3fec8e38dcc65f82350194aa1a5d"
+checksum = "6a197c0c744a5ef665822257a24bfd97969e52ee9642d5c81337b6b9dec9c766"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1568,9 +1568,9 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7245cd7449cc792608c3c8a9eaf69bd4eabbabf802713748fd739c98b82f0747"
+checksum = "527e8c9ac747e28542699a951517aa9a6945af506cd1f2e1b53a576c17b6cc11"
 dependencies = [
  "bytes",
  "fnv",
@@ -1590,9 +1590,9 @@ dependencies = [
 
 [[package]]
 name = "httparse"
-version = "1.3.5"
+version = "1.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "615caabe2c3160b313d52ccc905335f4ed5f10881dd63dc5699d47e90be85691"
+checksum = "bc35c995b9d93ec174cf9a27d425c7892722101e14993cd227fdb51d70cf9589"
 
 [[package]]
 name = "httpdate"
@@ -1939,9 +1939,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.92"
+version = "0.2.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56d855069fafbb9b344c0f962150cd2c1187975cb1c22c1522c240d8c4986714"
+checksum = "9385f66bf6105b241aa65a61cb923ef20efc665cb9f9bb50ac2f0c4b7f378d41"
 
 [[package]]
 name = "libloading"
@@ -3472,9 +3472,9 @@ dependencies = [
 
 [[package]]
 name = "tinyvec"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "317cca572a0e89c3ce0ca1f1bdc9369547fe318a683418e42ac8f59d14701023"
+checksum = "5b5220f05bb7de7f3f53c7c065e1199b3172696fe2db9f9c4d8ad9b4ee74c342"
 dependencies = [
  "tinyvec_macros",
 ]
@@ -3708,9 +3708,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-bidi"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49f2bd0c6468a8230e1db229cff8029217cf623c767ea5d60bfbd42729ea54d5"
+checksum = "eeb8be209bb1c96b7c177c7420d26e04eccacb0eeae6b980e35fcb74678107e0"
 dependencies = [
  "matches",
 ]
