@@ -18,6 +18,7 @@ use harmony_rust_sdk::{
 };
 use std::{collections::HashMap, sync::Arc};
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 enum AuthType {
     Form,

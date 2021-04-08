@@ -211,34 +211,3 @@ impl ThumbnailCache {
         self.thumbnails.remove(&key);
     }
 }
-
-#[derive(Debug, Clone)]
-pub enum ContentType {
-    Image,
-    Audio,
-    Video,
-    Other,
-}
-
-impl ContentType {
-    pub fn new(mimetype: &str) -> Self {
-        use ContentType::*;
-
-        if let Some(filetype) = mimetype.split('/').next() {
-            match filetype {
-                "image" => Image,
-                "audio" => Audio,
-                "video" => Video,
-                _ => Other,
-            }
-        } else {
-            Other
-        }
-    }
-}
-
-impl From<&str> for ContentType {
-    fn from(other: &str) -> Self {
-        ContentType::new(other)
-    }
-}

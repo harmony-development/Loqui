@@ -21,8 +21,8 @@ use harmony_rust_sdk::{
     client::api::{
         chat::{
             message::{
-                delete_message, send_message, update_message, SendMessage, SendMessageSelfBuilder,
-                UpdateMessage,
+                delete_message, send_message, update_message_text, SendMessage,
+                SendMessageSelfBuilder, UpdateMessageTextRequest,
             },
             EventSource,
         },
@@ -34,7 +34,7 @@ use content::ContentStore;
 use error::{ClientError, ClientResult};
 use iced::Command;
 use member::{Member, Members};
-use message::{harmony_messages_to_ui_messages, Attachment, Embed, MessageId, Override};
+use message::{harmony_messages_to_ui_messages, Attachment, Content, Embed, MessageId};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug, Formatter},
@@ -47,7 +47,6 @@ use std::{
 use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
 
 use self::{
-    content::ContentType,
     guild::Guilds,
     message::{EmbedHeading, Message},
 };
@@ -185,26 +184,13 @@ impl Client {
                 async move {
                     tokio::time::sleep(retry_after).await;
 
-                    let msg = SendMessage::new(guild_id, channel_id, message.content.clone())
+                    let msg = SendMessage::new(guild_id, channel_id)
+                        .content(harmony_rust_sdk::api::harmonytypes::Content {
+                            actions: vec![],
+                            content: Some(message.content.clone().into()),
+                        })
                         .echo_id(message.id.transaction_id().unwrap())
-                        .attachments(
-                            message
-                                .attachments
-                                .clone()
-                                .into_iter()
-                                .map(|a| a.id)
-                                .collect::<Vec<_>>(),
-                        )
-                        .overrides(message.overrides.as_ref().map(|o| {
-                            harmony_rust_sdk::api::harmonytypes::Override {
-                                avatar: o
-                                    .avatar_url
-                                    .as_ref()
-                                    .map_or_else(String::default, |id| id.to_string()),
-                                name: o.name.clone(),
-                                reason: o.reason.clone(),
-                            }
-                        }));
+                        .overrides(message.overrides.clone().map(Into::into));
 
                     let send_result = send_message(&inner, msg).await;
 
@@ -277,9 +263,14 @@ impl Client {
 
         Command::perform(
             async move {
-                let result = update_message(
+                let result = update_message_text(
                     &inner,
-                    UpdateMessage::new(guild_id, channel_id, message_id).new_content(new_content),
+                    UpdateMessageTextRequest {
+                        guild_id,
+                        channel_id,
+                        message_id,
+                        new_content,
+                    },
                 )
                 .await;
 
@@ -324,20 +315,12 @@ impl Client {
                             .flatten()
                         {
                             post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                                kind: ContentType::Image,
+                                kind: "image".into(),
                                 ..Attachment::new_unknown(id)
                             }));
                         }
 
-                        for attachment in &message.attachments {
-                            if attachment.is_thumbnail() {
-                                post.push(PostProcessEvent::FetchThumbnail(attachment.clone()));
-                            }
-                        }
-
-                        for embed in &message.embeds {
-                            post_heading(&mut post, &embed);
-                        }
+                        message.post_process(&mut post);
 
                         if let Some(msg) = channel
                             .messages
@@ -388,40 +371,7 @@ impl Client {
                         .iter_mut()
                         .find(|message| message.id == MessageId::Ack(message_updated.message_id))
                     {
-                        if message_updated.update_content {
-                            msg.content = message_updated.content;
-                        }
-                        if message_updated.update_attachments {
-                            msg.attachments = message_updated
-                                .attachments
-                                .into_iter()
-                                .flat_map(Attachment::from_harmony_attachment)
-                                .collect();
-                            for attachment in &msg.attachments {
-                                if attachment.is_thumbnail() {
-                                    post.push(PostProcessEvent::FetchThumbnail(attachment.clone()));
-                                }
-                            }
-                        }
-                        if message_updated.update_overrides {
-                            msg.overrides = message_updated.overrides.map(|overrides| {
-                                let overrides: Override = overrides.into();
-                                if let Some(id) = overrides.avatar_url.clone() {
-                                    post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                                        kind: ContentType::Image,
-                                        ..Attachment::new_unknown(id)
-                                    }));
-                                }
-                                overrides
-                            });
-                        }
-                        if message_updated.update_embeds {
-                            msg.embeds =
-                                message_updated.embeds.into_iter().map(From::from).collect();
-                            for embed in &msg.embeds {
-                                post_heading(&mut post, &embed);
-                            }
-                        }
+                        msg.content = Content::Text(message_updated.content);
                     }
                 }
             }
@@ -536,7 +486,7 @@ impl Client {
                     member.avatar_url = parsed.clone();
                     if let Some(id) = parsed {
                         post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                            kind: ContentType::Image,
+                            kind: "image".into(),
                             ..Attachment::new_unknown(id)
                         }));
                     }
@@ -577,7 +527,7 @@ impl Client {
                     guild.picture = parsed.clone();
                     if let Some(id) = parsed {
                         post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                            kind: ContentType::Image,
+                            kind: "image".into(),
                             ..Attachment::new_unknown(id)
                         }));
                     }
@@ -599,23 +549,17 @@ impl Client {
         let mut post = Vec::new();
         let mut messages = harmony_messages_to_ui_messages(messages);
 
-        for attachment in messages.iter().flat_map(|msg| &msg.attachments) {
-            if attachment.is_thumbnail() {
-                post.push(PostProcessEvent::FetchThumbnail(attachment.clone()));
-            }
+        for message in &messages {
+            message.post_process(&mut post);
         }
 
         for overrides in messages.iter().flat_map(|msg| msg.overrides.as_ref()) {
             if let Some(id) = overrides.avatar_url.clone() {
                 post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                    kind: ContentType::Image,
+                    kind: "image".into(),
                     ..Attachment::new_unknown(id)
                 }));
             }
-        }
-
-        for embed in messages.iter().flat_map(|msg| &msg.embeds) {
-            post_heading(&mut post, &embed);
         }
 
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
@@ -641,7 +585,7 @@ fn post_heading(post: &mut Vec<PostProcessEvent>, embed: &Embed) {
     let mut inner = |h: Option<&EmbedHeading>| {
         if let Some(id) = h.map(|h| h.icon.clone()).flatten() {
             post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                kind: ContentType::Image,
+                kind: "image".into(),
                 ..Attachment::new_unknown(id)
             }));
         }

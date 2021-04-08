@@ -32,7 +32,7 @@ codegen-units = 1
 panic = 'abort'
 
 [dependencies]
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client"] }
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client", "parking_lot"] }
 
 iced = { git = "https://github.com/yusdacra/iced.git", rev = "3778876c0050a91f2ab63f4d089736a0602cf7ef", features = ["tokio", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "3778876c0050a91f2ab63f4d089736a0602cf7ef" }
@@ -55,7 +55,7 @@ image = "0.23.14"
 directories-next = "2.0.0"
 
 async-mutex = "1.4.0"
-tokio = { version = "1.3.0", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
+tokio = { version = "1.4.0", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
 uuid = { version = "0.8.2", features = ["v4"] }
 ahash = "0.7"
 indexmap = "1.6.1"

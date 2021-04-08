@@ -1479,7 +1479,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#7643ef51261337107579bb68406373c01a837703"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#7a1947120de2a3cdc9ee7c10a8af2010fced4b62"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1489,7 +1489,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.5.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#7643ef51261337107579bb68406373c01a837703"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#7a1947120de2a3cdc9ee7c10a8af2010fced4b62"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1498,6 +1498,7 @@ dependencies = [
  "harmony_derive",
  "hrpc",
  "hrpc-build",
+ "parking_lot",
  "paste",
  "prost",
  "prost-types",

@@ -13,7 +13,7 @@ use crate::{
     client::{
         content::{self, ImageHandle, ThumbnailCache},
         error::ClientError,
-        message::{Attachment, Message as IcyMessage},
+        message::{Attachment, Content as IcyContent, Message as IcyMessage},
         Client,
     },
     label, label_button, length, space,
@@ -25,7 +25,6 @@ use crate::{
 use chan_guild_list::build_guild_list;
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
-use content::ContentType;
 use create_channel::ChannelCreationModal;
 use harmony_rust_sdk::{
     api::{
@@ -738,7 +737,9 @@ impl MainScreen {
                             .map(|c| c.messages.iter_mut().rev().find(|m| m.id.id() == Some(mid)))
                             .flatten()
                         {
-                            self.message = msg.content.clone();
+                            if let IcyContent::Text(text) = &msg.content {
+                                self.message = text.clone();
+                            }
                         }
                     } else {
                         self.composer_state.unfocus();
@@ -1016,7 +1017,9 @@ impl MainScreen {
                         return client.edit_msg_cmd(guild_id, channel_id, message_id, new_content);
                     } else if let Mode::Normal = self.mode {
                         let message = IcyMessage {
-                            content: self.message.drain(..).collect::<String>().trim().into(),
+                            content: IcyContent::Text(
+                                self.message.drain(..).collect::<String>().trim().into(),
+                            ),
                             sender: client.user_id.unwrap(),
                             ..Default::default()
                         };
@@ -1100,15 +1103,16 @@ impl MainScreen {
                         }
                         Ok(super::Message::SendMessage {
                             message: IcyMessage {
-                                attachments: ids
-                                    .into_iter()
-                                    .map(|(id, kind, name, size)| Attachment {
-                                        id,
-                                        kind: ContentType::new(&kind),
-                                        name,
-                                        size: size as u32,
-                                    })
-                                    .collect(),
+                                content: IcyContent::Files(
+                                    ids.into_iter()
+                                        .map(|(id, kind, name, size)| Attachment {
+                                            id,
+                                            kind,
+                                            name,
+                                            size: size as u32,
+                                        })
+                                        .collect(),
+                                ),
                                 sender,
                                 ..Default::default()
                             },
