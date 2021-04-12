@@ -1,41 +1,35 @@
 {
-  description = "Flake for crust, a Harmony client written in Rust";
-
   inputs = {
-    naersk = {
-      url = "github:nmattia/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    flakeUtils.url = "github:numtide/flake-utils";
-    nixpkgs.url = "nixpkgs/nixpkgs-unstable";
-    rustOverlay = {
-      url = "github:oxalica/rust-overlay";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixCargoIntegration = {
+      url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = inputs: with inputs; with flakeUtils.lib;
-    eachSystem [ "x86_64-linux" ] (system:
-      let
-        common = import ./nix/common.nix {
-          sources = { inherit naersk nixpkgs rustOverlay; };
-          inherit system;
-        };
-
-        packages = {
-          crust = import ./nix/build.nix { inherit common; release = true; };
-          crust-debug = import ./nix/build.nix { inherit common; };
-        };
-        apps = builtins.mapAttrs (n: v: mkApp { name = n; drv = v; exePath = "/bin/crust"; }) packages;
-      in
-      {
-        inherit packages apps;
-
-        defaultPackage = packages.crust;
-
-        defaultApp = apps.crust;
-
-        devShell = import ./nix/devShell.nix { inherit common; };
-      }
-    );
+  outputs = inputs: inputs.nixCargoIntegration.lib.makeOutputs {
+    root = ./.;
+    overrides = {
+      shell = common: prev: {
+        env = prev.env ++ [
+          {
+            name = "XDG_DATA_DIRS";
+            eval = with common.pkgs; "$GSETTINGS_SCHEMAS_PATH:$XDG_DATA_DIRS:${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share";
+          }
+        ];
+      };
+      build = common: prevb: {
+        overrideMain = prev:
+          let o = prevb.overrideMain prev; in
+          o // {
+            nativeBuildInputs = o.nativeBuildInputs ++ (with common.pkgs; [ makeWrapper wrapGAppsHook ]);
+            fixupPhase = with common.pkgs; ''
+              wrapProgram $out/bin/crust\
+                --set LD_LIBRARY_PATH ${lib.makeLibraryPath common.runtimeLibs}\
+                --set XDG_DATA_DIRS ${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share
+            '';
+          };
+      };
+    };
+  };
 }

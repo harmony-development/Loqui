@@ -1,14 +1,12 @@
 # Rust
-/target
+/target/
+**/*.rs.bk
 
-# icy_matrix
-/data
-
-# nix
+# Nix
 /result*
-/shell.nix
+/nix/result*
 
-# direnv
+# Direnv
 /.direnv
 /.envrc
 
