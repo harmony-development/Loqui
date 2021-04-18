@@ -50,12 +50,12 @@ iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", branch = "icy_matri
 
 open = "1.5.1"
 infer = "0.3.5"
-rfd = "0.2.1"
+rfd = "0.3"
 image = "0.23.14"
 directories-next = "2.0.0"
 
 async-mutex = "1.4.0"
-tokio = { version = "1.4.0", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
+tokio = { version = "1.5.0", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
 uuid = { version = "0.8.2", features = ["v4"] }
 ahash = "0.7"
 indexmap = "1.6.1"
