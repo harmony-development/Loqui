@@ -1,9 +1,14 @@
 {
   inputs = {
+    naersk = {
+      url = "github:yusdacra/naersk/feat/git-submodule";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nixCargoIntegration = {
       url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.naersk.follows = "naersk";
     };
   };
 
@@ -19,10 +24,12 @@
         ];
       };
       build = common: prevb: {
+        gitSubmodules = true;
+        allRefs = true;
         overrideMain = prev:
           let o = prevb.overrideMain prev; in
           o // {
-            nativeBuildInputs = o.nativeBuildInputs ++ (with common.pkgs; [ makeWrapper wrapGAppsHook ]);
+            nativeBuildInputs = o.nativeBuildInputs ++ (with common.pkgs; [ makeWrapper wrapGAppsHook rustfmt ]);
             fixupPhase = with common.pkgs; ''
               wrapProgram $out/bin/crust\
                 --set LD_LIBRARY_PATH ${lib.makeLibraryPath common.runtimeLibs}\

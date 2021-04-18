@@ -77,8 +77,6 @@ It aims to be lightweight with a good out-of-the-box experience.
 systems = ["x86_64-linux"]
 app = true
 build = true
-library = false
-toolchain = "stable"
 runtimeLibs = [
     "vulkan-loader",
     "wayland",
@@ -108,8 +106,7 @@ nativeBuildInputs = ["pkg-config", "cmake", "python3", "binutils"]
 env.PROTOC = "protoc"
 devshell.name = "crust-shell"
 
-[package.metadata.nix.xdg]
-enable = true
+[package.metadata.nix.desktopFile]
 name = "Crust"
 genericName = "Harmony Client"
 categories = "Network;"
