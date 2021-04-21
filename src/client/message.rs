@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use harmony_rust_sdk::{
     api::harmonytypes::{
         self, content, r#override::Reason, ContentEmbed, ContentFiles, ContentText,
-        FieldPresentation, Message as HarmonyMessage,
+        Message as HarmonyMessage,
     },
     client::api::rest::FileId,
 };
@@ -18,7 +18,6 @@ pub struct EmbedField {
     pub title: String,
     pub subtitle: String,
     pub body: String,
-    pub presentation: FieldPresentation,
 }
 
 impl From<EmbedField> for harmonytypes::EmbedField {
@@ -27,7 +26,6 @@ impl From<EmbedField> for harmonytypes::EmbedField {
             title: f.title,
             subtitle: f.subtitle,
             body: f.body,
-            presentation: f.presentation.into(),
             ..Default::default()
         }
     }
@@ -76,7 +74,6 @@ impl From<Embed> for harmonytypes::Embed {
             title: e.title,
             footer: e.footer.map(Into::into),
             header: e.header.map(Into::into),
-            actions: vec![],
         }
     }
 }
@@ -181,7 +178,7 @@ impl Default for MessageId {
 pub enum Content {
     Text(String),
     Files(Vec<Attachment>),
-    Embeds(Vec<Embed>),
+    Embeds(Box<Embed>),
 }
 
 impl From<Content> for content::Content {
@@ -189,7 +186,7 @@ impl From<Content> for content::Content {
         match c {
             Content::Text(content) => content::Content::TextMessage(ContentText { content }),
             Content::Embeds(embeds) => content::Content::EmbedMessage(ContentEmbed {
-                embeds: embeds.into_iter().map(Into::into).collect(),
+                embeds: Some(Box::new((*embeds).into())),
             }),
             Content::Files(attachments) => content::Content::FilesMessage(ContentFiles {
                 attachments: attachments.into_iter().map(Into::into).collect(),
@@ -210,7 +207,7 @@ impl From<content::Content> for Content {
                     .collect(),
             ),
             content::Content::EmbedMessage(embeds) => {
-                Self::Embeds(embeds.embeds.into_iter().map(From::from).collect())
+                Self::Embeds(Box::new((*embeds.embeds.unwrap_or_default()).into()))
             }
         }
     }
@@ -243,9 +240,7 @@ impl Message {
                 }
             }
             Content::Embeds(embeds) => {
-                for embed in embeds {
-                    post_heading(post, &embed);
-                }
+                post_heading(post, embeds);
             }
             _ => {}
         }
@@ -310,7 +305,6 @@ impl From<harmonytypes::Embed> for Embed {
                 .fields
                 .into_iter()
                 .map(|f| EmbedField {
-                    presentation: f.presentation(),
                     title: f.title,
                     subtitle: f.subtitle,
                     body: f.body,

@@ -32,7 +32,7 @@ pub fn build_event_history<'a>(
     looking_at_message: usize,
     scrollable_state: &'a mut scrollable::State,
     content_open_buttons: &'a mut [button::State; SHOWN_MSGS_LIMIT],
-    embed_buttons: &'a mut [[(button::State, button::State); SHOWN_MSGS_LIMIT]; SHOWN_MSGS_LIMIT],
+    embed_buttons: &'a mut [(button::State, button::State); SHOWN_MSGS_LIMIT],
     edit_buts_sate: &'a mut [button::State; SHOWN_MSGS_LIMIT],
     mode: Mode,
     theme: Theme,
@@ -68,11 +68,12 @@ pub fn build_event_history<'a>(
     let mut last_sender_name = None;
     let mut message_group = vec![];
 
-    for (((message, media_open_button_state), embed_buts), edit_but_state) in displayable_events
-        .iter()
-        .zip(content_open_buttons.iter_mut())
-        .zip(embed_buttons.iter_mut())
-        .zip(edit_buts_sate.iter_mut())
+    for (((message, media_open_button_state), (h_embed_but, f_embed_but)), edit_but_state) in
+        displayable_events
+            .iter()
+            .zip(content_open_buttons.iter_mut())
+            .zip(embed_buttons.iter_mut())
+            .zip(edit_buts_sate.iter_mut())
     {
         let id_to_use = if !message.id.is_ack() {
             current_user_id
@@ -208,95 +209,93 @@ pub fn build_event_history<'a>(
         }
 
         if let IcyContent::Embeds(embeds) = &message.content {
-            for (e, (h_but_state, f_but_state)) in embeds.iter().zip(embed_buts.iter_mut()) {
-                let put_heading = |embed: &mut Vec<Element<'a, Message>>,
-                                   h: &EmbedHeading,
-                                   state: &'a mut button::State| {
-                    if !(h.text.is_empty() && h.subtext.is_empty()) {
-                        let mut heading = Vec::with_capacity(3);
+            let put_heading = |embed: &mut Vec<Element<'a, Message>>,
+                               h: &EmbedHeading,
+                               state: &'a mut button::State| {
+                if !(h.text.is_empty() && h.subtext.is_empty()) {
+                    let mut heading = Vec::with_capacity(3);
 
-                        if let Some(img_url) = &h.icon {
-                            if let Some(handle) = thumbnail_cache.get_thumbnail(img_url) {
-                                heading.push(
-                                    Image::new(handle.clone())
-                                        .height(length!(=24))
-                                        .width(length!(=24))
-                                        .into(),
-                                );
-                            }
+                    if let Some(img_url) = &h.icon {
+                        if let Some(handle) = thumbnail_cache.get_thumbnail(img_url) {
+                            heading.push(
+                                Image::new(handle.clone())
+                                    .height(length!(=24))
+                                    .width(length!(=24))
+                                    .into(),
+                            );
                         }
-
-                        heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
-                        heading.push(
-                            label!(&h.subtext)
-                                .size(DEF_SIZE - 6)
-                                .color(color!(200, 200, 200))
-                                .into(),
-                        );
-
-                        let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING))
-                            .style(theme.embed());
-
-                        if let Some(url) = &h.url {
-                            but = but.on_press(Message::OpenUrl(url.clone()));
-                        }
-
-                        embed.push(but.into());
                     }
-                };
 
-                let mut embed = Vec::with_capacity(5);
-
-                if let Some(h) = &e.header {
-                    put_heading(&mut embed, h, h_but_state);
-                }
-
-                embed.push(label!(&e.title).size(DEF_SIZE + 2).into());
-                embed.push(
-                    label!(&e.body)
-                        .color(color!(220, 220, 220))
-                        .size(DEF_SIZE - 2)
-                        .into(),
-                );
-
-                for f in &e.fields {
-                    // TODO: handle presentation
-                    let field = vec![
-                        label!(&f.title).size(DEF_SIZE - 1).into(),
-                        label!(&f.subtitle).size(DEF_SIZE - 3).into(),
-                        label!(&f.body)
-                            .color(color!(220, 220, 220))
-                            .size(DEF_SIZE - 3)
+                    heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
+                    heading.push(
+                        label!(&h.subtext)
+                            .size(DEF_SIZE - 6)
+                            .color(color!(200, 200, 200))
                             .into(),
-                    ];
-
-                    embed.push(
-                        Container::new(
-                            column(field)
-                                .padding(PADDING / 4)
-                                .spacing(SPACING / 4)
-                                .align_items(Align::Start),
-                        )
-                        .style(theme.round())
-                        .into(),
                     );
-                }
 
-                if let Some(h) = &e.footer {
-                    put_heading(&mut embed, h, f_but_state);
-                }
+                    let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING))
+                        .style(theme.embed());
 
-                message_body_widgets.push(
+                    if let Some(url) = &h.url {
+                        but = but.on_press(Message::OpenUrl(url.clone()));
+                    }
+
+                    embed.push(but.into());
+                }
+            };
+
+            let mut embed = Vec::with_capacity(5);
+
+            if let Some(h) = &embeds.header {
+                put_heading(&mut embed, h, h_embed_but);
+            }
+
+            embed.push(label!(&embeds.title).size(DEF_SIZE + 2).into());
+            embed.push(
+                label!(&embeds.body)
+                    .color(color!(220, 220, 220))
+                    .size(DEF_SIZE - 2)
+                    .into(),
+            );
+
+            for f in &embeds.fields {
+                // TODO: handle presentation
+                let field = vec![
+                    label!(&f.title).size(DEF_SIZE - 1).into(),
+                    label!(&f.subtitle).size(DEF_SIZE - 3).into(),
+                    label!(&f.body)
+                        .color(color!(220, 220, 220))
+                        .size(DEF_SIZE - 3)
+                        .into(),
+                ];
+
+                embed.push(
                     Container::new(
-                        column(embed)
-                            .padding(PADDING / 2)
-                            .spacing(SPACING / 2)
+                        column(field)
+                            .padding(PADDING / 4)
+                            .spacing(SPACING / 4)
                             .align_items(Align::Start),
                     )
-                    .style(theme.round().secondary().with_border_color(e.color))
+                    .style(theme.round())
                     .into(),
                 );
             }
+
+            if let Some(h) = &embeds.footer {
+                put_heading(&mut embed, h, f_embed_but);
+            }
+
+            message_body_widgets.push(
+                Container::new(
+                    column(embed)
+                        .padding(PADDING / 2)
+                        .spacing(SPACING / 2)
+                        .align_items(Align::Start),
+                )
+                .style(theme.round().secondary().with_border_color(embeds.color))
+                .into(),
+            );
         }
 
         if let IcyContent::Files(attachments) = &message.content {

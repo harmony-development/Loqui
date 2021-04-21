@@ -186,7 +186,6 @@ impl Client {
 
                     let msg = SendMessage::new(guild_id, channel_id)
                         .content(harmony_rust_sdk::api::harmonytypes::Content {
-                            actions: vec![],
                             content: Some(message.content.clone().into()),
                         })
                         .echo_id(message.id.transaction_id().unwrap())

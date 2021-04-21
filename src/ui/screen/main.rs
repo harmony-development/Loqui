@@ -118,7 +118,7 @@ pub struct MainScreen {
     send_file_but_state: button::State,
     composer_state: text_input::State,
     scroll_to_bottom_but_state: button::State,
-    embed_buttons_state: [[(button::State, button::State); SHOWN_MSGS_LIMIT]; SHOWN_MSGS_LIMIT],
+    embed_buttons_state: [(button::State, button::State); SHOWN_MSGS_LIMIT],
 
     // Room area state
     channel_menu_state: pick_list::State<String>,
