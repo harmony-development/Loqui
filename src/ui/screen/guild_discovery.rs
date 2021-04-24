@@ -1,4 +1,7 @@
-use harmony_rust_sdk::{api::chat::InviteId, client::api::chat::*};
+use harmony_rust_sdk::{
+    api::chat::InviteId,
+    client::api::chat::{guild::AddGuildToGuildListRequest, *},
+};
 
 use crate::{
     client::{error::ClientError, Client},
@@ -170,15 +173,25 @@ impl GuildDiscovery {
 
                 return Command::perform(
                     async move {
-                        guild::create_guild(&inner, guild::CreateGuild::new(guild_name)).await
+                        let guild_id =
+                            guild::create_guild(&inner, guild::CreateGuild::new(guild_name))
+                                .await?
+                                .guild_id;
+                        guild::add_guild_to_guild_list(
+                            &inner,
+                            AddGuildToGuildListRequest {
+                                guild_id,
+                                homeserver: inner.homeserver_url().to_string(),
+                            },
+                        )
+                        .await?;
+                        Ok(guild_id)
                     },
                     |result| {
                         result.map_or_else(
-                            |e| super::Message::Error(Box::new(e.into())),
+                            |e| super::Message::Error(Box::new(e)),
                             |response| {
-                                super::Message::GuildDiscovery(Message::JoinedGuild(
-                                    response.guild_id,
-                                ))
+                                super::Message::GuildDiscovery(Message::JoinedGuild(response))
                             },
                         )
                     },
@@ -191,14 +204,23 @@ impl GuildDiscovery {
                 let inner = client.inner().clone();
 
                 return Command::perform(
-                    async move { guild::join_guild(&inner, invite).await },
+                    async move {
+                        let guild_id = guild::join_guild(&inner, invite).await?.guild_id;
+                        guild::add_guild_to_guild_list(
+                            &inner,
+                            AddGuildToGuildListRequest {
+                                guild_id,
+                                homeserver: inner.homeserver_url().to_string(),
+                            },
+                        )
+                        .await?;
+                        Ok(guild_id)
+                    },
                     |result| {
                         result.map_or_else(
-                            |e| super::Message::Error(Box::new(e.into())),
+                            |e| super::Message::Error(Box::new(e)),
                             |response| {
-                                super::Message::GuildDiscovery(Message::JoinedGuild(
-                                    response.guild_id,
-                                ))
+                                super::Message::GuildDiscovery(Message::JoinedGuild(response))
                             },
                         )
                     },
