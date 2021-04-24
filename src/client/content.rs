@@ -37,7 +37,7 @@ impl Default for ContentStore {
                 Some(app_dirs) => (
                     app_dirs.data_dir().join(SESSION_FILENAME),
                     app_dirs.data_dir().join(LOG_FILENAME),
-                    app_dirs.data_dir().join(CONTENT_DIR_NAME),
+                    app_dirs.cache_dir().join(CONTENT_DIR_NAME),
                 ),
                 // Fallback to current working directory if no HOME is present
                 None => (
