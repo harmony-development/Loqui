@@ -34,10 +34,10 @@ panic = 'abort'
 [dependencies]
 harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client", "parking_lot"] }
 
-iced = { git = "https://github.com/yusdacra/iced.git", rev = "3778876c0050a91f2ab63f4d089736a0602cf7ef", features = ["tokio", "image"] }
-iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "3778876c0050a91f2ab63f4d089736a0602cf7ef" }
-iced_futures = { git = "https://github.com/yusdacra/iced.git", rev = "3778876c0050a91f2ab63f4d089736a0602cf7ef" }
-iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", branch = "icy_matrix", default-features = false, features = [
+iced = { git = "https://github.com/yusdacra/iced.git", rev = "9a49487082c8d82ac5b05be507974dfa2cede787", features = ["tokio", "image"] }
+iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "9a49487082c8d82ac5b05be507974dfa2cede787" }
+iced_futures = { git = "https://github.com/yusdacra/iced.git", rev = "9a49487082c8d82ac5b05be507974dfa2cede787" }
+iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", rev = "8452d5b419e0057ab55e0a4d3ef876d08a9e1cb9", default-features = false, features = [
     "icons",
     "card",
     "colors",
@@ -86,24 +86,6 @@ runtimeLibs = [
     "xorg.libXrandr",
     "xorg.libXi",
 ]
-buildInputs = [
-    "zlib",
-    "harfbuzz",
-    "protobuf",
-    "gtk3",
-    "atk",
-    "cairo",
-    "pango",
-    "gdk_pixbuf",
-    "glib",
-    "expat",
-    "freetype",
-    "fontconfig",
-    "x11",
-    "xorg.libxcb",
-]
-nativeBuildInputs = ["pkg-config", "cmake", "python3", "binutils"]
-env.PROTOC = "protoc"
 devshell.name = "crust-shell"
 
 [package.metadata.nix.desktopFile]

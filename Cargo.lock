@@ -1620,8 +1620,8 @@ dependencies = [
 
 [[package]]
 name = "iced"
-version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.3.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1634,7 +1634,7 @@ dependencies = [
 [[package]]
 name = "iced_aw"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced_aw.git?branch=icy_matrix#88c4018167a286f14bf9d04f14c3ca588003a35e"
+source = "git+https://github.com/yusdacra/iced_aw.git?rev=8452d5b419e0057ab55e0a4d3ef876d08a9e1cb9#8452d5b419e0057ab55e0a4d3ef876d08a9e1cb9"
 dependencies = [
  "dodrio",
  "iced_graphics",
@@ -1647,13 +1647,13 @@ dependencies = [
 
 [[package]]
 name = "iced_core"
-version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.4.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 
 [[package]]
 name = "iced_futures"
-version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.3.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 dependencies = [
  "futures",
  "log",
@@ -1663,8 +1663,8 @@ dependencies = [
 
 [[package]]
 name = "iced_graphics"
-version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.2.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 dependencies = [
  "bytemuck",
  "font-kit",
@@ -1678,8 +1678,8 @@ dependencies = [
 
 [[package]]
 name = "iced_native"
-version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.4.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1690,16 +1690,16 @@ dependencies = [
 
 [[package]]
 name = "iced_style"
-version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.3.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 dependencies = [
  "iced_core",
 ]
 
 [[package]]
 name = "iced_web"
-version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.4.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 dependencies = [
  "dodrio",
  "iced_core",
@@ -1714,8 +1714,8 @@ dependencies = [
 
 [[package]]
 name = "iced_wgpu"
-version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.4.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 dependencies = [
  "bytemuck",
  "futures",
@@ -1732,8 +1732,8 @@ dependencies = [
 
 [[package]]
 name = "iced_winit"
-version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3778876c0050a91f2ab63f4d089736a0602cf7ef#3778876c0050a91f2ab63f4d089736a0602cf7ef"
+version = "0.3.0"
+source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
 dependencies = [
  "iced_futures",
  "iced_graphics",
@@ -1918,9 +1918,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.93"
+version = "0.2.94"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9385f66bf6105b241aa65a61cb923ef20efc665cb9f9bb50ac2f0c4b7f378d41"
+checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
 
 [[package]]
 name = "libloading"
