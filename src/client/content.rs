@@ -57,12 +57,9 @@ impl Default for ContentStore {
 
 impl ContentStore {
     pub fn content_path(&self, id: &FileId) -> PathBuf {
-        let normalized_id = match id {
-            FileId::External(uri) => uri.to_string(),
-            FileId::Hmc(hmc) => hmc.to_string(),
-            FileId::Id(id) => id.to_string(),
-        }
-        .replace(|c| [' ', '/', '\\', '.', ':'].contains(&c), "_");
+        let normalized_id = id
+            .to_string()
+            .replace(|c| [' ', '/', '\\', '.', ':'].contains(&c), "_");
         self.content_dir().join(normalized_id)
     }
 
@@ -117,7 +114,7 @@ fn get_image_size_from_handle(handle: &ImageHandle) -> Option<u64> {
 pub const MAX_THUMB_SIZE: u64 = 1000 * 500; // 500kb
 #[derive(Debug)]
 pub struct ThumbnailCache {
-    thumbnails: IndexMap<String, ImageHandle>,
+    thumbnails: IndexMap<FileId, ImageHandle>,
     max_size: u64,
 }
 
@@ -162,14 +159,7 @@ impl ThumbnailCache {
                 self.thumbnails.shift_remove_index(index);
             }
         } else {
-            self.thumbnails.insert(
-                match thumbnail_id {
-                    FileId::External(uri) => uri.to_string(),
-                    FileId::Hmc(hmc) => hmc.to_string(),
-                    FileId::Id(id) => id,
-                },
-                thumbnail,
-            );
+            self.thumbnails.insert(thumbnail_id, thumbnail);
         }
     }
 
@@ -185,29 +175,14 @@ impl ThumbnailCache {
     }
 
     pub fn has_thumbnail(&self, thumbnail_id: &FileId) -> bool {
-        let key = match thumbnail_id {
-            FileId::External(uri) => uri.to_string(),
-            FileId::Hmc(hmc) => hmc.to_string(),
-            FileId::Id(id) => id.to_string(),
-        };
-        self.thumbnails.contains_key(&key)
+        self.thumbnails.contains_key(thumbnail_id)
     }
 
     pub fn get_thumbnail(&self, thumbnail_id: &FileId) -> Option<&ImageHandle> {
-        let key = match thumbnail_id {
-            FileId::External(uri) => uri.to_string(),
-            FileId::Hmc(hmc) => hmc.to_string(),
-            FileId::Id(id) => id.to_string(),
-        };
-        self.thumbnails.get(&key)
+        self.thumbnails.get(thumbnail_id)
     }
 
     pub fn invalidate_thumbnail(&mut self, thumbnail_id: &FileId) {
-        let key = match thumbnail_id {
-            FileId::External(uri) => uri.to_string(),
-            FileId::Hmc(hmc) => hmc.to_string(),
-            FileId::Id(id) => id.to_string(),
-        };
-        self.thumbnails.remove(&key);
+        self.thumbnails.remove(thumbnail_id);
     }
 }
