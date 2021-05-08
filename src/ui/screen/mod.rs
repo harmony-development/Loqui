@@ -718,28 +718,22 @@ fn make_thumbnail_command(
                     }
                     Err(err) => {
                         tracing::warn!("couldn't read thumbnail from disk: {}", err);
-                        let download_task =
-                            harmony_rust_sdk::client::api::rest::download(&inner, data.id.clone());
-                        let resp = download_task.await?;
-                        match resp.bytes().await {
-                            Ok(raw_data) => {
-                                tokio::fs::write(content_path, &raw_data).await?;
-                                let bgra = image::load_from_memory(&raw_data).unwrap().into_bgra8();
-                                Ok(Message::DownloadedThumbnail {
-                                    data,
-                                    thumbnail: ImageHandle::from_pixels(
-                                        bgra.width(),
-                                        bgra.height(),
-                                        bgra.into_vec(),
-                                    ),
-                                    open: false,
-                                })
-                            }
-                            Err(err) => {
-                                Err(harmony_rust_sdk::client::error::ClientError::Reqwest(err)
-                                    .into())
-                            }
-                        }
+                        let file = harmony_rust_sdk::client::api::rest::download_extract_file(
+                            &inner,
+                            data.id.clone(),
+                        )
+                        .await?;
+                        tokio::fs::write(content_path, file.data()).await?;
+                        let bgra = image::load_from_memory(file.data()).unwrap().into_bgra8();
+                        Ok(Message::DownloadedThumbnail {
+                            data,
+                            thumbnail: ImageHandle::from_pixels(
+                                bgra.width(),
+                                bgra.height(),
+                                bgra.into_vec(),
+                            ),
+                            open: false,
+                        })
                     }
                 }
             },
