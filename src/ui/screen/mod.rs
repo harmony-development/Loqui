@@ -717,7 +717,11 @@ fn make_thumbnail_command(
                         })
                     }
                     Err(err) => {
-                        tracing::warn!("couldn't read thumbnail from disk: {}", err);
+                        tracing::warn!(
+                            "couldn't read thumbnail for ID {} from disk: {}",
+                            data.id,
+                            err
+                        );
                         let file = harmony_rust_sdk::client::api::rest::download_extract_file(
                             &inner,
                             data.id.clone(),

@@ -130,8 +130,8 @@ pub struct Override {
 }
 
 impl From<Override> for harmonytypes::Override {
-    fn from(o: Override) -> harmonytypes::Override {
-        harmony_rust_sdk::api::harmonytypes::Override {
+    fn from(o: Override) -> Self {
+        Self {
             avatar: o
                 .avatar_url
                 .map_or_else(String::default, |id| id.to_string()),

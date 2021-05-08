@@ -1073,7 +1073,9 @@ impl MainScreen {
                                     )
                                     .await;
 
-                                    match send_result.map(|id| FileId::Hmc(inner.make_hmc(id))) {
+                                    match send_result.map(|id| {
+                                        FileId::Hmc(inner.make_hmc(id).expect("id must be valid"))
+                                    }) {
                                         Ok(id) => {
                                             if let Err(err) = tokio::fs::hard_link(
                                                 handle.path(),
