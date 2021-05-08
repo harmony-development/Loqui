@@ -1624,7 +1624,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1637,7 +1637,7 @@ dependencies = [
 [[package]]
 name = "iced_aw"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced_aw.git?rev=8452d5b419e0057ab55e0a4d3ef876d08a9e1cb9#8452d5b419e0057ab55e0a4d3ef876d08a9e1cb9"
+source = "git+https://github.com/yusdacra/iced_aw.git?rev=229f402addaeced366a1f907281cb8367923a05a#229f402addaeced366a1f907281cb8367923a05a"
 dependencies = [
  "dodrio",
  "iced_graphics",
@@ -1651,12 +1651,12 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 
 [[package]]
 name = "iced_futures"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 dependencies = [
  "futures",
  "log",
@@ -1667,7 +1667,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 dependencies = [
  "bytemuck",
  "font-kit",
@@ -1682,7 +1682,7 @@ dependencies = [
 [[package]]
 name = "iced_native"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1694,7 +1694,7 @@ dependencies = [
 [[package]]
 name = "iced_style"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 dependencies = [
  "iced_core",
 ]
@@ -1702,7 +1702,7 @@ dependencies = [
 [[package]]
 name = "iced_web"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 dependencies = [
  "dodrio",
  "iced_core",
@@ -1718,7 +1718,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 dependencies = [
  "bytemuck",
  "futures",
@@ -1736,7 +1736,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=9a49487082c8d82ac5b05be507974dfa2cede787#9a49487082c8d82ac5b05be507974dfa2cede787"
+source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
 dependencies = [
  "iced_futures",
  "iced_graphics",
