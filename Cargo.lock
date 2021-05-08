@@ -492,9 +492,12 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cd5a7748210e7ec1a9696610b1015e6e31fbf58f77a160801f124bd1c36592a"
+checksum = "dec1028182c380cc45a2e2c5ec841134f2dfd0f8f5f0a5bcd68004f81b5efdf4"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "crc32fast"
@@ -1457,7 +1460,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#0e31a855377f35392ad80d60fb01a607a447c0c9"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#8d6da2183565c0ce9e30ada6fef8075c835742e4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1467,7 +1470,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.5.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#0e31a855377f35392ad80d60fb01a607a447c0c9"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#8d6da2183565c0ce9e30ada6fef8075c835742e4"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -2845,9 +2848,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce5f1ceb7f74abbce32601642fcf8e8508a8a8991e0621c7d750295b9095702b"
+checksum = "d07a8629359eb56f1e2fb1652bb04212c072a87ba68546a04065d525673ac461"
 dependencies = [
  "regex-syntax",
 ]
@@ -3694,9 +3697,9 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "url"
-version = "2.2.1"
+version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ccd964113622c8e9322cfac19eb1004a07e636c545f325da085d5cdde6f1f8b"
+checksum = "a507c383b2d33b5fc35d1861e77e6b383d158b2da5e14fe51b83dfedf6fd578c"
 dependencies = [
  "form_urlencoded",
  "idna",
