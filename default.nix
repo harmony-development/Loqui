@@ -1,6 +1,12 @@
+# Flake's default package for non-flake-enabled nix instances
 (import
-  (fetchTarball {
-    url = "https://github.com/edolstra/flake-compat/archive/99f1c2157fba4bfe6211a321fd0ee43199025dbf.tar.gz";
-    sha256 = "sha256:0x2jn3vrawwv9xp15674wjz9pixwjyj3j771izayl962zziivbx2";
-  })
-  { src = ./.; }).defaultNix
+  (
+    let lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+    in
+    fetchTarball {
+      url =
+        "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flakeCompat.locked.rev}.tar.gz";
+      sha256 = lock.nodes.flakeCompat.locked.narHash;
+    }
+  )
+  { src = ./.; }).defaultNix.default

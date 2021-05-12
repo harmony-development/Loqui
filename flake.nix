@@ -1,5 +1,9 @@
 {
   inputs = {
+    flakeCompat = {
+      url = "github:edolstra/flake-compat";
+      flake = false;
+    };
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nixCargoIntegration = {
       url = "github:yusdacra/nix-cargo-integration";
