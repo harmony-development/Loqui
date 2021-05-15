@@ -1164,8 +1164,8 @@ impl MainScreen {
                                 events.reserve(members.len());
                                 for member_id in members {
                                     events.push(Event::JoinedMember(MemberJoined {
-                                        guild_id,
                                         member_id,
+                                        guild_id,
                                     }));
                                 }
 

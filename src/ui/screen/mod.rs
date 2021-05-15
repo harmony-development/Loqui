@@ -1,8 +1,10 @@
 pub mod guild_discovery;
+pub mod guild_settings;
 pub mod login;
 pub mod main;
 
 pub use guild_discovery::GuildDiscovery;
+pub use guild_settings::GuildSettings;
 pub use login::LoginScreen;
 pub use main::MainScreen;
 
@@ -45,6 +47,7 @@ pub enum Message {
     LoginScreen(login::Message),
     MainScreen(main::Message),
     GuildDiscovery(guild_discovery::Message),
+    GuildSettings(guild_settings::Message),
     PopScreen,
     PushScreen(Box<Screen>),
     Logout(Box<Screen>),
@@ -94,6 +97,7 @@ pub enum Screen {
     Login(LoginScreen),
     Main(Box<MainScreen>),
     GuildDiscovery(GuildDiscovery),
+    GuildSettings(GuildSettings),
 }
 
 impl Screen {
@@ -102,6 +106,7 @@ impl Screen {
             Screen::Login(screen) => screen.on_error(error),
             Screen::GuildDiscovery(screen) => screen.on_error(error),
             Screen::Main(screen) => screen.on_error(error),
+            Screen::GuildSettings(screen) => screen.on_error(error),
         }
     }
 
@@ -328,6 +333,13 @@ impl Application for ScreenManager {
             }
             Message::GuildDiscovery(msg) => {
                 if let (Screen::GuildDiscovery(screen), Some(client)) =
+                    (self.screens.current_mut(), &self.client)
+                {
+                    return screen.update(msg, client);
+                }
+            }
+            Message::GuildSettings(msg) => {
+                if let (Screen::GuildSettings(screen), Some(client)) =
                     (self.screens.current_mut(), &self.client)
                 {
                     return screen.update(msg, client);
@@ -687,6 +699,9 @@ impl Application for ScreenManager {
             Screen::GuildDiscovery(screen) => screen
                 .view(self.theme, self.client.as_ref().unwrap()) // This will not panic cause [ref:client_set_before_main_view]
                 .map(Message::GuildDiscovery),
+            Screen::GuildSettings(screen) => screen
+                .view(self.theme, self.client.as_ref().unwrap())
+                .map(Message::GuildSettings),
         }
     }
 }
