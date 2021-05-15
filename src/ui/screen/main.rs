@@ -283,7 +283,11 @@ impl MainScreen {
             // TODO: show user avatar next to name
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
-                vec![guild.name.clone(), "New Channel".to_string()],
+                vec![
+                    guild.name.clone(),
+                    "New Channel".to_string(),
+                    "Edit Guild".to_string(),
+                ],
                 Some(guild.name.clone()),
                 Message::SelectedChannelMenuOption,
             )
@@ -864,12 +868,30 @@ impl MainScreen {
             Message::SelectedMember(user_id) => {
                 tracing::trace!("member: {}", user_id);
             }
-            Message::SelectedChannelMenuOption(option) => {
-                if let "New Channel" = option.as_str() {
+            Message::SelectedChannelMenuOption(option) => match option.as_str() {
+                "New Channel" => {
                     self.create_channel_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
-            }
+                "Edit Guild" => {
+                    let guild_id = self.current_guild_id;
+                    return Command::perform(
+                        async move {
+                            if let Some(guild_id) = guild_id {
+                                Ok(super::Message::PushScreen(Box::new(
+                                    super::Screen::GuildSettings(super::GuildSettings::new(
+                                        guild_id,
+                                    )),
+                                )))
+                            } else {
+                                Err(super::ClientError::Custom(String::from("Expected Guild ID here")))
+                            }
+                        },
+                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
+                    );
+                }
+                _ => {}
+            },
             Message::SelectedMenuOption(option) => match option.as_str() {
                 "Logout" => {
                     self.logout_modal.show(true);
