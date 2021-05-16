@@ -874,18 +874,12 @@ impl MainScreen {
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
                 "Edit Guild" => {
-                    let guild_id = self.current_guild_id;
+                    let guild_id = self.current_guild_id.unwrap();
                     return Command::perform(
                         async move {
-                            if let Some(guild_id) = guild_id {
-                                Ok(super::Message::PushScreen(Box::new(
-                                    super::Screen::GuildSettings(super::GuildSettings::new(
-                                        guild_id,
-                                    )),
-                                )))
-                            } else {
-                                Err(super::ClientError::Custom(String::from("Expected Guild ID here")))
-                            }
+                            Ok(super::Message::PushScreen(Box::new(
+                                super::Screen::GuildSettings(super::GuildSettings::new(guild_id)),
+                            )))
                         },
                         |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
                     );
