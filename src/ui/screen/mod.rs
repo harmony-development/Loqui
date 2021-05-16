@@ -116,6 +116,13 @@ impl Screen {
             _ => Subscription::none(),
         }
     }
+
+    fn push_screen_cmd(screen: Screen) -> Command<Message> {
+        Command::perform(
+            async move { Message::PushScreen(Box::new(screen)) },
+            |result| result,
+        )
+    }
 }
 
 pub struct ScreenStack {

@@ -1,13 +1,34 @@
-pub mod create_channel;
-pub mod image_viewer;
-pub mod logout;
-pub mod quick_switcher;
-
 use std::{
     cmp::Ordering,
     path::PathBuf,
     time::{Duration, Instant},
 };
+
+use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
+use channel::{get_channel_messages, GetChannelMessages};
+use chat::Typing;
+use harmony_rust_sdk::{
+    api::{
+        chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
+        harmonytypes::UserStatus,
+    },
+    client::api::{
+        chat::{
+            self,
+            channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
+            guild::get_guild_members,
+            permissions, GuildId,
+        },
+        rest::{download_extract_file, upload_extract_id, FileId},
+    },
+};
+use iced_aw::{modal, Modal};
+use indexmap::IndexMap;
+
+use chan_guild_list::build_guild_list;
+use create_channel::ChannelCreationModal;
+use image_viewer::ImageViewerModal;
+use logout::LogoutModal;
 
 use crate::{
     client::{
@@ -22,31 +43,13 @@ use crate::{
         style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
-use chan_guild_list::build_guild_list;
-use channel::{get_channel_messages, GetChannelMessages};
-use chat::Typing;
-use create_channel::ChannelCreationModal;
-use harmony_rust_sdk::{
-    api::{
-        chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
-        harmonytypes::UserStatus,
-    },
-    client::api::{
-        chat::{
-            self,
-            channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
-            guild::get_guild_members,
-            GuildId,
-        },
-        rest::{download_extract_file, upload_extract_id, FileId},
-    },
-};
-use iced_aw::{modal, Modal};
-use image_viewer::ImageViewerModal;
-use indexmap::IndexMap;
-use logout::LogoutModal;
 
 use self::quick_switcher::QuickSwitcherModal;
+
+pub mod create_channel;
+pub mod image_viewer;
+pub mod logout;
+pub mod quick_switcher;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Mode {
@@ -160,6 +163,8 @@ impl MainScreen {
         self.guilds_buts_state
             .resize_with(guilds.len(), Default::default);
 
+        // Create individual widgets
+
         let guilds_list = if guilds.is_empty() {
             fill_container(label!("No guilds found"))
                 .style(theme)
@@ -234,6 +239,7 @@ impl MainScreen {
                 }
             });
 
+            // Fill sorted_members with content
             for (state, (user_id, member)) in self
                 .members_buts_state
                 .iter_mut()
@@ -283,7 +289,11 @@ impl MainScreen {
             // TODO: show user avatar next to name
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
-                vec![guild.name.clone(), "New Channel".to_string()],
+                vec![
+                    guild.name.clone(),
+                    "New Channel".to_string(),
+                    "Edit Guild".to_string(),
+                ],
                 Some(guild.name.clone()),
                 Message::SelectedChannelMenuOption,
             )
@@ -490,10 +500,14 @@ impl MainScreen {
             );
         }
 
+        // Layouting
+
+        // Show screen widgets from left to right
         let content = Row::with_children(screen_widgets)
             .height(length!(+))
             .width(length!(+));
 
+        // Show error handling if needed
         let content: Element<Message> = if self.error_text.is_empty() {
             content.into()
         } else {
@@ -523,6 +537,7 @@ impl MainScreen {
             .into()
         };
 
+        // Show QuickSwitcherModal
         let content = Modal::new(&mut self.quick_switcher_modal, content, move |state| {
             state.view(theme).map(Message::QuickSwitchMsg)
         })
@@ -530,6 +545,7 @@ impl MainScreen {
         .backdrop(Message::QuickSwitch)
         .on_esc(Message::QuickSwitch);
 
+        // Show LogoutModal
         let content = Modal::new(&mut self.logout_modal, content, move |state| {
             state.view(theme).map(Message::LogoutChoice)
         })
@@ -538,6 +554,7 @@ impl MainScreen {
         .on_esc(Message::LogoutChoice(false));
 
         let content = if self.current_guild_id.is_some() {
+            // Show CreateChannelModal, if a guild is selected
             let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
                 state.view(theme).map(Message::ChannelCreationMessage)
             })
@@ -549,6 +566,7 @@ impl MainScreen {
                 create_channel::Message::GoBack,
             ));
             if self.current_channel_id.is_some() {
+                // Show Image view, if a guild and a channel are selected
                 Modal::new(&mut self.image_viewer_modal, content, move |state| {
                     state.view(theme).map(Message::ImageViewMessage)
                 })
@@ -571,7 +589,7 @@ impl MainScreen {
         msg: Message,
         client: &mut Client,
         thumbnail_cache: &ThumbnailCache,
-    ) -> Command<super::Message> {
+    ) -> Command<TopLevelMessage> {
         fn scroll_to_bottom(client: &mut Client, guild_id: u64, channel_id: u64) {
             if let Some((disp, looking_at_message)) = client
                 .guilds
@@ -832,12 +850,14 @@ impl MainScreen {
                                         )
                                         .await
                                         .map_or_else(
-                                            |err| super::Message::Error(Box::new(err.into())),
-                                            |response| super::Message::GetEventsBackwardsResponse {
-                                                messages: response.messages,
-                                                reached_top: response.reached_top,
-                                                guild_id,
-                                                channel_id,
+                                            |err| TopLevelMessage::Error(Box::new(err.into())),
+                                            |response| {
+                                                TopLevelMessage::GetEventsBackwardsResponse {
+                                                    messages: response.messages,
+                                                    reached_top: response.reached_top,
+                                                    guild_id,
+                                                    channel_id,
+                                                }
                                             },
                                         )
                                     },
@@ -864,23 +884,58 @@ impl MainScreen {
             Message::SelectedMember(user_id) => {
                 tracing::trace!("member: {}", user_id);
             }
-            Message::SelectedChannelMenuOption(option) => {
-                if let "New Channel" = option.as_str() {
+            Message::SelectedChannelMenuOption(option) => match option.as_str() {
+                "New Channel" => {
                     self.create_channel_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
-            }
+                "Edit Guild" => {
+                    let guild_id = self.current_guild_id.unwrap();
+                    let client_inner = client.inner().clone();
+                    return Command::perform(
+                        async move {
+                            // TODO: Why is channel_id required here?
+                            return permissions::query_has_permission(
+                                &client_inner,
+                                permissions::QueryPermissions::new(
+                                    guild_id,
+                                    0,
+                                    "guild.manage.change-information".to_string(),
+                                ),
+                            )
+                            .await;
+                        },
+                        move |result| {
+                            return match result {
+                                Ok(x) => {
+                                    if x.ok {
+                                        return TopLevelMessage::PushScreen(Box::new(
+                                            TopLevelScreen::GuildSettings(
+                                                super::GuildSettings::new(guild_id),
+                                            ),
+                                        ));
+                                    } else {
+                                        TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                            "Not permitted to edit guild information".to_string(),
+                                        )))
+                                    }
+                                }
+                                Err(x) => TopLevelMessage::Error(Box::new(x.into())),
+                            };
+                        },
+                    );
+                }
+                _ => {}
+            },
             Message::SelectedMenuOption(option) => match option.as_str() {
                 "Logout" => {
                     self.logout_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
                 "Join / Create a Guild" => {
-                    return Command::perform(async {}, |_| {
-                        super::Message::PushScreen(Box::new(super::Screen::GuildDiscovery(
-                            super::GuildDiscovery::default(),
-                        )))
-                    })
+                    return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
+                        super::GuildDiscovery::default(),
+                    ));
                 }
                 _ => {}
             },
@@ -905,8 +960,8 @@ impl MainScreen {
                             async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
                             |result| {
                                 result.map_or_else(
-                                    |err| super::Message::Error(Box::new(err.into())),
-                                    |_| super::Message::Nothing,
+                                    |err| TopLevelMessage::Error(Box::new(err.into())),
+                                    |_| TopLevelMessage::Nothing,
                                 )
                             },
                         );
@@ -936,7 +991,7 @@ impl MainScreen {
                                 let data = tokio::fs::read(&content_path).await?;
                                 let bgra = image::load_from_memory(&data).unwrap().into_bgra8();
 
-                                super::Message::DownloadedThumbnail {
+                                TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
                                     thumbnail: ImageHandle::from_pixels(
                                         bgra.width(),
@@ -946,17 +1001,17 @@ impl MainScreen {
                                     open: true,
                                 }
                             } else if is_thumbnail {
-                                super::Message::MainScreen(Message::OpenImageView {
+                                TopLevelMessage::MainScreen(Message::OpenImageView {
                                     handle: maybe_thumb.unwrap(),
                                     path: content_path,
                                     name: attachment.name,
                                 })
                             } else {
                                 open::that_in_background(content_path);
-                                super::Message::Nothing
+                                TopLevelMessage::Nothing
                             })
                         },
-                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
+                        |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
                     )
                 } else {
                     let inner = client.inner().clone();
@@ -970,7 +1025,7 @@ impl MainScreen {
                                 .into_bgra8();
 
                             Ok(if is_thumbnail && maybe_thumb.is_none() {
-                                super::Message::DownloadedThumbnail {
+                                TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
                                     thumbnail: ImageHandle::from_pixels(
                                         bgra.width(),
@@ -980,17 +1035,17 @@ impl MainScreen {
                                     open: true,
                                 }
                             } else if is_thumbnail {
-                                super::Message::MainScreen(Message::OpenImageView {
+                                TopLevelMessage::MainScreen(Message::OpenImageView {
                                     handle: maybe_thumb.unwrap(),
                                     path: content_path,
                                     name: attachment.name,
                                 })
                             } else {
                                 open::that_in_background(content_path);
-                                super::Message::Nothing
+                                TopLevelMessage::Nothing
                             })
                         },
-                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
+                        |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
                     )
                 };
             }
@@ -1103,7 +1158,7 @@ impl MainScreen {
                                 }
                             }
                         }
-                        Ok(super::Message::SendMessage {
+                        Ok(TopLevelMessage::SendMessage {
                             message: IcyMessage {
                                 content: IcyContent::Files(
                                     ids.into_iter()
@@ -1127,9 +1182,9 @@ impl MainScreen {
                         result.unwrap_or_else(|err| {
                             if matches!(err, ClientError::Custom(_)) {
                                 tracing::error!("{}", err);
-                                super::Message::Nothing
+                                TopLevelMessage::Nothing
                             } else {
-                                super::Message::Error(Box::new(err))
+                                TopLevelMessage::Error(Box::new(err))
                             }
                         })
                     },
@@ -1173,8 +1228,8 @@ impl MainScreen {
                             },
                             |result| {
                                 result.map_or_else(
-                                    |err| super::Message::Error(Box::new(err)),
-                                    super::Message::EventsReceived,
+                                    |err| TopLevelMessage::Error(Box::new(err)),
+                                    TopLevelMessage::EventsReceived,
                                 )
                             },
                         );
@@ -1228,8 +1283,8 @@ impl MainScreen {
                             },
                             |result| {
                                 result.map_or_else(
-                                    |err| super::Message::Error(Box::new(err)),
-                                    super::Message::EventsReceived,
+                                    |err| TopLevelMessage::Error(Box::new(err)),
+                                    TopLevelMessage::EventsReceived,
                                 )
                             },
                         );
@@ -1241,34 +1296,37 @@ impl MainScreen {
         Command::none()
     }
 
-    pub fn subscription(&self) -> Subscription<super::Message> {
+    pub fn subscription(&self) -> Subscription<TopLevelMessage> {
         use iced_native::{
             keyboard::{self, KeyCode},
             Event,
         };
 
-        fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<super::Message> {
+        fn filter_events(
+            ev: Event,
+            _status: iced_native::event::Status,
+        ) -> Option<TopLevelMessage> {
             match ev {
                 Event::Keyboard(keyboard::Event::KeyReleased {
                     key_code: KeyCode::Escape,
                     ..
-                }) => Some(super::Message::MainScreen(Message::ChangeMode(
+                }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(
                     Mode::Normal,
                 ))),
                 Event::Keyboard(keyboard::Event::KeyReleased {
                     key_code: KeyCode::K,
                     modifiers: keyboard::Modifiers { control: true, .. },
-                }) => Some(super::Message::MainScreen(Message::QuickSwitch)),
+                }) => Some(TopLevelMessage::MainScreen(Message::QuickSwitch)),
                 Event::Keyboard(keyboard::Event::KeyReleased {
                     key_code: KeyCode::E,
                     modifiers: keyboard::Modifiers { control: true, .. },
-                }) => Some(super::Message::MainScreen(Message::ChangeMode(
+                }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(
                     Mode::EditMessage,
                 ))),
                 Event::Keyboard(keyboard::Event::KeyReleased {
                     key_code: KeyCode::Up,
                     ..
-                }) => Some(super::Message::MainScreen(Message::EditLastMessage)),
+                }) => Some(TopLevelMessage::MainScreen(Message::EditLastMessage)),
                 _ => None,
             }
         }
@@ -1276,7 +1334,7 @@ impl MainScreen {
         iced_native::subscription::events_with(filter_events)
     }
 
-    pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
+    pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
         self.error_text = error.to_string();
         self.logout_modal.show(false);
 

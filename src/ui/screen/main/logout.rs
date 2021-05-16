@@ -1,3 +1,5 @@
+use super::super::Message as TopLevelMessage;
+
 use crate::{
     client::{error::ClientError, Client},
     label, label_button, length, space,
@@ -55,7 +57,7 @@ impl LogoutModal {
         }
     }
 
-    pub fn update(&mut self, msg: Message, client: &Client) -> Command<super::super::Message> {
+    pub fn update(&mut self, msg: Message, client: &Client) -> Command<TopLevelMessage> {
         if msg {
             let content_store = client.content_store_arc();
             let inner = client.inner().clone();
@@ -65,9 +67,9 @@ impl LogoutModal {
                         Client::logout(inner, content_store.session_file().to_path_buf()).await;
 
                     result.map_or_else(
-                        |err| super::super::Message::Error(Box::new(err)),
+                        |err| TopLevelMessage::Error(Box::new(err)),
                         |_| {
-                            super::super::Message::Logout(
+                            TopLevelMessage::Logout(
                                 super::super::Screen::Login(super::super::LoginScreen::new(
                                     content_store,
                                 ))
@@ -83,7 +85,7 @@ impl LogoutModal {
         }
     }
 
-    pub fn on_error(&mut self, _error: &ClientError) -> Command<super::super::Message> {
+    pub fn on_error(&mut self, _error: &ClientError) -> Command<TopLevelMessage> {
         self.confirmation = false;
 
         Command::none()

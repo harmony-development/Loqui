@@ -3,6 +3,8 @@ use harmony_rust_sdk::{
     client::api::chat::{guild::AddGuildToGuildListRequest, *},
 };
 
+use super::Message as TopLevelMessage;
+
 use crate::{
     client::{error::ClientError, Client},
     label, label_button, length, space,
@@ -155,7 +157,7 @@ impl GuildDiscovery {
         fill_container(padded_panel).style(theme).into()
     }
 
-    pub fn update(&mut self, msg: Message, client: &Client) -> Command<super::Message> {
+    pub fn update(&mut self, msg: Message, client: &Client) -> Command<TopLevelMessage> {
         match msg {
             Message::InviteChanged(new_invite) => {
                 self.invite = new_invite;
@@ -189,9 +191,9 @@ impl GuildDiscovery {
                     },
                     |result| {
                         result.map_or_else(
-                            |e| super::Message::Error(Box::new(e)),
+                            |e| TopLevelMessage::Error(Box::new(e)),
                             |response| {
-                                super::Message::GuildDiscovery(Message::JoinedGuild(response))
+                                TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response))
                             },
                         )
                     },
@@ -218,9 +220,9 @@ impl GuildDiscovery {
                     },
                     |result| {
                         result.map_or_else(
-                            |e| super::Message::Error(Box::new(e)),
+                            |e| TopLevelMessage::Error(Box::new(e)),
                             |response| {
-                                super::Message::GuildDiscovery(Message::JoinedGuild(response))
+                                TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response))
                             },
                         )
                     },
@@ -230,13 +232,13 @@ impl GuildDiscovery {
                 self.joined_guild = Some(room_id);
                 self.joining_guild = None;
             }
-            Message::GoBack => return Command::perform(async {}, |_| super::Message::PopScreen),
+            Message::GoBack => return Command::perform(async {}, |_| TopLevelMessage::PopScreen),
         }
 
         Command::none()
     }
 
-    pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
+    pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
         self.joined_guild = None;
         self.joining_guild = None;
         self.error_text = error.to_string();

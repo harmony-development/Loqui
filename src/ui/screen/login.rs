@@ -1,3 +1,4 @@
+use super::Message as TopLevelMessage;
 use crate::{
     client::{content::ContentStore, error::ClientError, Client, Session},
     label, label_button, length, space,
@@ -173,20 +174,20 @@ impl LoginScreen {
         client: Option<&Client>,
         msg: Message,
         content_store: &Arc<ContentStore>,
-    ) -> Command<super::Message> {
+    ) -> Command<TopLevelMessage> {
         fn respond(
             screen: &mut LoginScreen,
             client: &Client,
             response: AuthStepResponse,
-        ) -> Command<super::Message> {
+        ) -> Command<TopLevelMessage> {
             screen.waiting = true;
             let inner = client.inner().clone();
             Command::perform(
                 async move { inner.next_auth_step(response).await },
                 |result| {
                     result.map_or_else(
-                        |err| super::Message::Error(Box::new(err.into())),
-                        |step| super::Message::LoginScreen(Message::AuthStep(step)),
+                        |err| TopLevelMessage::Error(Box::new(err.into())),
+                        |step| TopLevelMessage::LoginScreen(Message::AuthStep(step)),
                     )
                 },
             )
@@ -208,8 +209,8 @@ impl LoginScreen {
                         async move { inner.prev_auth_step().await },
                         |result| {
                             result.map_or_else(
-                                |err| super::Message::Error(Box::new(err.into())),
-                                |step| super::Message::LoginScreen(Message::AuthStep(Some(step))),
+                                |err| TopLevelMessage::Error(Box::new(err.into())),
+                                |step| TopLevelMessage::LoginScreen(Message::AuthStep(Some(step))),
                             )
                         },
                     );
@@ -255,8 +256,8 @@ impl LoginScreen {
                                         Client::new(uri, None, content_store),
                                         |result| {
                                             result.map_or_else(
-                                                |err| super::Message::Error(Box::new(err)),
-                                                super::Message::ClientCreated,
+                                                |err| TopLevelMessage::Error(Box::new(err)),
+                                                TopLevelMessage::ClientCreated,
                                             )
                                         },
                                     )
@@ -319,9 +320,9 @@ impl LoginScreen {
                                 let ser = toml::ser::to_vec(&session).unwrap();
                                 tokio::fs::write(session_file, ser).await?;
                             }
-                            Ok(super::Message::LoginComplete(None))
+                            Ok(TopLevelMessage::LoginComplete(None))
                         },
-                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
+                        |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
                     );
                 }
             },
@@ -329,7 +330,7 @@ impl LoginScreen {
         Command::none()
     }
 
-    pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
+    pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
         self.current_error = error.to_string();
         self.reset_to_first_step();
 

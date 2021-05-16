@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use super::super::Message as TopLevelMessage;
+
 use crate::{
     client::content::ImageHandle,
     label_button, length, space,
@@ -61,7 +63,7 @@ impl ImageViewerModal {
         }
     }
 
-    pub fn update(&mut self, msg: Message) -> (Command<super::super::Message>, bool) {
+    pub fn update(&mut self, msg: Message) -> (Command<TopLevelMessage>, bool) {
         let can_go_back;
 
         match msg {
