@@ -167,6 +167,8 @@ impl MainScreen {
         self.guilds_buts_state
             .resize_with(guilds.len(), Default::default);
 
+        // Create individual widgets
+
         let guilds_list = if guilds.is_empty() {
             fill_container(label!("No guilds found"))
                 .style(theme)
@@ -241,6 +243,7 @@ impl MainScreen {
                 }
             });
 
+            // Fill sorted_members with content
             for (state, (user_id, member)) in self
                 .members_buts_state
                 .iter_mut()
@@ -502,10 +505,14 @@ impl MainScreen {
             );
         }
 
+        // Layouting
+
+        // Show screen widgets from left to right
         let content = Row::with_children(screen_widgets)
             .height(length!(+))
             .width(length!(+));
 
+        // Show error handling if needed
         let content: Element<Message> = if self.error_text.is_empty() {
             content.into()
         } else {
@@ -535,6 +542,7 @@ impl MainScreen {
                 .into()
         };
 
+        // Show QuickSwitcherModal
         let content = Modal::new(&mut self.quick_switcher_modal, content, move |state| {
             state.view(theme).map(Message::QuickSwitchMsg)
         })
@@ -542,6 +550,7 @@ impl MainScreen {
             .backdrop(Message::QuickSwitch)
             .on_esc(Message::QuickSwitch);
 
+        // Show LogoutModal
         let content = Modal::new(&mut self.logout_modal, content, move |state| {
             state.view(theme).map(Message::LogoutChoice)
         })
@@ -550,6 +559,7 @@ impl MainScreen {
             .on_esc(Message::LogoutChoice(false));
 
         let content = if self.current_guild_id.is_some() {
+            // Show CreateChannelModal, if a guild is selected
             let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
                 state.view(theme).map(Message::ChannelCreationMessage)
             })
@@ -561,6 +571,7 @@ impl MainScreen {
                     create_channel::Message::GoBack,
                 ));
             if self.current_channel_id.is_some() {
+                // Show Image view, if a guild and a channel are selected
                 Modal::new(&mut self.image_viewer_modal, content, move |state| {
                     state.view(theme).map(Message::ImageViewMessage)
                 })
