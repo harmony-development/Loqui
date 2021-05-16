@@ -1,3 +1,4 @@
+use super::Message as TopLevelMessage;
 use crate::{
     client::{content::ContentStore, error::ClientError, Client, Session},
     label, label_button, length, space,
@@ -16,7 +17,6 @@ use harmony_rust_sdk::{
         AuthStatus,
     },
 };
-use super::Message as TopLevelMessage;
 use std::{collections::HashMap, sync::Arc};
 
 #[allow(dead_code)]

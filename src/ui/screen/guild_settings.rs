@@ -8,21 +8,16 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub enum Message {
-
-}
+pub enum Message {}
 
 #[derive(Debug)]
 pub struct GuildSettings {
-    guild_id: u64
-
+    guild_id: u64,
 }
 
 impl GuildSettings {
     pub fn new(guild_id: u64) -> Self {
-        Self {
-            guild_id
-        }
+        Self { guild_id }
     }
 
     pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {

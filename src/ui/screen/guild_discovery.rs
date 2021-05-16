@@ -3,9 +3,7 @@ use harmony_rust_sdk::{
     client::api::chat::{guild::AddGuildToGuildListRequest, *},
 };
 
-use super::{
-    Message as TopLevelMessage,
-};
+use super::Message as TopLevelMessage;
 
 use crate::{
     client::{error::ClientError, Client},

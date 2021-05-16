@@ -4,10 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use super::{
-    Message as TopLevelMessage,
-    Screen as TopLevelScreen,
-};
+use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use harmony_rust_sdk::{
@@ -20,10 +17,9 @@ use harmony_rust_sdk::{
             self,
             channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
             guild::get_guild_members,
-            GuildId,
-            permissions,
+            permissions, GuildId,
         },
-        rest::{download_extract_file, FileId, upload_extract_id},
+        rest::{download_extract_file, upload_extract_id, FileId},
     },
 };
 use iced_aw::{modal, Modal};
@@ -36,15 +32,15 @@ use logout::LogoutModal;
 
 use crate::{
     client::{
-        Client,
         content::{self, ImageHandle, ThumbnailCache},
         error::ClientError,
         message::{Attachment, Content as IcyContent, Message as IcyMessage},
+        Client,
     },
     label, label_button, length, space,
     ui::{
-        component::{*, event_history::SHOWN_MSGS_LIMIT},
-        style::{ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING, Theme},
+        component::{event_history::SHOWN_MSGS_LIMIT, *},
+        style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
 
@@ -208,8 +204,8 @@ impl MainScreen {
             Some(current_username),
             Message::SelectedMenuOption,
         )
-            .width(length!(+))
-            .style(theme);
+        .width(length!(+))
+        .style(theme);
 
         if let Some((guild, guild_id)) = self
             .current_guild_id
@@ -275,10 +271,10 @@ impl MainScreen {
                             .next()
                             .unwrap_or('u')
                             .to_ascii_uppercase()))
-                            .width(length!(= AVATAR_WIDTH))
-                            .height(length!(= AVATAR_WIDTH))
-                            .style(theme.round())
-                            .into(),
+                        .width(length!(= AVATAR_WIDTH))
+                        .height(length!(= AVATAR_WIDTH))
+                        .style(theme.round())
+                        .into(),
                     );
                 }
 
@@ -289,7 +285,6 @@ impl MainScreen {
                         .width(length!(+)),
                 );
             }
-
 
             // TODO: show user avatar next to name
             let channel_menu = PickList::new(
@@ -302,8 +297,8 @@ impl MainScreen {
                 Some(guild.name.clone()),
                 Message::SelectedChannelMenuOption,
             )
-                .width(length!(+))
-                .style(theme);
+            .width(length!(+))
+            .style(theme);
 
             self.channels_buts_state
                 .resize_with(guild.channels.len(), Default::default);
@@ -398,9 +393,9 @@ impl MainScreen {
                         space!(w = 9).into(),
                         label!(typing_users_combined).size(14).into(),
                     ])
-                        .into(),
+                    .into(),
                 ])
-                    .height(length!(= 14));
+                .height(length!(= 14));
 
                 let send_file_button = Button::new(
                     &mut self.send_file_but_state,
@@ -408,11 +403,11 @@ impl MainScreen {
                         .font(iced_aw::ICON_FONT)
                         .size((PADDING / 4) * 3 + MESSAGE_SIZE),
                 )
-                    .style(theme.secondary())
-                    .on_press(Message::SendFiles {
-                        guild_id,
-                        channel_id,
-                    });
+                .style(theme.secondary())
+                .on_press(Message::SendFiles {
+                    guild_id,
+                    channel_id,
+                });
 
                 let message_composer = match self.mode {
                     Mode::Normal | Mode::EditingMessage(_) => TextInput::new(
@@ -421,15 +416,15 @@ impl MainScreen {
                         self.message.as_str(),
                         Message::ComposerMessageChanged,
                     )
-                        .padding((PADDING / 4) * 3)
-                        .size(MESSAGE_SIZE)
-                        .style(theme.secondary())
-                        .on_submit(Message::SendMessageComposer {
-                            guild_id,
-                            channel_id,
-                        })
-                        .width(length!(+))
-                        .into(),
+                    .padding((PADDING / 4) * 3)
+                    .size(MESSAGE_SIZE)
+                    .style(theme.secondary())
+                    .on_submit(Message::SendMessageComposer {
+                        guild_id,
+                        channel_id,
+                    })
+                    .width(length!(+))
+                    .into(),
                     Mode::EditMessage => fill_container(label!("Select a message to edit..."))
                         .padding((PADDING / 4) * 3)
                         .height(length!(-))
@@ -447,9 +442,9 @@ impl MainScreen {
                                 .font(iced_aw::ICON_FONT)
                                 .size((PADDING / 4) * 3 + MESSAGE_SIZE),
                         )
-                            .style(theme.secondary())
-                            .on_press(Message::ScrollToBottom(channel_id))
-                            .into(),
+                        .style(theme.secondary())
+                        .on_press(Message::ScrollToBottom(channel_id))
+                        .into(),
                     );
                 }
 
@@ -461,9 +456,9 @@ impl MainScreen {
                             .spacing(SPACING * 2)
                             .width(length!(+)),
                     )
-                        .width(length!(+))
-                        .padding(PADDING / 2)
-                        .into(),
+                    .width(length!(+))
+                    .padding(PADDING / 2)
+                    .into(),
                 ]);
 
                 screen_widgets.push(fill_container(message_area).style(theme.secondary()).into());
@@ -480,10 +475,10 @@ impl MainScreen {
                         .width(length!(+))
                         .height(length!(+)),
                 )
-                    .width(length!(= 200))
-                    .height(length!(+))
-                    .style(theme)
-                    .into(),
+                .width(length!(= 200))
+                .height(length!(+))
+                .style(theme)
+                .into(),
             );
         } else {
             let no_selected_guild_warning =
@@ -498,10 +493,10 @@ impl MainScreen {
                         .width(length!(+))
                         .height(length!(+)),
                 )
-                    .width(length!(= 200))
-                    .height(length!(+))
-                    .style(theme)
-                    .into(),
+                .width(length!(= 200))
+                .height(length!(+))
+                .style(theme)
+                .into(),
             );
         }
 
@@ -529,56 +524,56 @@ impl MainScreen {
                             .style(theme.secondary())
                             .into(),
                     ])
-                        .padding(PADDING / 4),
+                    .padding(PADDING / 4),
                 )
-                    .style(theme)
-                    .height(length!(-))
-                    .into(),
+                .style(theme)
+                .height(length!(-))
+                .into(),
                 content.into(),
             ])
-                .width(length!(+))
-                .height(length!(+))
-                .align_items(Align::Center)
-                .into()
+            .width(length!(+))
+            .height(length!(+))
+            .align_items(Align::Center)
+            .into()
         };
 
         // Show QuickSwitcherModal
         let content = Modal::new(&mut self.quick_switcher_modal, content, move |state| {
             state.view(theme).map(Message::QuickSwitchMsg)
         })
-            .style(theme)
-            .backdrop(Message::QuickSwitch)
-            .on_esc(Message::QuickSwitch);
+        .style(theme)
+        .backdrop(Message::QuickSwitch)
+        .on_esc(Message::QuickSwitch);
 
         // Show LogoutModal
         let content = Modal::new(&mut self.logout_modal, content, move |state| {
             state.view(theme).map(Message::LogoutChoice)
         })
-            .style(theme)
-            .backdrop(Message::LogoutChoice(false))
-            .on_esc(Message::LogoutChoice(false));
+        .style(theme)
+        .backdrop(Message::LogoutChoice(false))
+        .on_esc(Message::LogoutChoice(false));
 
         let content = if self.current_guild_id.is_some() {
             // Show CreateChannelModal, if a guild is selected
             let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
                 state.view(theme).map(Message::ChannelCreationMessage)
             })
-                .style(theme)
-                .backdrop(Message::ChannelCreationMessage(
-                    create_channel::Message::GoBack,
-                ))
-                .on_esc(Message::ChannelCreationMessage(
-                    create_channel::Message::GoBack,
-                ));
+            .style(theme)
+            .backdrop(Message::ChannelCreationMessage(
+                create_channel::Message::GoBack,
+            ))
+            .on_esc(Message::ChannelCreationMessage(
+                create_channel::Message::GoBack,
+            ));
             if self.current_channel_id.is_some() {
                 // Show Image view, if a guild and a channel are selected
                 Modal::new(&mut self.image_viewer_modal, content, move |state| {
                     state.view(theme).map(Message::ImageViewMessage)
                 })
-                    .style(theme)
-                    .backdrop(Message::ImageViewMessage(image_viewer::Message::Close))
-                    .on_esc(Message::ImageViewMessage(image_viewer::Message::Close))
-                    .into()
+                .style(theme)
+                .backdrop(Message::ImageViewMessage(image_viewer::Message::Close))
+                .on_esc(Message::ImageViewMessage(image_viewer::Message::Close))
+                .into()
             } else {
                 content.into()
             }
@@ -726,7 +721,7 @@ impl MainScreen {
             Message::EditLastMessage => {
                 let current_user_id = client.user_id.expect("literally how?");
                 if let (Some(guild_id), Some(channel_id)) =
-                (self.current_guild_id, self.current_channel_id)
+                    (self.current_guild_id, self.current_channel_id)
                 {
                     if let Some(mid) = client
                         .get_channel(guild_id, channel_id)
@@ -817,15 +812,15 @@ impl MainScreen {
                 scroll_perc,
             } => {
                 if let (Some(guild_id), Some(channel_id)) =
-                (self.current_guild_id, self.current_channel_id)
+                    (self.current_guild_id, self.current_channel_id)
                 {
                     if scroll_perc < 0.01 && scroll_perc <= prev_scroll_perc {
                         if let Some((
-                                        oldest_msg_id,
-                                        disp,
-                                        loading_messages_history,
-                                        looking_at_message,
-                                    )) = client
+                            oldest_msg_id,
+                            disp,
+                            loading_messages_history,
+                            looking_at_message,
+                        )) = client
                             .get_channel(guild_id, channel_id)
                             .map(|channel| {
                                 Some((
@@ -853,16 +848,18 @@ impl MainScreen {
                                             GetChannelMessages::new(guild_id, channel_id)
                                                 .before_message(oldest_msg_id.unwrap_or_default()),
                                         )
-                                            .await
-                                            .map_or_else(
-                                                |err| TopLevelMessage::Error(Box::new(err.into())),
-                                                |response| TopLevelMessage::GetEventsBackwardsResponse {
+                                        .await
+                                        .map_or_else(
+                                            |err| TopLevelMessage::Error(Box::new(err.into())),
+                                            |response| {
+                                                TopLevelMessage::GetEventsBackwardsResponse {
                                                     messages: response.messages,
                                                     reached_top: response.reached_top,
                                                     guild_id,
                                                     channel_id,
-                                                },
-                                            )
+                                                }
+                                            },
+                                        )
                                     },
                                     |result| result,
                                 );
@@ -870,9 +867,9 @@ impl MainScreen {
                         }
                     } else if scroll_perc > 0.99 && scroll_perc >= prev_scroll_perc {
                         if let Some((disp, looking_at_message)) =
-                        client.get_channel(guild_id, channel_id).map(|channel| {
-                            (channel.messages.len(), &mut channel.looking_at_message)
-                        })
+                            client.get_channel(guild_id, channel_id).map(|channel| {
+                                (channel.messages.len(), &mut channel.looking_at_message)
+                            })
                         {
                             if *looking_at_message > disp.saturating_sub(SHOWN_MSGS_LIMIT) {
                                 *looking_at_message = disp.saturating_sub(1);
@@ -901,26 +898,32 @@ impl MainScreen {
                             return permissions::query_has_permission(
                                 &client_inner,
                                 permissions::QueryPermissions::new(
-                                    guild_id, 0,
-                                    "guild.manage.change-information".to_string())).await;
+                                    guild_id,
+                                    0,
+                                    "guild.manage.change-information".to_string(),
+                                ),
+                            )
+                            .await;
                         },
                         move |result| {
                             return match result {
                                 Ok(x) => {
                                     if x.ok {
-                                        return TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
-                                            super::GuildSettings::new(guild_id),
-                                        )));
+                                        return TopLevelMessage::PushScreen(Box::new(
+                                            TopLevelScreen::GuildSettings(
+                                                super::GuildSettings::new(guild_id),
+                                            ),
+                                        ));
                                     } else {
-                                        TopLevelMessage::Error(Box::new(ClientError::Custom("Not permitted to edit guild information".to_string())))
+                                        TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                            "Not permitted to edit guild information".to_string(),
+                                        )))
                                     }
                                 }
-                                Err(x) => TopLevelMessage::Error(Box::new(x.into()))
-                            }
+                                Err(x) => TopLevelMessage::Error(Box::new(x.into())),
+                            };
                         },
                     );
-
-
                 }
                 _ => {}
             },
@@ -967,7 +970,7 @@ impl MainScreen {
             }
             Message::ScrollToBottom(sent_channel_id) => {
                 if let (Some(guild_id), Some(channel_id)) =
-                (self.current_guild_id, self.current_channel_id)
+                    (self.current_guild_id, self.current_channel_id)
                 {
                     if sent_channel_id == channel_id {
                         scroll_to_bottom(client, guild_id, channel_id);
@@ -1123,7 +1126,7 @@ impl MainScreen {
                                         file_mimetype.clone(),
                                         data,
                                     )
-                                        .await;
+                                    .await;
 
                                     match send_result.map(|id| {
                                         FileId::Hmc(inner.make_hmc(id).expect("id must be valid"))
@@ -1133,7 +1136,7 @@ impl MainScreen {
                                                 handle.path(),
                                                 content_store.content_path(&id),
                                             )
-                                                .await
+                                            .await
                                             {
                                                 tracing::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
                                             }
@@ -1264,8 +1267,8 @@ impl MainScreen {
                                     &inner,
                                     GetChannelMessages::new(guild_id, channel_id),
                                 )
-                                    .await?
-                                    .messages;
+                                .await?
+                                .messages;
                                 let events = messages
                                     .into_iter()
                                     .map(|msg| {
@@ -1299,28 +1302,31 @@ impl MainScreen {
             Event,
         };
 
-        fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<TopLevelMessage> {
+        fn filter_events(
+            ev: Event,
+            _status: iced_native::event::Status,
+        ) -> Option<TopLevelMessage> {
             match ev {
                 Event::Keyboard(keyboard::Event::KeyReleased {
-                                    key_code: KeyCode::Escape,
-                                    ..
-                                }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(
+                    key_code: KeyCode::Escape,
+                    ..
+                }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(
                     Mode::Normal,
                 ))),
                 Event::Keyboard(keyboard::Event::KeyReleased {
-                                    key_code: KeyCode::K,
-                                    modifiers: keyboard::Modifiers { control: true, .. },
-                                }) => Some(TopLevelMessage::MainScreen(Message::QuickSwitch)),
+                    key_code: KeyCode::K,
+                    modifiers: keyboard::Modifiers { control: true, .. },
+                }) => Some(TopLevelMessage::MainScreen(Message::QuickSwitch)),
                 Event::Keyboard(keyboard::Event::KeyReleased {
-                                    key_code: KeyCode::E,
-                                    modifiers: keyboard::Modifiers { control: true, .. },
-                                }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(
+                    key_code: KeyCode::E,
+                    modifiers: keyboard::Modifiers { control: true, .. },
+                }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(
                     Mode::EditMessage,
                 ))),
                 Event::Keyboard(keyboard::Event::KeyReleased {
-                                    key_code: KeyCode::Up,
-                                    ..
-                                }) => Some(TopLevelMessage::MainScreen(Message::EditLastMessage)),
+                    key_code: KeyCode::Up,
+                    ..
+                }) => Some(TopLevelMessage::MainScreen(Message::EditLastMessage)),
                 _ => None,
             }
         }

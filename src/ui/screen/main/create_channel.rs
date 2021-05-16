@@ -1,8 +1,5 @@
+use super::{super::Message as TopLevelMessage, Message as ParentMessage};
 use harmony_rust_sdk::client::api::chat::channel;
-use super::{
-    Message as ParentMessage,
-    super::Message as TopLevelMessage,
-};
 use iced_aw::Card;
 
 use crate::{

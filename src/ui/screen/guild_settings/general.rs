@@ -6,9 +6,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub enum Message {
-
-}
+pub enum Message {}
 
 #[derive(Debug)]
 pub struct General {
@@ -17,7 +15,6 @@ pub struct General {
 }
 
 impl General {
-
     pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {
         label!("asd").into()
     }
