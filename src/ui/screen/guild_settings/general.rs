@@ -1,5 +1,3 @@
-mod general;
-
 use iced::{Command, Element};
 
 use crate::{
@@ -13,17 +11,12 @@ pub enum Message {
 }
 
 #[derive(Debug)]
-pub struct GuildSettings {
-    guild_id: u64
-
+pub struct General {
+    guild_id: u64,
+    name_edit_state: text_input::State,
 }
 
-impl GuildSettings {
-    pub fn new(guild_id: u64) -> Self {
-        Self {
-            guild_id
-        }
-    }
+impl General {
 
     pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {
         label!("asd").into()
