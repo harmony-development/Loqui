@@ -55,7 +55,7 @@ jobs:
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        name: clippy-${{ matrix.os }}
+        name: 'clippy (${{ matrix.os }})'
 
     - name: Build
       if: ${{ matrix.os != 'macOS-latest' }}
