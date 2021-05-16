@@ -1,4 +1,4 @@
-name: Linux
+name: Rust
 
 on:
   push:
@@ -20,18 +20,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
 
     - name: Install dependencies
+      if: ${{ matrix.os }} == ubuntu-latest
       run: |
         sudo apt update -yy
         sudo apt install -yy --no-install-recommends libgtk-3-0 libgtk-3-dev protobuf-compiler libpango1.0-0 libpango1.0-dev libglib2.0-0 libglib2.0-dev python3 pkg-config cmake openssl libx11-dev libxcb1-dev libfreetype6 libfreetype6-dev fontconfig libfontconfig-dev expat libcairo2-dev libcairo2 libatk1.0-0 libatk1.0-dev libgdk-pixbuf2.0-0 libgdk-pixbuf2.0-dev gcc
+  
     - name: Install rust
-      run: rustup default 1.52.0 && rustup component add rustfmt clippy
+      uses: actions-rs/toolchain@v1.0.6
+      with:
+        toolchain: 1.52.1
+        default: true
+        override: true
+        components: rustfmt,clippy
 
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
@@ -40,13 +50,37 @@ jobs:
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        name: clippy-linux
+        name: clippy-${{ matrix.os }}
 
     - name: Build
+      if: ${{ matrix.os }} == ubuntu-latest || ${{ matrix.os }} == windows-latest
       run: cargo build --release
+
+    - name: Install cargo bundle
+      if: ${{ matrix.os }} == macOS-latest
+      run: cargo install cargo-bundle
     
+    - name: Build
+      if: ${{ matrix.os }} == macOS-latest
+      run: cargo bundle --release
+
     - name: Artifact
+      if: ${{ matrix.os }} == macOS-latest
+      uses: actions/upload-artifact@v2.2.2
+      with:
+        name: build-macos
+        path: target/release/bundle/osx/Crust.app
+
+    - name: Artifact
+      if: ${{ matrix.os }} == ubuntu-latest
       uses: actions/upload-artifact@v2.2.2
       with:
         name: build-linux
         path: target/release/crust
+
+    - name: Artifact
+      if: ${{ matrix.os }} == windows-latest
+      uses: actions/upload-artifact@v2.2.2
+      with:
+        name: build-windows
+        path: target/release/crust.exe
