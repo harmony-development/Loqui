@@ -877,11 +877,11 @@ impl MainScreen {
                     let guild_id = self.current_guild_id.unwrap();
                     return Command::perform(
                         async move {
-                            Ok(super::Message::PushScreen(Box::new(
+                            super::Message::PushScreen(Box::new(
                                 super::Screen::GuildSettings(super::GuildSettings::new(guild_id)),
-                            )))
+                            ))
                         },
-                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
+                        |result| result,
                     );
                 }
                 _ => {}
