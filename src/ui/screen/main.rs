@@ -4,6 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+use super::{
+    Message as TopLevelMessage,
+    Screen as TopLevelScreen,
+};
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use harmony_rust_sdk::{
@@ -579,7 +583,7 @@ impl MainScreen {
         msg: Message,
         client: &mut Client,
         thumbnail_cache: &ThumbnailCache,
-    ) -> Command<super::Message> {
+    ) -> Command<TopLevelMessage> {
         fn scroll_to_bottom(client: &mut Client, guild_id: u64, channel_id: u64) {
             if let Some((disp, looking_at_message)) = client
                 .guilds
@@ -840,8 +844,8 @@ impl MainScreen {
                                         )
                                             .await
                                             .map_or_else(
-                                                |err| super::Message::Error(Box::new(err.into())),
-                                                |response| super::Message::GetEventsBackwardsResponse {
+                                                |err| TopLevelMessage::Error(Box::new(err.into())),
+                                                |response| TopLevelMessage::GetEventsBackwardsResponse {
                                                     messages: response.messages,
                                                     reached_top: response.reached_top,
                                                     guild_id,
@@ -893,14 +897,14 @@ impl MainScreen {
                             return match result {
                                 Ok(x) => {
                                     if x.ok {
-                                        return super::Message::PushScreen(Box::new(super::Screen::GuildSettings(
+                                        return TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
                                             super::GuildSettings::new(guild_id),
                                         )));
                                     } else {
-                                        super::Message::Error(Box::new(ClientError::Custom("Not permitted to edit guild information".to_string())))
+                                        TopLevelMessage::Error(Box::new(ClientError::Custom("Not permitted to edit guild information".to_string())))
                                     }
                                 }
-                                Err(x) => super::Message::Error(Box::new(x.into()))
+                                Err(x) => TopLevelMessage::Error(Box::new(x.into()))
                             }
                         },
                     );
@@ -915,7 +919,7 @@ impl MainScreen {
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
                 "Join / Create a Guild" => {
-                    return super::Screen::push_screen_cmd(super::Screen::GuildDiscovery(
+                    return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
                         super::GuildDiscovery::default(),
                     ));
                 }
@@ -942,8 +946,8 @@ impl MainScreen {
                             async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
                             |result| {
                                 result.map_or_else(
-                                    |err| super::Message::Error(Box::new(err.into())),
-                                    |_| super::Message::Nothing,
+                                    |err| TopLevelMessage::Error(Box::new(err.into())),
+                                    |_| TopLevelMessage::Nothing,
                                 )
                             },
                         );
@@ -973,7 +977,7 @@ impl MainScreen {
                                 let data = tokio::fs::read(&content_path).await?;
                                 let bgra = image::load_from_memory(&data).unwrap().into_bgra8();
 
-                                super::Message::DownloadedThumbnail {
+                                TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
                                     thumbnail: ImageHandle::from_pixels(
                                         bgra.width(),
@@ -983,17 +987,17 @@ impl MainScreen {
                                     open: true,
                                 }
                             } else if is_thumbnail {
-                                super::Message::MainScreen(Message::OpenImageView {
+                                TopLevelMessage::MainScreen(Message::OpenImageView {
                                     handle: maybe_thumb.unwrap(),
                                     path: content_path,
                                     name: attachment.name,
                                 })
                             } else {
                                 open::that_in_background(content_path);
-                                super::Message::Nothing
+                                TopLevelMessage::Nothing
                             })
                         },
-                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
+                        |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
                     )
                 } else {
                     let inner = client.inner().clone();
@@ -1007,7 +1011,7 @@ impl MainScreen {
                                 .into_bgra8();
 
                             Ok(if is_thumbnail && maybe_thumb.is_none() {
-                                super::Message::DownloadedThumbnail {
+                                TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
                                     thumbnail: ImageHandle::from_pixels(
                                         bgra.width(),
@@ -1017,17 +1021,17 @@ impl MainScreen {
                                     open: true,
                                 }
                             } else if is_thumbnail {
-                                super::Message::MainScreen(Message::OpenImageView {
+                                TopLevelMessage::MainScreen(Message::OpenImageView {
                                     handle: maybe_thumb.unwrap(),
                                     path: content_path,
                                     name: attachment.name,
                                 })
                             } else {
                                 open::that_in_background(content_path);
-                                super::Message::Nothing
+                                TopLevelMessage::Nothing
                             })
                         },
-                        |result| result.unwrap_or_else(|err| super::Message::Error(Box::new(err))),
+                        |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
                     )
                 };
             }
@@ -1140,7 +1144,7 @@ impl MainScreen {
                                 }
                             }
                         }
-                        Ok(super::Message::SendMessage {
+                        Ok(TopLevelMessage::SendMessage {
                             message: IcyMessage {
                                 content: IcyContent::Files(
                                     ids.into_iter()
@@ -1164,9 +1168,9 @@ impl MainScreen {
                         result.unwrap_or_else(|err| {
                             if matches!(err, ClientError::Custom(_)) {
                                 tracing::error!("{}", err);
-                                super::Message::Nothing
+                                TopLevelMessage::Nothing
                             } else {
-                                super::Message::Error(Box::new(err))
+                                TopLevelMessage::Error(Box::new(err))
                             }
                         })
                     },
@@ -1210,8 +1214,8 @@ impl MainScreen {
                             },
                             |result| {
                                 result.map_or_else(
-                                    |err| super::Message::Error(Box::new(err)),
-                                    super::Message::EventsReceived,
+                                    |err| TopLevelMessage::Error(Box::new(err)),
+                                    TopLevelMessage::EventsReceived,
                                 )
                             },
                         );
@@ -1265,8 +1269,8 @@ impl MainScreen {
                             },
                             |result| {
                                 result.map_or_else(
-                                    |err| super::Message::Error(Box::new(err)),
-                                    super::Message::EventsReceived,
+                                    |err| TopLevelMessage::Error(Box::new(err)),
+                                    TopLevelMessage::EventsReceived,
                                 )
                             },
                         );
@@ -1278,34 +1282,34 @@ impl MainScreen {
         Command::none()
     }
 
-    pub fn subscription(&self) -> Subscription<super::Message> {
+    pub fn subscription(&self) -> Subscription<TopLevelMessage> {
         use iced_native::{
             keyboard::{self, KeyCode},
             Event,
         };
 
-        fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<super::Message> {
+        fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<TopLevelMessage> {
             match ev {
                 Event::Keyboard(keyboard::Event::KeyReleased {
                                     key_code: KeyCode::Escape,
                                     ..
-                                }) => Some(super::Message::MainScreen(Message::ChangeMode(
+                                }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(
                     Mode::Normal,
                 ))),
                 Event::Keyboard(keyboard::Event::KeyReleased {
                                     key_code: KeyCode::K,
                                     modifiers: keyboard::Modifiers { control: true, .. },
-                                }) => Some(super::Message::MainScreen(Message::QuickSwitch)),
+                                }) => Some(TopLevelMessage::MainScreen(Message::QuickSwitch)),
                 Event::Keyboard(keyboard::Event::KeyReleased {
                                     key_code: KeyCode::E,
                                     modifiers: keyboard::Modifiers { control: true, .. },
-                                }) => Some(super::Message::MainScreen(Message::ChangeMode(
+                                }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(
                     Mode::EditMessage,
                 ))),
                 Event::Keyboard(keyboard::Event::KeyReleased {
                                     key_code: KeyCode::Up,
                                     ..
-                                }) => Some(super::Message::MainScreen(Message::EditLastMessage)),
+                                }) => Some(TopLevelMessage::MainScreen(Message::EditLastMessage)),
                 _ => None,
             }
         }
@@ -1313,7 +1317,7 @@ impl MainScreen {
         iced_native::subscription::events_with(filter_events)
     }
 
-    pub fn on_error(&mut self, error: ClientError) -> Command<super::Message> {
+    pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
         self.error_text = error.to_string();
         self.logout_modal.show(false);
 
