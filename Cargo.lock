@@ -1626,7 +1626,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1639,7 +1639,7 @@ dependencies = [
 [[package]]
 name = "iced_aw"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced_aw.git?rev=229f402addaeced366a1f907281cb8367923a05a#229f402addaeced366a1f907281cb8367923a05a"
+source = "git+https://github.com/yusdacra/iced_aw.git?rev=63c71b4aa59d0b63c7f5b0e89761df15ef944a6d#63c71b4aa59d0b63c7f5b0e89761df15ef944a6d"
 dependencies = [
  "dodrio",
  "iced_graphics",
@@ -1653,12 +1653,12 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 
 [[package]]
 name = "iced_futures"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 dependencies = [
  "futures",
  "log",
@@ -1669,7 +1669,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 dependencies = [
  "bytemuck",
  "font-kit",
@@ -1684,7 +1684,7 @@ dependencies = [
 [[package]]
 name = "iced_native"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1696,7 +1696,7 @@ dependencies = [
 [[package]]
 name = "iced_style"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 dependencies = [
  "iced_core",
 ]
@@ -1704,7 +1704,7 @@ dependencies = [
 [[package]]
 name = "iced_web"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 dependencies = [
  "dodrio",
  "iced_core",
@@ -1720,7 +1720,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 dependencies = [
  "bytemuck",
  "futures",
@@ -1738,7 +1738,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?rev=3f2ea7764206a39ce585ab84d3323979daaa4977#3f2ea7764206a39ce585ab84d3323979daaa4977"
+source = "git+https://github.com/yusdacra/iced.git?rev=e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1#e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1"
 dependencies = [
  "iced_futures",
  "iced_graphics",
@@ -4086,9 +4086,9 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "window_clipboard"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f6a6c83705a9008993d91151c1f5d249f5e87ef752b862ea968bd62f15202ab"
+checksum = "33a4518b538a45ad39d138a8c3bea8f6b4452174aeb38143d1dd643a3a838ccc"
 dependencies = [
  "clipboard-win",
  "clipboard_macos",
