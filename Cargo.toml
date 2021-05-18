@@ -32,7 +32,7 @@ codegen-units = 1
 panic = 'abort'
 
 [dependencies]
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client", "parking_lot"] }
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "workaround/tls-fix", features = ["client", "parking_lot"] }
 
 iced = { git = "https://github.com/yusdacra/iced.git", rev = "e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1", features = ["tokio", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "e74a2a2003eab1c6e1f30ce88d9f5144f6b456a1" }
@@ -49,7 +49,7 @@ iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", rev = "63c71b4aa59d
 ] }
 
 open = "1.5.1"
-infer = "0.3.5"
+infer = "0.4.0"
 rfd = "0.3"
 image = "0.23.14"
 directories-next = "2.0.0"

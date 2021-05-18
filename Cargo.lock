@@ -120,17 +120,16 @@ dependencies = [
 [[package]]
 name = "async-tungstenite"
 version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07b30ef0ea5c20caaa54baea49514a206308989c68be7ecd86c7f956e4da6378"
+source = "git+https://github.com/yusdacra/async-tungstenite.git#09441f4b82085b95d09ab8fd99a1131f50c345ff"
 dependencies = [
  "futures-io",
  "futures-util",
  "log",
  "pin-project-lite",
+ "rustls-native-certs",
  "tokio",
  "tokio-rustls",
  "tungstenite",
- "webpki-roots",
 ]
 
 [[package]]
@@ -264,6 +263,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3c69b077ad434294d3ce9f1f6143a2a4b89a8a2d54ef813d85003a4fd1137fd"
 dependencies = [
  "jobserver",
+]
+
+[[package]]
+name = "cfb"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca453e8624711b2f0f4eb47076a318feda166252a827ee25d067b43de83dcba0"
+dependencies = [
+ "byteorder",
+ "uuid",
 ]
 
 [[package]]
@@ -807,9 +816,9 @@ dependencies = [
 
 [[package]]
 name = "euclid"
-version = "0.22.3"
+version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "536d206ede9fae5a338a1576623b04fd2459f6086e551d374ebf10e9b78bb4df"
+checksum = "7b9b0b0868386d989090b2431c4c2a4d31228490a132ca5db3a36184331782d3"
 dependencies = [
  "num-traits",
 ]
@@ -1462,7 +1471,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#35fbb23b144cf24eff934262cb519cc566366845"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#de2cd0ee45f4a6f5d8ad8bd89bef90b7b1f6495e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1472,7 +1481,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.5.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#35fbb23b144cf24eff934262cb519cc566366845"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#de2cd0ee45f4a6f5d8ad8bd89bef90b7b1f6495e"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1520,9 +1529,8 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a197c0c744a5ef665822257a24bfd97969e52ee9642d5c81337b6b9dec9c766"
+version = "0.6.6"
+source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#2c1bc5ec0f5a748a411cebdaa3b06d39a39bf26a"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1539,9 +1547,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc-build"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea9ed86d6bdc1dfb9928bc0b493cbd1766bbd6fe14e1387ba85dae666240fdaf"
+checksum = "94910dd78c0200f0dcefc082a0c39c4ee3264e212e5b7a354346639440b61962"
 dependencies = [
  "proc-macro2",
  "prost",
@@ -1798,9 +1806,12 @@ dependencies = [
 
 [[package]]
 name = "infer"
-version = "0.3.7"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "865e8a58ae8e24d2c4412c31344afa1d302a3740ad67528c10f50d6876cdcf55"
+checksum = "f92b41dab759f9e8427c03f519c344a14655490b8db548dac1e57a75b3258391"
+dependencies = [
+ "cfb",
+]
 
 [[package]]
 name = "inplace_it"
@@ -2806,9 +2817,9 @@ dependencies = [
 
 [[package]]
 name = "rayon"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b0d8e0819fadc20c74ea8373106ead0600e3a67ef1fe8da56e39b9ae7275674"
+checksum = "c06aca804d41dbc8ba42dfd964f0d01334eceb64314b9ecf7c5fad5188a06d90"
 dependencies = [
  "autocfg",
  "crossbeam-deque",
@@ -2818,9 +2829,9 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.9.0"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ab346ac5921dc62ffa9f89b7a773907511cdfa5490c572ae9be1be33e8afa4a"
+checksum = "d78120e2c850279833f1dd3582f730c4ab53ed95aeaaaa862a2a5c71b1656d8e"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-deque",
@@ -3615,8 +3626,7 @@ checksum = "85e00391c1f3d171490a3f8bd79999b0002ae38d3da0d6a3a306c754b053d71b"
 [[package]]
 name = "tungstenite"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
+source = "git+https://github.com/yusdacra/tungstenite-rs.git#d7e2f0a72a64cfca463b51547b9d8c9fe4bbdd00"
 dependencies = [
  "base64",
  "byteorder",
@@ -3627,12 +3637,12 @@ dependencies = [
  "log",
  "rand 0.8.3",
  "rustls",
+ "rustls-native-certs",
  "sha-1",
  "thiserror",
  "url",
  "utf-8",
  "webpki",
- "webpki-roots",
 ]
 
 [[package]]
@@ -3934,15 +3944,6 @@ checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
 dependencies = [
  "ring",
  "untrusted",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aabe153544e473b775453675851ecc86863d2a81d786d741f6b76778f2a48940"
-dependencies = [
- "webpki",
 ]
 
 [[package]]
