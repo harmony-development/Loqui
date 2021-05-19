@@ -21,6 +21,12 @@
             eval = with common.pkgs; "$GSETTINGS_SCHEMAS_PATH:$XDG_DATA_DIRS:${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share";
           }
         ];
+        commands = prev.commands ++ [
+            {
+              name = "local-dev";
+              command = "SSL_CERT_FILE=~/.local/share/mkcert/rootCA.pem cargo r";
+            }
+          ];
       };
       mainBuild = common: prev: {
         nativeBuildInputs = prev.nativeBuildInputs ++ (with common.pkgs; [ makeWrapper wrapGAppsHook ]);

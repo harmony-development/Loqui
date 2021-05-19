@@ -906,7 +906,7 @@ impl MainScreen {
                             .await;
                         },
                         move |result| {
-                            return match result {
+                            match result {
                                 Ok(x) => {
                                     if x.ok {
                                         return TopLevelMessage::PushScreen(Box::new(
@@ -921,7 +921,7 @@ impl MainScreen {
                                     }
                                 }
                                 Err(x) => TopLevelMessage::Error(Box::new(x.into())),
-                            };
+                            }
                         },
                     );
                 }
