@@ -905,23 +905,21 @@ impl MainScreen {
                             )
                             .await;
                         },
-                        move |result| {
-                            match result {
-                                Ok(x) => {
-                                    if x.ok {
-                                        return TopLevelMessage::PushScreen(Box::new(
-                                            TopLevelScreen::GuildSettings(
-                                                super::GuildSettings::new(guild_id),
-                                            ),
-                                        ));
-                                    } else {
-                                        TopLevelMessage::Error(Box::new(ClientError::Custom(
-                                            "Not permitted to edit guild information".to_string(),
-                                        )))
-                                    }
+                        move |result| match result {
+                            Ok(x) => {
+                                if x.ok {
+                                    TopLevelMessage::PushScreen(Box::new(
+                                        TopLevelScreen::GuildSettings(super::GuildSettings::new(
+                                            guild_id,
+                                        )),
+                                    ))
+                                } else {
+                                    TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                        "Not permitted to edit guild information".to_string(),
+                                    )))
                                 }
-                                Err(x) => TopLevelMessage::Error(Box::new(x.into())),
                             }
+                            Err(x) => TopLevelMessage::Error(Box::new(x.into())),
                         },
                     );
                 }
