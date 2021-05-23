@@ -71,7 +71,7 @@ impl Display for ClientError {
                         "API error: {}",
                         std::str::from_utf8(raw_error)
                             .unwrap_or("couldn't parse error")
-                            .replace('\n', ""),
+                            .replace('\n', " "),
                     )
                 } else {
                     write!(fmt, "{}", err)
