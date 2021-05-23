@@ -27,6 +27,7 @@ use indexmap::IndexMap;
 
 use chan_guild_list::build_guild_list;
 use create_channel::ChannelCreationModal;
+use help::HelpModal;
 use image_viewer::ImageViewerModal;
 use logout::LogoutModal;
 use profile_edit::ProfileEditModal;
@@ -48,6 +49,7 @@ use crate::{
 use self::quick_switcher::QuickSwitcherModal;
 
 pub mod create_channel;
+pub mod help;
 pub mod image_viewer;
 pub mod logout;
 pub mod profile_edit;
@@ -113,6 +115,7 @@ pub enum Message {
     ImageViewMessage(image_viewer::Message),
     QuickSwitchMsg(quick_switcher::Message),
     ProfileEditMsg(profile_edit::Message),
+    HelpModal(help::Message),
 }
 
 #[derive(Debug, Default)]
@@ -141,6 +144,7 @@ pub struct MainScreen {
     pub image_viewer_modal: modal::State<ImageViewerModal>,
     quick_switcher_modal: modal::State<QuickSwitcherModal>,
     profile_edit_modal: modal::State<ProfileEditModal>,
+    help_modal: modal::State<HelpModal>,
 
     // Join room screen state
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
@@ -204,6 +208,7 @@ impl MainScreen {
                 current_username.clone(),
                 "Join / Create a Guild".to_string(),
                 "Edit Profile".to_string(),
+                "Help".to_string(),
                 "Logout".to_string(),
             ],
             Some(current_username),
@@ -542,7 +547,15 @@ impl MainScreen {
             .into()
         };
 
-        // Show QuickSwitcherModal
+        // Show HelpModal
+        let content = Modal::new(&mut self.help_modal, content, move |state| {
+            state.view(theme).map(Message::HelpModal)
+        })
+        .style(theme)
+        .backdrop(Message::HelpModal(true))
+        .on_esc(Message::HelpModal(true));
+
+        // Show ProfileEditModal
         let content = Modal::new(&mut self.profile_edit_modal, content, move |state| {
             state
                 .view(theme, client, thumbnail_cache)
@@ -827,6 +840,11 @@ impl MainScreen {
 
                 return cmd;
             }
+            Message::HelpModal(msg) => {
+                if msg {
+                    self.help_modal.show(false);
+                }
+            }
             Message::LogoutChoice(confirm) => {
                 self.logout_modal.show(false);
                 return self.logout_modal.inner_mut().update(confirm, client);
@@ -966,6 +984,10 @@ impl MainScreen {
                         .user_id
                         .expect("we dont go to main screen if we dont have a user id");
                     self.profile_edit_modal.show(true);
+                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
+                }
+                "Help" => {
+                    self.help_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
                 _ => {}

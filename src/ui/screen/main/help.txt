@@ -1,0 +1,4 @@
+Pressing CTRL + E enables edit mode. Clicking on a text message allows you to edit it.
+Pressing Up Arrow allows you to edit the last message you sent quickly.
+Pressing CTRL + K opens the quick switcher. You can use `*` to search for guilds and `#` to search for channels.
+You can press Escape to close any dialog, or return to normal mode.
