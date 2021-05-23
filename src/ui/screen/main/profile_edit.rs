@@ -68,7 +68,7 @@ impl ProfileEditModal {
             let avatar_but = Button::new(&mut self.avatar_but, user_img)
                 .on_press(Message::UploadPfp)
                 .style(theme);
-            let username = label!(format!("Hello, {}", user_profile.username)).size(DEF_SIZE + 12);
+            let username = label!(format!("Hello, {}.", user_profile.username)).size(DEF_SIZE + 12);
             let username_field = TextInput::new(
                 &mut self.username_edit,
                 "Enter a new username...",

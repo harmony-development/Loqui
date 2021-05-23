@@ -91,6 +91,7 @@ pub enum Message {
     },
     /// Sent whenever an error occurs.
     Error(Box<ClientError>),
+    Exit,
 }
 
 #[derive(Debug)]
@@ -187,6 +188,7 @@ pub struct ScreenManager {
     thumbnail_cache: ThumbnailCache,
     sources_to_add: Vec<EventSource>,
     socket_reset: bool,
+    should_exit: bool,
 }
 
 impl ScreenManager {
@@ -199,6 +201,7 @@ impl ScreenManager {
             thumbnail_cache: ThumbnailCache::default(),
             sources_to_add: vec![],
             socket_reset: false,
+            should_exit: false,
         }
     }
 
@@ -331,6 +334,7 @@ impl Application for ScreenManager {
 
         match msg {
             Message::Nothing => {}
+            Message::Exit => self.should_exit = true,
             Message::LoginScreen(msg) => {
                 if let Screen::Login(screen) = self.screens.current_mut() {
                     return screen.update(self.client.as_ref(), msg, &self.content_store);
@@ -715,6 +719,10 @@ impl Application for ScreenManager {
                 .view(self.theme, self.client.as_ref().unwrap())
                 .map(Message::GuildSettings),
         }
+    }
+
+    fn should_exit(&self) -> bool {
+        self.should_exit
     }
 }
 

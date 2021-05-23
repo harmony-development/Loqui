@@ -272,7 +272,7 @@ mod dark {
                 background: DARK_BG.into(),
                 head_background: BRIGHT_BG.into(),
                 border_color: BRIGHT_BG,
-                foot_background: BRIGHT_BG.into(),
+                foot_background: DARK_BG.into(),
                 body_text_color: Color::WHITE,
                 foot_text_color: Color::WHITE,
                 head_text_color: Color::WHITE,

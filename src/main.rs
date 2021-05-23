@@ -9,8 +9,7 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 pub mod client;
 pub mod ui;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     // Create the content store
     let content_store = ContentStore::default();
     content_store.create_req_dirs().unwrap();

@@ -47,7 +47,6 @@ impl ImageViewerModal {
                 )
                 .foot(
                     label_button!(&mut self.external_but_state, "Open externally")
-                        .height(length!(= 50))
                         .style(theme)
                         .on_press(Message::OpenExternal),
                 )

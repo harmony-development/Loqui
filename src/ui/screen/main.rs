@@ -210,6 +210,7 @@ impl MainScreen {
                 "Edit Profile".to_string(),
                 "Help".to_string(),
                 "Logout".to_string(),
+                "Exit".to_string(),
             ],
             Some(current_username),
             Message::SelectedMenuOption,
@@ -990,6 +991,9 @@ impl MainScreen {
                     self.help_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
+                "Exit" => {
+                    return Command::perform(async { TopLevelMessage::Exit }, |msg| msg);
+                }
                 _ => {}
             },
             Message::ComposerMessageChanged(new_msg) => {
@@ -1299,7 +1303,7 @@ impl MainScreen {
     pub fn subscription(&self) -> Subscription<TopLevelMessage> {
         use iced_native::{
             keyboard::{self, KeyCode},
-            Event,
+            window, Event,
         };
 
         fn filter_events(
@@ -1327,6 +1331,7 @@ impl MainScreen {
                     key_code: KeyCode::Up,
                     ..
                 }) => Some(TopLevelMessage::MainScreen(Message::EditLastMessage)),
+                Event::Window(window::Event::CloseRequested) => Some(TopLevelMessage::Exit),
                 _ => None,
             }
         }
