@@ -902,7 +902,6 @@ impl MainScreen {
                                 &client_inner,
                                 permissions::QueryPermissions::new(
                                     guild_id,
-                                    0,
                                     "guild.manage.change-information".to_string(),
                                 ),
                             )
