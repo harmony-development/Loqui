@@ -890,6 +890,7 @@ impl MainScreen {
             Message::SelectedChannelMenuOption(option) => match option.as_str() {
                 "New Channel" => {
                     self.create_channel_modal.show(true);
+                    self.error_text.clear();
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
                 "Edit Guild" => {
@@ -897,7 +898,6 @@ impl MainScreen {
                     let client_inner = client.inner().clone();
                     return Command::perform(
                         async move {
-                            // TODO: Why is channel_id required here?
                             return permissions::query_has_permission(
                                 &client_inner,
                                 permissions::QueryPermissions::new(
