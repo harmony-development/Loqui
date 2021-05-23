@@ -423,6 +423,7 @@ impl Client {
                             loading_messages_history: false,
                             looking_at_message: 0,
                             messages: Vec::new(),
+                            reached_top: false,
                         },
                     );
                     guild.update_channel_order(previous_id, next_id, channel_id);
@@ -543,7 +544,7 @@ impl Client {
         guild_id: u64,
         channel_id: u64,
         messages: Vec<HarmonyMessage>,
-        _reached_top: bool,
+        reached_top: bool,
     ) -> Vec<PostProcessEvent> {
         let mut post = Vec::new();
         let mut messages = harmony_messages_to_ui_messages(messages);
@@ -564,6 +565,7 @@ impl Client {
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             messages.append(&mut channel.messages);
             channel.messages = messages;
+            channel.reached_top = reached_top;
         }
 
         post

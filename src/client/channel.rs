@@ -10,4 +10,5 @@ pub struct Channel {
     pub messages: Messages,
     pub looking_at_message: usize,
     pub loading_messages_history: bool,
+    pub reached_top: bool,
 }

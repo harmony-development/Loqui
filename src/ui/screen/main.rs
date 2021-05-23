@@ -818,6 +818,7 @@ impl MainScreen {
                         if let Some((
                             oldest_msg_id,
                             disp,
+                            reached_top,
                             loading_messages_history,
                             looking_at_message,
                         )) = client
@@ -826,6 +827,7 @@ impl MainScreen {
                                 Some((
                                     channel.messages.first().map(|m| m.id.id()).flatten(),
                                     channel.messages.len(),
+                                    channel.reached_top,
                                     &mut channel.loading_messages_history,
                                     &mut channel.looking_at_message,
                                 ))
@@ -838,7 +840,8 @@ impl MainScreen {
                                 *looking_at_message = looking_at_message.saturating_sub(1);
                             }
 
-                            if *looking_at_message < 2 && !*loading_messages_history {
+                            if !reached_top && *looking_at_message < 2 && !*loading_messages_history
+                            {
                                 *loading_messages_history = true;
                                 let inner = client.inner().clone();
                                 return Command::perform(
