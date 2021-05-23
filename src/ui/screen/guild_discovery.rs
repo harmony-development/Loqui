@@ -3,7 +3,7 @@ use harmony_rust_sdk::{
     client::api::chat::{guild::AddGuildToGuildListRequest, *},
 };
 
-use super::Message as TopLevelMessage;
+use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
 
 use crate::{
     client::{error::ClientError, Client},
@@ -232,7 +232,7 @@ impl GuildDiscovery {
                 self.joined_guild = Some(room_id);
                 self.joining_guild = None;
             }
-            Message::GoBack => return Command::perform(async {}, |_| TopLevelMessage::PopScreen),
+            Message::GoBack => return TopLevelScreen::pop_screen_cmd(),
         }
 
         Command::none()

@@ -19,7 +19,7 @@ use harmony_rust_sdk::{
             guild::get_guild_members,
             permissions, GuildId,
         },
-        rest::{download_extract_file, upload_extract_id, FileId},
+        rest::download_extract_file,
     },
 };
 use iced_aw::{modal, Modal};
@@ -29,10 +29,11 @@ use chan_guild_list::build_guild_list;
 use create_channel::ChannelCreationModal;
 use image_viewer::ImageViewerModal;
 use logout::LogoutModal;
+use profile_edit::ProfileEditModal;
 
 use crate::{
     client::{
-        content::{self, ImageHandle, ThumbnailCache},
+        content::{ImageHandle, ThumbnailCache},
         error::ClientError,
         message::{Attachment, Content as IcyContent, Message as IcyMessage},
         Client,
@@ -49,6 +50,7 @@ use self::quick_switcher::QuickSwitcherModal;
 pub mod create_channel;
 pub mod image_viewer;
 pub mod logout;
+pub mod profile_edit;
 pub mod quick_switcher;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -110,6 +112,7 @@ pub enum Message {
     ChannelCreationMessage(create_channel::Message),
     ImageViewMessage(image_viewer::Message),
     QuickSwitchMsg(quick_switcher::Message),
+    ProfileEditMsg(profile_edit::Message),
 }
 
 #[derive(Debug, Default)]
@@ -137,6 +140,7 @@ pub struct MainScreen {
     create_channel_modal: modal::State<ChannelCreationModal>,
     pub image_viewer_modal: modal::State<ImageViewerModal>,
     quick_switcher_modal: modal::State<QuickSwitcherModal>,
+    profile_edit_modal: modal::State<ProfileEditModal>,
 
     // Join room screen state
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
@@ -151,12 +155,12 @@ pub struct MainScreen {
 }
 
 impl MainScreen {
-    pub fn view(
-        &mut self,
+    pub fn view<'a>(
+        &'a mut self,
         theme: Theme,
-        client: &Client,
-        thumbnail_cache: &ThumbnailCache,
-    ) -> Element<Message> {
+        client: &'a Client,
+        thumbnail_cache: &'a ThumbnailCache,
+    ) -> Element<'a, Message> {
         let guilds = &client.guilds;
 
         // Resize and (if extended) initialize new button states for new rooms
@@ -199,6 +203,7 @@ impl MainScreen {
             vec![
                 current_username.clone(),
                 "Join / Create a Guild".to_string(),
+                "Edit Profile".to_string(),
                 "Logout".to_string(),
             ],
             Some(current_username),
@@ -538,6 +543,16 @@ impl MainScreen {
         };
 
         // Show QuickSwitcherModal
+        let content = Modal::new(&mut self.profile_edit_modal, content, move |state| {
+            state
+                .view(theme, client, thumbnail_cache)
+                .map(Message::ProfileEditMsg)
+        })
+        .style(theme)
+        .backdrop(Message::ProfileEditMsg(profile_edit::Message::Back))
+        .on_esc(Message::ProfileEditMsg(profile_edit::Message::Back));
+
+        // Show QuickSwitcherModal
         let content = Modal::new(&mut self.quick_switcher_modal, content, move |state| {
             state.view(theme).map(Message::QuickSwitchMsg)
         })
@@ -781,6 +796,15 @@ impl MainScreen {
                 self.image_viewer_modal.inner_mut().image_handle = Some((handle, (path, name)));
                 return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
             }
+            Message::ProfileEditMsg(msg) => {
+                let (cmd, go_back) = self.profile_edit_modal.inner_mut().update(msg, client);
+
+                if go_back {
+                    self.profile_edit_modal.show(false);
+                }
+
+                return cmd;
+            }
             Message::ImageViewMessage(msg) => {
                 let (cmd, go_back) = self.image_viewer_modal.inner_mut().update(msg);
 
@@ -936,6 +960,13 @@ impl MainScreen {
                     return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
                         super::GuildDiscovery::default(),
                     ));
+                }
+                "Edit Profile" => {
+                    self.profile_edit_modal.inner_mut().user_id = client
+                        .user_id
+                        .expect("we dont go to main screen if we dont have a user id");
+                    self.profile_edit_modal.show(true);
+                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
                 }
                 _ => {}
             },
@@ -1104,58 +1135,7 @@ impl MainScreen {
 
                 return Command::perform(
                     async move {
-                        let handles =
-                            rfd::AsyncFileDialog::new()
-                                .pick_files()
-                                .await
-                                .ok_or_else(|| {
-                                    ClientError::Custom("File selection error".to_string())
-                                })?;
-                        let mut ids = Vec::with_capacity(handles.len());
-
-                        for handle in handles {
-                            match tokio::fs::read(handle.path()).await {
-                                Ok(data) => {
-                                    let file_mimetype = content::infer_type_from_bytes(&data);
-                                    let filename = content::get_filename(handle.path()).to_string();
-                                    let filesize = data.len();
-
-                                    let send_result = upload_extract_id(
-                                        &inner,
-                                        filename.clone(),
-                                        file_mimetype.clone(),
-                                        data,
-                                    )
-                                    .await;
-
-                                    match send_result.map(FileId::Id) {
-                                        Ok(id) => {
-                                            if let Err(err) = tokio::fs::hard_link(
-                                                handle.path(),
-                                                content_store.content_path(&id),
-                                            )
-                                            .await
-                                            {
-                                                tracing::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
-                                            }
-                                            ids.push((id, file_mimetype, filename, filesize));
-                                        }
-                                        Err(err) => {
-                                            tracing::error!(
-                                                "An error occured while trying to upload a file: {}",
-                                                err
-                                            );
-                                        }
-                                    }
-                                }
-                                Err(err) => {
-                                    tracing::error!(
-                                        "An IO error occured while trying to upload a file: {}",
-                                        err
-                                    );
-                                }
-                            }
-                        }
+                        let ids = super::select_upload_files(&inner, content_store).await?;
                         Ok(TopLevelMessage::SendMessage {
                             message: IcyMessage {
                                 content: IcyContent::Files(

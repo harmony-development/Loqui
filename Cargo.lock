@@ -1471,7 +1471,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#cd1eaf16407f7deff0f9ab14b05089537fd5c8fa"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#d9b652bf2767f6da03f9b72d79c423411a1b04c2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1481,7 +1481,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.5.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#cd1eaf16407f7deff0f9ab14b05089537fd5c8fa"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#d9b652bf2767f6da03f9b72d79c423411a1b04c2"
 dependencies = [
  "async-mutex",
  "derive-new",

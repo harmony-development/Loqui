@@ -4,7 +4,7 @@ use super::super::Message as TopLevelMessage;
 
 use crate::{
     client::content::ImageHandle,
-    label_button, length, space,
+    label_button, length,
     ui::{
         component::*,
         style::{Theme, PADDING, SPACING},
@@ -59,7 +59,7 @@ impl ImageViewerModal {
             .center_y()
             .into()
         } else {
-            fill_container(space!(w+)).into()
+            unreachable!()
         }
     }
 

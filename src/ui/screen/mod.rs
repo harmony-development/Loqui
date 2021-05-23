@@ -11,7 +11,7 @@ pub use main::MainScreen;
 use crate::{
     client::{
         content::{ContentStore, ImageHandle, ThumbnailCache},
-        error::ClientError,
+        error::{ClientError, ClientResult},
         message::{Attachment, Message as IcyMessage, MessageId},
         Client, PostProcessEvent, Session,
     },
@@ -25,6 +25,7 @@ use harmony_rust_sdk::{
             GetGuildListRequest,
         },
         exports::hrpc::url::Url,
+        rest::FileId,
     },
     client::{
         api::{
@@ -36,7 +37,7 @@ use harmony_rust_sdk::{
             },
             harmonytypes::Message as HarmonyMessage,
         },
-        EventsSocket,
+        Client as InnerClient, EventsSocket,
     },
 };
 use iced::{executor, Application, Command, Element, Subscription};
@@ -120,8 +121,12 @@ impl Screen {
     fn push_screen_cmd(screen: Screen) -> Command<Message> {
         Command::perform(
             async move { Message::PushScreen(Box::new(screen)) },
-            |result| result,
+            |msg| msg,
         )
+    }
+
+    fn pop_screen_cmd() -> Command<Message> {
+        Command::perform(async { Message::PopScreen }, |msg| msg)
     }
 }
 
@@ -768,4 +773,50 @@ fn make_thumbnail_command(
     } else {
         Command::none()
     }
+}
+
+async fn select_upload_files(
+    inner: &InnerClient,
+    content_store: Arc<ContentStore>,
+) -> ClientResult<Vec<(FileId, String, String, usize)>> {
+    use crate::client::content;
+    use harmony_rust_sdk::client::api::rest::upload_extract_id;
+
+    let handles = rfd::AsyncFileDialog::new()
+        .pick_files()
+        .await
+        .ok_or_else(|| ClientError::Custom("File selection error".to_string()))?;
+    let mut ids = Vec::with_capacity(handles.len());
+
+    for handle in handles {
+        match tokio::fs::read(handle.path()).await {
+            Ok(data) => {
+                let file_mimetype = content::infer_type_from_bytes(&data);
+                let filename = content::get_filename(handle.path()).to_string();
+                let filesize = data.len();
+
+                let send_result =
+                    upload_extract_id(inner, filename.clone(), file_mimetype.clone(), data).await;
+
+                match send_result.map(FileId::Id) {
+                    Ok(id) => {
+                        if let Err(err) =
+                            tokio::fs::hard_link(handle.path(), content_store.content_path(&id))
+                                .await
+                        {
+                            tracing::warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
+                        }
+                        ids.push((id, file_mimetype, filename, filesize));
+                    }
+                    Err(err) => {
+                        tracing::error!("An error occured while trying to upload a file: {}", err);
+                    }
+                }
+            }
+            Err(err) => {
+                tracing::error!("An IO error occured while trying to upload a file: {}", err);
+            }
+        }
+    }
+    Ok(ids)
 }
