@@ -36,9 +36,9 @@ checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
 name = "ahash"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11149c3eb723d15cb065a9ea5cc74ab57250f098ef33c9f6f7f39b48bd207750"
+checksum = "43bb833f0bf979d8475d38fbf09ed3b8a55e1885fe93ad3f93239fc6a4f17b98"
 dependencies = [
  "getrandom 0.2.3",
  "once_cell",
@@ -258,9 +258,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.67"
+version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3c69b077ad434294d3ce9f1f6143a2a4b89a8a2d54ef813d85003a4fd1137fd"
+checksum = "4a72c244c1ff497a746a7e1fb3d14bd08420ecda70c8f25c7112f2781652d787"
 dependencies = [
  "jobserver",
 ]
@@ -566,7 +566,7 @@ dependencies = [
 name = "crust"
 version = "0.1.0"
 dependencies = [
- "ahash 0.7.3",
+ "ahash 0.7.4",
  "async-mutex",
  "chrono",
  "directories-next",
@@ -1471,7 +1471,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#d9b652bf2767f6da03f9b72d79c423411a1b04c2"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#a2fd0bbe0b73346509a03b25af493cb6dfcd4872"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1481,7 +1481,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.5.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#d9b652bf2767f6da03f9b72d79c423411a1b04c2"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#a2fd0bbe0b73346509a03b25af493cb6dfcd4872"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1531,7 +1531,7 @@ dependencies = [
 [[package]]
 name = "hrpc"
 version = "0.6.6"
-source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#447085cb14ebc9ed152af5f1dded572702e9a1f4"
+source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#92e43b36c313ac06c6dc92fbd9445009f4c2ed8f"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1549,7 +1549,7 @@ dependencies = [
 [[package]]
 name = "hrpc-build"
 version = "0.3.6"
-source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#447085cb14ebc9ed152af5f1dded572702e9a1f4"
+source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#92e43b36c313ac06c6dc92fbd9445009f4c2ed8f"
 dependencies = [
  "proc-macro2",
  "prost",
@@ -1588,15 +1588,15 @@ checksum = "f3a87b616e37e93c22fb19bcd386f02f3af5ea98a25670ad0fce773de23c5e68"
 
 [[package]]
 name = "httpdate"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05842d0d43232b23ccb7060ecb0f0626922c21f30012e97b767b30afd4a5d4b9"
+checksum = "6456b8a6c8f33fee7d958fcd1b60d55b11940a79e63ae87013e6d22e26034440"
 
 [[package]]
 name = "hyper"
-version = "0.14.7"
+version = "0.14.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e5f105c494081baa3bf9e200b279e27ec1623895cd504c7dbef8d0b080fcf54"
+checksum = "d3f71a7eea53a3f8257a7b4795373ff886397178cd634430ea94e12d7fe4fe34"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1934,9 +1934,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.94"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
+checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
 
 [[package]]
 name = "libloading"
@@ -2470,11 +2470,12 @@ checksum = "28988d872ab76095a6e6ac88d99b54fd267702734fd7ffe610ca27f533ddb95a"
 
 [[package]]
 name = "ordered-float"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76d99537dd7019c4dabfcf3898a43ee685412f76e6bee1ecc48785d730c1a275"
+checksum = "809348965973b261c3e504c8d0434e465274f78c880e10039914f2c5dcf49461"
 dependencies = [
  "num-traits",
+ "rand 0.8.3",
 ]
 
 [[package]]
@@ -2492,7 +2493,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a3c7a20e3f122223e68eef6ca58e39bc1ea8a1d83418ba4c2c1ba189d2ee355"
 dependencies = [
- "ttf-parser 0.12.0",
+ "ttf-parser 0.12.1",
 ]
 
 [[package]]
@@ -3619,14 +3620,14 @@ checksum = "3e5d7cd7ab3e47dda6e56542f4bbf3824c15234958c6e1bd6aaa347e93499fdc"
 
 [[package]]
 name = "ttf-parser"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85e00391c1f3d171490a3f8bd79999b0002ae38d3da0d6a3a306c754b053d71b"
+checksum = "2fc71742ead70703a55d184f82087302f2f9ffa3793e64db46a78bf75dd723f4"
 
 [[package]]
 name = "tungstenite"
 version = "0.13.0"
-source = "git+https://github.com/yusdacra/tungstenite-rs.git#d7e2f0a72a64cfca463b51547b9d8c9fe4bbdd00"
+source = "git+https://github.com/yusdacra/tungstenite-rs.git#a729b37b224744fcd5bcf71695fedb4849474b1f"
 dependencies = [
  "base64",
  "byteorder",
