@@ -297,14 +297,19 @@ impl MainScreen {
                 );
             }
 
-            // TODO: show user avatar next to name
+            let mut channel_menu_entries = vec![
+                guild.name.clone(),
+                "New Channel".to_string(),
+                "Edit Guild".to_string(),
+                "Copy Guild ID".to_string(), // [tag:copy_guild_id_menu_entry]
+            ];
+            if self.current_channel_id.is_some() {
+                channel_menu_entries.push("Copy Channel ID".to_string()); // [tag:copy_channel_id_menu_entry]
+            }
+
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
-                vec![
-                    guild.name.clone(),
-                    "New Channel".to_string(),
-                    "Edit Guild".to_string(),
-                ],
+                channel_menu_entries,
                 Some(guild.name.clone()),
                 Message::SelectedChannelMenuOption,
             )
@@ -618,6 +623,7 @@ impl MainScreen {
         msg: Message,
         client: &mut Client,
         thumbnail_cache: &ThumbnailCache,
+        clip: &mut iced::Clipboard,
     ) -> Command<TopLevelMessage> {
         fn scroll_to_bottom(client: &mut Client, guild_id: u64, channel_id: u64) {
             if let Some((disp, looking_at_message)) = client
@@ -635,13 +641,19 @@ impl MainScreen {
             Message::QuickSwitch => {
                 self.quick_switcher_modal
                     .show(!self.quick_switcher_modal.is_shown());
-                let cmd = self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
+                let cmd = self.update(
+                    Message::ChangeMode(Mode::Normal),
+                    client,
+                    thumbnail_cache,
+                    clip,
+                );
                 let cmd2 = self.update(
                     Message::QuickSwitchMsg(quick_switcher::Message::SearchTermChanged(
                         self.quick_switcher_modal.inner().search_value.clone(),
                     )),
                     client,
                     thumbnail_cache,
+                    clip,
                 );
                 return Command::batch(vec![cmd, cmd2]);
             }
@@ -650,15 +662,29 @@ impl MainScreen {
                     guild_id,
                     channel_id,
                 } => {
-                    let cmd = self.update(Message::GuildChanged(guild_id), client, thumbnail_cache);
-                    let cmd2 =
-                        self.update(Message::ChannelChanged(channel_id), client, thumbnail_cache);
+                    let cmd = self.update(
+                        Message::GuildChanged(guild_id),
+                        client,
+                        thumbnail_cache,
+                        clip,
+                    );
+                    let cmd2 = self.update(
+                        Message::ChannelChanged(channel_id),
+                        client,
+                        thumbnail_cache,
+                        clip,
+                    );
                     self.quick_switcher_modal.show(false);
                     self.quick_switcher_modal.inner_mut().search_value.clear();
                     return Command::batch(vec![cmd, cmd2]);
                 }
                 quick_switcher::Message::SwitchToGuild(guild_id) => {
-                    let cmd = self.update(Message::GuildChanged(guild_id), client, thumbnail_cache);
+                    let cmd = self.update(
+                        Message::GuildChanged(guild_id),
+                        client,
+                        thumbnail_cache,
+                        clip,
+                    );
                     self.quick_switcher_modal.show(false);
                     self.quick_switcher_modal.inner_mut().search_value.clear();
                     return cmd;
@@ -770,6 +796,7 @@ impl MainScreen {
                             Message::ChangeMode(Mode::EditingMessage(mid)),
                             client,
                             thumbnail_cache,
+                            clip,
                         );
                     }
                 }
@@ -808,7 +835,12 @@ impl MainScreen {
             Message::OpenImageView { handle, path, name } => {
                 self.image_viewer_modal.show(true);
                 self.image_viewer_modal.inner_mut().image_handle = Some((handle, (path, name)));
-                return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
+                return self.update(
+                    Message::ChangeMode(Mode::Normal),
+                    client,
+                    thumbnail_cache,
+                    clip,
+                );
             }
             Message::ProfileEditMsg(msg) => {
                 let (cmd, go_back) = self.profile_edit_modal.inner_mut().update(msg, client);
@@ -934,7 +966,12 @@ impl MainScreen {
                 "New Channel" => {
                     self.create_channel_modal.show(true);
                     self.error_text.clear();
-                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
+                    return self.update(
+                        Message::ChangeMode(Mode::Normal),
+                        client,
+                        thumbnail_cache,
+                        clip,
+                    );
                 }
                 "Edit Guild" => {
                     let guild_id = self.current_guild_id.unwrap();
@@ -968,12 +1005,31 @@ impl MainScreen {
                         },
                     );
                 }
+                "Copy Guild ID" => {
+                    clip.write(
+                        self.current_guild_id
+                            .expect("this menu is only shown if a guild is selected") // [ref:copy_guild_id_menu_entry]
+                            .to_string(),
+                    );
+                }
+                "Copy Channel ID" => {
+                    clip.write(
+                        self.current_channel_id
+                            .expect("this menu entry is only shown if a channel is selected") // [ref:copy_channel_id_menu_entry]
+                            .to_string(),
+                    );
+                }
                 _ => {}
             },
             Message::SelectedMenuOption(option) => match option.as_str() {
                 "Logout" => {
                     self.logout_modal.show(true);
-                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
+                    return self.update(
+                        Message::ChangeMode(Mode::Normal),
+                        client,
+                        thumbnail_cache,
+                        clip,
+                    );
                 }
                 "Join / Create a Guild" => {
                     return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
@@ -985,11 +1041,21 @@ impl MainScreen {
                         .user_id
                         .expect("we dont go to main screen if we dont have a user id");
                     self.profile_edit_modal.show(true);
-                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
+                    return self.update(
+                        Message::ChangeMode(Mode::Normal),
+                        client,
+                        thumbnail_cache,
+                        clip,
+                    );
                 }
                 "Help" => {
                     self.help_modal.show(true);
-                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
+                    return self.update(
+                        Message::ChangeMode(Mode::Normal),
+                        client,
+                        thumbnail_cache,
+                        clip,
+                    );
                 }
                 "Exit" => {
                     return Command::perform(async { TopLevelMessage::Exit }, |msg| msg);

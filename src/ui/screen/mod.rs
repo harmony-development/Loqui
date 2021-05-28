@@ -205,7 +205,11 @@ impl ScreenManager {
         }
     }
 
-    fn process_post_event(&mut self, post: PostProcessEvent) -> Command<Message> {
+    fn process_post_event(
+        &mut self,
+        post: PostProcessEvent,
+        clip: &mut iced::Clipboard,
+    ) -> Command<Message> {
         if let Some(client) = self.client.as_mut() {
             match post {
                 PostProcessEvent::FetchThumbnail(id) => {
@@ -248,6 +252,7 @@ impl ScreenManager {
                             main::Message::ScrollToBottom(channel_id),
                             client,
                             &self.thumbnail_cache,
+                            clip,
                         );
                     }
                 }
@@ -344,7 +349,7 @@ impl Application for ScreenManager {
                 if let (Screen::Main(screen), Some(client)) =
                     (self.screens.current_mut(), &mut self.client)
                 {
-                    return screen.update(msg, client, &self.thumbnail_cache);
+                    return screen.update(msg, client, &self.thumbnail_cache, clip);
                 }
             }
             Message::GuildDiscovery(msg) => {
@@ -599,7 +604,7 @@ impl Application for ScreenManager {
                         if let PostProcessEvent::FetchProfile(user_id) = post {
                             fetch_users.push(user_id);
                         } else {
-                            cmds.push(self.process_post_event(post));
+                            cmds.push(self.process_post_event(post, clip));
                         }
                     }
 
@@ -664,7 +669,9 @@ impl Application for ScreenManager {
                     Vec::new()
                 };
 
-                let cmds = posts.into_iter().map(|post| self.process_post_event(post));
+                let cmds = posts
+                    .into_iter()
+                    .map(|post| self.process_post_event(post, clip));
 
                 return Command::batch(cmds);
             }
