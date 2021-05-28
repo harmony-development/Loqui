@@ -20,11 +20,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  tagref:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    
+    - name: Install nix
+      uses: cachix/install-nix-action@v13
+      with:
+        install_url: https://github.com/numtide/nix-unstable-installer/releases/download/nix-2.4pre20210415_76980a1/install
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+      
+    - name: Check tagref
+      run: nix run nixpkgs#tagref
+
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
+    needs: tagref
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2

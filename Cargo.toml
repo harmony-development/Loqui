@@ -87,6 +87,7 @@ runtimeLibs = [
     "xorg.libXi",
 ]
 devshell.name = "crust-shell"
+devshell.commands = [{ package = "tagref" }]
 
 [package.metadata.nix.desktopFile]
 name = "Crust"

@@ -22,11 +22,11 @@
           }
         ];
         commands = prev.commands ++ [
-            {
-              name = "local-dev";
-              command = "SSL_CERT_FILE=~/.local/share/mkcert/rootCA.pem cargo r";
-            }
-          ];
+          {
+            name = "local-dev";
+            command = "SSL_CERT_FILE=~/.local/share/mkcert/rootCA.pem cargo r";
+          }
+        ];
       };
       mainBuild = common: prev: {
         nativeBuildInputs = prev.nativeBuildInputs ++ (with common.pkgs; [ makeWrapper wrapGAppsHook ]);
