@@ -22,10 +22,14 @@ fn main() {
     let file_logger = fmt::layer().with_ansi(false).with_writer(non_blocking);
 
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env()
-        .unwrap_or_else( |_|
-            EnvFilter::from("info,wgpu_core=error,iced_wgpu=error,gfx_memory=error,gfx_descriptor=error,gfx_backend_vulkan=error")
-        ))
+        .with(
+            EnvFilter::from_default_env()
+                .add_directive("wgpu_core=error".parse().unwrap())
+                .add_directive("iced_wgpu=error".parse().unwrap())
+                .add_directive("gfx_memory=error".parse().unwrap())
+                .add_directive("gfx_descriptor".parse().unwrap())
+                .add_directive("gfx_backend_vulkan=error".parse().unwrap()),
+        )
         .with(term_logger)
         .with(file_logger)
         .init();

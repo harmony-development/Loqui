@@ -382,6 +382,7 @@ impl Application for ScreenManager {
                     let mut cmds = Vec::with_capacity(2);
 
                     if let Some(ev) = event {
+                        tracing::debug!("event received from socket: {:?}", ev);
                         let cmd = match ev {
                             Ok(ev) => self.update(Message::EventsReceived(vec![ev]), clip),
                             Err(err) => self.update(Message::Error(Box::new(err.into())), clip),
