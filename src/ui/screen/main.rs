@@ -5,6 +5,7 @@ use std::{
 };
 
 use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
+use ahash::AHashMap;
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use harmony_rust_sdk::{
@@ -17,7 +18,8 @@ use harmony_rust_sdk::{
             self,
             channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
             guild::get_guild_members,
-            permissions, GuildId,
+            permissions::{self, QueryPermissions, QueryPermissionsSelfBuilder},
+            GuildId,
         },
         rest::download_extract_file,
     },
@@ -111,6 +113,7 @@ pub enum Message {
     SelectedChannelMenuOption(String),
     SelectedMember(u64),
     LogoutChoice(bool),
+    ChannelViewPerm(u64, bool),
     ChannelCreationMessage(create_channel::Message),
     ImageViewMessage(image_viewer::Message),
     QuickSwitchMsg(quick_switcher::Message),
@@ -156,6 +159,7 @@ pub struct MainScreen {
     error_text: String,
     error_close_but_state: button::State,
     mode: Mode,
+    has_permission_to_send_msg: AHashMap<u64, bool>,
 }
 
 impl MainScreen {
@@ -425,27 +429,40 @@ impl MainScreen {
                     channel_id,
                 });
 
-                let message_composer = match self.mode {
-                    Mode::Normal | Mode::EditingMessage(_) => TextInput::new(
-                        &mut self.composer_state,
-                        "Enter your message here...",
-                        self.message.as_str(),
-                        Message::ComposerMessageChanged,
-                    )
-                    .padding((PADDING / 4) * 3)
-                    .size(MESSAGE_SIZE)
-                    .style(theme.secondary())
-                    .on_submit(Message::SendMessageComposer {
-                        guild_id,
-                        channel_id,
-                    })
-                    .width(length!(+))
-                    .into(),
-                    Mode::EditMessage => fill_container(label!("Select a message to edit..."))
+                let message_composer = if self
+                    .has_permission_to_send_msg
+                    .get(&channel_id)
+                    .copied()
+                    .unwrap_or(false)
+                {
+                    match self.mode {
+                        Mode::Normal | Mode::EditingMessage(_) => TextInput::new(
+                            &mut self.composer_state,
+                            "Enter your message here...",
+                            self.message.as_str(),
+                            Message::ComposerMessageChanged,
+                        )
+                        .padding((PADDING / 4) * 3)
+                        .size(MESSAGE_SIZE)
+                        .style(theme.secondary())
+                        .on_submit(Message::SendMessageComposer {
+                            guild_id,
+                            channel_id,
+                        })
+                        .width(length!(+))
+                        .into(),
+                        Mode::EditMessage => fill_container(label!("Select a message to edit..."))
+                            .padding((PADDING / 4) * 3)
+                            .height(length!(-))
+                            .style(theme.secondary())
+                            .into(),
+                    }
+                } else {
+                    fill_container(label!("You don't have permission to send a message here"))
                         .padding((PADDING / 4) * 3)
                         .height(length!(-))
                         .style(theme.secondary())
-                        .into(),
+                        .into()
                 };
 
                 let mut bottom_area_widgets = vec![send_file_button.into(), message_composer];
@@ -638,6 +655,12 @@ impl MainScreen {
         }
 
         match msg {
+            Message::ChannelViewPerm(channel_id, ok) => {
+                self.has_permission_to_send_msg
+                    .entry(channel_id)
+                    .and_modify(|o| *o = ok)
+                    .or_insert(ok);
+            }
             Message::QuickSwitch => {
                 self.quick_switcher_modal
                     .show(!self.quick_switcher_modal.is_shown());
@@ -1328,10 +1351,34 @@ impl MainScreen {
                         *disp_at = disp.saturating_sub(1);
                         self.event_history_state.scroll_to_bottom();
                     }
+                    let mut cmds = Vec::with_capacity(2);
+                    let inner = client.inner().clone();
+                    let guild_id = self.current_guild_id.unwrap();
+                    cmds.push(Command::perform(
+                        async move {
+                            let perm = permissions::query_has_permission(
+                                &inner,
+                                QueryPermissions::new(guild_id, "messages.send".to_string())
+                                    .channel_id(channel_id),
+                            )
+                            .await?;
+                            Ok(perm.ok)
+                        },
+                        move |res| {
+                            res.map_or_else(
+                                |err| TopLevelMessage::Error(Box::new(err)),
+                                |ok| {
+                                    TopLevelMessage::MainScreen(Message::ChannelViewPerm(
+                                        channel_id, ok,
+                                    ))
+                                },
+                            )
+                        },
+                    ));
                     if disp == 0 {
                         let inner = client.inner().clone();
                         let guild_id = self.current_guild_id.unwrap();
-                        return Command::perform(
+                        cmds.push(Command::perform(
                             async move {
                                 let messages = get_channel_messages(
                                     &inner,
@@ -1357,8 +1404,9 @@ impl MainScreen {
                                     TopLevelMessage::EventsReceived,
                                 )
                             },
-                        );
+                        ));
                     }
+                    return Command::batch(cmds);
                 }
             }
         }
