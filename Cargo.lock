@@ -1478,7 +1478,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#f9c2cba022ab742f96c3524ebba6a6272987525b"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#a263333c314bf0036265742830ef829cc54d8002"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1488,7 +1488,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.5.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#f9c2cba022ab742f96c3524ebba6a6272987525b"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#a263333c314bf0036265742830ef829cc54d8002"
 dependencies = [
  "async-mutex",
  "derive-new",
@@ -1538,7 +1538,7 @@ dependencies = [
 [[package]]
 name = "hrpc"
 version = "0.6.6"
-source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#8549d12ca620ad5e49dca6925e898fef9d8ede11"
+source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#f9ea862109b9cd2c12f09eb78e3116a627c93c07"
 dependencies = [
  "async-trait",
  "async-tungstenite",
@@ -1556,7 +1556,7 @@ dependencies = [
 [[package]]
 name = "hrpc-build"
 version = "0.3.6"
-source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#8549d12ca620ad5e49dca6925e898fef9d8ede11"
+source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#f9ea862109b9cd2c12f09eb78e3116a627c93c07"
 dependencies = [
  "proc-macro2",
  "prost",
