@@ -5,7 +5,6 @@ use std::{
 };
 
 use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
-use ahash::AHashMap;
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use harmony_rust_sdk::{
@@ -48,9 +47,10 @@ use crate::{
     },
 };
 
-use self::quick_switcher::QuickSwitcherModal;
+use self::{edit_channel::UpdateChannelModal, quick_switcher::QuickSwitcherModal};
 
 pub mod create_channel;
+pub mod edit_channel;
 pub mod help;
 pub mod image_viewer;
 pub mod logout;
@@ -113,12 +113,16 @@ pub enum Message {
     SelectedChannelMenuOption(String),
     SelectedMember(u64),
     LogoutChoice(bool),
-    ChannelViewPerm(u64, bool),
+    ChannelViewPerm(u64, u64, bool),
     ChannelCreationMessage(create_channel::Message),
     ImageViewMessage(image_viewer::Message),
     QuickSwitchMsg(quick_switcher::Message),
     ProfileEditMsg(profile_edit::Message),
     HelpModal(help::Message),
+    UpdateChannelMessage(edit_channel::Message),
+    ShowUpdateChannelModal(u64, u64),
+    TryShowUpdateChannelModal(u64, u64),
+    CopyToClipboard(String),
 }
 
 #[derive(Debug, Default)]
@@ -138,7 +142,7 @@ pub struct MainScreen {
     guilds_list_state: scrollable::State,
     guilds_buts_state: Vec<button::State>,
     channels_list_state: scrollable::State,
-    channels_buts_state: Vec<button::State>,
+    channels_buts_state: Vec<(button::State, button::State, button::State)>,
     members_buts_state: Vec<button::State>,
     members_list_state: scrollable::State,
 
@@ -148,6 +152,7 @@ pub struct MainScreen {
     quick_switcher_modal: modal::State<QuickSwitcherModal>,
     profile_edit_modal: modal::State<ProfileEditModal>,
     help_modal: modal::State<HelpModal>,
+    update_channel_modal: modal::State<UpdateChannelModal>,
 
     // Join room screen state
     /// `None` if the user didn't select a room, `Some(room_id)` otherwise.
@@ -159,7 +164,6 @@ pub struct MainScreen {
     error_text: String,
     error_close_but_state: button::State,
     mode: Mode,
-    has_permission_to_send_msg: AHashMap<u64, bool>,
 }
 
 impl MainScreen {
@@ -301,15 +305,12 @@ impl MainScreen {
                 );
             }
 
-            let mut channel_menu_entries = vec![
+            let channel_menu_entries = vec![
                 guild.name.clone(),
                 "New Channel".to_string(),
-                "Edit Guild".to_string(),
+                "Edit Guild".to_string(),    // [tag:edit_guild_menu_entry]
                 "Copy Guild ID".to_string(), // [tag:copy_guild_id_menu_entry]
             ];
-            if self.current_channel_id.is_some() {
-                channel_menu_entries.push("Copy Channel ID".to_string()); // [tag:copy_channel_id_menu_entry]
-            }
 
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
@@ -331,6 +332,7 @@ impl MainScreen {
             } else {
                 build_channel_list(
                     &guild.channels,
+                    guild_id,
                     self.current_channel_id,
                     &mut self.channels_list_state,
                     &mut self.channels_buts_state,
@@ -429,12 +431,7 @@ impl MainScreen {
                     channel_id,
                 });
 
-                let message_composer = if self
-                    .has_permission_to_send_msg
-                    .get(&channel_id)
-                    .copied()
-                    .unwrap_or(false)
-                {
+                let message_composer = if channel.user_perms.send_msg {
                     match self.mode {
                         Mode::Normal | Mode::EditingMessage(_) => TextInput::new(
                             &mut self.composer_state,
@@ -605,7 +602,7 @@ impl MainScreen {
         .on_esc(Message::LogoutChoice(false));
 
         let content = if self.current_guild_id.is_some() {
-            // Show CreateChannelModal, if a guild is selected
+            // Show CreateChannelModal, if a guild is selected [tag:channel_creation_modal_view]
             let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
                 state.view(theme).map(Message::ChannelCreationMessage)
             })
@@ -616,6 +613,13 @@ impl MainScreen {
             .on_esc(Message::ChannelCreationMessage(
                 create_channel::Message::GoBack,
             ));
+            // Show UpdateChannelModal, if a guild is selected
+            let content = Modal::new(&mut self.update_channel_modal, content, move |state| {
+                state.view(theme).map(Message::UpdateChannelMessage)
+            })
+            .style(theme)
+            .backdrop(Message::UpdateChannelMessage(edit_channel::Message::GoBack))
+            .on_esc(Message::UpdateChannelMessage(edit_channel::Message::GoBack));
             if self.current_channel_id.is_some() {
                 // Show Image view, if a guild and a channel are selected
                 Modal::new(&mut self.image_viewer_modal, content, move |state| {
@@ -655,11 +659,13 @@ impl MainScreen {
         }
 
         match msg {
-            Message::ChannelViewPerm(channel_id, ok) => {
-                self.has_permission_to_send_msg
-                    .entry(channel_id)
-                    .and_modify(|o| *o = ok)
-                    .or_insert(ok);
+            Message::CopyToClipboard(string) => clip.write(string),
+            Message::ChannelViewPerm(guild_id, channel_id, ok) => {
+                client
+                    .get_channel(guild_id, channel_id)
+                    .unwrap() // [ref:channel_view_perm_exists_check]
+                    .user_perms
+                    .send_msg = ok;
             }
             Message::QuickSwitch => {
                 self.quick_switcher_modal
@@ -867,34 +873,78 @@ impl MainScreen {
             }
             Message::ProfileEditMsg(msg) => {
                 let (cmd, go_back) = self.profile_edit_modal.inner_mut().update(msg, client);
-
-                if go_back {
-                    self.profile_edit_modal.show(false);
-                }
-
+                self.profile_edit_modal.show(!go_back);
                 return cmd;
             }
             Message::ImageViewMessage(msg) => {
                 let (cmd, go_back) = self.image_viewer_modal.inner_mut().update(msg);
-
-                if go_back {
-                    self.image_viewer_modal.show(false);
-                }
-
+                self.image_viewer_modal.show(!go_back);
                 return cmd;
             }
             Message::ChannelCreationMessage(msg) => {
                 let (cmd, go_back) = self.create_channel_modal.inner_mut().update(
                     msg,
-                    self.current_guild_id.unwrap(),
+                    self.current_guild_id.unwrap(), // will never panic [ref:channel_creation_modal_view]
                     &client,
                 );
-
-                if go_back {
-                    self.create_channel_modal.show(false);
-                }
-
+                self.create_channel_modal.show(!go_back);
                 return cmd;
+            }
+            Message::UpdateChannelMessage(msg) => {
+                let (cmd, go_back) = self.update_channel_modal.inner_mut().update(msg, &client);
+                self.update_channel_modal.show(!go_back);
+                return cmd;
+            }
+            Message::TryShowUpdateChannelModal(guild_id, channel_id) => {
+                let inner = client.inner().clone();
+                return Command::perform(
+                    async move {
+                        Ok(permissions::query_has_permission(
+                            &inner,
+                            permissions::QueryPermissions::new(
+                                // [tag:update_channel_exists_check]
+                                guild_id,
+                                "channels.manage.change-information".to_string(),
+                            )
+                            .channel_id(channel_id),
+                        )
+                        .await?)
+                    },
+                    move |result| {
+                        result.map_or_else(
+                            |err| TopLevelMessage::Error(Box::new(err)),
+                            |resp| {
+                                if resp.ok {
+                                    TopLevelMessage::MainScreen(Message::ShowUpdateChannelModal(
+                                        guild_id, channel_id,
+                                    ))
+                                } else {
+                                    TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                        "Not permitted to edit channel information".to_string(),
+                                    )))
+                                }
+                            },
+                        )
+                    },
+                );
+            }
+            Message::ShowUpdateChannelModal(guild_id, channel_id) => {
+                self.update_channel_modal.show(true);
+                self.error_text.clear();
+                let modal_state = self.update_channel_modal.inner_mut();
+                let chan = client
+                    .get_channel(guild_id, channel_id)
+                    .expect("channel not found in client?"); // should never panic, if it does it means client data is corrupted [ref:update_channel_exists_check]
+                chan.user_perms.manage_channel = true;
+                modal_state.channel_name_field = chan.name.clone();
+                modal_state.guild_id = guild_id;
+                modal_state.channel_id = channel_id;
+                return self.update(
+                    Message::ChangeMode(Mode::Normal),
+                    client,
+                    thumbnail_cache,
+                    clip,
+                );
             }
             Message::HelpModal(msg) => {
                 if msg {
@@ -997,34 +1047,36 @@ impl MainScreen {
                     );
                 }
                 "Edit Guild" => {
-                    let guild_id = self.current_guild_id.unwrap();
-                    let client_inner = client.inner().clone();
+                    let guild_id = self.current_guild_id.unwrap(); // [ref:edit_guild_menu_entry]
+                    let inner = client.inner().clone();
                     return Command::perform(
                         async move {
-                            return permissions::query_has_permission(
-                                &client_inner,
+                            Ok(permissions::query_has_permission(
+                                &inner,
                                 permissions::QueryPermissions::new(
                                     guild_id,
                                     "guild.manage.change-information".to_string(),
                                 ),
                             )
-                            .await;
+                            .await?)
                         },
-                        move |result| match result {
-                            Ok(x) => {
-                                if x.ok {
-                                    TopLevelMessage::PushScreen(Box::new(
-                                        TopLevelScreen::GuildSettings(super::GuildSettings::new(
-                                            guild_id,
-                                        )),
-                                    ))
-                                } else {
-                                    TopLevelMessage::Error(Box::new(ClientError::Custom(
-                                        "Not permitted to edit guild information".to_string(),
-                                    )))
-                                }
-                            }
-                            Err(x) => TopLevelMessage::Error(Box::new(x.into())),
+                        move |result| {
+                            result.map_or_else(
+                                |err| TopLevelMessage::Error(Box::new(err)),
+                                |resp| {
+                                    if resp.ok {
+                                        TopLevelMessage::PushScreen(Box::new(
+                                            TopLevelScreen::GuildSettings(
+                                                super::GuildSettings::new(guild_id),
+                                            ),
+                                        ))
+                                    } else {
+                                        TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                            "Not permitted to edit guild information".to_string(),
+                                        )))
+                                    }
+                                },
+                            )
                         },
                     );
                 }
@@ -1032,13 +1084,6 @@ impl MainScreen {
                     clip.write(
                         self.current_guild_id
                             .expect("this menu is only shown if a guild is selected") // [ref:copy_guild_id_menu_entry]
-                            .to_string(),
-                    );
-                }
-                "Copy Channel ID" => {
-                    clip.write(
-                        self.current_channel_id
-                            .expect("this menu entry is only shown if a channel is selected") // [ref:copy_channel_id_menu_entry]
                             .to_string(),
                     );
                 }
@@ -1356,6 +1401,7 @@ impl MainScreen {
                     let guild_id = self.current_guild_id.unwrap();
                     cmds.push(Command::perform(
                         async move {
+                            // [tag:channel_view_perm_exists_check]
                             let perm = permissions::query_has_permission(
                                 &inner,
                                 QueryPermissions::new(guild_id, "messages.send".to_string())
@@ -1369,7 +1415,7 @@ impl MainScreen {
                                 |err| TopLevelMessage::Error(Box::new(err)),
                                 |ok| {
                                     TopLevelMessage::MainScreen(Message::ChannelViewPerm(
-                                        channel_id, ok,
+                                        guild_id, channel_id, ok,
                                     ))
                                 },
                             )

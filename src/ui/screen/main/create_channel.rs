@@ -119,10 +119,10 @@ impl ChannelCreationModal {
     ) -> (Command<TopLevelMessage>, bool) {
         let mut go_back = false;
         match msg {
-            super::create_channel::Message::ChannelNameChanged(new_name) => {
+            Message::ChannelNameChanged(new_name) => {
                 self.channel_name_field = new_name;
             }
-            super::create_channel::Message::CreateChannel => {
+            Message::CreateChannel => {
                 let channel_name = self.channel_name_field.clone();
 
                 self.error_text.clear();
@@ -162,7 +162,7 @@ impl ChannelCreationModal {
                     go_back,
                 );
             }
-            super::create_channel::Message::CreatedChannel {
+            Message::CreatedChannel {
                 guild_id,
                 channel_id,
             } => {
@@ -173,7 +173,7 @@ impl ChannelCreationModal {
                 };
                 self.channel_name_field.clear();
             }
-            super::create_channel::Message::GoBack => {
+            Message::GoBack => {
                 self.channel_creation_state = ChannelState::None;
                 self.channel_name_field.clear();
                 self.error_text.clear();

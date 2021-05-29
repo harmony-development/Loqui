@@ -44,7 +44,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::ui::component::event_history::SHOWN_MSGS_LIMIT;
+use crate::{client::channel::ChanPerms, ui::component::event_history::SHOWN_MSGS_LIMIT};
 
 use self::{
     guild::Guilds,
@@ -83,6 +83,7 @@ pub enum PostProcessEvent {
     FetchGuildData(u64),
     FetchThumbnail(Attachment),
     GoToFirstMsgOnChannel(u64),
+    CheckPermsForChannel(u64, u64),
 }
 
 pub struct Client {
@@ -415,6 +416,7 @@ impl Client {
                 metadata: _,
             }) => {
                 if let Some(guild) = self.get_guild(guild_id) {
+                    // [tag:channel_added_to_client]
                     guild.channels.insert(
                         channel_id,
                         Channel {
@@ -424,9 +426,14 @@ impl Client {
                             looking_at_message: 0,
                             messages: Vec::new(),
                             reached_top: false,
+                            user_perms: ChanPerms {
+                                manage_channel: false,
+                                send_msg: false,
+                            },
                         },
                     );
                     guild.update_channel_order(previous_id, next_id, channel_id);
+                    post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
                 }
             }
             Event::Typing(Typing {

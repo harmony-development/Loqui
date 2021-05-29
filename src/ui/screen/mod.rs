@@ -10,6 +10,7 @@ pub use main::MainScreen;
 
 use crate::{
     client::{
+        channel::ChanPerms,
         content::{ContentStore, ImageHandle, ThumbnailCache},
         error::{ClientError, ClientResult},
         message::{Attachment, Message as IcyMessage, MessageId},
@@ -32,6 +33,7 @@ use harmony_rust_sdk::{
             auth::AuthStepResponse,
             chat::{
                 guild::{get_guild, get_guild_list},
+                permissions::{self, QueryPermissions, QueryPermissionsSelfBuilder},
                 profile::{get_user, get_user_bulk},
                 EventSource, GuildId, UserId,
             },
@@ -89,6 +91,7 @@ pub enum Message {
         message_id: u64,
         err: Option<Box<ClientError>>,
     },
+    UpdateChanPerms(ChanPerms, u64, u64),
     /// Sent whenever an error occurs.
     Error(Box<ClientError>),
     Exit,
@@ -213,6 +216,32 @@ impl ScreenManager {
     ) -> Command<Message> {
         if let Some(client) = self.client.as_mut() {
             match post {
+                PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => {
+                    let inner = client.inner().clone();
+                    return Command::perform(
+                        async move {
+                            let query = |check_for: &str| {
+                                permissions::query_has_permission(
+                                    &inner,
+                                    QueryPermissions::new(guild_id, check_for.to_string())
+                                        .channel_id(channel_id),
+                                )
+                            };
+                            let manage = query("channels.manage.change-information").await?.ok;
+                            let send_msg = query("messages.send").await?.ok;
+                            Ok(ChanPerms {
+                                manage_channel: manage,
+                                send_msg,
+                            })
+                        },
+                        move |res| {
+                            res.map_or_else(
+                                |err| Message::Error(Box::new(err)),
+                                |perms| Message::UpdateChanPerms(perms, guild_id, channel_id),
+                            )
+                        },
+                    );
+                }
                 PostProcessEvent::FetchThumbnail(id) => {
                     return make_thumbnail_command(client, id, &self.thumbnail_cache);
                 }
@@ -393,6 +422,12 @@ impl Application for ScreenManager {
                         )
                     },
                 );
+            }
+            Message::UpdateChanPerms(perms, guild_id, channel_id) => {
+                if let Some(client) = self.client.as_mut() {
+                    // [ref:channel_added_to_client]
+                    client.get_channel(guild_id, channel_id).unwrap().user_perms = perms;
+                }
             }
             Message::SocketEvent { mut socket, event } => {
                 if self.client.is_some() {
