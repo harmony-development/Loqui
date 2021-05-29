@@ -92,6 +92,7 @@ pub enum Message {
     /// Sent whenever an error occurs.
     Error(Box<ClientError>),
     Exit,
+    ExitReady,
 }
 
 #[derive(Debug)]
@@ -186,7 +187,7 @@ pub struct ScreenManager {
     client: Option<Client>,
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
-    sources_to_add: Vec<EventSource>,
+    cur_socket: Option<Box<EventsSocket>>,
     socket_reset: bool,
     should_exit: bool,
 }
@@ -199,7 +200,7 @@ impl ScreenManager {
             client: None,
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
-            sources_to_add: vec![],
+            cur_socket: None,
             socket_reset: false,
             should_exit: false,
         }
@@ -339,7 +340,18 @@ impl Application for ScreenManager {
 
         match msg {
             Message::Nothing => {}
-            Message::Exit => self.should_exit = true,
+            Message::Exit => {
+                let sock = self.cur_socket.take();
+                return Command::perform(
+                    async move {
+                        if let Some(sock) = sock {
+                            let _ = sock.close().await;
+                        }
+                    },
+                    |_| Message::ExitReady,
+                );
+            }
+            Message::ExitReady => self.should_exit = true,
             Message::LoginScreen(msg) => {
                 if let Screen::Login(screen) = self.screens.current_mut() {
                     return screen.update(self.client.as_ref(), msg, &self.content_store);
@@ -393,19 +405,24 @@ impl Application for ScreenManager {
                             Err(err) => self.update(Message::Error(Box::new(err.into())), clip),
                         };
                         cmds.push(cmd);
+                    } else {
+                        self.cur_socket = Some(socket.clone());
                     }
 
                     if !self.socket_reset {
-                        let subs = self.sources_to_add.drain(..).collect::<Vec<_>>();
                         cmds.push(Command::perform(
                             async move {
-                                for sub in subs {
-                                    if let Err(err) = socket.add_source(sub).await {
-                                        tracing::error!("can't sub to source: {}", err);
+                                let ev;
+                                loop {
+                                    if let Some(event) = socket.get_event().await {
+                                        ev = event;
+                                        break;
                                     }
                                 }
-                                let event = socket.get_event().await;
-                                Message::SocketEvent { socket, event }
+                                Message::SocketEvent {
+                                    socket,
+                                    event: Some(ev),
+                                }
                             },
                             |msg| msg,
                         ));
@@ -588,14 +605,31 @@ impl Application for ScreenManager {
 
                     let mut cmds = Vec::with_capacity(processed.len());
 
-                    for sub in processed.iter().flat_map(|post| {
-                        if let PostProcessEvent::FetchGuildData(id) = post {
-                            Some(EventSource::Guild(*id))
-                        } else {
-                            None
-                        }
-                    }) {
-                        self.sources_to_add.push(sub);
+                    let sources_to_add = processed
+                        .iter()
+                        .flat_map(|post| {
+                            if let PostProcessEvent::FetchGuildData(id) = post {
+                                Some(EventSource::Guild(*id))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    if let Some(mut sock) = self.cur_socket.clone() {
+                        cmds.push(Command::perform(
+                            async move {
+                                for source in sources_to_add {
+                                    sock.add_source(source).await?;
+                                }
+                                Ok(())
+                            },
+                            |res| {
+                                res.map_or_else(
+                                    |err| Message::Error(Box::new(err)),
+                                    |_| Message::Nothing,
+                                )
+                            },
+                        ));
                     }
 
                     let mut fetch_users = Vec::with_capacity(64);
