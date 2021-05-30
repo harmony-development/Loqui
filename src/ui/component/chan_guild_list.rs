@@ -35,18 +35,28 @@ pub fn build_channel_list<'a>(
     for ((channel_id, channel), (button_state, edit_state, copy_state)) in
         channels.iter().zip(buttons_state.iter_mut())
     {
-        let channel_name_prefix = if channel.is_category { "+" } else { "#" };
-        let channel_name_formatted = format!("{}{}", channel_name_prefix, channel.name);
-        let channel_name_widget = label!(channel_name_formatted).size(DEF_SIZE - 2);
+        let channel_name_prefix = if channel.is_category {
+            iced_aw::Icon::ListNested
+        } else {
+            iced_aw::Icon::Hash
+        };
 
-        let mut content_widgets = Vec::with_capacity(4);
-        content_widgets.push(channel_name_widget.into());
+        let mut content_widgets = Vec::with_capacity(6);
+        content_widgets.push(
+            label!(channel_name_prefix)
+                .font(iced_aw::ICON_FONT)
+                .size(DEF_SIZE - 2)
+                .vertical_alignment(iced::VerticalAlignment::Bottom)
+                .into(),
+        );
+        content_widgets.push(label!(&channel.name).size(DEF_SIZE - 2).into());
         content_widgets.push(space!(w+).into());
         content_widgets.push(
             Button::new(
                 copy_state,
                 label!(iced_aw::Icon::Clipboard)
                     .font(iced_aw::ICON_FONT)
+                    .vertical_alignment(iced::VerticalAlignment::Top)
                     .size(DEF_SIZE - 8),
             )
             .style(theme)
@@ -55,6 +65,7 @@ pub fn build_channel_list<'a>(
         );
 
         if channel.user_perms.manage_channel {
+            content_widgets.push(space!(w = SPACING / 2).into());
             content_widgets.push(
                 Button::new(
                     edit_state,
@@ -68,7 +79,7 @@ pub fn build_channel_list<'a>(
             );
         }
 
-        let content = Row::with_children(content_widgets).spacing(SPACING / 2);
+        let content = Row::with_children(content_widgets).align_items(align!(|));
         let mut but = Button::new(button_state, content)
             .width(length!(+))
             .style(theme.secondary());

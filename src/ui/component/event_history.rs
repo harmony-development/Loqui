@@ -393,15 +393,22 @@ pub fn build_event_history<'a>(
             space!(w = PADDING * 2 - (PADDING / 4 + PADDING / 16)).into()
         };
         message_row.push(maybe_timestamp);
-        let mut but = Button::new(edit_but_state, msg_body)
-            .padding(1)
-            .style(theme.embed());
-        if msg_text.is_some() && current_user_id == message.sender && Mode::EditMessage == mode {
+        message_row.push(msg_body.into());
+
+        if msg_text.is_some() && current_user_id == message.sender {
             if let Some(id) = message.id.id() {
-                but = but.on_press(Message::ChangeMode(Mode::EditingMessage(id)));
+                let but = Button::new(
+                    edit_but_state,
+                    label!(iced_aw::Icon::Pencil)
+                        .font(iced_aw::ICON_FONT)
+                        .size(MESSAGE_SIZE - 10),
+                )
+                .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
+                .style(theme.secondary());
+                message_row.push(space!(w+).into());
+                message_row.push(but.into());
             }
         }
-        message_row.push(but.into());
 
         message_group.push(row(message_row).align_items(align!(|<)).padding(0).into());
 

@@ -834,7 +834,9 @@ impl MainScreen {
                 }
             }
             Message::ChangeMode(mode) => {
-                if let (Mode::EditMessage, Mode::EditingMessage(mid)) = (self.mode, mode) {
+                if let (Mode::Normal, Mode::EditingMessage(mid))
+                | (Mode::EditMessage, Mode::EditingMessage(mid)) = (self.mode, mode)
+                {
                     if let (Some(gid), Some(cid)) = (self.current_guild_id, self.current_channel_id)
                     {
                         self.composer_state.focus();
