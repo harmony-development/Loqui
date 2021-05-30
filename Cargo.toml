@@ -18,12 +18,11 @@ short_description = "Rust client for the Harmony protocol."
 
 [profile.dev]
 opt-level = 0
-overflow-checks = false
-debug-assertions = false
+overflow-checks = true
+debug-assertions = true
 debug = false
 codegen-units = 256
 lto = false
-panic = 'abort'
 incremental = true
 
 [profile.release]
