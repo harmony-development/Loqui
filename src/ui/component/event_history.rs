@@ -397,14 +397,9 @@ pub fn build_event_history<'a>(
 
         if msg_text.is_some() && current_user_id == message.sender {
             if let Some(id) = message.id.id() {
-                let but = Button::new(
-                    edit_but_state,
-                    label!(iced_aw::Icon::Pencil)
-                        .font(iced_aw::ICON_FONT)
-                        .size(MESSAGE_SIZE - 10),
-                )
-                .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
-                .style(theme.secondary());
+                let but = Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 10))
+                    .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
+                    .style(theme.secondary());
                 message_row.push(space!(w+).into());
                 message_row.push(but.into());
             }

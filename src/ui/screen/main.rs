@@ -419,9 +419,7 @@ impl MainScreen {
 
                 let send_file_button = Button::new(
                     &mut self.send_file_but_state,
-                    label!(iced_aw::Icon::Upload)
-                        .font(iced_aw::ICON_FONT)
-                        .size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                    icon(Icon::Upload).size((PADDING / 4) * 3 + MESSAGE_SIZE),
                 )
                 .style(theme.secondary())
                 .on_press(Message::SendFiles {
@@ -466,9 +464,7 @@ impl MainScreen {
                     bottom_area_widgets.push(
                         Button::new(
                             &mut self.scroll_to_bottom_but_state,
-                            label!(iced_aw::Icon::ArrowDown)
-                                .font(iced_aw::ICON_FONT)
-                                .size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                            icon(Icon::ArrowDown).size((PADDING / 4) * 3 + MESSAGE_SIZE),
                         )
                         .style(theme.secondary())
                         .on_press(Message::ScrollToBottom(channel_id))

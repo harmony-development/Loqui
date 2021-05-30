@@ -36,15 +36,14 @@ pub fn build_channel_list<'a>(
         channels.iter().zip(buttons_state.iter_mut())
     {
         let channel_name_prefix = if channel.is_category {
-            iced_aw::Icon::ListNested
+            Icon::ListNested
         } else {
-            iced_aw::Icon::Hash
+            Icon::Hash
         };
 
         let mut content_widgets = Vec::with_capacity(6);
         content_widgets.push(
-            label!(channel_name_prefix)
-                .font(iced_aw::ICON_FONT)
+            icon(channel_name_prefix)
                 .size(DEF_SIZE - 2)
                 .vertical_alignment(iced::VerticalAlignment::Bottom)
                 .into(),
@@ -54,8 +53,7 @@ pub fn build_channel_list<'a>(
         content_widgets.push(
             Button::new(
                 copy_state,
-                label!(iced_aw::Icon::Clipboard)
-                    .font(iced_aw::ICON_FONT)
+                icon(Icon::Clipboard)
                     .vertical_alignment(iced::VerticalAlignment::Top)
                     .size(DEF_SIZE - 8),
             )
@@ -67,15 +65,10 @@ pub fn build_channel_list<'a>(
         if channel.user_perms.manage_channel {
             content_widgets.push(space!(w = SPACING / 2).into());
             content_widgets.push(
-                Button::new(
-                    edit_state,
-                    label!(iced_aw::Icon::Pencil)
-                        .font(iced_aw::ICON_FONT)
-                        .size(DEF_SIZE - 8),
-                )
-                .style(theme)
-                .on_press(Message::TryShowUpdateChannelModal(guild_id, *channel_id))
-                .into(),
+                Button::new(edit_state, icon(Icon::Pencil).size(DEF_SIZE - 8))
+                    .style(theme)
+                    .on_press(Message::TryShowUpdateChannelModal(guild_id, *channel_id))
+                    .into(),
             );
         }
 
@@ -121,11 +114,7 @@ pub fn build_guild_list<'a>(
             // [ref:create_join_guild_but_state]
             let but = Button::new(
                 button_state,
-                fill_container(
-                    label!(iced_aw::Icon::Plus)
-                        .font(iced_aw::ICON_FONT)
-                        .size(DEF_SIZE + 10),
-                ),
+                fill_container(icon(Icon::Plus).size(DEF_SIZE + 10)),
             )
             .width(length!(+))
             .style(theme.secondary())

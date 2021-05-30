@@ -9,6 +9,7 @@ pub use iced::{
     button, pick_list, scrollable, text_input, Align, Button, Color, Column, Command, Container,
     Element, Image, Length, PickList, Row, Scrollable, Space, Subscription, Text, TextInput,
 };
+pub use iced_aw::Icon;
 
 use super::style::{PADDING, SPACING};
 
@@ -36,6 +37,11 @@ pub fn fill_container<'a, M>(child: impl Into<Element<'a, M>>) -> Container<'a, 
         .center_y()
         .width(length!(+))
         .height(length!(+))
+}
+
+#[inline(always)]
+pub fn icon(icon: Icon) -> Text {
+    label!(icon).font(iced_aw::ICON_FONT)
 }
 
 #[macro_export]
