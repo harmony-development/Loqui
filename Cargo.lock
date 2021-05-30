@@ -118,21 +118,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-tungstenite"
-version = "0.13.1"
-source = "git+https://github.com/yusdacra/async-tungstenite.git#09441f4b82085b95d09ab8fd99a1131f50c345ff"
-dependencies = [
- "futures-io",
- "futures-util",
- "log",
- "pin-project-lite",
- "rustls-native-certs",
- "tokio",
- "tokio-rustls",
- "tungstenite",
-]
-
-[[package]]
 name = "atk-sys"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1478,7 +1463,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#338dd25e374658ef7fa3a91ed9e780526634b801"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#b40e4472fbd52f51585c424731be2015e1875e5e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1487,10 +1472,9 @@ dependencies = [
 
 [[package]]
 name = "harmony_rust_sdk"
-version = "0.5.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=workaround/tls-fix#338dd25e374658ef7fa3a91ed9e780526634b801"
+version = "0.6.0"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#b40e4472fbd52f51585c424731be2015e1875e5e"
 dependencies = [
- "async-mutex",
  "derive-new",
  "derive_more",
  "futures",
@@ -1504,6 +1488,7 @@ dependencies = [
  "prost-types",
  "reqwest",
  "serde",
+ "tokio",
  "tracing",
  "urlencoding",
 ]
@@ -1537,26 +1522,29 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.7.0"
-source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#4a551e6d3ef07a78b60573af36438da9c4c6514b"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef77ab080195854a7b1766002d479e33f93acf116eb0a49e26b6b2d7b42bc064"
 dependencies = [
  "async-trait",
- "async-tungstenite",
  "bytes",
  "futures-util",
  "http",
  "prost",
  "reqwest",
+ "rustls-native-certs",
  "tokio",
  "tokio-rustls",
+ "tokio-tungstenite",
  "tracing",
  "url",
 ]
 
 [[package]]
 name = "hrpc-build"
-version = "0.4.0"
-source = "git+https://github.com/harmony-development/hrpc-rs.git?branch=workaround/tls-fix#4a551e6d3ef07a78b60573af36438da9c4c6514b"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dbbfadde1f6de2e5fbfa945e4f956e211e85bffd2a1631a4ea71e92f475e0ca"
 dependencies = [
  "proc-macro2",
  "prost",
@@ -3527,6 +3515,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-tungstenite"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e96bb520beab540ab664bd5a9cfeaa1fcd846fa68c830b42e2c8963071251d2"
+dependencies = [
+ "futures-util",
+ "log",
+ "pin-project",
+ "rustls",
+ "tokio",
+ "tokio-rustls",
+ "tungstenite",
+ "webpki",
+ "webpki-roots",
+]
+
+[[package]]
 name = "tokio-util"
 version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3662,7 +3667,8 @@ checksum = "2fc71742ead70703a55d184f82087302f2f9ffa3793e64db46a78bf75dd723f4"
 [[package]]
 name = "tungstenite"
 version = "0.13.0"
-source = "git+https://github.com/yusdacra/tungstenite-rs.git#a729b37b224744fcd5bcf71695fedb4849474b1f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
 dependencies = [
  "base64",
  "byteorder",
@@ -3673,12 +3679,12 @@ dependencies = [
  "log",
  "rand 0.8.3",
  "rustls",
- "rustls-native-certs",
  "sha-1",
  "thiserror",
  "url",
  "utf-8",
  "webpki",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -3992,6 +3998,15 @@ checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
 dependencies = [
  "ring",
  "untrusted",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aabe153544e473b775453675851ecc86863d2a81d786d741f6b76778f2a48940"
+dependencies = [
+ "webpki",
 ]
 
 [[package]]
