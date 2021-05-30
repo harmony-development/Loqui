@@ -6,7 +6,7 @@ use ui::{screen::ScreenManager, style::DEF_SIZE};
 use iced::{Application, Settings};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-pub mod client;
+pub use client;
 pub mod ui;
 
 fn main() {
@@ -16,8 +16,7 @@ fn main() {
 
     let term_logger = fmt::layer();
     let log_file = content_store.log_file();
-    let file_appender =
-        tracing_appender::rolling::never(log_file.parent().unwrap(), log_file.file_name().unwrap());
+    let file_appender = tracing_appender::rolling::never(log_file.parent().unwrap(), log_file.file_name().unwrap());
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     let file_logger = fmt::layer().with_ansi(false).with_writer(non_blocking);
 

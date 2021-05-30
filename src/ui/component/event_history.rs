@@ -1,7 +1,7 @@
 use crate::{
     client::{
         channel::Channel,
-        content::{ContentStore, ThumbnailCache},
+        content::ContentStore,
         member::Members,
         message::{Attachment, Content as IcyContent, EmbedHeading},
     },
@@ -10,13 +10,13 @@ use crate::{
         component::*,
         screen::main::{Message, Mode},
         style::{
-            Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR,
-            MESSAGE_SENDER_SIZE, MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
+            Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR, MESSAGE_SENDER_SIZE,
+            MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
         },
     },
 };
 use chrono::{Datelike, Timelike};
-use harmony_rust_sdk::api::harmonytypes::r#override::Reason;
+use client::harmony_rust_sdk::api::harmonytypes::r#override::Reason;
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
@@ -37,12 +37,10 @@ pub fn build_event_history<'a>(
     theme: Theme,
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
-        .on_scroll(
-            |scroll_perc, prev_scroll_perc| Message::MessageHistoryScrolled {
-                prev_scroll_perc,
-                scroll_perc,
-            },
-        )
+        .on_scroll(|scroll_perc, prev_scroll_perc| Message::MessageHistoryScrolled {
+            prev_scroll_perc,
+            scroll_perc,
+        })
         .snap_to_bottom(true)
         .width(length!(+))
         .height(length!(+))
@@ -104,10 +102,7 @@ pub fn build_event_history<'a>(
         let sender_avatar_url = if let Some(overrides) = &message.overrides {
             overrides.avatar_url.as_ref()
         } else {
-            members
-                .get(&id_to_use)
-                .map(|m| m.avatar_url.as_ref())
-                .flatten()
+            members.get(&id_to_use).map(|m| m.avatar_url.as_ref()).flatten()
         };
         let sender_body_creator = |sender_display_name: &str| {
             let mut widgets = Vec::with_capacity(2);
@@ -144,16 +139,14 @@ pub fn build_event_history<'a>(
                 .padding(0)
         };
 
-        let is_sender_different = last_sender_id.as_ref() != Some(&id_to_use)
-            || last_sender_name.as_ref() != Some(&sender_display_name);
+        let is_sender_different =
+            last_sender_id.as_ref() != Some(&id_to_use) || last_sender_name.as_ref() != Some(&sender_display_name);
         if is_sender_different {
             if !message_group.is_empty() {
                 event_history = event_history.push(
-                    Container::new(
-                        column(message_group.drain(..).collect()).align_items(align!(|<)),
-                    )
-                    .style(theme.round())
-                    .width(Length::Fill),
+                    Container::new(column(message_group.drain(..).collect()).align_items(align!(|<)))
+                        .style(theme.round())
+                        .width(Length::Fill),
                 );
             }
             message_group.push(sender_body_creator(&sender_display_name).into());
@@ -172,8 +165,7 @@ pub fn build_event_history<'a>(
 
         if !is_sender_different
             && !message_group.is_empty()
-            && last_timestamp.signed_duration_since(message.timestamp)
-                > chrono::Duration::minutes(5)
+            && last_timestamp.signed_duration_since(message.timestamp) > chrono::Duration::minutes(5)
         {
             event_history = event_history.push(
                 Container::new(column(message_group.drain(..).collect()).align_items(align!(|<)))
@@ -206,41 +198,39 @@ pub fn build_event_history<'a>(
         }
 
         if let IcyContent::Embeds(embeds) = &message.content {
-            let put_heading = |embed: &mut Vec<Element<'a, Message>>,
-                               h: &EmbedHeading,
-                               state: &'a mut button::State| {
-                if !(h.text.is_empty() && h.subtext.is_empty()) {
-                    let mut heading = Vec::with_capacity(3);
+            let put_heading =
+                |embed: &mut Vec<Element<'a, Message>>, h: &EmbedHeading, state: &'a mut button::State| {
+                    if !(h.text.is_empty() && h.subtext.is_empty()) {
+                        let mut heading = Vec::with_capacity(3);
 
-                    if let Some(img_url) = &h.icon {
-                        if let Some(handle) = thumbnail_cache.get_thumbnail(img_url) {
-                            heading.push(
-                                Image::new(handle.clone())
-                                    .height(length!(=24))
-                                    .width(length!(=24))
-                                    .into(),
-                            );
+                        if let Some(img_url) = &h.icon {
+                            if let Some(handle) = thumbnail_cache.get_thumbnail(img_url) {
+                                heading.push(
+                                    Image::new(handle.clone())
+                                        .height(length!(=24))
+                                        .width(length!(=24))
+                                        .into(),
+                                );
+                            }
                         }
+
+                        heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
+                        heading.push(
+                            label!(&h.subtext)
+                                .size(DEF_SIZE - 6)
+                                .color(color!(200, 200, 200))
+                                .into(),
+                        );
+
+                        let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING)).style(theme.embed());
+
+                        if let Some(url) = &h.url {
+                            but = but.on_press(Message::OpenUrl(url.clone()));
+                        }
+
+                        embed.push(but.into());
                     }
-
-                    heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
-                    heading.push(
-                        label!(&h.subtext)
-                            .size(DEF_SIZE - 6)
-                            .color(color!(200, 200, 200))
-                            .into(),
-                    );
-
-                    let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING))
-                        .style(theme.embed());
-
-                    if let Some(url) = &h.url {
-                        but = but.on_press(Message::OpenUrl(url.clone()));
-                    }
-
-                    embed.push(but.into());
-                }
-            };
+                };
 
             let mut embed = Vec::with_capacity(5);
 
@@ -261,10 +251,7 @@ pub fn build_event_history<'a>(
                 let field = vec![
                     label!(&f.title).size(DEF_SIZE - 1).into(),
                     label!(&f.subtitle).size(DEF_SIZE - 3).into(),
-                    label!(&f.body)
-                        .color(color!(220, 220, 220))
-                        .size(DEF_SIZE - 3)
-                        .into(),
+                    label!(&f.body).color(color!(220, 220, 220)).size(DEF_SIZE - 3).into(),
                 ];
 
                 embed.push(
@@ -290,7 +277,11 @@ pub fn build_event_history<'a>(
                         .spacing(SPACING / 2)
                         .align_items(Align::Start),
                 )
-                .style(theme.round().secondary().with_border_color(embeds.color))
+                .style(theme.round().secondary().with_border_color(Color::from_rgb8(
+                    embeds.color.0,
+                    embeds.color.1,
+                    embeds.color.2,
+                )))
                 .into(),
             );
         }
@@ -338,9 +329,7 @@ pub fn build_event_history<'a>(
                             is_thumbnail,
                             attachment.clone(),
                             Column::with_children(vec![
-                                label!("Download {}", attachment.name)
-                                    .size(DEF_SIZE - 4)
-                                    .into(),
+                                label!("Download {}", attachment.name).size(DEF_SIZE - 4).into(),
                                 thumbnail_image.into(),
                             ])
                             .spacing(SPACING),
@@ -351,11 +340,7 @@ pub fn build_event_history<'a>(
                         message_body_widgets.push(button);
                     }
                 } else {
-                    let text = if does_content_exist {
-                        "Open"
-                    } else {
-                        "Download"
-                    };
+                    let text = if does_content_exist { "Open" } else { "Download" };
 
                     message_body_widgets.push(create_button(
                         is_thumbnail,
@@ -374,9 +359,7 @@ pub fn build_event_history<'a>(
             .spacing(MSG_LR_PADDING);
         let mut message_row = Vec::with_capacity(2);
 
-        let maybe_timestamp = if is_sender_different
-            || last_timestamp.minute() != message.timestamp.minute()
-        {
+        let maybe_timestamp = if is_sender_different || last_timestamp.minute() != message.timestamp.minute() {
             let message_timestamp = message.timestamp.format("%H:%M").to_string();
 
             let timestamp_label = label!(message_timestamp)
@@ -385,8 +368,7 @@ pub fn build_event_history<'a>(
 
             Column::with_children(vec![
                 space!(h = PADDING / 8).into(),
-                Row::with_children(vec![timestamp_label.into(), space!(h = PADDING / 2).into()])
-                    .into(),
+                Row::with_children(vec![timestamp_label.into(), space!(h = PADDING / 2).into()]).into(),
             ])
             .into()
         } else {

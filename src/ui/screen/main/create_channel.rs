@@ -1,5 +1,5 @@
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
-use harmony_rust_sdk::client::api::chat::channel;
+use client::harmony_rust_sdk::{api::chat::Place, client::api::chat::channel};
 use iced_aw::Card;
 
 use crate::{
@@ -79,9 +79,7 @@ impl ChannelCreationModal {
                         .into(),
                 );
             }
-            ChannelState::Creating { name } => {
-                create_widgets.push(label!("Creating channel {}", name).into())
-            }
+            ChannelState::Creating { name } => create_widgets.push(label!("Creating channel {}", name).into()),
             _ => {}
         }
 
@@ -89,13 +87,10 @@ impl ChannelCreationModal {
             create_widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
         }
         create_widgets.push(
-            Row::with_children(vec![
-                create_text_edit.into(),
-                create.width(length!(= 80)).into(),
-            ])
-            .align_items(align!(|))
-            .spacing(SPACING * 2)
-            .into(),
+            Row::with_children(vec![create_text_edit.into(), create.width(length!(= 80)).into()])
+                .align_items(align!(|))
+                .spacing(SPACING * 2)
+                .into(),
         );
 
         Container::new(
@@ -133,24 +128,18 @@ impl ChannelCreationModal {
                         async move {
                             let result = channel::create_channel(
                                 &inner,
-                                channel::CreateChannel::new(
-                                    guild_id,
-                                    channel_name,
-                                    harmony_rust_sdk::api::chat::Place::Top { before: 0 },
-                                ),
+                                channel::CreateChannel::new(guild_id, channel_name, Place::Top { before: 0 }),
                             )
                             .await;
                             result.map_or_else(
                                 |e| TopLevelMessage::Error(Box::new(e.into())),
                                 |response| {
-                                    TopLevelMessage::MainScreen(
-                                        ParentMessage::ChannelCreationMessage(
-                                            Message::CreatedChannel {
-                                                guild_id,
-                                                channel_id: response.channel_id,
-                                            },
-                                        ),
-                                    )
+                                    TopLevelMessage::MainScreen(ParentMessage::ChannelCreationMessage(
+                                        Message::CreatedChannel {
+                                            guild_id,
+                                            channel_id: response.channel_id,
+                                        },
+                                    ))
                                 },
                             )
                         },
@@ -159,10 +148,7 @@ impl ChannelCreationModal {
                     go_back,
                 );
             }
-            Message::CreatedChannel {
-                guild_id,
-                channel_id,
-            } => {
+            Message::CreatedChannel { guild_id, channel_id } => {
                 self.channel_creation_state = ChannelState::Created {
                     guild_id,
                     channel_id,

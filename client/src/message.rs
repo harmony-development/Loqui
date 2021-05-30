@@ -1,8 +1,7 @@
 use chrono::NaiveDateTime;
 use harmony_rust_sdk::{
     api::harmonytypes::{
-        self, content, r#override::Reason, ContentEmbed, ContentFiles, ContentText,
-        Message as HarmonyMessage,
+        self, content, r#override::Reason, ContentEmbed, ContentFiles, ContentText, Message as HarmonyMessage,
     },
     client::api::rest::FileId,
 };
@@ -54,7 +53,7 @@ impl From<EmbedHeading> for harmonytypes::EmbedHeading {
 pub struct Embed {
     pub title: String,
     pub body: String,
-    pub color: iced::Color,
+    pub color: (u8, u8, u8),
     pub footer: Option<EmbedHeading>,
     pub header: Option<EmbedHeading>,
     pub fields: Vec<EmbedField>,
@@ -65,9 +64,9 @@ impl From<Embed> for harmonytypes::Embed {
         harmonytypes::Embed {
             body: e.body,
             color: {
-                let mut c = (e.color.r * 255_f32) as i64;
-                c = (c << 8) + (e.color.g * 255_f32) as i64;
-                c = (c << 8) + (e.color.b * 255_f32) as i64;
+                let mut c = (e.color.0 * 255) as i64;
+                c = (c << 8) + (e.color.1 * 255) as i64;
+                c = (c << 8) + (e.color.2 * 255) as i64;
                 c as i64
             },
             fields: e.fields.into_iter().map(Into::into).collect(),
@@ -132,9 +131,7 @@ pub struct Override {
 impl From<Override> for harmonytypes::Override {
     fn from(o: Override) -> Self {
         Self {
-            avatar: o
-                .avatar_url
-                .map_or_else(String::default, |id| id.to_string()),
+            avatar: o.avatar_url.map_or_else(String::default, |id| id.to_string()),
             name: o.name,
             reason: o.reason,
         }
@@ -310,7 +307,7 @@ impl From<harmonytypes::Embed> for Embed {
                     body: f.body,
                 })
                 .collect(),
-            color: iced::Color::from_rgb8(
+            color: (
                 ((e.color >> 16) & 255) as u8,
                 ((e.color >> 8) & 255) as u8,
                 (e.color & 255) as u8,

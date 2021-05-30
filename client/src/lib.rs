@@ -10,6 +10,7 @@ pub mod message;
 use channel::Channel;
 use guild::Guild;
 pub use harmony_rust_sdk::{
+    self,
     api::exports::hrpc::url::Url,
     client::{api::auth::Session as InnerSession, AuthStatus, Client as InnerClient},
 };
@@ -21,8 +22,8 @@ use harmony_rust_sdk::{
     client::api::{
         chat::{
             message::{
-                delete_message, send_message, update_message_text, SendMessage,
-                SendMessageSelfBuilder, UpdateMessageTextRequest,
+                delete_message, send_message, update_message_text, SendMessage, SendMessageSelfBuilder,
+                UpdateMessageTextRequest,
             },
             EventSource,
         },
@@ -32,24 +33,28 @@ use harmony_rust_sdk::{
 
 use content::ContentStore;
 use error::{ClientError, ClientResult};
-use iced::Command;
 use member::{Member, Members};
 use message::{harmony_messages_to_ui_messages, Attachment, Content, Embed, MessageId};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug, Formatter},
+    future::Future,
     path::PathBuf,
     str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use crate::{client::channel::ChanPerms, ui::component::event_history::SHOWN_MSGS_LIMIT};
+use crate::channel::ChanPerms;
 
 use self::{
     guild::Guilds,
     message::{EmbedHeading, Message},
 };
+
+pub type IndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
+pub use ahash::AHashMap;
+pub use tracing;
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
 #[derive(Clone, Deserialize, Serialize)]
@@ -99,10 +104,7 @@ impl Debug for Client {
         fmt.debug_struct("Client")
             .field(
                 "user_id",
-                &format!(
-                    "{:?}",
-                    self.auth_status().session().map_or(0, |s| s.user_id)
-                ),
+                &format!("{:?}", self.auth_status().session().map_or(0, |s| s.user_id)),
             )
             .field("session_file", &self.content_store.session_file())
             .finish()
@@ -171,9 +173,7 @@ impl Client {
         channel_id: u64,
         retry_after: Duration,
         message: Message,
-    ) -> Option<Command<crate::ui::screen::Message>> {
-        use crate::ui::screen::Message;
-
+    ) -> Option<impl Future<Output = (u64, u64, u64, Message, Duration, Option<u64>)>> {
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             if retry_after.as_secs() == 0 {
                 channel.messages.push(message.clone());
@@ -181,39 +181,41 @@ impl Client {
 
             let inner = self.inner().clone();
 
-            Some(Command::perform(
-                async move {
-                    tokio::time::sleep(retry_after).await;
+            Some(async move {
+                tokio::time::sleep(retry_after).await;
 
-                    let msg = SendMessage::new(guild_id, channel_id)
-                        .content(harmony_rust_sdk::api::harmonytypes::Content {
-                            content: Some(message.content.clone().into()),
-                        })
-                        .echo_id(message.id.transaction_id().unwrap())
-                        .overrides(message.overrides.clone().map(Into::into));
+                let echo_id = message.id.transaction_id().unwrap();
+                let msg = SendMessage::new(guild_id, channel_id)
+                    .content(harmony_rust_sdk::api::harmonytypes::Content {
+                        content: Some(message.content.clone().into()),
+                    })
+                    .echo_id(echo_id)
+                    .overrides(message.overrides.clone().map(Into::into));
 
-                    let send_result = send_message(&inner, msg).await;
+                let send_result = send_message(&inner, msg).await;
 
-                    match send_result {
-                        Ok(resp) => Message::MessageSent {
-                            message_id: resp.message_id,
-                            transaction_id: message.id.transaction_id().unwrap(),
-                            channel_id,
+                match send_result {
+                    Ok(resp) => (
+                        guild_id,
+                        channel_id,
+                        echo_id,
+                        message,
+                        retry_after,
+                        Some(resp.message_id),
+                    ),
+                    Err(err) => {
+                        tracing::error!("error occured when sending message: {}", err);
+                        (
                             guild_id,
-                        },
-                        Err(err) => {
-                            tracing::error!("error occured when sending message: {}", err);
-                            Message::SendMessage {
-                                message,
-                                retry_after: retry_after + Duration::from_secs(1),
-                                channel_id,
-                                guild_id,
-                            }
-                        }
+                            channel_id,
+                            echo_id,
+                            message,
+                            retry_after + Duration::from_secs(1),
+                            None,
+                        )
                     }
-                },
-                |retry| retry,
-            ))
+                }
+            })
         } else {
             None
         }
@@ -224,30 +226,21 @@ impl Client {
         guild_id: u64,
         channel_id: u64,
         message_id: u64,
-    ) -> Command<crate::ui::screen::Message> {
-        use crate::ui::screen::Message;
-
+    ) -> impl Future<Output = ClientResult<()>> {
         let inner = self.inner().clone();
 
-        Command::perform(
-            async move {
-                delete_message(
-                    &inner,
-                    DeleteMessageRequest {
-                        guild_id,
-                        channel_id,
-                        message_id,
-                    },
-                )
-                .await
-            },
-            |result| {
-                result.map_or_else(
-                    |err| Message::Error(Box::new(err.into())),
-                    |_| Message::Nothing,
-                )
-            },
-        )
+        async move {
+            delete_message(
+                &inner,
+                DeleteMessageRequest {
+                    guild_id,
+                    channel_id,
+                    message_id,
+                },
+            )
+            .await
+            .map_err(Into::into)
+        }
     }
 
     pub fn edit_msg_cmd(
@@ -256,41 +249,26 @@ impl Client {
         channel_id: u64,
         message_id: u64,
         new_content: String,
-    ) -> Command<crate::ui::screen::Message> {
-        use crate::ui::screen::Message;
-
+    ) -> impl Future<Output = (u64, u64, u64, Option<Box<ClientError>>)> {
         let inner = self.inner().clone();
 
-        Command::perform(
-            async move {
-                let result = update_message_text(
-                    &inner,
-                    UpdateMessageTextRequest {
-                        guild_id,
-                        channel_id,
-                        message_id,
-                        new_content,
-                    },
-                )
-                .await;
+        async move {
+            let result = update_message_text(
+                &inner,
+                UpdateMessageTextRequest {
+                    guild_id,
+                    channel_id,
+                    message_id,
+                    new_content,
+                },
+            )
+            .await;
 
-                result.map_or_else(
-                    |err| Message::MessageEdited {
-                        guild_id,
-                        channel_id,
-                        message_id,
-                        err: Some(Box::new(err.into())),
-                    },
-                    |_| Message::MessageEdited {
-                        guild_id,
-                        channel_id,
-                        message_id,
-                        err: None,
-                    },
-                )
-            },
-            |m| m,
-        )
+            result.map_or_else(
+                |err| (guild_id, channel_id, message_id, Some(Box::new(err.into()))),
+                |_| (guild_id, channel_id, message_id, None),
+            )
+        }
     }
 
     pub fn process_event(&mut self, event: Event) -> Vec<PostProcessEvent> {
@@ -339,7 +317,7 @@ impl Client {
                         }
 
                         let disp = channel.messages.len();
-                        if channel.looking_at_message >= disp.saturating_sub(SHOWN_MSGS_LIMIT) {
+                        if channel.looking_at_message >= disp.saturating_sub(32) {
                             channel.looking_at_message = disp.saturating_sub(1);
                             post.push(PostProcessEvent::GoToFirstMsgOnChannel(channel_id));
                         }
@@ -375,10 +353,7 @@ impl Client {
                     }
                 }
             }
-            Event::DeletedChannel(ChannelDeleted {
-                guild_id,
-                channel_id,
-            }) => {
+            Event::DeletedChannel(ChannelDeleted { guild_id, channel_id }) => {
                 if let Some(guild) = self.get_guild(guild_id) {
                     guild.channels.remove(&channel_id);
                 }
@@ -445,10 +420,7 @@ impl Client {
                     member.typing_in_channel = Some((guild_id, channel_id, Instant::now()));
                 }
             }
-            Event::JoinedMember(MemberJoined {
-                guild_id,
-                member_id,
-            }) => {
+            Event::JoinedMember(MemberJoined { guild_id, member_id }) => {
                 if member_id == 0 {
                     return post;
                 }

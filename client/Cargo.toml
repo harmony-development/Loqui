@@ -1,0 +1,23 @@
+[package]
+name = "client"
+version = "0.1.0"
+authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
+edition = "2018"
+license = "GPLv3"
+repository = "https://github.com/harmony-development/crust"
+homepage = "https://github.com/harmony-development/crust"
+
+[dependencies]
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client", "parking_lot"] }
+
+infer = "0.5.0"
+directories-next = "2.0.0"
+
+tokio = { version = "1.6", features = ["parking_lot", "time", "fs"] }
+uuid = { version = "0.8.2", features = ["v4"] }
+ahash = "0.7"
+indexmap = "1.6.1"
+
+serde = { version = "1.0", features = ["derive"] }
+chrono = "0.4.19"
+tracing = "0.1"

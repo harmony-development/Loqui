@@ -60,10 +60,7 @@ impl Display for ClientError {
             }
             ClientError::Internal(err) => {
                 if let InnerClientError::Internal(
-                    harmony_rust_sdk::api::exports::hrpc::client::ClientError::EndpointError {
-                        raw_error,
-                        ..
-                    },
+                    harmony_rust_sdk::api::exports::hrpc::client::ClientError::EndpointError { raw_error, .. },
                 ) = err
                 {
                     write!(

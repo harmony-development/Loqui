@@ -7,7 +7,7 @@ use crate::{
         style::{Theme, ERROR_COLOR, PADDING},
     },
 };
-use harmony_rust_sdk::{
+use client::harmony_rust_sdk::{
     api::{
         auth::{auth_step::Step, next_step_request::form_fields::Field},
         exports::hrpc::url::Url,
@@ -92,32 +92,24 @@ impl LoginScreen {
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
         if self.waiting {
-            return fill_container(label!("Please wait...").size(30))
-                .style(theme)
-                .into();
+            return fill_container(label!("Please wait...").size(30)).style(theme).into();
         }
 
         let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 1);
         if !self.current_error.is_empty() {
-            let error_text = label!(self
-                .current_error
-                .as_str()
-                .chars()
-                .take(250)
-                .collect::<String>())
-            .color(ERROR_COLOR)
-            .size(18);
+            let error_text = label!(self.current_error.as_str().chars().take(250).collect::<String>())
+                .color(ERROR_COLOR)
+                .size(18);
             widgets.push(error_text.into());
         }
 
         if !self.fields.is_empty() {
             for (name, (state, value, r#type)) in self.fields.iter_mut() {
                 let namee = name.clone();
-                let mut input = TextInput::new(state, name, value, move |new| {
-                    Message::FieldChanged(namee.clone(), new)
-                })
-                .padding(PADDING / 2)
-                .style(theme);
+                let mut input =
+                    TextInput::new(state, name, value, move |new| Message::FieldChanged(namee.clone(), new))
+                        .padding(PADDING / 2)
+                        .style(theme);
                 input = match r#type.as_str() {
                     "password" | "new-password" => input.password(),
                     _ => input,
@@ -175,22 +167,15 @@ impl LoginScreen {
         msg: Message,
         content_store: &Arc<ContentStore>,
     ) -> Command<TopLevelMessage> {
-        fn respond(
-            screen: &mut LoginScreen,
-            client: &Client,
-            response: AuthStepResponse,
-        ) -> Command<TopLevelMessage> {
+        fn respond(screen: &mut LoginScreen, client: &Client, response: AuthStepResponse) -> Command<TopLevelMessage> {
             screen.waiting = true;
             let inner = client.inner().clone();
-            Command::perform(
-                async move { inner.next_auth_step(response).await },
-                |result| {
-                    result.map_or_else(
-                        |err| TopLevelMessage::Error(Box::new(err.into())),
-                        |step| TopLevelMessage::LoginScreen(Message::AuthStep(step)),
-                    )
-                },
-            )
+            Command::perform(async move { inner.next_auth_step(response).await }, |result| {
+                result.map_or_else(
+                    |err| TopLevelMessage::Error(Box::new(err.into())),
+                    |step| TopLevelMessage::LoginScreen(Message::AuthStep(step)),
+                )
+            })
         }
 
         match msg {
@@ -205,15 +190,12 @@ impl LoginScreen {
                 if let Some(client) = client {
                     self.waiting = true;
                     let inner = client.inner().clone();
-                    return Command::perform(
-                        async move { inner.prev_auth_step().await },
-                        |result| {
-                            result.map_or_else(
-                                |err| TopLevelMessage::Error(Box::new(err.into())),
-                                |step| TopLevelMessage::LoginScreen(Message::AuthStep(Some(step))),
-                            )
-                        },
-                    );
+                    return Command::perform(async move { inner.prev_auth_step().await }, |result| {
+                        result.map_or_else(
+                            |err| TopLevelMessage::Error(Box::new(err.into())),
+                            |step| TopLevelMessage::LoginScreen(Message::AuthStep(Some(step))),
+                        )
+                    });
                 }
             }
             Message::ProceedWithChoice(choice) => {
@@ -241,30 +223,22 @@ impl LoginScreen {
                     };
                     return respond(self, client, response);
                 } else if let AuthPart::Homeserver = &self.current_step {
-                    if let Some(index) = self.fields.iter().position(|(key, _)| key == "homeserver")
-                    {
-                        if let Some(homeserver) = self
-                            .fields
-                            .get(index)
-                            .map(|(_, (_, homeserver, _))| homeserver.clone())
+                    if let Some(index) = self.fields.iter().position(|(key, _)| key == "homeserver") {
+                        if let Some(homeserver) =
+                            self.fields.get(index).map(|(_, (_, homeserver, _))| homeserver.clone())
                         {
                             return match homeserver.parse::<Url>() {
                                 Ok(uri) => {
                                     let content_store = content_store.clone();
                                     self.waiting = true;
-                                    Command::perform(
-                                        Client::new(uri, None, content_store),
-                                        |result| {
-                                            result.map_or_else(
-                                                |err| TopLevelMessage::Error(Box::new(err)),
-                                                TopLevelMessage::ClientCreated,
-                                            )
-                                        },
-                                    )
+                                    Command::perform(Client::new(uri, None, content_store), |result| {
+                                        result.map_or_else(
+                                            |err| TopLevelMessage::Error(Box::new(err)),
+                                            TopLevelMessage::ClientCreated,
+                                        )
+                                    })
                                 }
-                                Err(err) => {
-                                    self.on_error(ClientError::UrlParse(homeserver.clone(), err))
-                                }
+                                Err(err) => self.on_error(ClientError::UrlParse(homeserver.clone(), err)),
                             };
                         }
                     }
@@ -288,10 +262,8 @@ impl LoginScreen {
                             }
                             Step::Form(form) => {
                                 for field in form.fields {
-                                    self.fields.push((
-                                        field.name,
-                                        (Default::default(), Default::default(), field.r#type),
-                                    ));
+                                    self.fields
+                                        .push((field.name, (Default::default(), Default::default(), field.r#type)));
                                 }
                                 self.current_step = AuthPart::Step(AuthType::Form);
                             }

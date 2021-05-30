@@ -1,6 +1,9 @@
-use harmony_rust_sdk::{
-    api::chat::InviteId,
-    client::api::chat::{guild::AddGuildToGuildListRequest, *},
+use client::{
+    harmony_rust_sdk::{
+        api::chat::InviteId,
+        client::api::chat::{guild::AddGuildToGuildListRequest, *},
+    },
+    tracing::debug,
 };
 
 use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
@@ -75,11 +78,7 @@ impl GuildDiscovery {
             }
 
             let maybe_invite = InviteId::new(&self.invite).map_or_else(
-                || {
-                    Err(ClientError::Custom(
-                        "Please enter a valid invite".to_string(),
-                    ))
-                },
+                || Err(ClientError::Custom("Please enter a valid invite".to_string())),
                 Ok,
             );
 
@@ -91,7 +90,7 @@ impl GuildDiscovery {
                 }
                 Err(e) => {
                     if !self.invite.is_empty() {
-                        tracing::debug!("{}", e); // We don't print this as an error since it'll spam the logs
+                        debug!("{}", e); // We don't print this as an error since it'll spam the logs
                         texts.push(label!(e.to_string()).color(ERROR_COLOR).into());
                     }
                 }
@@ -104,11 +103,7 @@ impl GuildDiscovery {
             .map(|id| client.guilds.get(id).map(|r| &r.name))
             .flatten()
         {
-            texts.push(
-                label!("Successfully joined guild {}", name)
-                    .color(SUCCESS_COLOR)
-                    .into(),
-            );
+            texts.push(label!("Successfully joined guild {}", name).color(SUCCESS_COLOR).into());
         }
 
         if let Some(name) = self.joining_guild.as_ref() {
@@ -175,10 +170,9 @@ impl GuildDiscovery {
 
                 return Command::perform(
                     async move {
-                        let guild_id =
-                            guild::create_guild(&inner, guild::CreateGuild::new(guild_name))
-                                .await?
-                                .guild_id;
+                        let guild_id = guild::create_guild(&inner, guild::CreateGuild::new(guild_name))
+                            .await?
+                            .guild_id;
                         guild::add_guild_to_guild_list(
                             &inner,
                             AddGuildToGuildListRequest {
@@ -192,9 +186,7 @@ impl GuildDiscovery {
                     |result| {
                         result.map_or_else(
                             |e| TopLevelMessage::Error(Box::new(e)),
-                            |response| {
-                                TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response))
-                            },
+                            |response| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response)),
                         )
                     },
                 );
@@ -221,9 +213,7 @@ impl GuildDiscovery {
                     |result| {
                         result.map_or_else(
                             |e| TopLevelMessage::Error(Box::new(e)),
-                            |response| {
-                                TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response))
-                            },
+                            |response| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response)),
                         )
                     },
                 );

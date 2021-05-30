@@ -1,8 +1,5 @@
 use crate::color;
-use iced::{
-    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
-    text_input, Color,
-};
+use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, Color};
 
 pub const DEF_SIZE: u16 = 20;
 pub const MESSAGE_TIMESTAMP_SIZE: u16 = 14;
@@ -255,8 +252,7 @@ mod light {
 mod dark {
     use crate::color;
     use iced::{
-        button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider,
-        text_input, Color,
+        button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, Color,
     };
     use iced_aw::{card, modal};
 
@@ -288,11 +284,7 @@ mod dark {
     impl modal::StyleSheet for Modal {
         fn active(&self) -> modal::Style {
             modal::Style {
-                background: Color {
-                    a: 0.7,
-                    ..Color::BLACK
-                }
-                .into(),
+                background: Color { a: 0.7, ..Color::BLACK }.into(),
             }
         }
     }
@@ -360,11 +352,7 @@ mod dark {
 
         fn hovered(&self) -> radio::Style {
             radio::Style {
-                background: Color {
-                    a: 0.5,
-                    ..BRIGHT_BG
-                }
-                .into(),
+                background: Color { a: 0.5, ..BRIGHT_BG }.into(),
                 ..self.active()
             }
         }
@@ -556,11 +544,7 @@ mod dark {
             let active = self.active();
 
             scrollable::Scrollbar {
-                background: Color {
-                    a: 0.5,
-                    ..BRIGHT_BG
-                }
-                .into(),
+                background: Color { a: 0.5, ..BRIGHT_BG }.into(),
                 scroller: scrollable::Scroller {
                     color: ACCENT,
                     ..active.scroller

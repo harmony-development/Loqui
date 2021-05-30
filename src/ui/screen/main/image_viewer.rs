@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use super::super::Message as TopLevelMessage;
 
 use crate::{
-    client::content::ImageHandle,
     label_button, length,
     ui::{
         component::*,
@@ -38,12 +37,10 @@ impl ImageViewerModal {
             Container::new(
                 Card::new(
                     label!(name).width(length!(= 720 - PADDING - SPACING)),
-                    Container::new(
-                        Viewer::new(&mut self.viewer_state, handle).width(length!(= 720)),
-                    )
-                    .center_x()
-                    .center_y()
-                    .width(length!(= 720)),
+                    Container::new(Viewer::new(&mut self.viewer_state, handle).width(length!(= 720)))
+                        .center_x()
+                        .center_y()
+                        .width(length!(= 720)),
                 )
                 .foot(
                     label_button!(&mut self.external_but_state, "Open externally")

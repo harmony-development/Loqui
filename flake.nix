@@ -18,7 +18,8 @@
         overlays = [
           (final: prev: {
             llvmPackages_12 = prev.llvmPackages_12 // {
-              bintools = prev.lib.hiPrio prev.llvmPackages_12.bintools;
+              clang = prev.lib.hiPrio prev.llvmPackages_12.clang;
+              bintools = prev.lib.setPrio (-20) prev.llvmPackages_12.bintools;
             };
           })
         ] ++ prev.overlays;

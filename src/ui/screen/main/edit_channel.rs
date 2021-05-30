@@ -1,5 +1,5 @@
 use super::super::Message as TopLevelMessage;
-use harmony_rust_sdk::client::api::chat::channel;
+use client::harmony_rust_sdk::client::api::chat::channel;
 use iced_aw::Card;
 
 use crate::{
@@ -66,8 +66,7 @@ impl UpdateChannelModal {
 
         Container::new(
             Card::new(
-                label!("Update channel information")
-                    .width(length!(= 480 + PADDING + (SPACING * 3))),
+                label!("Update channel information").width(length!(= 480 + PADDING + (SPACING * 3))),
                 column(widgets),
             )
             .style(theme.round())

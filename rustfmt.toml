@@ -1,0 +1,4 @@
+reorder_imports = true
+reorder_modules = true
+merge_derives = true
+max_width = 120

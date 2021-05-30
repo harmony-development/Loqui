@@ -1,7 +1,8 @@
 use super::message::Messages;
+use ahash::RandomState;
 use indexmap::IndexMap;
 
-pub type Channels = IndexMap<u64, Channel>;
+pub type Channels = IndexMap<u64, Channel, RandomState>;
 
 #[derive(Debug, Clone)]
 pub struct Channel {

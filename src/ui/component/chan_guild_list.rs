@@ -1,7 +1,6 @@
 use crate::{
     client::{
         channel::Channels,
-        content::ThumbnailCache,
         guild::{Guild, Guilds},
     },
     label, space,
@@ -32,8 +31,7 @@ pub fn build_channel_list<'a>(
         .spacing(SPACING)
         .padding(PADDING / 4);
 
-    for ((channel_id, channel), (button_state, edit_state, copy_state)) in
-        channels.iter().zip(buttons_state.iter_mut())
+    for ((channel_id, channel), (button_state, edit_state, copy_state)) in channels.iter().zip(buttons_state.iter_mut())
     {
         let channel_name_prefix = if channel.is_category {
             Icon::ListNested
@@ -112,13 +110,10 @@ pub fn build_guild_list<'a>(
     {
         if index >= buttons_state_len - 1 {
             // [ref:create_join_guild_but_state]
-            let but = Button::new(
-                button_state,
-                fill_container(icon(Icon::Plus).size(DEF_SIZE + 10)),
-            )
-            .width(length!(+))
-            .style(theme.secondary())
-            .on_press(Message::OpenCreateJoinGuild);
+            let but = Button::new(button_state, fill_container(icon(Icon::Plus).size(DEF_SIZE + 10)))
+                .width(length!(+))
+                .style(theme.secondary())
+                .on_press(Message::OpenCreateJoinGuild);
             guild_list = guild_list.push(but);
         } else {
             let content = fill_container(
@@ -130,13 +125,8 @@ pub fn build_guild_list<'a>(
                     .map_or_else(
                         || {
                             Element::from(
-                                label!(guild
-                                    .name
-                                    .chars()
-                                    .next()
-                                    .unwrap_or('u')
-                                    .to_ascii_uppercase())
-                                .size(DEF_SIZE + 10),
+                                label!(guild.name.chars().next().unwrap_or('u').to_ascii_uppercase())
+                                    .size(DEF_SIZE + 10),
                             )
                         },
                         |handle| Element::from(Image::new(handle.clone())),

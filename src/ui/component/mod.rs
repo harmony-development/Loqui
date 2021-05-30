@@ -4,10 +4,11 @@ pub mod event_history;
 use crate::length;
 pub use crate::{align, color, label};
 pub use chan_guild_list::build_channel_list;
+use client::{harmony_rust_sdk::api::rest::FileId, IndexMap};
 pub use event_history::build_event_history;
 pub use iced::{
-    button, pick_list, scrollable, text_input, Align, Button, Color, Column, Command, Container,
-    Element, Image, Length, PickList, Row, Scrollable, Space, Subscription, Text, TextInput,
+    button, pick_list, scrollable, text_input, Align, Button, Color, Column, Command, Container, Element, Image,
+    Length, PickList, Row, Scrollable, Space, Subscription, Text, TextInput,
 };
 pub use iced_aw::Icon;
 
@@ -140,4 +141,95 @@ macro_rules! align {
     (|<) => {
         ::iced::Align::Start
     };
+}
+
+pub use iced::image::Handle as ImageHandle;
+
+pub fn get_image_size_from_handle(handle: &ImageHandle) -> Option<u64> {
+    use iced_native::image::Data;
+    // This one angers me a lot, iced pls read the file beforehand and cache it
+    match handle.data() {
+        Data::Bytes(raw) => Some(raw.len() as u64),
+        Data::Path(path) => std::fs::metadata(path).map_or(None, |meta| Some(meta.len())),
+        Data::Pixels {
+            pixels,
+            height: _,
+            width: _,
+        } => Some(pixels.len() as u64),
+    }
+}
+
+#[derive(Debug)]
+pub struct ThumbnailCache {
+    thumbnails: IndexMap<FileId, ImageHandle>,
+    max_size: u64,
+}
+
+impl Default for ThumbnailCache {
+    fn default() -> Self {
+        const MAX_CACHE_SIZE: u64 = 1000 * 1000 * 100; // 100Mb
+        Self::new(MAX_CACHE_SIZE)
+    }
+}
+
+impl ThumbnailCache {
+    pub fn new(max_size: u64) -> Self {
+        Self {
+            thumbnails: IndexMap::default(),
+            max_size,
+        }
+    }
+
+    pub fn put_thumbnail(&mut self, thumbnail_id: FileId, thumbnail: ImageHandle) {
+        let thumbnail_size = match get_image_size_from_handle(&thumbnail) {
+            Some(size) => size,
+            None => return,
+        };
+        let cache_size = self.len();
+
+        if cache_size + thumbnail_size > self.max_size {
+            let mut current_size = 0;
+            let mut remove_upto = 0;
+            for (index, size) in self
+                .thumbnails
+                .values()
+                .flat_map(|h| get_image_size_from_handle(h))
+                .enumerate()
+            {
+                if current_size >= thumbnail_size {
+                    remove_upto = index + 1;
+                    break;
+                }
+                current_size += size;
+            }
+            for index in 0..remove_upto {
+                self.thumbnails.shift_remove_index(index);
+            }
+        } else {
+            self.thumbnails.insert(thumbnail_id, thumbnail);
+        }
+    }
+
+    pub fn len(&self) -> u64 {
+        self.thumbnails
+            .values()
+            .flat_map(|h| get_image_size_from_handle(h))
+            .sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() < 1
+    }
+
+    pub fn has_thumbnail(&self, thumbnail_id: &FileId) -> bool {
+        self.thumbnails.contains_key(thumbnail_id)
+    }
+
+    pub fn get_thumbnail(&self, thumbnail_id: &FileId) -> Option<&ImageHandle> {
+        self.thumbnails.get(thumbnail_id)
+    }
+
+    pub fn invalidate_thumbnail(&mut self, thumbnail_id: &FileId) {
+        self.thumbnails.remove(thumbnail_id);
+    }
 }

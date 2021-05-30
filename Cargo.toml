@@ -8,6 +8,9 @@ license = "GPLv3"
 repository = "https://github.com/harmony-development/crust"
 homepage = "https://github.com/harmony-development/crust"
 
+[workspace]
+members = ["client"]
+
 [package.metadata.bundle]
 name = "Crust"
 identifier = "nodomain.yusdacra.crust"
@@ -32,11 +35,10 @@ codegen-units = 1
 panic = 'abort'
 
 [dependencies]
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client", "parking_lot"] }
+client = { path = "./client" }
 
 iced = { git = "https://github.com/yusdacra/iced.git", rev = "416c4f4f263a60c2e7fc255d3e38dcf743a8218d", features = ["tokio", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "416c4f4f263a60c2e7fc255d3e38dcf743a8218d" }
-iced_futures = { git = "https://github.com/yusdacra/iced.git", rev = "416c4f4f263a60c2e7fc255d3e38dcf743a8218d" }
 iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", rev = "3303b1f49603ce4b11294e70e22c8cdff09f5438", default-features = false, features = [
     "icons",
     "card",
@@ -49,21 +51,13 @@ iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", rev = "3303b1f49603
 ] }
 
 open = "1.5.1"
-infer = "0.5.0"
 rfd = "0.4"
 image = "0.23.14"
-directories-next = "2.0.0"
 
-async-mutex = "1.4.0"
-tokio = { version = "1.5.0", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
-uuid = { version = "0.8.2", features = ["v4"] }
-ahash = "0.7"
-indexmap = "1.6.1"
+tokio = { version = "1.6", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
 
-serde = { version = "1.0", features = ["derive"] }
 toml = "0.5"
 chrono = "0.4.19"
-tracing = "0.1"
 tracing-subscriber = "0.2"
 tracing-appender = "0.1"
 fuzzy-matcher = "0.3.7"

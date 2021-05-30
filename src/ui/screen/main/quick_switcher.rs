@@ -15,15 +15,8 @@ pub enum Message {
 
 #[derive(Debug, Clone)]
 pub enum SearchResult {
-    Guild {
-        id: u64,
-        name: String,
-    },
-    Channel {
-        guild_id: u64,
-        id: u64,
-        name: String,
-    },
+    Guild { id: u64, name: String },
+    Channel { guild_id: u64, id: u64, name: String },
 }
 
 #[derive(Debug, Default)]
@@ -53,11 +46,7 @@ impl QuickSwitcherModal {
         if let Some(result) = self.results.first() {
             let msg = match result {
                 SearchResult::Guild { id, name: _ } => Message::SwitchToGuild(*id),
-                SearchResult::Channel {
-                    guild_id,
-                    id,
-                    name: _,
-                } => Message::SwitchToChannel {
+                SearchResult::Channel { guild_id, id, name: _ } => Message::SwitchToChannel {
                     guild_id: *guild_id,
                     channel_id: *id,
                 },
@@ -72,14 +61,12 @@ impl QuickSwitcherModal {
                 SearchResult::Guild { id, name } => label_button!(but_stt, &format!("*{}", name))
                     .style(theme)
                     .on_press(Message::SwitchToGuild(*id)),
-                SearchResult::Channel { guild_id, id, name } => {
-                    label_button!(but_stt, &format!("#{}", name))
-                        .style(theme)
-                        .on_press(Message::SwitchToChannel {
-                            guild_id: *guild_id,
-                            channel_id: *id,
-                        })
-                }
+                SearchResult::Channel { guild_id, id, name } => label_button!(but_stt, &format!("#{}", name))
+                    .style(theme)
+                    .on_press(Message::SwitchToChannel {
+                        guild_id: *guild_id,
+                        channel_id: *id,
+                    }),
             };
 
             result_widgets.push(widget.into());

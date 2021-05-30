@@ -21,9 +21,7 @@ pub struct LogoutModal {
 impl LogoutModal {
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
         if self.confirmation {
-            fill_container(label!("Logging out...").size(30))
-                .style(theme)
-                .into()
+            fill_container(label!("Logging out...").size(30)).style(theme).into()
         } else {
             let make_button = |state, confirm| {
                 let text = if confirm { "Yes" } else { "No" };
@@ -63,17 +61,13 @@ impl LogoutModal {
             let inner = client.inner().clone();
             Command::perform(
                 async move {
-                    let result =
-                        Client::logout(inner, content_store.session_file().to_path_buf()).await;
+                    let result = Client::logout(inner, content_store.session_file().to_path_buf()).await;
 
                     result.map_or_else(
                         |err| TopLevelMessage::Error(Box::new(err)),
                         |_| {
                             TopLevelMessage::Logout(
-                                super::super::Screen::Login(super::super::LoginScreen::new(
-                                    content_store,
-                                ))
-                                .into(),
+                                super::super::Screen::Login(super::super::LoginScreen::new(content_store)).into(),
                             )
                         },
                     )

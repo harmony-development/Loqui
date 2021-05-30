@@ -1,8 +1,8 @@
-use harmony_rust_sdk::client::api::chat::profile::{profile_update, ProfileUpdate};
+use client::harmony_rust_sdk::client::api::chat::profile::{profile_update, ProfileUpdate};
 use iced_aw::Card;
 
 use crate::{
-    client::{content::ThumbnailCache, Client},
+    client::Client,
     label_button, length,
     ui::{component::*, style::*},
 };
@@ -35,34 +35,19 @@ impl ProfileEditModal {
         }
     }
 
-    pub fn view(
-        &mut self,
-        theme: Theme,
-        client: &Client,
-        thumbnail_cache: &ThumbnailCache,
-    ) -> Element<Message> {
-        let content: Element<Message> = if let Some(user_profile) =
-            client.members.get(&self.user_id)
-        {
+    pub fn view(&mut self, theme: Theme, client: &Client, thumbnail_cache: &ThumbnailCache) -> Element<Message> {
+        let content: Element<Message> = if let Some(user_profile) = client.members.get(&self.user_id) {
             let user_img: Element<Message> = if let Some(handle) = user_profile
                 .avatar_url
                 .as_ref()
                 .map(|id| thumbnail_cache.get_thumbnail(id))
                 .flatten()
             {
-                Image::new(handle.clone())
-                    .height(length!(+))
-                    .width(length!(+))
-                    .into()
+                Image::new(handle.clone()).height(length!(+)).width(length!(+)).into()
             } else {
-                label!(user_profile
-                    .username
-                    .chars()
-                    .next()
-                    .unwrap_or('U')
-                    .to_ascii_uppercase())
-                .size((DEF_SIZE * 3) + 4)
-                .into()
+                label!(user_profile.username.chars().next().unwrap_or('U').to_ascii_uppercase())
+                    .size((DEF_SIZE * 3) + 4)
+                    .into()
             };
             let avatar_but = Button::new(&mut self.avatar_but, fill_container(user_img))
                 .on_press(Message::UploadPfp)
@@ -77,10 +62,9 @@ impl ProfileEditModal {
             .on_submit(Message::ChangeName)
             .padding(PADDING / 2)
             .style(theme);
-            let username_change_but =
-                label_button!(&mut self.username_change_but, "Change username")
-                    .on_press(Message::ChangeName)
-                    .style(theme);
+            let username_change_but = label_button!(&mut self.username_change_but, "Change username")
+                .on_press(Message::ChangeName)
+                .style(theme);
             let content = Column::with_children(vec![
                 row(vec![
                     avatar_but.width(length!(=96)).height(length!(=96)).into(),
@@ -124,13 +108,7 @@ impl ProfileEditModal {
                     let inner = client.inner().clone();
                     let username = self.current_username.drain(..).collect::<String>();
                     Command::perform(
-                        async move {
-                            Ok(profile_update(
-                                &inner,
-                                ProfileUpdate::default().new_username(username),
-                            )
-                            .await?)
-                        },
+                        async move { Ok(profile_update(&inner, ProfileUpdate::default().new_username(username)).await?) },
                         |result| {
                             result.map_or_else(
                                 |err| TopLevelMessage::Error(Box::new(err)),
@@ -144,15 +122,8 @@ impl ProfileEditModal {
                     let content_store = client.content_store_arc();
                     Command::perform(
                         async move {
-                            let id = select_upload_files(&inner, content_store)
-                                .await?
-                                .remove(0)
-                                .0;
-                            Ok(profile_update(
-                                &inner,
-                                ProfileUpdate::default().new_avatar(Some(id)),
-                            )
-                            .await?)
+                            let id = select_upload_files(&inner, content_store).await?.remove(0).0;
+                            Ok(profile_update(&inner, ProfileUpdate::default().new_avatar(Some(id))).await?)
                         },
                         |result| {
                             result.map_or_else(
