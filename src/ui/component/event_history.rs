@@ -20,6 +20,7 @@ use harmony_rust_sdk::api::harmonytypes::r#override::Reason;
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
+type ButsState = [(button::State, button::State, button::State, button::State); SHOWN_MSGS_LIMIT];
 
 #[allow(clippy::mutable_key_type)]
 #[allow(clippy::clippy::too_many_arguments)]
@@ -31,9 +32,7 @@ pub fn build_event_history<'a>(
     current_user_id: u64,
     looking_at_message: usize,
     scrollable_state: &'a mut scrollable::State,
-    content_open_buttons: &'a mut [button::State; SHOWN_MSGS_LIMIT],
-    embed_buttons: &'a mut [(button::State, button::State); SHOWN_MSGS_LIMIT],
-    edit_buts_sate: &'a mut [button::State; SHOWN_MSGS_LIMIT],
+    buts_sate: &'a mut ButsState,
     mode: Mode,
     theme: Theme,
 ) -> Element<'a, Message> {
@@ -68,12 +67,8 @@ pub fn build_event_history<'a>(
     let mut last_sender_name = None;
     let mut message_group = vec![];
 
-    for (((message, media_open_button_state), (h_embed_but, f_embed_but)), edit_but_state) in
-        displayable_events
-            .iter()
-            .zip(content_open_buttons.iter_mut())
-            .zip(embed_buttons.iter_mut())
-            .zip(edit_buts_sate.iter_mut())
+    for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state)) in
+        displayable_events.iter().zip(buts_sate.iter_mut())
     {
         let id_to_use = if !message.id.is_ack() {
             current_user_id
@@ -157,7 +152,8 @@ pub fn build_event_history<'a>(
                     Container::new(
                         column(message_group.drain(..).collect()).align_items(align!(|<)),
                     )
-                    .style(theme.round()),
+                    .style(theme.round())
+                    .width(Length::Fill),
                 );
             }
             message_group.push(sender_body_creator(&sender_display_name).into());
@@ -181,7 +177,8 @@ pub fn build_event_history<'a>(
         {
             event_history = event_history.push(
                 Container::new(column(message_group.drain(..).collect()).align_items(align!(|<)))
-                    .style(theme.round()),
+                    .style(theme.round())
+                    .width(Length::Fill),
             );
             message_group.push(sender_body_creator(&sender_display_name).into());
         }
@@ -415,6 +412,7 @@ pub fn build_event_history<'a>(
     if !message_group.is_empty() {
         event_history = event_history.push(
             Container::new(column(message_group.drain(..).collect()).align_items(align!(|<)))
+                .width(Length::Fill)
                 .style(theme.round()),
         );
     }

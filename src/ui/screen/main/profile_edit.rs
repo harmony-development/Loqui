@@ -61,11 +61,10 @@ impl ProfileEditModal {
                     .next()
                     .unwrap_or('U')
                     .to_ascii_uppercase())
-                .height(length!(+))
-                .width(length!(+))
+                .size((DEF_SIZE * 3) + 4)
                 .into()
             };
-            let avatar_but = Button::new(&mut self.avatar_but, user_img)
+            let avatar_but = Button::new(&mut self.avatar_but, fill_container(user_img))
                 .on_press(Message::UploadPfp)
                 .style(theme);
             let username = label!(format!("Hello, {}.", user_profile.username)).size(DEF_SIZE + 12);

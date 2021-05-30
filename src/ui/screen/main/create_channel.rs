@@ -46,6 +46,7 @@ pub struct ChannelCreationModal {
     channel_creation_state: ChannelState,
     channel_name_field: String,
     error_text: String,
+    pub guild_id: u64,
 }
 
 impl ChannelCreationModal {
@@ -111,12 +112,7 @@ impl ChannelCreationModal {
         .into()
     }
 
-    pub fn update(
-        &mut self,
-        msg: Message,
-        guild_id: u64,
-        client: &Client,
-    ) -> (Command<TopLevelMessage>, bool) {
+    pub fn update(&mut self, msg: Message, client: &Client) -> (Command<TopLevelMessage>, bool) {
         let mut go_back = false;
         match msg {
             Message::ChannelNameChanged(new_name) => {
@@ -130,6 +126,7 @@ impl ChannelCreationModal {
                     name: channel_name.clone(),
                 };
                 let inner = client.inner().clone();
+                let guild_id = self.guild_id;
 
                 return (
                     Command::perform(

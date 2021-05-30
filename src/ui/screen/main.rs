@@ -123,18 +123,18 @@ pub enum Message {
     ShowUpdateChannelModal(u64, u64),
     TryShowUpdateChannelModal(u64, u64),
     CopyToClipboard(String),
+    OpenCreateJoinGuild,
 }
 
 #[derive(Debug, Default)]
 pub struct MainScreen {
     // Event history area state
     event_history_state: scrollable::State,
-    content_open_buts_state: [button::State; SHOWN_MSGS_LIMIT],
-    edit_buts_sate: [button::State; SHOWN_MSGS_LIMIT],
+    history_buts_sate:
+        [(button::State, button::State, button::State, button::State); SHOWN_MSGS_LIMIT],
     send_file_but_state: button::State,
     composer_state: text_input::State,
     scroll_to_bottom_but_state: button::State,
-    embed_buttons_state: [(button::State, button::State); SHOWN_MSGS_LIMIT],
 
     // Room area state
     channel_menu_state: pick_list::State<String>,
@@ -176,8 +176,9 @@ impl MainScreen {
         let guilds = &client.guilds;
 
         // Resize and (if extended) initialize new button states for new rooms
+        // +1 for create / join guild [tag:create_join_guild_but_state]
         self.guilds_buts_state
-            .resize_with(guilds.len(), Default::default);
+            .resize_with(guilds.len() + 1, Default::default);
 
         // Create individual widgets
 
@@ -214,7 +215,6 @@ impl MainScreen {
             &mut self.menu_state,
             vec![
                 current_username.clone(),
-                "Join / Create a Guild".to_string(),
                 "Edit Profile".to_string(),
                 "Help".to_string(),
                 "Logout".to_string(),
@@ -307,7 +307,7 @@ impl MainScreen {
 
             let channel_menu_entries = vec![
                 guild.name.clone(),
-                "New Channel".to_string(),
+                "New Channel".to_string(),   // [tag:new_channel_menu_entry]
                 "Edit Guild".to_string(),    // [tag:edit_guild_menu_entry]
                 "Copy Guild ID".to_string(), // [tag:copy_guild_id_menu_entry]
             ];
@@ -366,9 +366,7 @@ impl MainScreen {
                     current_user_id,
                     channel.looking_at_message,
                     &mut self.event_history_state,
-                    &mut self.content_open_buts_state,
-                    &mut self.embed_buttons_state,
-                    &mut self.edit_buts_sate,
+                    &mut self.history_buts_sate,
                     self.mode,
                     theme,
                 );
@@ -602,7 +600,7 @@ impl MainScreen {
         .on_esc(Message::LogoutChoice(false));
 
         let content = if self.current_guild_id.is_some() {
-            // Show CreateChannelModal, if a guild is selected [tag:channel_creation_modal_view]
+            // Show CreateChannelModal, if a guild is selected
             let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
                 state.view(theme).map(Message::ChannelCreationMessage)
             })
@@ -659,6 +657,11 @@ impl MainScreen {
         }
 
         match msg {
+            Message::OpenCreateJoinGuild => {
+                return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
+                    super::GuildDiscovery::default(),
+                ));
+            }
             Message::CopyToClipboard(string) => clip.write(string),
             Message::ChannelViewPerm(guild_id, channel_id, ok) => {
                 client
@@ -882,11 +885,7 @@ impl MainScreen {
                 return cmd;
             }
             Message::ChannelCreationMessage(msg) => {
-                let (cmd, go_back) = self.create_channel_modal.inner_mut().update(
-                    msg,
-                    self.current_guild_id.unwrap(), // will never panic [ref:channel_creation_modal_view]
-                    &client,
-                );
+                let (cmd, go_back) = self.create_channel_modal.inner_mut().update(msg, &client);
                 self.create_channel_modal.show(!go_back);
                 return cmd;
             }
@@ -1037,6 +1036,7 @@ impl MainScreen {
             }
             Message::SelectedChannelMenuOption(option) => match option.as_str() {
                 "New Channel" => {
+                    self.create_channel_modal.inner_mut().guild_id = self.current_guild_id.unwrap(); // [ref:new_channel_menu_entry]
                     self.create_channel_modal.show(true);
                     self.error_text.clear();
                     return self.update(
@@ -1098,11 +1098,6 @@ impl MainScreen {
                         thumbnail_cache,
                         clip,
                     );
-                }
-                "Join / Create a Guild" => {
-                    return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
-                        super::GuildDiscovery::default(),
-                    ));
                 }
                 "Edit Profile" => {
                     self.profile_edit_modal.inner_mut().user_id = client

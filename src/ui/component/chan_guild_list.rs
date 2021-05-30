@@ -1,5 +1,9 @@
 use crate::{
-    client::{channel::Channels, content::ThumbnailCache, guild::Guilds},
+    client::{
+        channel::Channels,
+        content::ThumbnailCache,
+        guild::{Guild, Guilds},
+    },
     label, space,
     ui::{
         component::*,
@@ -80,7 +84,7 @@ pub fn build_channel_list<'a>(
 }
 
 #[allow(clippy::clippy::too_many_arguments)]
-pub fn build_guild_list<'a, Message: Clone + 'a>(
+pub fn build_guild_list<'a>(
     guilds: &Guilds,
     thumbnail_cache: &ThumbnailCache,
     current_guild_id: Option<u64>,
@@ -96,42 +100,63 @@ pub fn build_guild_list<'a, Message: Clone + 'a>(
         .spacing(SPACING)
         .padding(PADDING / 4);
 
-    for ((guild_id, guild), button_state) in guilds.into_iter().zip(buttons_state.iter_mut()) {
-        let content = fill_container(
-            guild
-                .picture
-                .as_ref()
-                .map(|guild_picture| thumbnail_cache.get_thumbnail(&guild_picture))
-                .flatten()
-                .map_or_else(
-                    || {
-                        Element::from(
-                            label!(guild
-                                .name
-                                .chars()
-                                .next()
-                                .unwrap_or('u')
-                                .to_ascii_uppercase())
-                            .size(30),
-                        )
-                    },
-                    |handle| Element::from(Image::new(handle.clone())),
+    let buttons_state_len = buttons_state.len();
+    for ((guild_id, guild), (index, button_state)) in guilds
+        .into_iter()
+        .chain(std::iter::once((&0, &Guild::default()))) // [ref:create_join_guild_but_state]
+        .zip(buttons_state.iter_mut().enumerate())
+    {
+        if index >= buttons_state_len - 1 {
+            // [ref:create_join_guild_but_state]
+            let but = Button::new(
+                button_state,
+                fill_container(
+                    label!(iced_aw::Icon::Plus)
+                        .font(iced_aw::ICON_FONT)
+                        .size(DEF_SIZE + 10),
                 ),
-        );
-
-        let mut but = Button::new(button_state, content)
+            )
             .width(length!(+))
-            .style(theme.secondary());
+            .style(theme.secondary())
+            .on_press(Message::OpenCreateJoinGuild);
+            guild_list = guild_list.push(but);
+        } else {
+            let content = fill_container(
+                guild
+                    .picture
+                    .as_ref()
+                    .map(|guild_picture| thumbnail_cache.get_thumbnail(&guild_picture))
+                    .flatten()
+                    .map_or_else(
+                        || {
+                            Element::from(
+                                label!(guild
+                                    .name
+                                    .chars()
+                                    .next()
+                                    .unwrap_or('u')
+                                    .to_ascii_uppercase())
+                                .size(DEF_SIZE + 10),
+                            )
+                        },
+                        |handle| Element::from(Image::new(handle.clone())),
+                    ),
+            );
 
-        if current_guild_id != Some(*guild_id) {
-            but = but.on_press(on_button_press(*guild_id));
+            let mut but = Button::new(button_state, content)
+                .width(length!(+))
+                .style(theme.secondary());
+
+            if current_guild_id != Some(*guild_id) {
+                but = but.on_press(on_button_press(*guild_id));
+            }
+
+            let tooltip = Tooltip::new(but, &guild.name, Position::Bottom)
+                .gap(8)
+                .style(theme.secondary());
+
+            guild_list = guild_list.push(tooltip);
         }
-
-        let tooltip = Tooltip::new(but, &guild.name, Position::Bottom)
-            .gap(8)
-            .style(theme.secondary());
-
-        guild_list = guild_list.push(tooltip);
     }
 
     guild_list.into()
