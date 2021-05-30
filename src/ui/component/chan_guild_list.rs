@@ -15,7 +15,7 @@ use crate::{
 use iced::{tooltip::Position, Tooltip};
 
 /// Builds a room list.
-#[allow(clippy::clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub fn build_channel_list<'a>(
     channels: &Channels,
     guild_id: u64,
@@ -94,7 +94,7 @@ pub fn build_channel_list<'a>(
     channel_list.into()
 }
 
-#[allow(clippy::clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub fn build_guild_list<'a>(
     guilds: &Guilds,
     thumbnail_cache: &ThumbnailCache,

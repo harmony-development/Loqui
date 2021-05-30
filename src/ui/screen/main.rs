@@ -790,9 +790,9 @@ impl MainScreen {
                                     .unwrap_or_else(|| "unknown".to_string()),
                             })
                             .collect();
-                    } else if let Some(pattern) = new_term.strip_prefix("*").map(str::trim) {
+                    } else if let Some(pattern) = new_term.strip_prefix('*').map(str::trim) {
                         self.quick_switcher_modal.inner_mut().results = guild(pattern);
-                    } else if let Some(pattern) = new_term.strip_prefix("#").map(str::trim) {
+                    } else if let Some(pattern) = new_term.strip_prefix('#').map(str::trim) {
                         self.quick_switcher_modal.inner_mut().results = channel(pattern);
                     } else {
                         self.quick_switcher_modal.inner_mut().results = guild(term_trimmed);

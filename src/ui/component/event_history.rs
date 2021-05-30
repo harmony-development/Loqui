@@ -23,7 +23,7 @@ const MSG_LR_PADDING: u16 = SPACING * 2;
 type ButsState = [(button::State, button::State, button::State, button::State); SHOWN_MSGS_LIMIT];
 
 #[allow(clippy::mutable_key_type)]
-#[allow(clippy::clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub fn build_event_history<'a>(
     content_store: &ContentStore,
     thumbnail_cache: &ThumbnailCache,

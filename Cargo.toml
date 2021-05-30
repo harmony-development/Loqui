@@ -37,7 +37,7 @@ harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_
 iced = { git = "https://github.com/yusdacra/iced.git", rev = "416c4f4f263a60c2e7fc255d3e38dcf743a8218d", features = ["tokio", "image"] }
 iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "416c4f4f263a60c2e7fc255d3e38dcf743a8218d" }
 iced_futures = { git = "https://github.com/yusdacra/iced.git", rev = "416c4f4f263a60c2e7fc255d3e38dcf743a8218d" }
-iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", rev = "086f6264429cb4aed7650ba3b9c382c126d47aee", default-features = false, features = [
+iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", rev = "3303b1f49603ce4b11294e70e22c8cdff09f5438", default-features = false, features = [
     "icons",
     "card",
     "colors",
@@ -86,6 +86,8 @@ runtimeLibs = [
     "xorg.libXrandr",
     "xorg.libXi",
 ]
+cCompiler = "llvmPackages_12.clang"
+nativeBuildInputs = ["llvmPackages_12.bintools"]
 devshell.name = "crust-shell"
 devshell.commands = [{ package = "tagref" }]
 

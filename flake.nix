@@ -4,7 +4,7 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixCargoIntegration = {
       url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -14,6 +14,15 @@
   outputs = inputs: inputs.nixCargoIntegration.lib.makeOutputs {
     root = ./.;
     overrides = {
+      pkgs = common: prev: {
+        overlays = [
+          (final: prev: {
+            llvmPackages_12 = prev.llvmPackages_12 // {
+              bintools = prev.lib.hiPrio prev.llvmPackages_12.bintools;
+            };
+          })
+        ] ++ prev.overlays;
+      };
       shell = common: prev: {
         env = prev.env ++ [
           {
