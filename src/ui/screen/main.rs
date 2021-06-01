@@ -20,7 +20,6 @@ use client::{
                 self,
                 channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
                 guild::get_guild_members,
-                permissions::{self, QueryPermissions, QueryPermissionsSelfBuilder},
                 GuildId,
             },
             rest::download_extract_file,
@@ -47,7 +46,7 @@ use crate::{
     label, label_button, length, space,
     ui::{
         component::{event_history::SHOWN_MSGS_LIMIT, *},
-        screen::{map_send_msg, ResultExt},
+        screen::{make_query_perm, map_send_msg, ResultExt},
         style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
@@ -825,30 +824,21 @@ impl MainScreen {
                 return cmd;
             }
             Message::TryShowUpdateChannelModal(guild_id, channel_id) => {
-                let inner = client.inner_arc();
-                return Command::perform(
-                    async move {
-                        permissions::query_has_permission(
-                            &inner,
-                            permissions::QueryPermissions::new(
-                                // [tag:update_channel_exists_check]
-                                guild_id,
-                                "channels.manage.change-information".to_string(),
-                            )
-                            .channel_id(channel_id),
-                        )
-                        .await
-                        .map_to_msg_def(|resp| {
-                            if resp.ok {
-                                TopLevelMessage::MainScreen(Message::ShowUpdateChannelModal(guild_id, channel_id))
-                            } else {
-                                TopLevelMessage::Error(Box::new(ClientError::Custom(
-                                    "Not permitted to edit channel information".to_string(),
-                                )))
-                            }
-                        })
+                // [tag:update_channel_exists_check]
+                return make_query_perm(
+                    client,
+                    guild_id,
+                    channel_id,
+                    "channels.manage.change-information",
+                    |p, gid, cid| {
+                        if p.ok {
+                            TopLevelMessage::MainScreen(Message::ShowUpdateChannelModal(gid, cid))
+                        } else {
+                            TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                "Not permitted to edit channel information".to_string(),
+                            )))
+                        }
                     },
-                    identity,
                 );
             }
             Message::ShowUpdateChannelModal(guild_id, channel_id) => {
@@ -949,31 +939,17 @@ impl MainScreen {
                 }
                 "Edit Guild" => {
                     let guild_id = self.current_guild_id.unwrap(); // [ref:edit_guild_menu_entry]
-                    let inner = client.inner_arc();
-                    return Command::perform(
-                        async move {
-                            permissions::query_has_permission(
-                                &inner,
-                                permissions::QueryPermissions::new(
-                                    guild_id,
-                                    "guild.manage.change-information".to_string(),
-                                ),
-                            )
-                            .await
-                            .map_to_msg_def(|resp| {
-                                if resp.ok {
-                                    TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
-                                        super::GuildSettings::new(guild_id),
-                                    )))
-                                } else {
-                                    TopLevelMessage::Error(Box::new(ClientError::Custom(
-                                        "Not permitted to edit guild information".to_string(),
-                                    )))
-                                }
-                            })
-                        },
-                        identity,
-                    );
+                    return make_query_perm(client, guild_id, 0, "guild.manage.change-information", |p, gid, _| {
+                        if p.ok {
+                            TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
+                                super::GuildSettings::new(gid),
+                            )))
+                        } else {
+                            TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                "Not permitted to edit guild information".to_string(),
+                            )))
+                        }
+                    });
                 }
                 "Copy Guild ID" => {
                     clip.write(
@@ -1238,44 +1214,36 @@ impl MainScreen {
                         self.event_history_state.scroll_to_bottom();
                     }
                     let mut cmds = Vec::with_capacity(2);
-                    let inner = client.inner_arc();
                     let guild_id = self.current_guild_id.unwrap();
-                    cmds.push(Command::perform(
-                        async move {
-                            // [tag:channel_view_perm_exists_check]
-                            permissions::query_has_permission(
-                                &inner,
-                                QueryPermissions::new(guild_id, "messages.send".to_string()).channel_id(channel_id),
-                            )
-                            .await
-                            .map_to_msg_def(|p| {
-                                TopLevelMessage::MainScreen(Message::ChannelViewPerm(guild_id, channel_id, p.ok))
-                            })
-                        },
-                        identity,
+                    // [tag:channel_view_perm_exists_check]
+                    cmds.push(make_query_perm(
+                        client,
+                        guild_id,
+                        channel_id,
+                        "messages.send",
+                        |p, gid, cid| TopLevelMessage::MainScreen(Message::ChannelViewPerm(gid, cid, p.ok)),
                     ));
                     if disp == 0 {
                         let inner = client.inner_arc();
                         let guild_id = self.current_guild_id.unwrap();
                         cmds.push(Command::perform(
                             async move {
-                                let messages =
-                                    get_channel_messages(&inner, GetChannelMessages::new(guild_id, channel_id))
-                                        .await?
-                                        .messages;
-                                let events = messages
-                                    .into_iter()
-                                    .map(|msg| {
-                                        Event::SentMessage(Box::new(MessageSent {
-                                            message: Some(msg),
-                                            ..Default::default()
-                                        }))
+                                get_channel_messages(&inner, GetChannelMessages::new(guild_id, channel_id))
+                                    .await
+                                    .map(|m| {
+                                        m.messages
+                                            .into_iter()
+                                            .map(|msg| {
+                                                Event::SentMessage(Box::new(MessageSent {
+                                                    message: Some(msg),
+                                                    ..Default::default()
+                                                }))
+                                            })
+                                            .rev()
+                                            .collect()
                                     })
-                                    .rev()
-                                    .collect();
-                                Ok(events)
                             },
-                            |result: ClientResult<_>| result.map_to_msg_def(TopLevelMessage::EventsReceived),
+                            |result| result.map_to_msg_def(TopLevelMessage::EventsReceived),
                         ));
                     }
                     return Command::batch(cmds);

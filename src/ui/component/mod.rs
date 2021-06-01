@@ -14,7 +14,6 @@ pub use iced_aw::Icon;
 
 use super::style::{PADDING, SPACING};
 
-#[inline(always)]
 pub fn column<M>(children: Vec<Element<M>>) -> Column<M> {
     Column::with_children(children)
         .align_items(align!(|))
@@ -22,7 +21,6 @@ pub fn column<M>(children: Vec<Element<M>>) -> Column<M> {
         .spacing(SPACING)
 }
 
-#[inline(always)]
 pub fn row<M>(children: Vec<Element<M>>) -> Row<M> {
     Row::with_children(children)
         .align_items(align!(|))
@@ -30,7 +28,6 @@ pub fn row<M>(children: Vec<Element<M>>) -> Row<M> {
         .spacing(SPACING)
 }
 
-#[inline(always)]
 /// Creates a `Container` that fills all the space available and centers it child.
 pub fn fill_container<'a, M>(child: impl Into<Element<'a, M>>) -> Container<'a, M> {
     Container::new(child)
@@ -40,7 +37,6 @@ pub fn fill_container<'a, M>(child: impl Into<Element<'a, M>>) -> Container<'a, 
         .height(length!(+))
 }
 
-#[inline(always)]
 pub fn icon(icon: Icon) -> Text {
     label!(icon).font(iced_aw::ICON_FONT)
 }

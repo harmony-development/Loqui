@@ -25,7 +25,7 @@ use client::{
         api::{
             chat::{
                 event::{Event, GuildAddedToList, GuildUpdated, ProfileUpdated},
-                GetGuildListRequest,
+                GetGuildListRequest, QueryPermissionsResponse,
             },
             exports::hrpc::url::Url,
             rest::FileId,
@@ -775,6 +775,25 @@ fn map_send_msg(data: (u64, u64, u64, IcyMessage, Duration, Option<u64>)) -> Mes
             retry_after,
         },
     }
+}
+
+fn make_query_perm(
+    client: &Client,
+    guild_id: u64,
+    channel_id: u64,
+    check_for: impl std::fmt::Display,
+    f: impl FnOnce(QueryPermissionsResponse, u64, u64) -> Message + Send + 'static,
+) -> Command<Message> {
+    let query = permissions::QueryPermissions::new(guild_id, check_for.to_string()).channel_id(channel_id);
+    let inner = client.inner_arc();
+    Command::perform(
+        async move {
+            permissions::query_has_permission(&inner, query)
+                .await
+                .map_to_msg_def(|p| f(p, guild_id, channel_id))
+        },
+        identity,
+    )
 }
 
 fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &ThumbnailCache) -> Command<Message> {
