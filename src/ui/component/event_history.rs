@@ -3,7 +3,7 @@ use crate::{
         channel::Channel,
         content::ContentStore,
         member::Members,
-        message::{Attachment, Content as IcyContent, EmbedHeading},
+        message::{Content as IcyContent, EmbedHeading},
     },
     color, label, space,
     ui::{
@@ -64,6 +64,12 @@ pub fn build_event_history<'a>(
     let mut last_sender_id = None;
     let mut last_sender_name = None;
     let mut message_group = vec![];
+
+    let push_to_msg_group = |msg_group: &mut Vec<Element<'a, Message>>| {
+        Container::new(column(msg_group.drain(..).collect()).align_items(align!(|<)))
+            .width(Length::Fill)
+            .style(theme.round())
+    };
 
     for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state)) in
         displayable_events.iter().zip(buts_sate.iter_mut())
@@ -143,11 +149,7 @@ pub fn build_event_history<'a>(
             last_sender_id.as_ref() != Some(&id_to_use) || last_sender_name.as_ref() != Some(&sender_display_name);
         if is_sender_different {
             if !message_group.is_empty() {
-                event_history = event_history.push(
-                    Container::new(column(message_group.drain(..).collect()).align_items(align!(|<)))
-                        .style(theme.round())
-                        .width(Length::Fill),
-                );
+                event_history = event_history.push(push_to_msg_group(&mut message_group));
             }
             message_group.push(sender_body_creator(&sender_display_name).into());
         }
@@ -167,11 +169,7 @@ pub fn build_event_history<'a>(
             && !message_group.is_empty()
             && last_timestamp.signed_duration_since(message.timestamp) > chrono::Duration::minutes(5)
         {
-            event_history = event_history.push(
-                Container::new(column(message_group.drain(..).collect()).align_items(align!(|<)))
-                    .style(theme.round())
-                    .width(Length::Fill),
-            );
+            event_history = event_history.push(push_to_msg_group(&mut message_group));
             message_group.push(sender_body_creator(&sender_display_name).into());
         }
 
@@ -288,68 +286,35 @@ pub fn build_event_history<'a>(
 
         if let IcyContent::Files(attachments) = &message.content {
             if let Some(attachment) = attachments.first() {
-                fn create_button<'a>(
-                    is_thumbnail: bool,
-                    attachment: Attachment,
-                    content: impl Into<Element<'a, Message>>,
-                    button_state: &'a mut button::State,
-                    theme: Theme,
-                ) -> Element<'a, Message> {
-                    Button::new(button_state, content.into())
-                        .on_press(Message::OpenContent {
-                            attachment,
-                            is_thumbnail,
-                        })
-                        .style(theme.secondary())
-                        .into()
-                }
-
                 let is_thumbnail = matches!(attachment.kind.split('/').next(), Some("image"));
                 let does_content_exist = content_store.content_exists(&attachment.id);
 
-                if let Some(thumbnail_image) = thumbnail_cache
+                let content: Element<Message> = if let Some(thumbnail_image) = thumbnail_cache
                     .get_thumbnail(&attachment.id)
                     // FIXME: Don't hardcode this length, calculate it using the size of the window
                     .map(|handle| Image::new(handle.clone()).width(length!(= 320)))
                 {
-                    if does_content_exist {
-                        message_body_widgets.push(create_button(
-                            is_thumbnail,
-                            attachment.clone(),
-                            Column::with_children(vec![
-                                label!("{}", attachment.name).size(DEF_SIZE - 4).into(),
-                                thumbnail_image.into(),
-                            ])
-                            .spacing(SPACING),
-                            media_open_button_state,
-                            theme,
-                        ));
+                    let text = if does_content_exist {
+                        label!(&attachment.name)
                     } else {
-                        let button = create_button(
-                            is_thumbnail,
-                            attachment.clone(),
-                            Column::with_children(vec![
-                                label!("Download {}", attachment.name).size(DEF_SIZE - 4).into(),
-                                thumbnail_image.into(),
-                            ])
-                            .spacing(SPACING),
-                            media_open_button_state,
-                            theme,
-                        );
-
-                        message_body_widgets.push(button);
-                    }
+                        label!("Download {}", attachment.name)
+                    };
+                    Column::with_children(vec![text.size(DEF_SIZE - 4).into(), thumbnail_image.into()])
+                        .spacing(SPACING)
+                        .into()
                 } else {
                     let text = if does_content_exist { "Open" } else { "Download" };
-
-                    message_body_widgets.push(create_button(
-                        is_thumbnail,
-                        attachment.clone(),
-                        label!("{} {}", text, attachment.name),
-                        media_open_button_state,
-                        theme,
-                    ));
-                }
+                    label!("{} {}", text, attachment.name).into()
+                };
+                message_body_widgets.push(
+                    Button::new(media_open_button_state, content)
+                        .on_press(Message::OpenContent {
+                            attachment: attachment.clone(),
+                            is_thumbnail,
+                        })
+                        .style(theme.secondary())
+                        .into(),
+                );
             }
         }
 
@@ -394,11 +359,7 @@ pub fn build_event_history<'a>(
         last_timestamp = message.timestamp;
     }
     if !message_group.is_empty() {
-        event_history = event_history.push(
-            Container::new(column(message_group.drain(..).collect()).align_items(align!(|<)))
-                .width(Length::Fill)
-                .style(theme.round()),
-        );
+        event_history = event_history.push(push_to_msg_group(&mut message_group));
     }
     event_history.into()
 }

@@ -1,5 +1,6 @@
 use std::{
     cmp::Ordering,
+    convert::identity,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -8,6 +9,7 @@ use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use client::{
+    error::ClientResult,
     harmony_rust_sdk::{
         api::{
             chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
@@ -45,7 +47,7 @@ use crate::{
     label, label_button, length, space,
     ui::{
         component::{event_history::SHOWN_MSGS_LIMIT, *},
-        screen::map_send_msg,
+        screen::{map_send_msg, ResultExt},
         style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
@@ -823,10 +825,10 @@ impl MainScreen {
                 return cmd;
             }
             Message::TryShowUpdateChannelModal(guild_id, channel_id) => {
-                let inner = client.inner().clone();
+                let inner = client.inner_arc();
                 return Command::perform(
                     async move {
-                        Ok(permissions::query_has_permission(
+                        permissions::query_has_permission(
                             &inner,
                             permissions::QueryPermissions::new(
                                 // [tag:update_channel_exists_check]
@@ -835,22 +837,18 @@ impl MainScreen {
                             )
                             .channel_id(channel_id),
                         )
-                        .await?)
+                        .await
+                        .map_to_msg_def(|resp| {
+                            if resp.ok {
+                                TopLevelMessage::MainScreen(Message::ShowUpdateChannelModal(guild_id, channel_id))
+                            } else {
+                                TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                    "Not permitted to edit channel information".to_string(),
+                                )))
+                            }
+                        })
                     },
-                    move |result| {
-                        result.map_or_else(
-                            |err| TopLevelMessage::Error(Box::new(err)),
-                            |resp| {
-                                if resp.ok {
-                                    TopLevelMessage::MainScreen(Message::ShowUpdateChannelModal(guild_id, channel_id))
-                                } else {
-                                    TopLevelMessage::Error(Box::new(ClientError::Custom(
-                                        "Not permitted to edit channel information".to_string(),
-                                    )))
-                                }
-                            },
-                        )
-                    },
+                    identity,
                 );
             }
             Message::ShowUpdateChannelModal(guild_id, channel_id) => {
@@ -903,7 +901,7 @@ impl MainScreen {
 
                             if !reached_top && *looking_at_message < 2 && !*loading_messages_history {
                                 *loading_messages_history = true;
-                                let inner = client.inner().clone();
+                                let inner = client.inner_arc();
                                 return Command::perform(
                                     async move {
                                         channel::get_channel_messages(
@@ -912,17 +910,16 @@ impl MainScreen {
                                                 .before_message(oldest_msg_id.unwrap_or_default()),
                                         )
                                         .await
-                                        .map_or_else(
-                                            |err| TopLevelMessage::Error(Box::new(err.into())),
-                                            |response| TopLevelMessage::GetEventsBackwardsResponse {
+                                        .map_to_msg_def(|response| {
+                                            TopLevelMessage::GetEventsBackwardsResponse {
                                                 messages: response.messages,
                                                 reached_top: response.reached_top,
                                                 guild_id,
                                                 channel_id,
-                                            },
-                                        )
+                                            }
+                                        })
                                     },
-                                    |result| result,
+                                    identity,
                                 );
                             }
                         }
@@ -952,34 +949,30 @@ impl MainScreen {
                 }
                 "Edit Guild" => {
                     let guild_id = self.current_guild_id.unwrap(); // [ref:edit_guild_menu_entry]
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     return Command::perform(
                         async move {
-                            Ok(permissions::query_has_permission(
+                            permissions::query_has_permission(
                                 &inner,
                                 permissions::QueryPermissions::new(
                                     guild_id,
                                     "guild.manage.change-information".to_string(),
                                 ),
                             )
-                            .await?)
+                            .await
+                            .map_to_msg_def(|resp| {
+                                if resp.ok {
+                                    TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
+                                        super::GuildSettings::new(guild_id),
+                                    )))
+                                } else {
+                                    TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                        "Not permitted to edit guild information".to_string(),
+                                    )))
+                                }
+                            })
                         },
-                        move |result| {
-                            result.map_or_else(
-                                |err| TopLevelMessage::Error(Box::new(err)),
-                                |resp| {
-                                    if resp.ok {
-                                        TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
-                                            super::GuildSettings::new(guild_id),
-                                        )))
-                                    } else {
-                                        TopLevelMessage::Error(Box::new(ClientError::Custom(
-                                            "Not permitted to edit guild information".to_string(),
-                                        )))
-                                    }
-                                },
-                            )
-                        },
+                        identity,
                     );
                 }
                 "Copy Guild ID" => {
@@ -1008,7 +1001,7 @@ impl MainScreen {
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
                 }
                 "Exit" => {
-                    return Command::perform(async { TopLevelMessage::Exit }, |msg| msg);
+                    return Command::perform(async { TopLevelMessage::Exit }, identity);
                 }
                 _ => {}
             },
@@ -1028,15 +1021,10 @@ impl MainScreen {
                         || typing.map_or(false, |(_, _, since)| since.elapsed().as_secs() >= 5)
                     {
                         *typing = Some((guild_id, channel_id, Instant::now()));
-                        let inner = client.inner().clone();
+                        let inner = client.inner_arc();
                         return Command::perform(
                             async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
-                            |result| {
-                                result.map_or_else(
-                                    |err| TopLevelMessage::Error(Box::new(err.into())),
-                                    |_| TopLevelMessage::Nothing,
-                                )
-                            },
+                            ResultExt::map_to_nothing,
                         );
                     }
                 }
@@ -1078,10 +1066,10 @@ impl MainScreen {
                                 TopLevelMessage::Nothing
                             })
                         },
-                        |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
+                        |result: ClientResult<_>| result.unwrap_or_else(Into::into),
                     )
                 } else {
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     Command::perform(
                         async move {
                             let downloaded_file = download_extract_file(&inner, attachment.id.clone()).await?;
@@ -1105,7 +1093,7 @@ impl MainScreen {
                                 TopLevelMessage::Nothing
                             })
                         },
-                        |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
+                        |result: ClientResult<_>| result.unwrap_or_else(Into::into),
                     )
                 };
             }
@@ -1144,13 +1132,14 @@ impl MainScreen {
                     }
                 } else if let Mode::EditingMessage(mid) = self.mode {
                     self.mode = Mode::Normal;
-                    return Command::perform(client.delete_msg_cmd(guild_id, channel_id, mid), |res| {
-                        res.map_or_else(|err| TopLevelMessage::Error(err.into()), |_| TopLevelMessage::Nothing)
-                    });
+                    return Command::perform(
+                        client.delete_msg_cmd(guild_id, channel_id, mid),
+                        ResultExt::map_to_nothing,
+                    );
                 }
             }
             Message::SendFiles { guild_id, channel_id } => {
-                let inner = client.inner().clone();
+                let inner = client.inner_arc();
                 let content_store = client.content_store_arc();
                 let sender = client.user_id.unwrap();
 
@@ -1195,7 +1184,7 @@ impl MainScreen {
                 self.current_guild_id = Some(guild_id);
                 if let Some(guild) = client.get_guild(guild_id) {
                     if guild.channels.is_empty() {
-                        let inner = client.inner().clone();
+                        let inner = client.inner_arc();
 
                         return Command::perform(
                             async move {
@@ -1221,12 +1210,7 @@ impl MainScreen {
 
                                 Ok(events)
                             },
-                            |result| {
-                                result.map_or_else(
-                                    |err| TopLevelMessage::Error(Box::new(err)),
-                                    TopLevelMessage::EventsReceived,
-                                )
-                            },
+                            |result: ClientResult<_>| result.map_to_msg_def(TopLevelMessage::EventsReceived),
                         );
                     } else {
                         self.current_channel_id = self
@@ -1254,27 +1238,24 @@ impl MainScreen {
                         self.event_history_state.scroll_to_bottom();
                     }
                     let mut cmds = Vec::with_capacity(2);
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     let guild_id = self.current_guild_id.unwrap();
                     cmds.push(Command::perform(
                         async move {
                             // [tag:channel_view_perm_exists_check]
-                            let perm = permissions::query_has_permission(
+                            permissions::query_has_permission(
                                 &inner,
                                 QueryPermissions::new(guild_id, "messages.send".to_string()).channel_id(channel_id),
                             )
-                            .await?;
-                            Ok(perm.ok)
+                            .await
+                            .map_to_msg_def(|p| {
+                                TopLevelMessage::MainScreen(Message::ChannelViewPerm(guild_id, channel_id, p.ok))
+                            })
                         },
-                        move |res| {
-                            res.map_or_else(
-                                |err| TopLevelMessage::Error(Box::new(err)),
-                                |ok| TopLevelMessage::MainScreen(Message::ChannelViewPerm(guild_id, channel_id, ok)),
-                            )
-                        },
+                        identity,
                     ));
                     if disp == 0 {
-                        let inner = client.inner().clone();
+                        let inner = client.inner_arc();
                         let guild_id = self.current_guild_id.unwrap();
                         cmds.push(Command::perform(
                             async move {
@@ -1294,12 +1275,7 @@ impl MainScreen {
                                     .collect();
                                 Ok(events)
                             },
-                            |result| {
-                                result.map_or_else(
-                                    |err| TopLevelMessage::Error(Box::new(err)),
-                                    TopLevelMessage::EventsReceived,
-                                )
-                            },
+                            |result: ClientResult<_>| result.map_to_msg_def(TopLevelMessage::EventsReceived),
                         ));
                     }
                     return Command::batch(cmds);
@@ -1311,29 +1287,30 @@ impl MainScreen {
     }
 
     pub fn subscription(&self) -> Subscription<TopLevelMessage> {
-        use iced_native::{
-            keyboard::{self, KeyCode},
-            window, Event,
-        };
+        use iced_native::{keyboard, window, Event};
 
         fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<TopLevelMessage> {
+            type Ke = keyboard::Event;
+            type Km = keyboard::Modifiers;
+            type Kc = keyboard::KeyCode;
+            type We = window::Event;
+
             match ev {
-                Event::Keyboard(keyboard::Event::KeyReleased {
-                    key_code: KeyCode::Escape,
-                    ..
+                Event::Keyboard(Ke::KeyReleased {
+                    key_code: Kc::Escape, ..
                 }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(Mode::Normal))),
-                Event::Keyboard(keyboard::Event::KeyReleased {
-                    key_code: KeyCode::K,
-                    modifiers: keyboard::Modifiers { control: true, .. },
+                Event::Keyboard(Ke::KeyReleased {
+                    key_code: Kc::K,
+                    modifiers: Km { control: true, .. },
                 }) => Some(TopLevelMessage::MainScreen(Message::QuickSwitch)),
-                Event::Keyboard(keyboard::Event::KeyReleased {
-                    key_code: KeyCode::E,
-                    modifiers: keyboard::Modifiers { control: true, .. },
+                Event::Keyboard(Ke::KeyReleased {
+                    key_code: Kc::E,
+                    modifiers: Km { control: true, .. },
                 }) => Some(TopLevelMessage::MainScreen(Message::ChangeMode(Mode::EditMessage))),
-                Event::Keyboard(keyboard::Event::KeyReleased {
-                    key_code: KeyCode::Up, ..
-                }) => Some(TopLevelMessage::MainScreen(Message::EditLastMessage)),
-                Event::Window(window::Event::CloseRequested) => Some(TopLevelMessage::Exit),
+                Event::Keyboard(Ke::KeyReleased { key_code: Kc::Up, .. }) => {
+                    Some(TopLevelMessage::MainScreen(Message::EditLastMessage))
+                }
+                Event::Window(We::CloseRequested) => Some(TopLevelMessage::Exit),
                 _ => None,
             }
         }

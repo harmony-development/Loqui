@@ -1,3 +1,5 @@
+use std::convert::identity;
+
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
 use client::harmony_rust_sdk::{api::chat::Place, client::api::chat::channel};
 use iced_aw::Card;
@@ -7,6 +9,7 @@ use crate::{
     label, label_button, length,
     ui::{
         component::*,
+        screen::ResultExt,
         style::{Theme, ERROR_COLOR, PADDING, SPACING, SUCCESS_COLOR},
     },
 };
@@ -120,7 +123,7 @@ impl ChannelCreationModal {
                 self.channel_creation_state = ChannelState::Creating {
                     name: channel_name.clone(),
                 };
-                let inner = client.inner().clone();
+                let inner = client.inner_arc();
                 let guild_id = self.guild_id;
 
                 return (
@@ -131,19 +134,16 @@ impl ChannelCreationModal {
                                 channel::CreateChannel::new(guild_id, channel_name, Place::Top { before: 0 }),
                             )
                             .await;
-                            result.map_or_else(
-                                |e| TopLevelMessage::Error(Box::new(e.into())),
-                                |response| {
-                                    TopLevelMessage::MainScreen(ParentMessage::ChannelCreationMessage(
-                                        Message::CreatedChannel {
-                                            guild_id,
-                                            channel_id: response.channel_id,
-                                        },
-                                    ))
-                                },
-                            )
+                            result.map_to_msg_def(|response| {
+                                TopLevelMessage::MainScreen(ParentMessage::ChannelCreationMessage(
+                                    Message::CreatedChannel {
+                                        guild_id,
+                                        channel_id: response.channel_id,
+                                    },
+                                ))
+                            })
                         },
-                        |msg| msg,
+                        identity,
                     ),
                     go_back,
                 );

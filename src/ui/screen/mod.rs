@@ -47,7 +47,7 @@ use client::{
     tracing::{debug, error, warn},
 };
 use iced::{executor, Application, Command, Element, Subscription};
-use std::{sync::Arc, time::Duration};
+use std::{convert::identity, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum Message {
@@ -128,11 +128,11 @@ impl Screen {
     }
 
     fn push_screen_cmd(screen: Screen) -> Command<Message> {
-        Command::perform(async move { Message::PushScreen(Box::new(screen)) }, |msg| msg)
+        Command::perform(async move { Message::PushScreen(Box::new(screen)) }, identity)
     }
 
     fn pop_screen_cmd() -> Command<Message> {
-        Command::perform(async { Message::PopScreen }, |msg| msg)
+        Command::perform(async { Message::PopScreen }, identity)
     }
 }
 
@@ -211,7 +211,7 @@ impl ScreenManager {
         if let Some(client) = self.client.as_mut() {
             match post {
                 PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => {
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     return Command::perform(
                         async move {
                             let query = |check_for: &str| {
@@ -220,43 +220,42 @@ impl ScreenManager {
                                     QueryPermissions::new(guild_id, check_for.to_string()).channel_id(channel_id),
                                 )
                             };
-                            let manage = query("channels.manage.change-information").await?.ok;
+                            let manage_channel = query("channels.manage.change-information").await?.ok;
                             let send_msg = query("messages.send").await?.ok;
-                            Ok(ChanPerms {
-                                manage_channel: manage,
-                                send_msg,
-                            })
+                            Ok(Message::UpdateChanPerms(
+                                ChanPerms {
+                                    send_msg,
+                                    manage_channel,
+                                },
+                                guild_id,
+                                channel_id,
+                            ))
                         },
-                        move |res| {
-                            res.map_or_else(
-                                |err| Message::Error(Box::new(err)),
-                                |perms| Message::UpdateChanPerms(perms, guild_id, channel_id),
-                            )
-                        },
+                        |res: ClientResult<_>| res.map_to_msg_def(identity),
                     );
                 }
                 PostProcessEvent::FetchThumbnail(id) => {
                     return make_thumbnail_command(client, id, &self.thumbnail_cache);
                 }
                 PostProcessEvent::FetchProfile(user_id) => {
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     return Command::perform(
                         async move {
-                            let profile = get_user(&inner, UserId::new(user_id)).await?;
-                            let event = Event::ProfileUpdated(ProfileUpdated {
-                                user_id,
-                                new_avatar: profile.user_avatar,
-                                new_status: profile.user_status,
-                                new_username: profile.user_name,
-                                is_bot: profile.is_bot,
-                                update_is_bot: true,
-                                update_status: true,
-                                update_avatar: true,
-                                update_username: true,
-                            });
-                            Ok(vec![event])
+                            get_user(&inner, UserId::new(user_id)).await.map(|profile| {
+                                vec![Event::ProfileUpdated(ProfileUpdated {
+                                    user_id,
+                                    new_avatar: profile.user_avatar,
+                                    new_status: profile.user_status,
+                                    new_username: profile.user_name,
+                                    is_bot: profile.is_bot,
+                                    update_is_bot: true,
+                                    update_status: true,
+                                    update_avatar: true,
+                                    update_username: true,
+                                })]
+                            })
                         },
-                        |result| result.map_or_else(|err| Message::Error(Box::new(err)), Message::EventsReceived),
+                        |result| result.map_to_msg_def(Message::EventsReceived),
                     );
                 }
                 PostProcessEvent::GoToFirstMsgOnChannel(channel_id) => {
@@ -275,22 +274,22 @@ impl ScreenManager {
                     }
                 }
                 PostProcessEvent::FetchGuildData(guild_id) => {
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     return Command::perform(
                         async move {
-                            let guild_data = get_guild(&inner, GuildId::new(guild_id)).await?;
-                            let event = Event::EditedGuild(GuildUpdated {
-                                guild_id,
-                                metadata: guild_data.metadata,
-                                name: guild_data.guild_name,
-                                picture: guild_data.guild_picture,
-                                update_name: true,
-                                update_picture: true,
-                                update_metadata: true,
-                            });
-                            Ok(vec![event])
+                            get_guild(&inner, GuildId::new(guild_id)).await.map(|guild_data| {
+                                vec![Event::EditedGuild(GuildUpdated {
+                                    guild_id,
+                                    metadata: guild_data.metadata,
+                                    name: guild_data.guild_name,
+                                    picture: guild_data.guild_picture,
+                                    update_name: true,
+                                    update_picture: true,
+                                    update_metadata: true,
+                                })]
+                            })
                         },
-                        |result| result.map_or_else(|err| Message::Error(Box::new(err)), Message::EventsReceived),
+                        |result| result.map_to_msg_def(Message::EventsReceived),
                     );
                 }
             }
@@ -324,12 +323,7 @@ impl Application for ScreenManager {
                     )
                     .await
                 },
-                |result| {
-                    result.map_or_else(
-                        |err| Message::Error(err.into()),
-                        |client| Message::LoginComplete(Some(client)),
-                    )
-                },
+                |result| result.map_to_msg_def(|client| Message::LoginComplete(Some(client))),
             )
         } else {
             Command::none()
@@ -392,12 +386,7 @@ impl Application for ScreenManager {
                         inner.begin_auth().await?;
                         inner.next_auth_step(AuthStepResponse::Initial).await
                     },
-                    |result| {
-                        result.map_or_else(
-                            |err| Message::Error(Box::new(err.into())),
-                            |step| Message::LoginScreen(login::Message::AuthStep(step)),
-                        )
-                    },
+                    |result| result.map_to_msg_def(|step| Message::LoginScreen(login::Message::AuthStep(step))),
                 );
             }
             Message::UpdateChanPerms(perms, guild_id, channel_id) => {
@@ -414,7 +403,7 @@ impl Application for ScreenManager {
                         debug!("event received from socket: {:?}", ev);
                         let cmd = match ev {
                             Ok(ev) => self.update(Message::EventsReceived(vec![ev]), clip),
-                            Err(err) => self.update(Message::Error(Box::new(err.into())), clip),
+                            Err(err) => self.update(err.into(), clip),
                         };
                         cmds.push(cmd);
                     } else {
@@ -436,22 +425,19 @@ impl Application for ScreenManager {
                                     event: Some(ev),
                                 }
                             },
-                            |msg| msg,
+                            identity,
                         ));
                     } else {
                         let client = self.client.as_ref().unwrap();
                         let sources = client.subscribe_to();
-                        let inner = client.inner().clone();
+                        let inner = client.inner_arc();
                         cmds.push(Command::perform(
                             async move { inner.subscribe_events(sources).await },
                             |result| {
-                                result.map_or_else(
-                                    |err| Message::Error(Box::new(err.into())),
-                                    |socket| Message::SocketEvent {
-                                        socket: socket.into(),
-                                        event: None,
-                                    },
-                                )
+                                result.map_to_msg_def(|socket| Message::SocketEvent {
+                                    socket: socket.into(),
+                                    event: None,
+                                })
                             },
                         ));
                         self.socket_reset = false;
@@ -468,17 +454,14 @@ impl Application for ScreenManager {
 
                 let client = self.client.as_mut().unwrap();
                 let sources = client.subscribe_to();
-                let inner = client.inner().clone();
+                let inner = client.inner_arc();
                 let ws_cmd = Command::perform(async move { inner.subscribe_events(sources).await }, |result| {
-                    result.map_or_else(
-                        |err| Message::Error(Box::new(err.into())),
-                        |socket| Message::SocketEvent {
-                            socket: socket.into(),
-                            event: None,
-                        },
-                    )
+                    result.map_to_msg_def(|socket| Message::SocketEvent {
+                        socket: socket.into(),
+                        event: None,
+                    })
                 });
-                let inner = client.inner().clone();
+                let inner = client.inner_arc();
                 client.user_id = Some(inner.auth_status().session().unwrap().user_id);
                 let self_id = client.user_id.unwrap();
                 let init = Command::perform(
@@ -507,7 +490,7 @@ impl Application for ScreenManager {
                         }));
                         Ok(events)
                     },
-                    |result| result.map_or_else(|err| Message::Error(Box::new(err)), Message::EventsReceived),
+                    |result: ClientResult<_>| result.map_to_msg_def(Message::EventsReceived),
                 );
                 return Command::batch(vec![ws_cmd, init]);
             }
@@ -614,9 +597,9 @@ impl Application for ScreenManager {
                                 for source in sources_to_add {
                                     sock.add_source(source).await?;
                                 }
-                                Ok(())
+                                ClientResult::<_>::Ok(())
                             },
-                            |res| res.map_or_else(|err| Message::Error(Box::new(err)), |_| Message::Nothing),
+                            ResultExt::map_to_nothing,
                         ));
                     }
 
@@ -635,29 +618,28 @@ impl Application for ScreenManager {
                             let inner = self.client.as_ref().unwrap().inner().clone();
                             let fetch_users_cmd = Command::perform(
                                 async move {
-                                    let profiles = get_user_bulk(&inner, chunk.clone()).await?;
-                                    Ok(profiles
-                                        .users
-                                        .into_iter()
-                                        .zip(chunk.into_iter())
-                                        .map(|(profile, user_id)| {
-                                            Event::ProfileUpdated(ProfileUpdated {
-                                                user_id,
-                                                new_avatar: profile.user_avatar,
-                                                new_status: profile.user_status,
-                                                new_username: profile.user_name,
-                                                is_bot: profile.is_bot,
-                                                update_is_bot: true,
-                                                update_status: true,
-                                                update_avatar: true,
-                                                update_username: true,
+                                    get_user_bulk(&inner, chunk.clone()).await.map(|profiles| {
+                                        profiles
+                                            .users
+                                            .into_iter()
+                                            .zip(chunk.into_iter())
+                                            .map(|(profile, user_id)| {
+                                                Event::ProfileUpdated(ProfileUpdated {
+                                                    user_id,
+                                                    new_avatar: profile.user_avatar,
+                                                    new_status: profile.user_status,
+                                                    new_username: profile.user_name,
+                                                    is_bot: profile.is_bot,
+                                                    update_is_bot: true,
+                                                    update_status: true,
+                                                    update_avatar: true,
+                                                    update_username: true,
+                                                })
                                             })
-                                        })
-                                        .collect::<Vec<_>>())
+                                            .collect::<Vec<_>>()
+                                    })
                                 },
-                                |result| {
-                                    result.map_or_else(|err| Message::Error(Box::new(err)), Message::EventsReceived)
-                                },
+                                |res| res.map_to_msg_def(Message::EventsReceived),
                             );
                             cmds.push(fetch_users_cmd);
                         }
@@ -744,6 +726,39 @@ impl Application for ScreenManager {
     }
 }
 
+type InternalClientError = harmony_rust_sdk::client::error::ClientError;
+
+impl From<ClientError> for Message {
+    fn from(err: ClientError) -> Self {
+        Message::Error(Box::new(err))
+    }
+}
+
+impl From<InternalClientError> for Message {
+    fn from(err: InternalClientError) -> Self {
+        Message::Error(Box::new(err.into()))
+    }
+}
+
+pub trait ResultExt<T>: Sized {
+    fn map_to_msg_def<F: FnOnce(T) -> Message>(self, f: F) -> Message;
+    fn map_to_nothing(self) -> Message {
+        self.map_to_msg_def(|_| Message::Nothing)
+    }
+}
+
+impl<T> ResultExt<T> for Result<T, ClientError> {
+    fn map_to_msg_def<F: FnOnce(T) -> Message>(self, f: F) -> Message {
+        self.map_or_else(Into::into, f)
+    }
+}
+
+impl<T> ResultExt<T> for Result<T, InternalClientError> {
+    fn map_to_msg_def<F: FnOnce(T) -> Message>(self, f: F) -> Message {
+        self.map_or_else(Into::into, f)
+    }
+}
+
 fn map_send_msg(data: (u64, u64, u64, IcyMessage, Duration, Option<u64>)) -> Message {
     let (guild_id, channel_id, transaction_id, message, retry_after, res) = data;
     match res {
@@ -766,7 +781,7 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
     if !thumbnail_cache.has_thumbnail(&data.id) {
         let content_path = client.content_store().content_path(&data.id);
 
-        let inner = client.inner().clone();
+        let inner = client.inner_arc();
 
         Command::perform(
             async move {
@@ -793,7 +808,7 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
                     }
                 }
             },
-            |msg| msg.unwrap_or_else(|err| Message::Error(Box::new(err))),
+            |msg: ClientResult<_>| msg.unwrap_or_else(Into::into),
         )
     } else {
         Command::none()

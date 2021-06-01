@@ -152,6 +152,11 @@ impl Client {
     }
 
     #[inline(always)]
+    pub fn inner_arc(&self) -> InnerClient {
+        self.inner.clone()
+    }
+
+    #[inline(always)]
     pub fn get_guild(&mut self, guild_id: u64) -> Option<&mut Guild> {
         self.guilds.get_mut(&guild_id)
     }

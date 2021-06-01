@@ -1,4 +1,5 @@
 use client::{
+    error::ClientResult,
     harmony_rust_sdk::{
         api::chat::InviteId,
         client::api::chat::{guild::AddGuildToGuildListRequest, *},
@@ -6,7 +7,7 @@ use client::{
     tracing::debug,
 };
 
-use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
+use super::{Message as TopLevelMessage, ResultExt, Screen as TopLevelScreen};
 
 use crate::{
     client::{error::ClientError, Client},
@@ -166,7 +167,7 @@ impl GuildDiscovery {
                 self.joined_guild = None;
                 self.joining_guild = Some(guild_name.clone());
                 self.error_text.clear();
-                let inner = client.inner().clone();
+                let inner = client.inner_arc();
 
                 return Command::perform(
                     async move {
@@ -183,11 +184,8 @@ impl GuildDiscovery {
                         .await?;
                         Ok(guild_id)
                     },
-                    |result| {
-                        result.map_or_else(
-                            |e| TopLevelMessage::Error(Box::new(e)),
-                            |response| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response)),
-                        )
+                    |res: ClientResult<u64>| {
+                        res.map_to_msg_def(|response| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response)))
                     },
                 );
             }
@@ -195,7 +193,7 @@ impl GuildDiscovery {
                 self.joined_guild = None;
                 self.joining_guild = Some(invite.to_string());
                 self.error_text.clear();
-                let inner = client.inner().clone();
+                let inner = client.inner_arc();
 
                 return Command::perform(
                     async move {
@@ -210,11 +208,9 @@ impl GuildDiscovery {
                         .await?;
                         Ok(guild_id)
                     },
-                    |result| {
-                        result.map_or_else(
-                            |e| TopLevelMessage::Error(Box::new(e)),
-                            |response| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response)),
-                        )
+                    |result: ClientResult<u64>| {
+                        result
+                            .map_to_msg_def(|response| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response)))
                     },
                 );
             }

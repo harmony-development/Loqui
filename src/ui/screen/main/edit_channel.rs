@@ -7,6 +7,7 @@ use crate::{
     label, label_button, length,
     ui::{
         component::*,
+        screen::ResultExt,
         style::{Theme, ERROR_COLOR, PADDING, SPACING},
     },
 };
@@ -93,25 +94,21 @@ impl UpdateChannelModal {
                 let channel_name = self.channel_name_field.clone();
 
                 self.error_text.clear();
-                let inner = client.inner().clone();
+                let inner = client.inner_arc();
                 let guild_id = self.guild_id;
                 let channel_id = self.channel_id;
 
                 return (
                     Command::perform(
                         async move {
-                            let result = channel::update_channel_information(
+                            channel::update_channel_information(
                                 &inner,
                                 channel::UpdateChannelInformation::new(guild_id, channel_id)
                                     .new_channel_name(channel_name),
                             )
-                            .await;
-                            result.map_or_else(
-                                |e| TopLevelMessage::Error(Box::new(e.into())),
-                                |_| TopLevelMessage::Nothing,
-                            )
+                            .await
                         },
-                        |msg| msg,
+                        ResultExt::map_to_nothing,
                     ),
                     go_back,
                 );

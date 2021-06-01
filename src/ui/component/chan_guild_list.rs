@@ -70,8 +70,7 @@ pub fn build_channel_list<'a>(
             );
         }
 
-        let content = Row::with_children(content_widgets).align_items(align!(|));
-        let mut but = Button::new(button_state, content)
+        let mut but = Button::new(button_state, Row::with_children(content_widgets).align_items(align!(|)))
             .width(length!(+))
             .style(theme.secondary());
 
@@ -105,48 +104,53 @@ pub fn build_guild_list<'a>(
     let buttons_state_len = buttons_state.len();
     for ((guild_id, guild), (index, button_state)) in guilds
         .into_iter()
-        .chain(std::iter::once((&0, &Guild::default()))) // [ref:create_join_guild_but_state]
+        .chain(std::iter::once((
+            &0,
+            &Guild {
+                name: String::from("Create / join guild"),
+                ..Default::default()
+            },
+        ))) // [ref:create_join_guild_but_state]
         .zip(buttons_state.iter_mut().enumerate())
     {
-        if index >= buttons_state_len - 1 {
-            // [ref:create_join_guild_but_state]
-            let but = Button::new(button_state, fill_container(icon(Icon::Plus).size(DEF_SIZE + 10)))
+        let mk_but = |state: &'a mut button::State, content: Element<'a, Message>| {
+            Button::new(state, fill_container(content))
                 .width(length!(+))
                 .style(theme.secondary())
-                .on_press(Message::OpenCreateJoinGuild);
-            guild_list = guild_list.push(but);
-        } else {
-            let content = fill_container(
-                guild
-                    .picture
-                    .as_ref()
-                    .map(|guild_picture| thumbnail_cache.get_thumbnail(&guild_picture))
-                    .flatten()
-                    .map_or_else(
-                        || {
-                            Element::from(
-                                label!(guild.name.chars().next().unwrap_or('u').to_ascii_uppercase())
-                                    .size(DEF_SIZE + 10),
-                            )
-                        },
-                        |handle| Element::from(Image::new(handle.clone())),
-                    ),
-            );
+        };
 
-            let mut but = Button::new(button_state, content)
-                .width(length!(+))
-                .style(theme.secondary());
+        let but = if index >= buttons_state_len - 1 {
+            // [ref:create_join_guild_but_state]
+            mk_but(button_state, icon(Icon::Plus).size(DEF_SIZE + 10).into()).on_press(Message::OpenCreateJoinGuild)
+        } else {
+            let content = guild
+                .picture
+                .as_ref()
+                .map(|guild_picture| thumbnail_cache.get_thumbnail(&guild_picture))
+                .flatten()
+                .map_or_else::<Element<Message>, _, _>(
+                    || {
+                        label!(guild.name.chars().next().unwrap_or('u').to_ascii_uppercase())
+                            .size(DEF_SIZE + 10)
+                            .into()
+                    },
+                    |handle| Image::new(handle.clone()).into(),
+                );
+
+            let mut but = mk_but(button_state, content);
 
             if current_guild_id != Some(*guild_id) {
                 but = but.on_press(on_button_press(*guild_id));
             }
 
-            let tooltip = Tooltip::new(but, &guild.name, Position::Bottom)
-                .gap(8)
-                .style(theme.secondary());
+            but
+        };
 
-            guild_list = guild_list.push(tooltip);
-        }
+        guild_list = guild_list.push(
+            Tooltip::new(but, &guild.name, Position::Bottom)
+                .gap(8)
+                .style(theme.secondary()),
+        );
     }
 
     guild_list.into()

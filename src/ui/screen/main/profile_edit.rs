@@ -1,10 +1,13 @@
-use client::harmony_rust_sdk::client::api::chat::profile::{profile_update, ProfileUpdate};
+use client::{
+    error::ClientError,
+    harmony_rust_sdk::client::api::chat::profile::{profile_update, ProfileUpdate},
+};
 use iced_aw::Card;
 
 use crate::{
     client::Client,
     label_button, length,
-    ui::{component::*, style::*},
+    ui::{component::*, screen::ResultExt, style::*},
 };
 
 use super::super::{select_upload_files, Message as TopLevelMessage};
@@ -105,32 +108,24 @@ impl ProfileEditModal {
                     Command::none()
                 }
                 Message::ChangeName => {
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     let username = self.current_username.drain(..).collect::<String>();
                     Command::perform(
-                        async move { Ok(profile_update(&inner, ProfileUpdate::default().new_username(username)).await?) },
-                        |result| {
-                            result.map_or_else(
-                                |err| TopLevelMessage::Error(Box::new(err)),
-                                |_| TopLevelMessage::Nothing,
-                            )
-                        },
+                        async move { profile_update(&inner, ProfileUpdate::default().new_username(username)).await },
+                        ResultExt::map_to_nothing,
                     )
                 }
                 Message::UploadPfp => {
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     let content_store = client.content_store_arc();
                     Command::perform(
                         async move {
                             let id = select_upload_files(&inner, content_store).await?.remove(0).0;
-                            Ok(profile_update(&inner, ProfileUpdate::default().new_avatar(Some(id))).await?)
+                            profile_update(&inner, ProfileUpdate::default().new_avatar(Some(id)))
+                                .await
+                                .map_err(ClientError::Internal)
                         },
-                        |result| {
-                            result.map_or_else(
-                                |err| TopLevelMessage::Error(Box::new(err)),
-                                |_| TopLevelMessage::Nothing,
-                            )
-                        },
+                        ResultExt::map_to_nothing,
                     )
                 }
                 Message::Back => return (Command::none(), true),

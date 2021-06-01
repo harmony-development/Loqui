@@ -4,17 +4,21 @@ use crate::{
     label, label_button, length, space,
     ui::{
         component::*,
+        screen::ResultExt,
         style::{Theme, ERROR_COLOR, PADDING},
     },
 };
-use client::harmony_rust_sdk::{
-    api::{
-        auth::{auth_step::Step, next_step_request::form_fields::Field},
-        exports::hrpc::url::Url,
-    },
-    client::{
-        api::auth::{AuthStep, AuthStepResponse},
-        AuthStatus,
+use client::{
+    error::ClientResult,
+    harmony_rust_sdk::{
+        api::{
+            auth::{auth_step::Step, next_step_request::form_fields::Field},
+            exports::hrpc::url::Url,
+        },
+        client::{
+            api::auth::{AuthStep, AuthStepResponse},
+            AuthStatus,
+        },
     },
 };
 use std::{collections::HashMap, sync::Arc};
@@ -169,12 +173,9 @@ impl LoginScreen {
     ) -> Command<TopLevelMessage> {
         fn respond(screen: &mut LoginScreen, client: &Client, response: AuthStepResponse) -> Command<TopLevelMessage> {
             screen.waiting = true;
-            let inner = client.inner().clone();
+            let inner = client.inner_arc();
             Command::perform(async move { inner.next_auth_step(response).await }, |result| {
-                result.map_or_else(
-                    |err| TopLevelMessage::Error(Box::new(err.into())),
-                    |step| TopLevelMessage::LoginScreen(Message::AuthStep(step)),
-                )
+                result.map_to_msg_def(|step| TopLevelMessage::LoginScreen(Message::AuthStep(step)))
             })
         }
 
@@ -189,12 +190,9 @@ impl LoginScreen {
             Message::GoBack => {
                 if let Some(client) = client {
                     self.waiting = true;
-                    let inner = client.inner().clone();
+                    let inner = client.inner_arc();
                     return Command::perform(async move { inner.prev_auth_step().await }, |result| {
-                        result.map_or_else(
-                            |err| TopLevelMessage::Error(Box::new(err.into())),
-                            |step| TopLevelMessage::LoginScreen(Message::AuthStep(Some(step))),
-                        )
+                        result.map_to_msg_def(|step| TopLevelMessage::LoginScreen(Message::AuthStep(Some(step))))
                     });
                 }
             }
@@ -232,10 +230,7 @@ impl LoginScreen {
                                     let content_store = content_store.clone();
                                     self.waiting = true;
                                     Command::perform(Client::new(uri, None, content_store), |result| {
-                                        result.map_or_else(
-                                            |err| TopLevelMessage::Error(Box::new(err)),
-                                            TopLevelMessage::ClientCreated,
-                                        )
+                                        result.map_to_msg_def(TopLevelMessage::ClientCreated)
                                     })
                                 }
                                 Err(err) => self.on_error(ClientError::UrlParse(homeserver.clone(), err)),
@@ -292,9 +287,9 @@ impl LoginScreen {
                                 let ser = toml::ser::to_vec(&session).unwrap();
                                 tokio::fs::write(session_file, ser).await?;
                             }
-                            Ok(TopLevelMessage::LoginComplete(None))
+                            Ok(None)
                         },
-                        |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
+                        |result: ClientResult<Option<Client>>| result.map_to_msg_def(TopLevelMessage::LoginComplete),
                     );
                 }
             },
