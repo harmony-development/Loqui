@@ -7,7 +7,7 @@ use crate::{
     label, label_button, length, space,
     ui::{
         component::*,
-        screen::ResultExt,
+        screen::ClientExt,
         style::{Theme, DEF_SIZE, ERROR_COLOR},
     },
 };
@@ -61,13 +61,11 @@ impl LogoutModal {
     pub fn update(&mut self, msg: Message, client: &Client) -> Command<TopLevelMessage> {
         if msg {
             let content_store = client.content_store_arc();
-            let inner = client.inner_arc();
-            Command::perform(
-                async move {
-                    let result = Client::logout(inner, content_store.session_file().to_path_buf()).await;
-                    result.map_to_msg_def(|_| {
-                        TopLevelMessage::Logout(TopLevelScreen::Login(LoginScreen::new(content_store)).into())
-                    })
+            client.mk_cmd(
+                |inner| async move {
+                    Client::logout(inner, content_store.session_file().to_path_buf())
+                        .await
+                        .map(|_| TopLevelMessage::Logout(TopLevelScreen::Login(LoginScreen::new(content_store)).into()))
                 },
                 identity,
             )

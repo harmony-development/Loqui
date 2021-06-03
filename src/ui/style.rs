@@ -1,4 +1,5 @@
 use crate::color;
+use client::bool_ext::BoolExt;
 use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, Color};
 
 pub const DEF_SIZE: u16 = 20;
@@ -84,7 +85,7 @@ impl Default for Theme {
 
 impl From<Theme> for Box<dyn container::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
+        theme.dark.map_or_default(|| {
             if theme.secondary {
                 if theme.round {
                     dark::BrightRoundContainer.into()
@@ -96,33 +97,25 @@ impl From<Theme> for Box<dyn container::StyleSheet> {
             } else {
                 dark::Container.into()
             }
-        } else {
-            Default::default()
-        }
+        })
     }
 }
 
 impl From<Theme> for Box<dyn radio::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::Radio.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::Radio.into())
     }
 }
 
 impl From<Theme> for Box<dyn text_input::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
+        theme.dark.map_or_default(|| {
             if theme.secondary {
                 dark::DarkTextInput.into()
             } else {
                 dark::TextInput.into()
             }
-        } else {
-            Default::default()
-        }
+        })
     }
 }
 
@@ -144,81 +137,49 @@ impl From<Theme> for Box<dyn button::StyleSheet> {
 
 impl From<Theme> for Box<dyn scrollable::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::Scrollable.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::Scrollable.into())
     }
 }
 
 impl From<Theme> for Box<dyn slider::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::Slider.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::Slider.into())
     }
 }
 
 impl From<Theme> for Box<dyn progress_bar::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::ProgressBar.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::ProgressBar.into())
     }
 }
 
 impl From<Theme> for Box<dyn checkbox::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::Checkbox.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::Checkbox.into())
     }
 }
 
 impl From<Theme> for Box<dyn pick_list::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::PickList.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::PickList.into())
     }
 }
 
 impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::Rule.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::Rule.into())
     }
 }
 
 impl From<Theme> for Box<dyn iced_aw::modal::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::Modal.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::Modal.into())
     }
 }
 
 impl From<Theme> for Box<dyn iced_aw::card::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::Card.into()
-        } else {
-            Default::default()
-        }
+        theme.dark.map_or_default(|| dark::Card.into())
     }
 }
 

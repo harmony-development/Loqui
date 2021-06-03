@@ -7,7 +7,7 @@ use client::{
     tracing::debug,
 };
 
-use super::{Message as TopLevelMessage, ResultExt, Screen as TopLevelScreen};
+use super::{ClientExt, Message as TopLevelMessage, Screen as TopLevelScreen};
 
 use crate::{
     client::{error::ClientError, Client},
@@ -167,10 +167,9 @@ impl GuildDiscovery {
                 self.joined_guild = None;
                 self.joining_guild = Some(guild_name.clone());
                 self.error_text.clear();
-                let inner = client.inner_arc();
 
-                return Command::perform(
-                    async move {
+                return client.mk_cmd(
+                    |inner| async move {
                         let guild_id = guild::create_guild(&inner, guild::CreateGuild::new(guild_name))
                             .await?
                             .guild_id;
@@ -182,21 +181,18 @@ impl GuildDiscovery {
                             },
                         )
                         .await?;
-                        Ok(guild_id)
+                        ClientResult::Ok(guild_id)
                     },
-                    |res: ClientResult<u64>| {
-                        res.map_to_msg_def(|response| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response)))
-                    },
+                    |id| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(id)),
                 );
             }
             Message::JoinGuild(invite) => {
                 self.joined_guild = None;
                 self.joining_guild = Some(invite.to_string());
                 self.error_text.clear();
-                let inner = client.inner_arc();
 
-                return Command::perform(
-                    async move {
+                return client.mk_cmd(
+                    |inner| async move {
                         let guild_id = guild::join_guild(&inner, invite).await?.guild_id;
                         guild::add_guild_to_guild_list(
                             &inner,
@@ -206,12 +202,9 @@ impl GuildDiscovery {
                             },
                         )
                         .await?;
-                        Ok(guild_id)
+                        ClientResult::Ok(guild_id)
                     },
-                    |result: ClientResult<u64>| {
-                        result
-                            .map_to_msg_def(|response| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(response)))
-                    },
+                    |id| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(id)),
                 );
             }
             Message::JoinedGuild(room_id) => {

@@ -171,6 +171,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bool_ext"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4aaa5af5d1705aba49bace04f3d29c8fa9c0c20829fdea161b89718b2955ef1"
+
+[[package]]
 name = "bumpalo"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -289,15 +295,16 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "ahash 0.7.4",
+ "bool_ext",
  "chrono",
  "directories-next",
  "harmony_rust_sdk",
  "indexmap",
  "infer",
+ "rand 0.8.3",
  "serde",
  "tokio",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -3783,9 +3790,6 @@ name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
-dependencies = [
- "getrandom 0.2.3",
-]
 
 [[package]]
 name = "version-compare"

@@ -1,10 +1,10 @@
 use super::Message as TopLevelMessage;
 use crate::{
     client::{content::ContentStore, error::ClientError, Client, Session},
-    label, label_button, length, space,
+    label, label_button,
     ui::{
         component::*,
-        screen::ResultExt,
+        screen::{ClientExt, ResultExt},
         style::{Theme, ERROR_COLOR, PADDING},
     },
 };
@@ -20,8 +20,9 @@ use client::{
             AuthStatus,
         },
     },
+    AHashMap, IndexMap,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
@@ -48,8 +49,8 @@ pub enum Message {
 
 #[derive(Debug)]
 pub struct LoginScreen {
-    fields: Vec<(String, (text_input::State, String, String))>,
-    choices: HashMap<String, button::State>,
+    fields: IndexMap<String, (text_input::State, String, String)>,
+    choices: AHashMap<String, button::State>,
     proceed: button::State,
     back: button::State,
 
@@ -84,14 +85,14 @@ impl LoginScreen {
         self.current_step = AuthPart::Homeserver;
         self.fields.clear();
         self.choices.clear();
-        self.fields.push((
+        self.fields.insert(
             "homeserver".to_string(),
             (
                 Default::default(),
                 "https://chat.harmonyapp.io:2289".to_string(),
                 "text".to_string(),
             ),
-        ));
+        );
     }
 
     pub fn view(&mut self, theme: Theme) -> Element<Message> {
@@ -155,14 +156,7 @@ impl LoginScreen {
 
         let field_panel = column(widgets);
 
-        let padded_panel = row(vec![
-            space!(w = 3).into(),
-            field_panel.width(length!(% 4)).into(),
-            space!(w = 3).into(),
-        ])
-        .height(length!(+));
-
-        fill_container(padded_panel).style(theme).into()
+        fill_container(field_panel).style(theme).into()
     }
 
     pub fn update(
@@ -173,27 +167,25 @@ impl LoginScreen {
     ) -> Command<TopLevelMessage> {
         fn respond(screen: &mut LoginScreen, client: &Client, response: AuthStepResponse) -> Command<TopLevelMessage> {
             screen.waiting = true;
-            let inner = client.inner_arc();
-            Command::perform(async move { inner.next_auth_step(response).await }, |result| {
-                result.map_to_msg_def(|step| TopLevelMessage::LoginScreen(Message::AuthStep(step)))
-            })
+            client.mk_cmd(
+                |inner| async move { inner.next_auth_step(response).await },
+                |step| TopLevelMessage::LoginScreen(Message::AuthStep(step)),
+            )
         }
 
         match msg {
             Message::FieldChanged(field, value) => {
-                if let Some(index) = self.fields.iter().position(|(key, _)| key == &field) {
-                    if let Some((_, (_, val, _))) = self.fields.get_mut(index) {
-                        *val = value;
-                    }
+                if let Some((_, val, _)) = self.fields.get_mut(&field) {
+                    *val = value;
                 }
             }
             Message::GoBack => {
                 if let Some(client) = client {
                     self.waiting = true;
-                    let inner = client.inner_arc();
-                    return Command::perform(async move { inner.prev_auth_step().await }, |result| {
-                        result.map_to_msg_def(|step| TopLevelMessage::LoginScreen(Message::AuthStep(Some(step))))
-                    });
+                    return client.mk_cmd(
+                        |inner| async move { inner.prev_auth_step().await },
+                        |step| TopLevelMessage::LoginScreen(Message::AuthStep(Some(step))),
+                    );
                 }
             }
             Message::ProceedWithChoice(choice) => {
@@ -203,39 +195,35 @@ impl LoginScreen {
                 }
             }
             Message::Proceed => {
-                if let (Some(client), AuthPart::Step(step)) = (client, self.current_step) {
-                    let response = match step {
-                        AuthType::Choice => unreachable!("choice is not handled here"),
-                        AuthType::Form => AuthStepResponse::form(
-                            self.fields
-                                .iter()
-                                .map(|(_, (_, value, r#type))| match r#type.as_str() {
-                                    "number" => Field::Number(value.parse().unwrap()),
-                                    "password" => Field::Bytes(value.as_bytes().to_vec()),
-                                    "new-password" => Field::Bytes(value.as_bytes().to_vec()),
-                                    _ => Field::String(value.clone()),
-                                })
-                                .collect(),
-                        ),
-                        _ => todo!("Implement waiting"),
-                    };
+                if let (Some(client), AuthPart::Step(AuthType::Form)) = (client, self.current_step) {
+                    let response = AuthStepResponse::form(
+                        self.fields
+                            .iter()
+                            .map(|(_, (_, value, r#type))| match r#type.as_str() {
+                                "number" => Field::Number(value.parse().unwrap()),
+                                "password" => Field::Bytes(value.as_bytes().to_vec()),
+                                "new-password" => Field::Bytes(value.as_bytes().to_vec()),
+                                _ => Field::String(value.clone()),
+                            })
+                            .collect(),
+                    );
                     return respond(self, client, response);
                 } else if let AuthPart::Homeserver = &self.current_step {
-                    if let Some(index) = self.fields.iter().position(|(key, _)| key == "homeserver") {
-                        if let Some(homeserver) =
-                            self.fields.get(index).map(|(_, (_, homeserver, _))| homeserver.clone())
-                        {
-                            return match homeserver.parse::<Url>() {
-                                Ok(uri) => {
-                                    let content_store = content_store.clone();
-                                    self.waiting = true;
-                                    Command::perform(Client::new(uri, None, content_store), |result| {
-                                        result.map_to_msg_def(TopLevelMessage::ClientCreated)
-                                    })
-                                }
-                                Err(err) => self.on_error(ClientError::UrlParse(homeserver.clone(), err)),
-                            };
-                        }
+                    if let Some(homeserver) = self
+                        .fields
+                        .get("homeserver")
+                        .map(|(_, homeserver, _)| homeserver.clone())
+                    {
+                        return match homeserver.parse::<Url>() {
+                            Ok(uri) => {
+                                let content_store = content_store.clone();
+                                self.waiting = true;
+                                Command::perform(Client::new(uri, None, content_store), |result| {
+                                    result.map_to_msg_def(TopLevelMessage::ClientCreated)
+                                })
+                            }
+                            Err(err) => self.on_error(ClientError::UrlParse(homeserver.clone(), err)),
+                        };
                     }
                 }
             }
@@ -250,16 +238,16 @@ impl LoginScreen {
                     if let Some(step) = step.step {
                         match step {
                             Step::Choice(choice) => {
-                                for option in choice.options {
-                                    self.choices.insert(option, Default::default());
-                                }
+                                self.choices
+                                    .extend(choice.options.into_iter().map(|opt| (opt, Default::default())));
                                 self.current_step = AuthPart::Step(AuthType::Choice);
                             }
                             Step::Form(form) => {
-                                for field in form.fields {
-                                    self.fields
-                                        .push((field.name, (Default::default(), Default::default(), field.r#type)));
-                                }
+                                self.fields.extend(
+                                    form.fields.into_iter().map(|field| {
+                                        (field.name, (Default::default(), Default::default(), field.r#type))
+                                    }),
+                                );
                                 self.current_step = AuthPart::Step(AuthType::Form);
                             }
                             _ => todo!("Implement waiting"),

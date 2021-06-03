@@ -7,6 +7,7 @@ pub mod guild;
 pub mod member;
 pub mod message;
 
+use bool_ext::BoolExt;
 use channel::Channel;
 use guild::Guild;
 pub use harmony_rust_sdk::{
@@ -54,6 +55,7 @@ use self::{
 
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub use ahash::AHashMap;
+pub use bool_ext;
 pub use tracing;
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
@@ -181,7 +183,7 @@ impl Client {
     ) -> Option<impl Future<Output = (u64, u64, u64, Message, Duration, Option<u64>)>> {
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             if retry_after.as_secs() == 0 {
-                channel.messages.push(message.clone());
+                channel.messages.insert(message.id, message.clone());
             }
 
             let inner = self.inner().clone();
@@ -198,28 +200,19 @@ impl Client {
                     .overrides(message.overrides.clone().map(Into::into));
 
                 let send_result = send_message(&inner, msg).await;
-
-                match send_result {
-                    Ok(resp) => (
-                        guild_id,
-                        channel_id,
-                        echo_id,
-                        message,
-                        retry_after,
-                        Some(resp.message_id),
-                    ),
-                    Err(err) => {
-                        tracing::error!("error occured when sending message: {}", err);
-                        (
-                            guild_id,
-                            channel_id,
-                            echo_id,
-                            message,
-                            retry_after + Duration::from_secs(1),
-                            None,
-                        )
-                    }
-                }
+                (
+                    guild_id,
+                    channel_id,
+                    echo_id,
+                    message,
+                    send_result
+                        .is_err()
+                        .map_or(retry_after, || retry_after + Duration::from_secs(1)),
+                    send_result
+                        .map(|resp| resp.message_id)
+                        .map_err(|err| tracing::error!("error occured when sending message: {}", err))
+                        .ok(),
+                )
             })
         } else {
             None
@@ -269,9 +262,11 @@ impl Client {
             )
             .await;
 
-            result.map_or_else(
-                |err| (guild_id, channel_id, message_id, Some(Box::new(err.into()))),
-                |_| (guild_id, channel_id, message_id, None),
+            (
+                guild_id,
+                channel_id,
+                message_id,
+                result.err().map(|err| Box::new(err.into())),
             )
         }
     }
@@ -305,20 +300,12 @@ impl Client {
 
                         message.post_process(&mut post);
 
-                        if let Some(msg) = channel
-                            .messages
-                            .iter_mut()
-                            .find(|omsg| omsg.id == MessageId::Unack(echo_id))
-                        {
+                        if let Some(msg) = channel.messages.get_mut(&MessageId::Unack(echo_id)) {
                             *msg = message;
-                        } else if let Some(msg) = channel
-                            .messages
-                            .iter_mut()
-                            .find(|omsg| omsg.id == MessageId::Ack(message_id))
-                        {
+                        } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
                             *msg = message;
                         } else {
-                            channel.messages.push(message);
+                            channel.messages.insert(message.id, message);
                         }
 
                         let disp = channel.messages.len();
@@ -335,13 +322,7 @@ impl Client {
                 message_id,
             }) => {
                 if let Some(channel) = self.get_channel(guild_id, channel_id) {
-                    if let Some(pos) = channel
-                        .messages
-                        .iter()
-                        .position(|msg| msg.id == MessageId::Ack(message_id))
-                    {
-                        channel.messages.remove(pos);
-                    }
+                    channel.messages.remove(&MessageId::Ack(message_id));
                 }
             }
             Event::EditedMessage(message_updated) => {
@@ -349,11 +330,7 @@ impl Client {
                 let channel_id = message_updated.channel_id;
 
                 if let Some(channel) = self.get_channel(guild_id, channel_id) {
-                    if let Some(msg) = channel
-                        .messages
-                        .iter_mut()
-                        .find(|message| message.id == MessageId::Ack(message_updated.message_id))
-                    {
+                    if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_updated.message_id)) {
                         msg.content = Content::Text(message_updated.content);
                     }
                 }
@@ -404,7 +381,7 @@ impl Client {
                             name,
                             loading_messages_history: false,
                             looking_at_message: 0,
-                            messages: Vec::new(),
+                            messages: Default::default(),
                             reached_top: false,
                             user_perms: ChanPerms {
                                 manage_channel: false,
@@ -531,13 +508,18 @@ impl Client {
         reached_top: bool,
     ) -> Vec<PostProcessEvent> {
         let mut post = Vec::new();
-        let mut messages = harmony_messages_to_ui_messages(messages);
+        let mut messages = harmony_messages_to_ui_messages(
+            messages
+                .into_iter()
+                .map(|msg| (MessageId::Ack(msg.message_id), msg))
+                .collect(),
+        );
 
-        for message in &messages {
+        for message in messages.values() {
             message.post_process(&mut post);
         }
 
-        for overrides in messages.iter().flat_map(|msg| msg.overrides.as_ref()) {
+        for overrides in messages.values().flat_map(|msg| msg.overrides.as_ref()) {
             if let Some(id) = overrides.avatar_url.clone() {
                 post.push(PostProcessEvent::FetchThumbnail(Attachment {
                     kind: "image".into(),
@@ -547,7 +529,7 @@ impl Client {
         }
 
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
-            messages.append(&mut channel.messages);
+            messages.extend(channel.messages.drain(..));
             channel.messages = messages;
             channel.reached_top = reached_top;
         }

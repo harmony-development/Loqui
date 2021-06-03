@@ -7,7 +7,11 @@ use iced_aw::Card;
 use crate::{
     client::Client,
     label_button, length,
-    ui::{component::*, screen::ResultExt, style::*},
+    ui::{
+        component::*,
+        screen::{map_to_nothing, ClientExt},
+        style::*,
+    },
 };
 
 use super::super::{select_upload_files, Message as TopLevelMessage};
@@ -108,24 +112,22 @@ impl ProfileEditModal {
                     Command::none()
                 }
                 Message::ChangeName => {
-                    let inner = client.inner_arc();
                     let username = self.current_username.drain(..).collect::<String>();
-                    Command::perform(
-                        async move { profile_update(&inner, ProfileUpdate::default().new_username(username)).await },
-                        ResultExt::map_to_nothing,
+                    client.mk_cmd(
+                        |inner| async move { profile_update(&inner, ProfileUpdate::default().new_username(username)).await },
+                        map_to_nothing,
                     )
                 }
                 Message::UploadPfp => {
-                    let inner = client.inner_arc();
                     let content_store = client.content_store_arc();
-                    Command::perform(
-                        async move {
+                    client.mk_cmd(
+                        |inner| async move {
                             let id = select_upload_files(&inner, content_store).await?.remove(0).0;
                             profile_update(&inner, ProfileUpdate::default().new_avatar(Some(id)))
                                 .await
                                 .map_err(ClientError::Internal)
                         },
-                        ResultExt::map_to_nothing,
+                        map_to_nothing,
                     )
                 }
                 Message::Back => return (Command::none(), true),

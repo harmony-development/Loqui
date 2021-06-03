@@ -1,5 +1,5 @@
 use super::super::Message as TopLevelMessage;
-use client::harmony_rust_sdk::client::api::chat::channel;
+use client::{bool_ext::BoolExt, harmony_rust_sdk::client::api::chat::channel};
 use iced_aw::Card;
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
     label, label_button, length,
     ui::{
         component::*,
-        screen::ResultExt,
+        screen::{map_to_nothing, ClientExt},
         style::{Theme, ERROR_COLOR, PADDING, SPACING},
     },
 };
@@ -83,24 +83,22 @@ impl UpdateChannelModal {
         let mut go_back = false;
         match msg {
             Message::ChannelNameChanged(new_name) => {
-                if new_name.is_empty() {
-                    self.error_text = "Channel name can't be empty".to_string();
-                } else {
-                    self.error_text.clear();
-                }
+                self.error_text.clear();
+                new_name
+                    .is_empty()
+                    .and_do(|| self.error_text.push_str("Channel name can't be empty"));
                 self.channel_name_field = new_name;
             }
             Message::UpdateChannel => {
                 let channel_name = self.channel_name_field.clone();
 
                 self.error_text.clear();
-                let inner = client.inner_arc();
                 let guild_id = self.guild_id;
                 let channel_id = self.channel_id;
 
                 return (
-                    Command::perform(
-                        async move {
+                    client.mk_cmd(
+                        |inner| async move {
                             channel::update_channel_information(
                                 &inner,
                                 channel::UpdateChannelInformation::new(guild_id, channel_id)
@@ -108,7 +106,7 @@ impl UpdateChannelModal {
                             )
                             .await
                         },
-                        ResultExt::map_to_nothing,
+                        map_to_nothing,
                     ),
                     go_back,
                 );

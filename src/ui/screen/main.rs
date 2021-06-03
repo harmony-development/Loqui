@@ -9,6 +9,7 @@ use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
 use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use client::{
+    bool_ext::BoolExt,
     error::ClientResult,
     harmony_rust_sdk::{
         api::{
@@ -25,6 +26,7 @@ use client::{
             rest::download_extract_file,
         },
     },
+    message::MessageId,
     tracing::{error, trace},
     IndexMap,
 };
@@ -46,7 +48,7 @@ use crate::{
     label, label_button, length, space,
     ui::{
         component::{event_history::SHOWN_MSGS_LIMIT, *},
-        screen::{make_query_perm, map_send_msg, ResultExt},
+        screen::{make_query_perm, map_send_msg, map_to_nothing, ClientExt, ResultExt},
         style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
 };
@@ -264,34 +266,25 @@ impl MainScreen {
                 if matches!(member.status, UserStatus::Offline) {
                     username = username.color(ALT_COLOR);
                 }
-                let mut content: Vec<Element<Message>> = vec![username.into(), space!(w+).into()];
-                if let Some(handle) = member
+                let pfp: Element<Message> = if let Some(handle) = member
                     .avatar_url
                     .as_ref()
                     .map(|hmc| thumbnail_cache.get_thumbnail(hmc))
                     .flatten()
                 {
-                    content.push(
-                        fill_container(Image::new(handle.clone()).width(length!(+)))
-                            .width(length!(= AVATAR_WIDTH))
-                            .height(length!(= AVATAR_WIDTH))
-                            .style(theme.round())
-                            .into(),
-                    );
+                    Image::new(handle.clone()).width(length!(+)).into()
                 } else {
-                    content.push(
-                        fill_container(label!(member
-                            .username
-                            .chars()
-                            .next()
-                            .unwrap_or('u')
-                            .to_ascii_uppercase()))
+                    label!(member.username.chars().next().unwrap_or('u').to_ascii_uppercase()).into()
+                };
+                let content: Vec<Element<Message>> = vec![
+                    username.into(),
+                    space!(w+).into(),
+                    fill_container(pfp)
                         .width(length!(= AVATAR_WIDTH))
                         .height(length!(= AVATAR_WIDTH))
                         .style(theme.round())
                         .into(),
-                    );
-                }
+                ];
 
                 members_list = members_list.push(
                     Button::new(state, Row::with_children(content).align_items(align!(|)))
@@ -376,11 +369,10 @@ impl MainScreen {
                             return None;
                         }
 
-                        if member.typing_in_channel.map(|(g, c, _)| (g, c)) == Some((guild_id, channel_id)) {
-                            Some(member.username.as_str())
-                        } else {
-                            None
-                        }
+                        member
+                            .typing_in_channel
+                            .map(|(g, c, _)| (g == guild_id && c == channel_id).then(|| member.username.as_str()))
+                            .flatten()
                     })
                     .collect::<Vec<_>>();
 
@@ -715,9 +707,8 @@ impl MainScreen {
                     };
 
                     let term_trimmed = new_term.trim();
-                    if term_trimmed.is_empty() {
-                        self.quick_switcher_modal.inner_mut().results = self
-                            .guild_last_channels
+                    self.quick_switcher_modal.inner_mut().results = if term_trimmed.is_empty() {
+                        self.guild_last_channels
                             .iter()
                             .map(|(gid, cid)| quick_switcher::SearchResult::Channel {
                                 guild_id: *gid,
@@ -727,16 +718,14 @@ impl MainScreen {
                                     .map(|c| c.name.clone())
                                     .unwrap_or_else(|| "unknown".to_string()),
                             })
-                            .collect();
+                            .collect()
                     } else if let Some(pattern) = new_term.strip_prefix('*').map(str::trim) {
-                        self.quick_switcher_modal.inner_mut().results = guild(pattern);
+                        guild(pattern)
                     } else if let Some(pattern) = new_term.strip_prefix('#').map(str::trim) {
-                        self.quick_switcher_modal.inner_mut().results = channel(pattern);
+                        channel(pattern)
                     } else {
-                        self.quick_switcher_modal.inner_mut().results = guild(term_trimmed);
-                        let mut channels = channel(term_trimmed);
-                        self.quick_switcher_modal.inner_mut().results.append(&mut channels);
-                    }
+                        [guild(term_trimmed), channel(term_trimmed)].concat()
+                    };
                     self.quick_switcher_modal.inner_mut().search_value = new_term;
                 }
             },
@@ -746,12 +735,8 @@ impl MainScreen {
                     if let Some(mid) = client
                         .get_channel(guild_id, channel_id)
                         .map(|c| {
-                            c.messages.iter().rev().find_map(|m| {
-                                if m.sender == current_user_id && m.id.id().is_some() {
-                                    m.id.id()
-                                } else {
-                                    None
-                                }
+                            c.messages.iter().rev().find_map(|(id, m)| {
+                                (m.sender == current_user_id && id.id().is_some()).some_with(|| id.id().unwrap())
                             })
                         })
                         .flatten()
@@ -774,7 +759,7 @@ impl MainScreen {
                         self.composer_state.focus();
                         if let Some(msg) = client
                             .get_channel(gid, cid)
-                            .map(|c| c.messages.iter_mut().rev().find(|m| m.id.id() == Some(mid)))
+                            .map(|c| c.messages.get(&MessageId::Ack(mid)))
                             .flatten()
                         {
                             if let IcyContent::Text(text) = &msg.content {
@@ -874,7 +859,7 @@ impl MainScreen {
                                 .get_channel(guild_id, channel_id)
                                 .map(|channel| {
                                     Some((
-                                        channel.messages.first().map(|m| m.id.id()).flatten(),
+                                        channel.messages.values().next().map(|m| m.id.id()).flatten(),
                                         channel.messages.len(),
                                         channel.reached_top,
                                         &mut channel.loading_messages_history,
@@ -891,16 +876,15 @@ impl MainScreen {
 
                             if !reached_top && *looking_at_message < 2 && !*loading_messages_history {
                                 *loading_messages_history = true;
-                                let inner = client.inner_arc();
-                                return Command::perform(
-                                    async move {
+                                return client.mk_cmd(
+                                    |inner| async move {
                                         channel::get_channel_messages(
                                             &inner,
                                             GetChannelMessages::new(guild_id, channel_id)
                                                 .before_message(oldest_msg_id.unwrap_or_default()),
                                         )
                                         .await
-                                        .map_to_msg_def(|response| {
+                                        .map(|response| {
                                             TopLevelMessage::GetEventsBackwardsResponse {
                                                 messages: response.messages,
                                                 reached_top: response.reached_top,
@@ -997,10 +981,9 @@ impl MainScreen {
                         || typing.map_or(false, |(_, _, since)| since.elapsed().as_secs() >= 5)
                     {
                         *typing = Some((guild_id, channel_id, Instant::now()));
-                        let inner = client.inner_arc();
-                        return Command::perform(
-                            async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
-                            ResultExt::map_to_nothing,
+                        return client.mk_cmd(
+                            |inner| async move { chat::typing(&inner, Typing::new(guild_id, channel_id)).await },
+                            map_to_nothing,
                         );
                     }
                 }
@@ -1079,7 +1062,7 @@ impl MainScreen {
                         let new_content: String = self.message.drain(..).collect::<String>().trim().into();
                         if let Some(msg) = client
                             .get_channel(guild_id, channel_id)
-                            .map(|c| c.messages.iter_mut().find(|m| m.id.id() == Some(message_id)))
+                            .map(|c| c.messages.get_mut(&MessageId::Ack(message_id)))
                             .flatten()
                         {
                             msg.being_edited = Some(new_content.clone());
@@ -1160,10 +1143,8 @@ impl MainScreen {
                 self.current_guild_id = Some(guild_id);
                 if let Some(guild) = client.get_guild(guild_id) {
                     if guild.channels.is_empty() {
-                        let inner = client.inner_arc();
-
-                        return Command::perform(
-                            async move {
+                        return client.mk_cmd(
+                            |inner| async move {
                                 let guildid = GuildId::new(guild_id);
                                 let channels_list = get_guild_channels(&inner, guildid).await?.channels;
                                 let mut events = Vec::with_capacity(channels_list.len());
@@ -1184,9 +1165,9 @@ impl MainScreen {
                                     events.push(Event::JoinedMember(MemberJoined { member_id, guild_id }));
                                 }
 
-                                Ok(events)
+                                ClientResult::<_>::Ok(events)
                             },
-                            |result: ClientResult<_>| result.map_to_msg_def(TopLevelMessage::EventsReceived),
+                            TopLevelMessage::EventsReceived,
                         );
                     } else {
                         self.current_channel_id = self
@@ -1224,10 +1205,9 @@ impl MainScreen {
                         |p, gid, cid| TopLevelMessage::MainScreen(Message::ChannelViewPerm(gid, cid, p.ok)),
                     ));
                     if disp == 0 {
-                        let inner = client.inner_arc();
                         let guild_id = self.current_guild_id.unwrap();
-                        cmds.push(Command::perform(
-                            async move {
+                        cmds.push(client.mk_cmd(
+                            |inner| async move {
                                 get_channel_messages(&inner, GetChannelMessages::new(guild_id, channel_id))
                                     .await
                                     .map(|m| {
@@ -1243,7 +1223,7 @@ impl MainScreen {
                                             .collect()
                                     })
                             },
-                            |result| result.map_to_msg_def(TopLevelMessage::EventsReceived),
+                            TopLevelMessage::EventsReceived,
                         ));
                     }
                     return Command::batch(cmds);

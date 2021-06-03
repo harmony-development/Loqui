@@ -1,3 +1,5 @@
+use std::ops::Not;
+
 use crate::{
     client::{
         channel::Channel,
@@ -16,7 +18,7 @@ use crate::{
     },
 };
 use chrono::{Datelike, Timelike};
-use client::harmony_rust_sdk::api::harmonytypes::r#override::Reason;
+use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::r#override::Reason};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
@@ -49,18 +51,23 @@ pub fn build_event_history<'a>(
         .spacing(SPACING * 2)
         .padding(PADDING);
 
-    let displayable_events = &channel.messages;
     let timeline_range_end = looking_at_message
         .saturating_add(SHOWN_MSGS_LIMIT)
-        .min(displayable_events.len());
+        .min(channel.messages.len());
     let timeline_range_start = timeline_range_end.saturating_sub(SHOWN_MSGS_LIMIT);
-    let displayable_events = &displayable_events[timeline_range_start..timeline_range_end];
+    let mut displayable_events = channel
+        .messages
+        .iter()
+        .skip(timeline_range_start)
+        .take(timeline_range_end - timeline_range_start)
+        .map(|(_, m)| m);
 
-    let mut last_timestamp = if let Some(ev) = displayable_events.first() {
-        ev.timestamp
+    let first_message = if let Some(msg) = displayable_events.next() {
+        msg
     } else {
         return event_history.into();
     };
+    let mut last_timestamp = first_message.timestamp;
     let mut last_sender_id = None;
     let mut last_sender_name = None;
     let mut message_group = vec![];
@@ -72,13 +79,14 @@ pub fn build_event_history<'a>(
     };
 
     for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state)) in
-        displayable_events.iter().zip(buts_sate.iter_mut())
+        (std::iter::once(first_message).chain(displayable_events)).zip(buts_sate.iter_mut())
     {
-        let id_to_use = if !message.id.is_ack() {
-            current_user_id
-        } else {
-            message.sender
-        };
+        let id_to_use = message
+            .id
+            .is_ack()
+            .not()
+            .some(current_user_id)
+            .unwrap_or(message.sender);
 
         let name_to_use = members
             .get(&id_to_use)
@@ -97,19 +105,14 @@ pub fn build_event_history<'a>(
                 Reason::Webhook(_) => {
                     format!("webhook by {}", name_to_use)
                 }
-                _ => todo!("plurality"),
+                Reason::SystemPlurality(_) => "plurality".to_string(),
             });
-        let sender_display_name = if let Some(overrides) = &message.overrides {
-            overrides.name.clone()
-        } else {
-            name_to_use
-        };
+        let sender_display_name = message.overrides.as_ref().map_or(name_to_use, |ov| ov.name.clone());
         let sender_color = theme.calculate_sender_color(sender_display_name.len());
-        let sender_avatar_url = if let Some(overrides) = &message.overrides {
-            overrides.avatar_url.as_ref()
-        } else {
-            members.get(&id_to_use).map(|m| m.avatar_url.as_ref()).flatten()
-        };
+        let sender_avatar_url = message.overrides.as_ref().map_or_else(
+            || members.get(&id_to_use).map(|m| m.avatar_url.as_ref()).flatten(),
+            |ov| ov.avatar_url.as_ref(),
+        );
         let sender_body_creator = |sender_display_name: &str| {
             let mut widgets = Vec::with_capacity(2);
 

@@ -1,3 +1,4 @@
+use bool_ext::BoolExt;
 use chrono::NaiveDateTime;
 use harmony_rust_sdk::{
     api::harmonytypes::{
@@ -5,12 +6,14 @@ use harmony_rust_sdk::{
     },
     client::api::rest::FileId,
 };
+use rand::Rng;
 use std::{str::FromStr, time::UNIX_EPOCH};
-use uuid::Uuid;
+
+use crate::IndexMap;
 
 use super::{content::MAX_THUMB_SIZE, post_heading, PostProcessEvent};
 
-pub type Messages = Vec<Message>;
+pub type Messages = IndexMap<MessageId, Message>;
 
 #[derive(Debug, Clone)]
 pub struct EmbedField {
@@ -138,7 +141,7 @@ impl From<Override> for harmonytypes::Override {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MessageId {
     Ack(u64),
     Unack(u64),
@@ -166,8 +169,7 @@ impl MessageId {
 
 impl Default for MessageId {
     fn default() -> Self {
-        let transaction = Uuid::new_v4().as_u128() as u64;
-        MessageId::Unack(transaction)
+        MessageId::Unack(rand::thread_rng().gen())
     }
 }
 
@@ -260,8 +262,10 @@ impl Default for Message {
     }
 }
 
-pub(crate) fn harmony_messages_to_ui_messages(messages: Vec<HarmonyMessage>) -> Vec<Message> {
-    messages.into_iter().map(From::from).rev().collect()
+pub(crate) fn harmony_messages_to_ui_messages(
+    messages: IndexMap<MessageId, HarmonyMessage>,
+) -> IndexMap<MessageId, Message> {
+    messages.into_iter().map(|(id, msg)| (id, msg.into())).rev().collect()
 }
 
 impl From<harmonytypes::Override> for Override {
@@ -279,13 +283,7 @@ impl From<harmonytypes::EmbedHeading> for EmbedHeading {
         EmbedHeading {
             text: h.text,
             subtext: h.subtext,
-            url: {
-                if h.url.is_empty() {
-                    None
-                } else {
-                    Some(h.url)
-                }
-            },
+            url: h.url.is_empty().some(h.url),
             icon: FileId::from_str(&h.icon).ok(),
         }
     }
