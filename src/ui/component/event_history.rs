@@ -164,6 +164,8 @@ pub fn build_event_history<'a>(
             .height(length!(-));
 
             event_history = event_history.push(date_time_seperator);
+            event_history = event_history.push(push_to_msg_group(&mut message_group));
+            message_group.push(sender_body_creator(&sender_display_name).into());
         }
 
         if !is_sender_different
