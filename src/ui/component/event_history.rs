@@ -73,9 +73,7 @@ pub fn build_event_history<'a>(
     let mut message_group = vec![];
 
     let push_to_msg_group = |msg_group: &mut Vec<Element<'a, Message>>| {
-        Container::new(column(msg_group.drain(..).collect()).align_items(align!(|<)))
-            .width(Length::Fill)
-            .style(theme.round())
+        Container::new(column(msg_group.drain(..).collect()).align_items(align!(|<))).style(theme.round())
     };
 
     for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state)) in
@@ -345,14 +343,11 @@ pub fn build_event_history<'a>(
         message_row.push(maybe_timestamp);
         message_row.push(msg_body.into());
 
-        if msg_text.is_some() && current_user_id == message.sender {
-            if let Some(id) = message.id.id() {
-                let but = Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 10))
-                    .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
-                    .style(theme.secondary());
-                message_row.push(space!(w+).into());
-                message_row.push(but.into());
-            }
+        if let (Some(id), true) = (message.id.id(), msg_text.is_some() && current_user_id == message.sender) {
+            let but = Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 10))
+                .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
+                .style(theme.secondary());
+            message_row.push(but.into());
         }
 
         message_group.push(row(message_row).align_items(align!(|<)).padding(0).into());
