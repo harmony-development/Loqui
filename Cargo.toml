@@ -84,6 +84,7 @@ cCompiler = "llvmPackages_12.clang"
 nativeBuildInputs = ["llvmPackages_12.bintools"]
 devshell.name = "crust-shell"
 devshell.commands = [{ package = "tagref" }]
+env.RUSTC_FORCE_INCREMENTAL = "1"
 
 [package.metadata.nix.desktopFile]
 name = "Crust"
