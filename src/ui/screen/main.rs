@@ -186,19 +186,15 @@ impl MainScreen {
 
         // Create individual widgets
 
-        let guilds_list = if guilds.is_empty() {
-            fill_container(label!("No guilds found")).style(theme).into()
-        } else {
-            build_guild_list(
-                guilds,
-                thumbnail_cache,
-                self.current_guild_id,
-                &mut self.guilds_list_state,
-                &mut self.guilds_buts_state,
-                Message::GuildChanged,
-                theme,
-            )
-        };
+        let guilds_list = build_guild_list(
+            guilds,
+            thumbnail_cache,
+            self.current_guild_id,
+            &mut self.guilds_list_state,
+            &mut self.guilds_buts_state,
+            Message::GuildChanged,
+            theme,
+        );
 
         let mut screen_widgets = vec![Container::new(guilds_list)
             .width(length!(= 64))
