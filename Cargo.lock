@@ -77,9 +77,9 @@ checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
 
 [[package]]
 name = "approx"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f2a05fd1bd10b2527e20a2cd32d8873d115b8b39fe219ee25f42a8aca6ba278"
+checksum = "072df7202e63b127ab55acfe16ce97013d5b97bf160489336d3f1840fd78e99e"
 dependencies = [
  "num-traits",
 ]
@@ -817,9 +817,9 @@ dependencies = [
 
 [[package]]
 name = "euclid"
-version = "0.22.5"
+version = "0.22.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80241b4d9c9a508525973ae683a1405c443d877a05e0140e59bb127ef067f66e"
+checksum = "da96828553a086d7b18dcebfc579bd9628b016f86590d7453c115e490fa74b80"
 dependencies = [
  "num-traits",
 ]
@@ -1354,9 +1354,9 @@ dependencies = [
 
 [[package]]
 name = "glyph_brush_layout"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10bc06d530bf20c1902f1b02799ab7372ff43f6119770c49b0bc3f21bd148820"
+checksum = "15cf18cf985bd942f05e14552b63c9d08f7d0ed1ec79a977eb9747c9e065f497"
 dependencies = [
  "ab_glyph",
  "approx",
@@ -1463,7 +1463,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#b40e4472fbd52f51585c424731be2015e1875e5e"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#763403a01afabd8bd705c919a52a07a57ae68ed7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1473,7 +1473,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#b40e4472fbd52f51585c424731be2015e1875e5e"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#763403a01afabd8bd705c919a52a07a57ae68ed7"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1504,9 +1504,9 @@ dependencies = [
 
 [[package]]
 name = "heck"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87cbf45460356b7deeb5e3415b5563308c0a9b057c85e12b06ad551f98d0a6ac"
+checksum = "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c"
 dependencies = [
  "unicode-segmentation",
 ]
@@ -1522,9 +1522,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef77ab080195854a7b1766002d479e33f93acf116eb0a49e26b6b2d7b42bc064"
+checksum = "4fbdcf28ae225cd710a5e424f67b5debca6f4ad544b03c6b218d2ff9290bd780"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1542,9 +1542,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc-build"
-version = "0.5.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dbbfadde1f6de2e5fbfa945e4f956e211e85bffd2a1631a4ea71e92f475e0ca"
+checksum = "9a7bf2882d90e932e7822a67ee2ef5ad55d6e9b99a1d3fa3460707698ad07495"
 dependencies = [
  "proc-macro2",
  "prost",
@@ -2466,12 +2466,11 @@ checksum = "28988d872ab76095a6e6ac88d99b54fd267702734fd7ffe610ca27f533ddb95a"
 
 [[package]]
 name = "ordered-float"
-version = "2.5.0"
+version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "809348965973b261c3e504c8d0434e465274f78c880e10039914f2c5dcf49461"
+checksum = "f100fcfb41e5385e0991f74981732049f9b896821542a219420491046baafdc2"
 dependencies = [
  "num-traits",
- "rand 0.8.3",
 ]
 
 [[package]]
@@ -2882,11 +2881,10 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae1ded71d66a4a97f5e961fd0cb25a5f366a42a41570d16a763a69c092c26ae4"
+checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
 dependencies = [
- "byteorder",
  "regex-syntax",
 ]
 
@@ -3730,9 +3728,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-normalization"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33717dca7ac877f497014e10d73f3acf948c342bee31b5ca7892faf94ccc6b49"
+checksum = "d54590932941a9e9266f0832deed84ebe1bf2e4c9e4a3554d393d18f5e854bf9"
 dependencies = [
  "tinyvec",
 ]
