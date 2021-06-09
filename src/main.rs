@@ -22,7 +22,8 @@ fn main() {
 
     tracing_subscriber::registry()
         .with(
-            EnvFilter::from_default_env()
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::from("info"))
                 .add_directive("wgpu_core=error".parse().unwrap())
                 .add_directive("iced_wgpu=error".parse().unwrap())
                 .add_directive("gfx_memory=error".parse().unwrap())

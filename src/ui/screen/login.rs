@@ -24,7 +24,7 @@ use client::{
         },
     },
     smol_str::SmolStr,
-    urlencoding, AHashMap, IndexMap,
+    AHashMap, IndexMap, InnerSession,
 };
 use std::sync::Arc;
 
@@ -226,11 +226,34 @@ impl LoginScreen {
                 let content_store = content_store.clone();
                 return Command::perform(
                     async move {
-                        let client =
-                            Client::new(session.homeserver.parse().unwrap(), Some(session.into()), content_store)
-                                .await?;
-                        let user_profile =
-                            profile::get_user(client.inner(), UserId::new(client.user_id.unwrap())).await?;
+                        let Session {
+                            session_token,
+                            user_name: _,
+                            user_id,
+                            homeserver,
+                        } = session;
+                        let client = Client::new(
+                            homeserver.parse().unwrap(),
+                            Some(InnerSession {
+                                user_id: user_id.parse().unwrap(),
+                                session_token: session_token.into(),
+                            }),
+                            content_store,
+                        )
+                        .await?;
+                        let user_id = client.user_id.unwrap();
+                        let user_profile = profile::get_user(client.inner(), UserId::new(user_id)).await?;
+                        let session_file = client.content_store().session_path(&homeserver, user_id);
+                        tokio::fs::hard_link(session_file.as_path(), client.content_store().latest_session_file())
+                            .await
+                            .map_err(|err| {
+                                ClientError::Custom(format!(
+                                    "couldn't link session file ({}) to latest session ({}): {}",
+                                    session_file.to_string_lossy(),
+                                    client.content_store().latest_session_file().to_string_lossy(),
+                                    err
+                                ))
+                            })?;
                         Ok((client, user_profile))
                     },
                     |result: ClientResult<_>| {
@@ -314,17 +337,12 @@ impl LoginScreen {
                         return Command::perform(
                             async move {
                                 if let AuthStatus::Complete(session) = auth_status {
-                                    let user_id = session.user_id.to_string().into();
-                                    let session_file = content_store.sessions_dir().join(format!(
-                                        "{}_{}",
-                                        urlencoding::encode(&homeserver),
-                                        user_id
-                                    ));
+                                    let session_file = content_store.session_path(&homeserver, session.user_id);
                                     let user_profile = profile::get_user(&inner, UserId::new(session.user_id)).await?;
                                     let session = Session {
                                         homeserver,
                                         session_token: session.session_token.into(),
-                                        user_id,
+                                        user_id: session.user_id.to_string().into(),
                                         user_name: user_profile.user_name.as_str().into(),
                                     };
 
