@@ -38,9 +38,8 @@ use member::{Member, Members};
 use message::{harmony_messages_to_ui_messages, Attachment, Content, Embed, MessageId};
 use serde::{Deserialize, Serialize};
 use std::{
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     future::Future,
-    path::PathBuf,
     str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
@@ -57,11 +56,13 @@ pub type IndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub use ahash::AHashMap;
 pub use bool_ext;
 pub use tracing;
+pub use urlencoding;
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize, Hash, PartialEq, Eq)]
 pub struct Session {
     pub session_token: String,
+    pub user_name: String,
     pub user_id: String,
     pub homeserver: String,
 }
@@ -70,8 +71,19 @@ impl Debug for Session {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session")
             .field("user_id", &self.user_id)
+            .field("user_name", &self.user_name)
             .field("homeserver", &self.homeserver)
             .finish()
+    }
+}
+
+impl Display for Session {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.user_name)?;
+        if !self.homeserver.is_empty() {
+            write!(f, " on {}", self.homeserver)?;
+        }
+        Ok(())
     }
 }
 
@@ -108,7 +120,7 @@ impl Debug for Client {
                 "user_id",
                 &format!("{:?}", self.auth_status().session().map_or(0, |s| s.user_id)),
             )
-            .field("session_file", &self.content_store.session_file())
+            .field("content_store", &self.content_store)
             .finish()
     }
 }
@@ -128,8 +140,11 @@ impl Client {
         })
     }
 
-    pub async fn logout(_inner: InnerClient, session_file: PathBuf) -> ClientResult<()> {
-        tokio::fs::remove_file(session_file).await?;
+    pub async fn logout(homeserver_encoded: Option<String>, content_store: Arc<ContentStore>) -> ClientResult<()> {
+        if let Some(homeserver_encoded) = homeserver_encoded {
+            tokio::fs::remove_file(content_store.sessions_dir().join(homeserver_encoded)).await?;
+        }
+        tokio::fs::remove_file(content_store.latest_session_file()).await?;
         Ok(())
     }
 

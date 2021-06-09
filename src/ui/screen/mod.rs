@@ -26,9 +26,8 @@ use client::{
         api::{
             chat::{
                 event::{Event, GuildAddedToList, GuildUpdated, ProfileUpdated},
-                GetGuildListRequest, QueryPermissionsResponse,
+                GetGuildListRequest, GetUserResponse, QueryPermissionsResponse,
             },
-            exports::hrpc::url::Url,
             rest::FileId,
         },
         client::{
@@ -60,7 +59,7 @@ pub enum Message {
     PopScreen,
     PushScreen(Box<Screen>),
     Logout(Box<Screen>),
-    LoginComplete(Option<Client>),
+    LoginComplete(Option<Client>, Option<GetUserResponse>),
     ClientCreated(Client),
     Nothing,
     DownloadedThumbnail {
@@ -199,7 +198,7 @@ impl ScreenManager {
     pub fn new(content_store: Arc<ContentStore>) -> Self {
         Self {
             theme: Theme::default(),
-            screens: ScreenStack::new(Screen::Login(LoginScreen::new(content_store.clone()))),
+            screens: ScreenStack::new(Screen::Login(LoginScreen::new())),
             client: None,
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
@@ -305,24 +304,22 @@ impl Application for ScreenManager {
     fn new(content_store: Self::Flags) -> (Self, Command<Self::Message>) {
         let content_store = Arc::new(content_store);
         let mut manager = ScreenManager::new(content_store.clone());
-        let cmd = if content_store.session_file().exists() {
-            let session_file = content_store.session_file().to_path_buf();
+        let cmd = if content_store.latest_session_file().exists() {
             if let Screen::Login(screen) = manager.screens.current_mut() {
                 screen.waiting = true;
             }
             Command::perform(
                 async move {
-                    let session_raw = tokio::fs::read(session_file).await?;
-                    let session: Session =
-                        toml::de::from_slice(&session_raw).map_err(|_| ClientError::MissingLoginInfo)?;
-                    Client::new(
-                        session.homeserver.parse::<Url>().unwrap(),
-                        Some(session.into()),
-                        content_store.clone(),
-                    )
-                    .await
+                    let raw = tokio::fs::read(content_store.latest_session_file()).await?;
+                    let session: Session = toml::de::from_slice(&raw).map_err(|_| ClientError::MissingLoginInfo)?;
+                    let client =
+                        Client::new(session.homeserver.parse().unwrap(), Some(session.into()), content_store).await?;
+                    let user_profile = get_user(client.inner(), UserId::new(client.user_id.unwrap())).await?;
+                    Ok((client, user_profile))
                 },
-                |result| result.map_to_msg_def(|client| Message::LoginComplete(Some(client))),
+                |result: ClientResult<_>| {
+                    result.map_to_msg_def(|(client, profile)| Message::LoginComplete(Some(client), Some(profile)))
+                },
             )
         } else {
             Command::none()
@@ -439,11 +436,22 @@ impl Application for ScreenManager {
                     }
 
                     return Command::batch(cmds);
+                } else {
+                    return Command::perform(
+                        async move {
+                            let _ = socket.close().await;
+                        },
+                        |_| Message::Nothing,
+                    );
                 }
             }
-            Message::LoginComplete(maybe_client) => {
+            Message::LoginComplete(maybe_client, maybe_profile) => {
                 if let Some(client) = maybe_client {
                     self.client = Some(client); // This is the only place we set a main screen [tag:client_set_before_main_view]
+                }
+                if let Screen::Login(screen) = self.screens.current_mut() {
+                    screen.waiting = false;
+                    screen.reset_to_first_step();
                 }
                 self.screens.push(Screen::Main(Box::new(MainScreen::default())));
 
@@ -460,7 +468,11 @@ impl Application for ScreenManager {
                 let self_id = client.user_id.unwrap();
                 let init = client.mk_cmd(
                     |inner| async move {
-                        let self_profile = get_user(&inner, UserId::new(self_id)).await?;
+                        let self_profile = if let Some(profile) = maybe_profile {
+                            profile
+                        } else {
+                            get_user(&inner, UserId::new(self_id)).await?
+                        };
                         let guilds = get_guild_list(&inner, GetGuildListRequest {}).await?.guilds;
                         let mut events = guilds
                             .into_iter()
@@ -661,10 +673,7 @@ impl Application for ScreenManager {
                 .and_do(|| self.socket_reset = true);
 
                 if err_disp.contains("invalid-session") || err_disp.contains("connect error") {
-                    self.update(
-                        Message::Logout(Screen::Login(LoginScreen::new(self.content_store.clone())).into()),
-                        clip,
-                    );
+                    self.update(Message::Logout(Screen::Login(LoginScreen::new()).into()), clip);
                 }
 
                 return self.screens.current_mut().on_error(*err);
@@ -679,7 +688,7 @@ impl Application for ScreenManager {
 
     fn view(&mut self) -> Element<Self::Message> {
         match self.screens.current_mut() {
-            Screen::Login(screen) => screen.view(self.theme).map(Message::LoginScreen),
+            Screen::Login(screen) => screen.view(self.theme, &self.content_store).map(Message::LoginScreen),
             Screen::Main(screen) => screen
                 .view(
                     self.theme,

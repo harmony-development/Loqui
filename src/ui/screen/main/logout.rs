@@ -1,4 +1,4 @@
-use std::convert::identity;
+use client::urlencoding;
 
 use super::super::{LoginScreen, Message as TopLevelMessage, Screen as TopLevelScreen};
 
@@ -62,12 +62,13 @@ impl LogoutModal {
         if msg {
             let content_store = client.content_store_arc();
             client.mk_cmd(
-                |inner| async move {
-                    Client::logout(inner, content_store.session_file().to_path_buf())
-                        .await
-                        .map(|_| TopLevelMessage::Logout(TopLevelScreen::Login(LoginScreen::new(content_store)).into()))
+                |inner| {
+                    Client::logout(
+                        Some(urlencoding::encode(inner.homeserver_url().as_str())),
+                        content_store,
+                    )
                 },
-                identity,
+                |_| TopLevelMessage::Logout(TopLevelScreen::Login(LoginScreen::new()).into()),
             )
         } else {
             Command::none()

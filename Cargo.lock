@@ -305,6 +305,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "urlencoding",
 ]
 
 [[package]]

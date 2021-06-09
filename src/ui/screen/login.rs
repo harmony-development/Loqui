@@ -16,11 +16,14 @@ use client::{
             exports::hrpc::url::Url,
         },
         client::{
-            api::auth::{AuthStep, AuthStepResponse},
+            api::{
+                auth::{AuthStep, AuthStepResponse},
+                chat::{profile, UserId},
+            },
             AuthStatus,
         },
     },
-    AHashMap, IndexMap,
+    urlencoding, AHashMap, IndexMap,
 };
 use std::sync::Arc;
 
@@ -38,6 +41,12 @@ enum AuthPart {
     Step(AuthType),
 }
 
+impl Default for AuthPart {
+    fn default() -> Self {
+        Self::Homeserver
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     FieldChanged(String, String),
@@ -45,36 +54,27 @@ pub enum Message {
     Proceed,
     GoBack,
     AuthStep(Option<AuthStep>),
+    UseSession(Session),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct LoginScreen {
     fields: IndexMap<String, (text_input::State, String, String)>,
     choices: AHashMap<String, button::State>,
     proceed: button::State,
     back: button::State,
+    saved_sessions: pick_list::State<Session>,
 
     current_step: AuthPart,
     can_go_back: bool,
     /// The error formatted as a string to be displayed to the user.
     current_error: String,
-    content_store: Arc<ContentStore>,
     pub waiting: bool,
 }
 
 impl LoginScreen {
-    pub fn new(content_store: Arc<ContentStore>) -> Self {
-        let mut screen = Self {
-            content_store,
-            fields: Default::default(),
-            choices: Default::default(),
-            proceed: Default::default(),
-            back: Default::default(),
-            current_step: AuthPart::Homeserver,
-            can_go_back: false,
-            current_error: Default::default(),
-            waiting: false,
-        };
+    pub fn new() -> Self {
+        let mut screen = Self::default();
         screen.reset_to_first_step();
         screen
     }
@@ -95,12 +95,13 @@ impl LoginScreen {
         );
     }
 
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
+    pub fn view(&mut self, theme: Theme, content_store: &Arc<ContentStore>) -> Element<Message> {
         if self.waiting {
             return fill_container(label!("Please wait...").size(30)).style(theme).into();
         }
 
         let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 1);
+
         if !self.current_error.is_empty() {
             let error_text = label!(self.current_error.as_str().chars().take(250).collect::<String>())
                 .color(ERROR_COLOR)
@@ -108,19 +109,45 @@ impl LoginScreen {
             widgets.push(error_text.into());
         }
 
-        if !self.fields.is_empty() {
-            for (name, (state, value, r#type)) in self.fields.iter_mut() {
-                let namee = name.clone();
-                let mut input =
-                    TextInput::new(state, name, value, move |new| Message::FieldChanged(namee.clone(), new))
-                        .padding(PADDING / 2)
-                        .style(theme);
-                input = match r#type.as_str() {
-                    "password" | "new-password" => input.password(),
-                    _ => input,
-                };
-                widgets.push(input.into());
-            }
+        if let (AuthPart::Homeserver, Ok(read_dir)) =
+            (self.current_step, std::fs::read_dir(content_store.sessions_dir()))
+        {
+            let saved_sessions = read_dir
+                .flatten()
+                .filter(|entry| entry.file_name().to_str() != Some("latest"))
+                .flat_map(|entry| {
+                    let raw = std::fs::read(entry.path()).ok()?;
+                    toml::de::from_slice::<Session>(&raw).ok()
+                })
+                .collect::<Vec<_>>();
+            let message = if saved_sessions.is_empty() {
+                "No sessions"
+            } else {
+                "Select a session"
+            };
+            let session_list = PickList::new(
+                &mut self.saved_sessions,
+                saved_sessions,
+                Some(Session {
+                    user_name: message.to_string(),
+                    ..Default::default()
+                }),
+                Message::UseSession,
+            )
+            .style(theme);
+            widgets.push(session_list.into());
+        }
+
+        for (name, (state, value, r#type)) in self.fields.iter_mut() {
+            let namee = name.clone();
+            let mut input = TextInput::new(state, name, value, move |new| Message::FieldChanged(namee.clone(), new))
+                .padding(PADDING / 2)
+                .style(theme);
+            input = match r#type.as_str() {
+                "password" | "new-password" => input.password(),
+                _ => input,
+            };
+            widgets.push(input.into());
         }
 
         if !self.choices.is_empty() {
@@ -194,6 +221,24 @@ impl LoginScreen {
                     return respond(self, client, response);
                 }
             }
+            Message::UseSession(session) => {
+                let content_store = content_store.clone();
+                return Command::perform(
+                    async move {
+                        let client =
+                            Client::new(session.homeserver.parse().unwrap(), Some(session.into()), content_store)
+                                .await?;
+                        let user_profile =
+                            profile::get_user(client.inner(), UserId::new(client.user_id.unwrap())).await?;
+                        Ok((client, user_profile))
+                    },
+                    |result: ClientResult<_>| {
+                        result.map_to_msg_def(|(client, profile)| {
+                            TopLevelMessage::LoginComplete(Some(client), Some(profile))
+                        })
+                    },
+                );
+            }
             Message::Proceed => {
                 if let (Some(client), AuthPart::Step(AuthType::Form)) = (client, self.current_step) {
                     let response = AuthStepResponse::form(
@@ -227,60 +272,89 @@ impl LoginScreen {
                     }
                 }
             }
-            Message::AuthStep(step) => match step {
-                Some(step) => {
-                    self.current_error = String::default();
-                    self.waiting = false;
-                    self.fields.clear();
-                    self.choices.clear();
-                    self.can_go_back = step.can_go_back;
+            Message::AuthStep(step) => {
+                match step {
+                    Some(step) => {
+                        self.current_error = String::default();
+                        self.waiting = false;
+                        self.fields.clear();
+                        self.choices.clear();
+                        self.can_go_back = step.can_go_back;
 
-                    if let Some(step) = step.step {
-                        match step {
-                            Step::Choice(choice) => {
-                                self.choices
-                                    .extend(choice.options.into_iter().map(|opt| (opt, Default::default())));
-                                self.current_step = AuthPart::Step(AuthType::Choice);
-                            }
-                            Step::Form(form) => {
-                                self.fields.extend(
-                                    form.fields.into_iter().map(|field| {
+                        if let Some(step) = step.step {
+                            match step {
+                                Step::Choice(choice) => {
+                                    self.choices
+                                        .extend(choice.options.into_iter().map(|opt| (opt, Default::default())));
+                                    self.current_step = AuthPart::Step(AuthType::Choice);
+                                }
+                                Step::Form(form) => {
+                                    self.fields.extend(form.fields.into_iter().map(|field| {
                                         (field.name, (Default::default(), Default::default(), field.r#type))
-                                    }),
-                                );
-                                self.current_step = AuthPart::Step(AuthType::Form);
+                                    }));
+                                    self.current_step = AuthPart::Step(AuthType::Form);
+                                }
+                                _ => todo!("Implement waiting"),
                             }
-                            _ => todo!("Implement waiting"),
                         }
                     }
-                }
-                None => {
-                    self.waiting = true;
-                    // If these unwraps fail, then something is very wrong, so we abort here.
-                    // (How can there be no client, but we get authenticated?)
-                    // We *can* recover from here but it's not worth the effort
-                    let auth_status = client.unwrap().auth_status();
-                    let homeserver = client.unwrap().inner().homeserver_url().to_string();
-                    let session_file = content_store.session_file().to_path_buf();
-                    return Command::perform(
-                        async move {
-                            if let AuthStatus::Complete(session) = auth_status {
-                                let session = Session {
-                                    homeserver,
-                                    session_token: session.session_token,
-                                    user_id: session.user_id.to_string(),
-                                };
+                    None => {
+                        self.waiting = true;
+                        // If these unwraps fail, then something is very wrong, so we abort here.
+                        // (How can there be no client, but we get authenticated?)
+                        // We *can* recover from here but it's not worth the effort
+                        let auth_status = client.unwrap().auth_status();
+                        let homeserver = client.unwrap().inner().homeserver_url().to_string();
+                        let content_store = client.unwrap().content_store_arc();
+                        let inner = client.unwrap().inner_arc();
+                        return Command::perform(
+                            async move {
+                                if let AuthStatus::Complete(session) = auth_status {
+                                    let user_id = session.user_id.to_string();
+                                    let session_file = content_store.sessions_dir().join(format!(
+                                        "{}_{}",
+                                        urlencoding::encode(&homeserver),
+                                        user_id
+                                    ));
+                                    let user_profile = profile::get_user(&inner, UserId::new(session.user_id)).await?;
+                                    let session = Session {
+                                        homeserver,
+                                        session_token: session.session_token,
+                                        user_id,
+                                        user_name: user_profile.user_name.clone(),
+                                    };
 
-                                // This should never ever fail in our case, if it does something is very very very wrong
-                                let ser = toml::ser::to_vec(&session).unwrap();
-                                tokio::fs::write(session_file, ser).await?;
-                            }
-                            Ok(None)
-                        },
-                        |result: ClientResult<Option<Client>>| result.map_to_msg_def(TopLevelMessage::LoginComplete),
-                    );
+                                    // This should never ever fail in our case, if it does something is very very very wrong
+                                    let ser = toml::ser::to_vec(&session).unwrap();
+                                    tokio::fs::write(session_file.as_path(), ser).await.map_err(|err| {
+                                        ClientError::Custom(format!(
+                                            "couldn't write session file to {}: {}",
+                                            session_file.to_string_lossy(),
+                                            err
+                                        ))
+                                    })?;
+                                    tokio::fs::hard_link(session_file.as_path(), content_store.latest_session_file())
+                                        .await
+                                        .map_err(|err| {
+                                            ClientError::Custom(format!(
+                                                "couldn't link session file ({}) to latest session ({}): {}",
+                                                session_file.to_string_lossy(),
+                                                content_store.latest_session_file().to_string_lossy(),
+                                                err
+                                            ))
+                                        })?;
+                                    Ok(Some(user_profile))
+                                } else {
+                                    Ok(None)
+                                }
+                            },
+                            |result: ClientResult<_>| {
+                                result.map_to_msg_def(|profile| TopLevelMessage::LoginComplete(None, profile))
+                            },
+                        );
+                    }
                 }
-            },
+            }
         }
         Command::none()
     }

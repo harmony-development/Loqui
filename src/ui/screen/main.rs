@@ -212,9 +212,9 @@ impl MainScreen {
         let menu = PickList::new(
             &mut self.menu_state,
             vec![
-                current_username.clone(),
                 "Edit Profile".to_string(),
                 "Help".to_string(),
+                "Switch Account".to_string(),
                 "Logout".to_string(),
                 "Exit".to_string(),
             ],
@@ -291,7 +291,6 @@ impl MainScreen {
             }
 
             let channel_menu_entries = vec![
-                guild.name.clone(),
                 "New Channel".to_string(),   // [tag:new_channel_menu_entry]
                 "Edit Guild".to_string(),    // [tag:edit_guild_menu_entry]
                 "Copy Guild ID".to_string(), // [tag:copy_guild_id_menu_entry]
@@ -944,6 +943,12 @@ impl MainScreen {
                 "Logout" => {
                     self.logout_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
+                }
+                "Switch Account" => {
+                    let content_store = client.content_store_arc();
+                    return Command::perform(Client::logout(None, content_store), |result| {
+                        result.map_to_msg_def(|_| TopLevelMessage::PopScreen)
+                    });
                 }
                 "Edit Profile" => {
                     self.profile_edit_modal.inner_mut().user_id = client
