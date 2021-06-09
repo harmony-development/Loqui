@@ -5,7 +5,7 @@ use crate::{
     ui::{
         component::*,
         screen::{ClientExt, ResultExt},
-        style::{Theme, ERROR_COLOR, PADDING},
+        style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING},
     },
 };
 use client::{
@@ -23,6 +23,7 @@ use client::{
             AuthStatus,
         },
     },
+    smol_str::SmolStr,
     urlencoding, AHashMap, IndexMap,
 };
 use std::sync::Arc;
@@ -49,8 +50,8 @@ impl Default for AuthPart {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    FieldChanged(String, String),
-    ProceedWithChoice(String),
+    FieldChanged(SmolStr, String),
+    ProceedWithChoice(SmolStr),
     Proceed,
     GoBack,
     AuthStep(Option<AuthStep>),
@@ -59,8 +60,8 @@ pub enum Message {
 
 #[derive(Debug, Default)]
 pub struct LoginScreen {
-    fields: IndexMap<String, (text_input::State, String, String)>,
-    choices: AHashMap<String, button::State>,
+    fields: IndexMap<SmolStr, (text_input::State, String, String)>,
+    choices: AHashMap<SmolStr, button::State>,
     proceed: button::State,
     back: button::State,
     saved_sessions: pick_list::State<Session>,
@@ -86,7 +87,7 @@ impl LoginScreen {
         self.fields.clear();
         self.choices.clear();
         self.fields.insert(
-            "homeserver".to_string(),
+            SmolStr::new_inline("homeserver"),
             (
                 Default::default(),
                 "https://chat.harmonyapp.io:2289".to_string(),
@@ -97,15 +98,15 @@ impl LoginScreen {
 
     pub fn view(&mut self, theme: Theme, content_store: &Arc<ContentStore>) -> Element<Message> {
         if self.waiting {
-            return fill_container(label!("Please wait...").size(30)).style(theme).into();
+            return fill_container(label!("Please wait...").size(DEF_SIZE + 10))
+                .style(theme)
+                .into();
         }
 
         let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 1);
 
         if !self.current_error.is_empty() {
-            let error_text = label!(self.current_error.as_str().chars().take(250).collect::<String>())
-                .color(ERROR_COLOR)
-                .size(18);
+            let error_text = label!(&self.current_error).color(ERROR_COLOR).size(DEF_SIZE - 2);
             widgets.push(error_text.into());
         }
 
@@ -129,7 +130,7 @@ impl LoginScreen {
                 &mut self.saved_sessions,
                 saved_sessions,
                 Some(Session {
-                    user_name: message.to_string(),
+                    user_name: SmolStr::new_inline(message),
                     ..Default::default()
                 }),
                 Message::UseSession,
@@ -155,7 +156,7 @@ impl LoginScreen {
             sorted_choices.sort_unstable_by_key(|(name, _)| name.as_str());
             for (name, state) in &mut self.choices {
                 widgets.push(
-                    Button::new(state, label!(name))
+                    Button::new(state, label!(name.as_str()))
                         .on_press(Message::ProceedWithChoice(name.clone()))
                         .style(theme)
                         .into(),
@@ -217,7 +218,7 @@ impl LoginScreen {
             }
             Message::ProceedWithChoice(choice) => {
                 if let Some(client) = client {
-                    let response = AuthStepResponse::Choice(choice);
+                    let response = AuthStepResponse::Choice(choice.into());
                     return respond(self, client, response);
                 }
             }
@@ -285,12 +286,15 @@ impl LoginScreen {
                             match step {
                                 Step::Choice(choice) => {
                                     self.choices
-                                        .extend(choice.options.into_iter().map(|opt| (opt, Default::default())));
+                                        .extend(choice.options.into_iter().map(|opt| (opt.into(), Default::default())));
                                     self.current_step = AuthPart::Step(AuthType::Choice);
                                 }
                                 Step::Form(form) => {
                                     self.fields.extend(form.fields.into_iter().map(|field| {
-                                        (field.name, (Default::default(), Default::default(), field.r#type))
+                                        (
+                                            field.name.into(),
+                                            (Default::default(), Default::default(), field.r#type),
+                                        )
                                     }));
                                     self.current_step = AuthPart::Step(AuthType::Form);
                                 }
@@ -304,13 +308,13 @@ impl LoginScreen {
                         // (How can there be no client, but we get authenticated?)
                         // We *can* recover from here but it's not worth the effort
                         let auth_status = client.unwrap().auth_status();
-                        let homeserver = client.unwrap().inner().homeserver_url().to_string();
+                        let homeserver = SmolStr::new(client.unwrap().inner().homeserver_url().as_str());
                         let content_store = client.unwrap().content_store_arc();
                         let inner = client.unwrap().inner_arc();
                         return Command::perform(
                             async move {
                                 if let AuthStatus::Complete(session) = auth_status {
-                                    let user_id = session.user_id.to_string();
+                                    let user_id = session.user_id.to_string().into();
                                     let session_file = content_store.sessions_dir().join(format!(
                                         "{}_{}",
                                         urlencoding::encode(&homeserver),
@@ -319,9 +323,9 @@ impl LoginScreen {
                                     let user_profile = profile::get_user(&inner, UserId::new(session.user_id)).await?;
                                     let session = Session {
                                         homeserver,
-                                        session_token: session.session_token,
+                                        session_token: session.session_token.into(),
                                         user_id,
-                                        user_name: user_profile.user_name.clone(),
+                                        user_name: user_profile.user_name.as_str().into(),
                                     };
 
                                     // This should never ever fail in our case, if it does something is very very very wrong

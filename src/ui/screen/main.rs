@@ -27,6 +27,7 @@ use client::{
         },
     },
     message::MessageId,
+    smol_str::SmolStr,
     tracing::{error, trace},
     IndexMap,
 };
@@ -104,7 +105,7 @@ pub enum Message {
         path: PathBuf,
         name: String,
     },
-    OpenUrl(String),
+    OpenUrl(SmolStr),
     /// Sent when the user selects a different guild.
     GuildChanged(u64),
     /// Sent twhen the user selects a different channel.
@@ -115,8 +116,8 @@ pub enum Message {
         scroll_perc: f32,
     },
     /// Sent when the user selects an option from the bottom menu.
-    SelectedMenuOption(String),
-    SelectedChannelMenuOption(String),
+    SelectedMenuOption(SmolStr),
+    SelectedChannelMenuOption(SmolStr),
     SelectedMember(u64),
     LogoutChoice(bool),
     ChannelViewPerm(u64, u64, bool),
@@ -128,7 +129,7 @@ pub enum Message {
     UpdateChannelMessage(edit_channel::Message),
     ShowUpdateChannelModal(u64, u64),
     TryShowUpdateChannelModal(u64, u64),
-    CopyToClipboard(String),
+    CopyIdToClipboard(u64),
     OpenCreateJoinGuild,
 }
 
@@ -142,8 +143,8 @@ pub struct MainScreen {
     scroll_to_bottom_but_state: button::State,
 
     // Room area state
-    channel_menu_state: pick_list::State<String>,
-    menu_state: pick_list::State<String>,
+    channel_menu_state: pick_list::State<SmolStr>,
+    menu_state: pick_list::State<SmolStr>,
     guilds_list_state: scrollable::State,
     guilds_buts_state: Vec<button::State>,
     channels_list_state: scrollable::State,
@@ -206,17 +207,17 @@ impl MainScreen {
         let current_username = client
             .members
             .get(&current_user_id)
-            .map_or_else(|| String::from("unknown"), |member| member.username.clone());
+            .map_or(SmolStr::new_inline("Loading..."), |member| member.username.clone());
 
         // TODO: show user avatar next to name
         let menu = PickList::new(
             &mut self.menu_state,
             vec![
-                "Edit Profile".to_string(),
-                "Help".to_string(),
-                "Switch Account".to_string(),
-                "Logout".to_string(),
-                "Exit".to_string(),
+                SmolStr::new_inline("Edit Profile"),
+                SmolStr::new_inline("Help"),
+                SmolStr::new_inline("Switch Account"),
+                SmolStr::new_inline("Logout"),
+                SmolStr::new_inline("Exit"),
             ],
             Some(current_username),
             Message::SelectedMenuOption,
@@ -258,7 +259,7 @@ impl MainScreen {
 
             // Fill sorted_members with content
             for (state, (user_id, member)) in self.members_buts_state.iter_mut().zip(sorted_members.iter()) {
-                let mut username = label!(&member.username);
+                let mut username = label!(member.username.as_str());
                 if matches!(member.status, UserStatus::Offline) {
                     username = username.color(ALT_COLOR);
                 }
@@ -291,15 +292,15 @@ impl MainScreen {
             }
 
             let channel_menu_entries = vec![
-                "New Channel".to_string(),   // [tag:new_channel_menu_entry]
-                "Edit Guild".to_string(),    // [tag:edit_guild_menu_entry]
-                "Copy Guild ID".to_string(), // [tag:copy_guild_id_menu_entry]
+                SmolStr::new_inline("New Channel"),   // [tag:new_channel_menu_entry]
+                SmolStr::new_inline("Edit Guild"),    // [tag:edit_guild_menu_entry]
+                SmolStr::new_inline("Copy Guild ID"), // [tag:copy_guild_id_menu_entry]
             ];
 
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
                 channel_menu_entries,
-                Some(guild.name.clone()),
+                Some(guild.name.as_str().into()),
                 Message::SelectedChannelMenuOption,
             )
             .width(length!(+))
@@ -620,7 +621,7 @@ impl MainScreen {
                     super::GuildDiscovery::default(),
                 ));
             }
-            Message::CopyToClipboard(string) => clip.write(string),
+            Message::CopyIdToClipboard(id) => clip.write(id.to_string()),
             Message::ChannelViewPerm(guild_id, channel_id, ok) => {
                 client
                     .get_channel(guild_id, channel_id)
@@ -696,7 +697,7 @@ impl MainScreen {
                             .map(|(_, gid, cid, name)| quick_switcher::SearchResult::Channel {
                                 guild_id: gid,
                                 id: cid,
-                                name: name.to_string(),
+                                name: name.into(),
                             })
                             .collect()
                     };
@@ -710,8 +711,7 @@ impl MainScreen {
                                 id: *cid,
                                 name: client
                                     .get_channel(*gid, *cid)
-                                    .map(|c| c.name.clone())
-                                    .unwrap_or_else(|| "unknown".to_string()),
+                                    .map_or(SmolStr::new_inline("unknown"), |c| c.name.clone()),
                             })
                             .collect()
                     } else if let Some(pattern) = new_term.strip_prefix('*').map(str::trim) {
@@ -758,7 +758,8 @@ impl MainScreen {
                             .flatten()
                         {
                             if let IcyContent::Text(text) = &msg.content {
-                                self.message = text.clone();
+                                self.message.clear();
+                                self.message.push_str(text);
                             }
                         }
                     } else {
@@ -776,7 +777,7 @@ impl MainScreen {
                 self.error_text.clear();
             }
             Message::OpenUrl(url) => {
-                open::that_in_background(url);
+                open::that_in_background(url.as_str());
             }
             Message::OpenImageView { handle, path, name } => {
                 self.image_viewer_modal.show(true);
@@ -829,7 +830,8 @@ impl MainScreen {
                     .get_channel(guild_id, channel_id)
                     .expect("channel not found in client?"); // should never panic, if it does it means client data is corrupted [ref:update_channel_exists_check]
                 chan.user_perms.manage_channel = true;
-                modal_state.channel_name_field = chan.name.clone();
+                modal_state.channel_name_field.clear();
+                modal_state.channel_name_field.push_str(&chan.name);
                 modal_state.guild_id = guild_id;
                 modal_state.channel_id = channel_id;
                 return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);

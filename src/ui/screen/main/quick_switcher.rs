@@ -1,3 +1,5 @@
+use client::smol_str::SmolStr;
+
 use crate::{
     label_button, length, space,
     ui::{
@@ -16,7 +18,7 @@ pub enum Message {
 #[derive(Debug, Clone)]
 pub enum SearchResult {
     Guild { id: u64, name: String },
-    Channel { guild_id: u64, id: u64, name: String },
+    Channel { guild_id: u64, id: u64, name: SmolStr },
 }
 
 #[derive(Debug, Default)]

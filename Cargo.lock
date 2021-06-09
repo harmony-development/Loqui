@@ -303,6 +303,7 @@ dependencies = [
  "infer",
  "rand 0.8.3",
  "serde",
+ "smol_str",
  "tokio",
  "tracing",
  "urlencoding",
@@ -3252,6 +3253,15 @@ checksum = "06384dfaf645908220d976ae24ed39f6cf92efecb0225ea0a948e403014de527"
 dependencies = [
  "smithay-client-toolkit",
  "wayland-client",
+]
+
+[[package]]
+name = "smol_str"
+version = "0.1.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ca0f7ce3a29234210f0f4f0b56f8be2e722488b95cb522077943212da3b32eb"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

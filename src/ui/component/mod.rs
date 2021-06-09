@@ -141,35 +141,34 @@ macro_rules! align {
 
 pub use iced::image::Handle as ImageHandle;
 
-pub fn get_image_size_from_handle(handle: &ImageHandle) -> Option<u64> {
+pub fn get_image_size_from_handle(handle: &ImageHandle) -> usize {
     use iced_native::image::Data;
-    // This one angers me a lot, iced pls read the file beforehand and cache it
     match handle.data() {
-        Data::Bytes(raw) => Some(raw.len() as u64),
-        Data::Path(path) => std::fs::metadata(path).map_or(None, |meta| Some(meta.len())),
+        Data::Bytes(raw) => raw.len(),
         Data::Pixels {
             pixels,
             height: _,
             width: _,
-        } => Some(pixels.len() as u64),
+        } => pixels.len(),
+        Data::Path(_) => unreachable!("we dont use images with path"),
     }
 }
 
 #[derive(Debug)]
 pub struct ThumbnailCache {
     thumbnails: IndexMap<FileId, ImageHandle>,
-    max_size: u64,
+    max_size: usize,
 }
 
 impl Default for ThumbnailCache {
     fn default() -> Self {
-        const MAX_CACHE_SIZE: u64 = 1000 * 1000 * 100; // 100Mb
+        const MAX_CACHE_SIZE: usize = 1000 * 1000 * 100; // 100Mb
         Self::new(MAX_CACHE_SIZE)
     }
 }
 
 impl ThumbnailCache {
-    pub fn new(max_size: u64) -> Self {
+    pub fn new(max_size: usize) -> Self {
         Self {
             thumbnails: IndexMap::default(),
             max_size,
@@ -177,21 +176,13 @@ impl ThumbnailCache {
     }
 
     pub fn put_thumbnail(&mut self, thumbnail_id: FileId, thumbnail: ImageHandle) {
-        let thumbnail_size = match get_image_size_from_handle(&thumbnail) {
-            Some(size) => size,
-            None => return,
-        };
+        let thumbnail_size = get_image_size_from_handle(&thumbnail);
         let cache_size = self.len();
 
         if cache_size + thumbnail_size > self.max_size {
             let mut current_size = 0;
             let mut remove_upto = 0;
-            for (index, size) in self
-                .thumbnails
-                .values()
-                .flat_map(|h| get_image_size_from_handle(h))
-                .enumerate()
-            {
+            for (index, size) in self.thumbnails.values().map(get_image_size_from_handle).enumerate() {
                 if current_size >= thumbnail_size {
                     remove_upto = index + 1;
                     break;
@@ -206,11 +197,8 @@ impl ThumbnailCache {
         }
     }
 
-    pub fn len(&self) -> u64 {
-        self.thumbnails
-            .values()
-            .flat_map(|h| get_image_size_from_handle(h))
-            .sum()
+    pub fn len(&self) -> usize {
+        self.thumbnails.values().map(get_image_size_from_handle).sum()
     }
 
     pub fn is_empty(&self) -> bool {

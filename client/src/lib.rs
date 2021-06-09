@@ -37,6 +37,7 @@ use error::{ClientError, ClientResult};
 use member::{Member, Members};
 use message::{harmony_messages_to_ui_messages, Attachment, Content, Embed, MessageId};
 use serde::{Deserialize, Serialize};
+use smol_str::SmolStr;
 use std::{
     fmt::{self, Debug, Display, Formatter},
     future::Future,
@@ -55,16 +56,17 @@ use self::{
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub use ahash::AHashMap;
 pub use bool_ext;
+pub use smol_str;
 pub use tracing;
 pub use urlencoding;
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
 #[derive(Clone, Default, Deserialize, Serialize, Hash, PartialEq, Eq)]
 pub struct Session {
-    pub session_token: String,
-    pub user_name: String,
-    pub user_id: String,
-    pub homeserver: String,
+    pub session_token: SmolStr,
+    pub user_name: SmolStr,
+    pub user_id: SmolStr,
+    pub homeserver: SmolStr,
 }
 
 impl Debug for Session {
@@ -91,7 +93,7 @@ impl From<Session> for InnerSession {
     fn from(session: Session) -> Self {
         InnerSession {
             user_id: session.user_id.parse().unwrap(),
-            session_token: session.session_token,
+            session_token: session.session_token.into(),
         }
     }
 }
@@ -368,7 +370,7 @@ impl Client {
             }) => {
                 if let Some(channel) = self.get_channel(guild_id, channel_id) {
                     if update_name {
-                        channel.name = name;
+                        channel.name = name.into();
                     }
                 }
 
@@ -393,7 +395,7 @@ impl Client {
                         channel_id,
                         Channel {
                             is_category,
-                            name,
+                            name: name.into(),
                             loading_messages_history: false,
                             looking_at_message: 0,
                             messages: Default::default(),
@@ -452,7 +454,7 @@ impl Client {
             }) => {
                 let member = self.members.entry(user_id).or_default();
                 if update_username {
-                    member.username = new_username;
+                    member.username = new_username.into();
                 }
                 if update_status {
                     member.status = UserStatus::from_i32(new_status).unwrap();

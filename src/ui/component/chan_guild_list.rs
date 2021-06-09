@@ -46,7 +46,7 @@ pub fn build_channel_list<'a>(
                 .vertical_alignment(iced::VerticalAlignment::Bottom)
                 .into(),
         );
-        content_widgets.push(label!(&channel.name).size(DEF_SIZE - 2).into());
+        content_widgets.push(label!(channel.name.as_str()).size(DEF_SIZE - 2).into());
         content_widgets.push(space!(w+).into());
         content_widgets.push(
             Button::new(
@@ -56,7 +56,7 @@ pub fn build_channel_list<'a>(
                     .size(DEF_SIZE - 8),
             )
             .style(theme)
-            .on_press(Message::CopyToClipboard(channel_id.to_string()))
+            .on_press(Message::CopyIdToClipboard(*channel_id))
             .into(),
         );
 

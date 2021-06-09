@@ -18,7 +18,7 @@ use crate::{
     },
 };
 use chrono::{Datelike, Timelike};
-use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::r#override::Reason};
+use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::r#override::Reason, smol_str::SmolStr};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
@@ -88,7 +88,7 @@ pub fn build_event_history<'a>(
 
         let name_to_use = members
             .get(&id_to_use)
-            .map_or_else(String::default, |member| member.username.clone());
+            .map_or_else(SmolStr::default, |member| member.username.clone());
         let override_reason = message
             .overrides
             .as_ref()
@@ -105,7 +105,10 @@ pub fn build_event_history<'a>(
                 }
                 Reason::SystemPlurality(_) => "plurality".to_string(),
             });
-        let sender_display_name = message.overrides.as_ref().map_or(name_to_use, |ov| ov.name.clone());
+        let sender_display_name = message
+            .overrides
+            .as_ref()
+            .map_or(name_to_use, |ov| ov.name.as_str().into());
         let sender_color = theme.calculate_sender_color(sender_display_name.len());
         let sender_avatar_url = message.overrides.as_ref().map_or_else(
             || members.get(&id_to_use).map(|m| m.avatar_url.as_ref()).flatten(),
@@ -124,7 +127,7 @@ pub fn build_event_history<'a>(
             }
 
             widgets.push(
-                label!("[{}]", sender_display_name)
+                label!(sender_display_name)
                     .color(sender_color)
                     .size(MESSAGE_SENDER_SIZE)
                     .into(),
@@ -225,8 +228,8 @@ pub fn build_event_history<'a>(
 
                         let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING)).style(theme.embed());
 
-                        if let Some(url) = &h.url {
-                            but = but.on_press(Message::OpenUrl(url.clone()));
+                        if let Some(url) = h.url.clone() {
+                            but = but.on_press(Message::OpenUrl(url));
                         }
 
                         embed.push(but.into());

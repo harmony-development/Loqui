@@ -1,12 +1,13 @@
 use super::message::Messages;
 use ahash::RandomState;
 use indexmap::IndexMap;
+use smol_str::SmolStr;
 
 pub type Channels = IndexMap<u64, Channel, RandomState>;
 
 #[derive(Debug, Clone)]
 pub struct Channel {
-    pub name: String,
+    pub name: SmolStr,
     pub is_category: bool,
     pub messages: Messages,
     pub looking_at_message: usize,

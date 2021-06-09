@@ -23,3 +23,4 @@ serde = { version = "1.0", features = ["derive"] }
 chrono = "0.4.19"
 tracing = "0.1"
 bool_ext = "0.5"
+smol_str = { version = "0.1.17", features = ["serde"] }

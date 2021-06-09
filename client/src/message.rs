@@ -7,6 +7,7 @@ use harmony_rust_sdk::{
     client::api::rest::FileId,
 };
 use rand::Rng;
+use smol_str::SmolStr;
 use std::{str::FromStr, time::UNIX_EPOCH};
 
 use crate::IndexMap;
@@ -35,7 +36,7 @@ impl From<EmbedField> for harmonytypes::EmbedField {
 
 #[derive(Debug, Clone)]
 pub struct EmbedHeading {
-    pub url: Option<String>,
+    pub url: Option<SmolStr>,
     pub icon: Option<FileId>,
     pub text: String,
     pub subtext: String,
@@ -47,7 +48,7 @@ impl From<EmbedHeading> for harmonytypes::EmbedHeading {
             icon: h.icon.map_or_else(String::default, |id| id.to_string()),
             subtext: h.subtext,
             text: h.text,
-            url: h.url.unwrap_or_default(),
+            url: h.url.map_or_else(String::default, Into::into),
         }
     }
 }
@@ -283,7 +284,7 @@ impl From<harmonytypes::EmbedHeading> for EmbedHeading {
         EmbedHeading {
             text: h.text,
             subtext: h.subtext,
-            url: h.url.is_empty().some(h.url),
+            url: h.url.is_empty().some(h.url.into()),
             icon: FileId::from_str(&h.icon).ok(),
         }
     }
