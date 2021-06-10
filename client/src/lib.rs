@@ -142,9 +142,9 @@ impl Client {
         })
     }
 
-    pub async fn logout(homeserver_encoded: Option<String>, content_store: Arc<ContentStore>) -> ClientResult<()> {
-        if let Some(homeserver_encoded) = homeserver_encoded {
-            tokio::fs::remove_file(content_store.sessions_dir().join(homeserver_encoded)).await?;
+    pub async fn logout(homeserver: Option<(String, u64)>, content_store: Arc<ContentStore>) -> ClientResult<()> {
+        if let Some((homeserver, user_id)) = homeserver {
+            tokio::fs::remove_file(content_store.session_path(&homeserver, user_id)).await?;
         }
         tokio::fs::remove_file(content_store.latest_session_file()).await?;
         Ok(())

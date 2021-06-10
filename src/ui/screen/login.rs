@@ -244,13 +244,15 @@ impl LoginScreen {
                         let user_id = client.user_id.unwrap();
                         let user_profile = profile::get_user(client.inner(), UserId::new(user_id)).await?;
                         let session_file = client.content_store().session_path(&homeserver, user_id);
-                        tokio::fs::hard_link(session_file.as_path(), client.content_store().latest_session_file())
+                        let latest = client.content_store().latest_session_file();
+                        let _ = tokio::fs::remove_file(latest).await;
+                        tokio::fs::hard_link(session_file.as_path(), latest)
                             .await
                             .map_err(|err| {
                                 ClientError::Custom(format!(
                                     "couldn't link session file ({}) to latest session ({}): {}",
                                     session_file.to_string_lossy(),
-                                    client.content_store().latest_session_file().to_string_lossy(),
+                                    latest.to_string_lossy(),
                                     err
                                 ))
                             })?;
@@ -355,13 +357,15 @@ impl LoginScreen {
                                             err
                                         ))
                                     })?;
-                                    tokio::fs::hard_link(session_file.as_path(), content_store.latest_session_file())
+                                    let latest = content_store.latest_session_file();
+                                    let _ = tokio::fs::remove_file(latest).await;
+                                    tokio::fs::hard_link(session_file.as_path(), latest)
                                         .await
                                         .map_err(|err| {
                                             ClientError::Custom(format!(
                                                 "couldn't link session file ({}) to latest session ({}): {}",
                                                 session_file.to_string_lossy(),
-                                                content_store.latest_session_file().to_string_lossy(),
+                                                latest.to_string_lossy(),
                                                 err
                                             ))
                                         })?;
