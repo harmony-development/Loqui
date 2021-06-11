@@ -6,7 +6,7 @@ use iced_aw::Card;
 
 use crate::{
     client::Client,
-    label_button, length,
+    length, space,
     ui::{
         component::*,
         screen::{map_to_nothing, ClientExt},
@@ -27,6 +27,7 @@ pub enum Message {
 #[derive(Debug, Default)]
 pub struct ProfileEditModal {
     pub user_id: u64,
+    pub is_edit: bool,
     avatar_but: button::State,
     back_but: button::State,
     username_edit: text_input::State,
@@ -43,6 +44,8 @@ impl ProfileEditModal {
     }
 
     pub fn view(&mut self, theme: Theme, client: &Client, thumbnail_cache: &ThumbnailCache) -> Element<Message> {
+        const MAX_LENGTH: u16 = 380 + (PADDING * 2) - SPACING;
+
         let content: Element<Message> = if let Some(user_profile) = client.members.get(&self.user_id) {
             let user_img: Element<Message> = if let Some(handle) = user_profile
                 .avatar_url
@@ -56,47 +59,65 @@ impl ProfileEditModal {
                     .size((DEF_SIZE * 3) + 4)
                     .into()
             };
-            let avatar_but = Button::new(&mut self.avatar_but, fill_container(user_img))
-                .on_press(Message::UploadPfp)
-                .style(theme);
-            let username = label!(format!("Hello, {}.", user_profile.username)).size(DEF_SIZE + 12);
-            let username_field = TextInput::new(
-                &mut self.username_edit,
-                "Enter a new username...",
-                &self.current_username,
-                Message::UpdateNewUsername,
-            )
-            .on_submit(Message::ChangeName)
-            .padding(PADDING / 2)
-            .style(theme);
-            let username_change_but = label_button!(&mut self.username_change_but, "Change username")
-                .on_press(Message::ChangeName)
-                .style(theme);
-            let content = Column::with_children(vec![
-                row(vec![
-                    avatar_but.width(length!(=96)).height(length!(=96)).into(),
-                    username.into(),
-                ])
-                .into(),
-                row(vec![
-                    username_field.width(length!(=256)).into(),
-                    username_change_but.into(),
-                ])
-                .into(),
-            ])
-            .align_items(align!(|<));
-            content.into()
+            let mut avatar_but = Button::new(&mut self.avatar_but, fill_container(user_img)).style(theme);
+            if self.is_edit {
+                avatar_but = avatar_but.on_press(Message::UploadPfp);
+            }
+            let username_text = if self.is_edit {
+                format!("Hello, {}.", user_profile.username).into()
+            } else {
+                user_profile.username.clone()
+            };
+            let username = label!(username_text).size(DEF_SIZE + 12);
+            let mut profile_widgets = Vec::with_capacity(4);
+            profile_widgets.push(avatar_but.width(length!(=96)).height(length!(=96)).into());
+            profile_widgets.push(space!(w+).into());
+            profile_widgets.push(username.into());
+            if !self.is_edit {
+                profile_widgets.push(space!(w+).into())
+            }
+            let profile_widgets = row(profile_widgets);
+
+            let mut widgets = Vec::with_capacity(2);
+            widgets.push(profile_widgets.into());
+            if self.is_edit {
+                let username_change_widgets = {
+                    let username_field = TextInput::new(
+                        &mut self.username_edit,
+                        "Enter a new username...",
+                        &self.current_username,
+                        Message::UpdateNewUsername,
+                    )
+                    .on_submit(Message::ChangeName)
+                    .padding(PADDING / 2)
+                    .style(theme);
+                    let username_change_but = Button::new(
+                        &mut self.username_change_but,
+                        label!("Update username").size(DEF_SIZE - 1),
+                    )
+                    .on_press(Message::ChangeName)
+                    .style(theme);
+                    row(vec![
+                        username_field.width(length!(=256)).into(),
+                        space!(w+).into(),
+                        username_change_but.into(),
+                    ])
+                };
+                widgets.push(username_change_widgets.into());
+            }
+
+            Column::with_children(widgets)
+                .max_width((MAX_LENGTH + PADDING + SPACING) as u32)
+                .align_items(align!(|<))
+                .into()
         } else {
             label!("No profile loaded yet.").into()
         };
 
         Container::new(
-            Card::new(
-                label!("Edit profile").width(length!(= 380 + (PADDING * 2) - SPACING)),
-                content,
-            )
-            .style(theme.round())
-            .on_close(Message::Back),
+            Card::new(label!("Edit profile").width(length!(= MAX_LENGTH)), content)
+                .style(theme.round())
+                .on_close(Message::Back),
         )
         .style(theme.round())
         .center_x()

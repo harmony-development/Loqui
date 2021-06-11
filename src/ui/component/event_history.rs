@@ -22,7 +22,13 @@ use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::r#override:
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
-type ButsState = [(button::State, button::State, button::State, button::State); SHOWN_MSGS_LIMIT];
+pub type EventHistoryButsState = [(
+    button::State,
+    button::State,
+    button::State,
+    button::State,
+    button::State,
+); SHOWN_MSGS_LIMIT];
 
 #[allow(clippy::mutable_key_type)]
 #[allow(clippy::too_many_arguments)]
@@ -34,7 +40,7 @@ pub fn build_event_history<'a>(
     current_user_id: u64,
     looking_at_message: usize,
     scrollable_state: &'a mut scrollable::State,
-    buts_sate: &'a mut ButsState,
+    buts_sate: &'a mut EventHistoryButsState,
     mode: Mode,
     theme: Theme,
 ) -> Element<'a, Message> {
@@ -76,7 +82,7 @@ pub fn build_event_history<'a>(
         Container::new(column(msg_group.drain(..).collect()).align_items(align!(|<))).style(theme.round())
     };
 
-    for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state)) in
+    for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state, avatar_but_state)) in
         (std::iter::once(first_message).chain(displayable_events)).zip(buts_sate.iter_mut())
     {
         let id_to_use = message
@@ -114,17 +120,30 @@ pub fn build_event_history<'a>(
             || members.get(&id_to_use).map(|m| m.avatar_url.as_ref()).flatten(),
             |ov| ov.avatar_url.as_ref(),
         );
-        let sender_body_creator = |sender_display_name: &str| {
-            let mut widgets = Vec::with_capacity(2);
+        let sender_body_creator = |sender_display_name: &str, avatar_but_state: &'a mut button::State| {
+            let mut widgets = Vec::with_capacity(3);
 
-            if let Some(handle) = sender_avatar_url
+            let pfp: Element<Message> = if let Some(handle) = sender_avatar_url
                 .map(|u| thumbnail_cache.get_thumbnail(&u))
                 .flatten()
                 .cloned()
             {
                 // TODO: Add `border_radius` styling for `Image` so we can use it here
-                widgets.push(Image::new(handle).width(length!(= AVATAR_WIDTH)).into());
-            }
+                Image::new(handle).height(length!(+)).width(length!(+)).into()
+            } else {
+                fill_container(label!(sender_display_name
+                    .chars()
+                    .next()
+                    .unwrap_or('u')
+                    .to_ascii_uppercase()))
+                .into()
+            };
+            let pfp_but = Button::new(avatar_but_state, pfp)
+                .width(length!(= AVATAR_WIDTH))
+                .height(length!(= AVATAR_WIDTH))
+                .on_press(Message::SelectedMember(id_to_use))
+                .style(theme);
+            widgets.push(pfp_but.into());
 
             widgets.push(
                 label!(sender_display_name)
@@ -147,6 +166,7 @@ pub fn build_event_history<'a>(
                 .max_height(AVATAR_WIDTH as u32)
                 .spacing(MSG_LR_PADDING)
                 .padding(0)
+                .into()
         };
 
         let is_sender_different =
@@ -155,10 +175,8 @@ pub fn build_event_history<'a>(
             if !message_group.is_empty() {
                 event_history = event_history.push(push_to_msg_group(&mut message_group));
             }
-            message_group.push(sender_body_creator(&sender_display_name).into());
-        }
-
-        if message.timestamp.day() != last_timestamp.day() {
+            message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
+        } else if message.timestamp.day() != last_timestamp.day() {
             let date_time_seperator = fill_container(
                 label!(message.timestamp.format("[%d %B %Y]").to_string())
                     .size(DATE_SEPERATOR_SIZE)
@@ -168,15 +186,12 @@ pub fn build_event_history<'a>(
 
             event_history = event_history.push(push_to_msg_group(&mut message_group));
             event_history = event_history.push(date_time_seperator);
-            message_group.push(sender_body_creator(&sender_display_name).into());
-        }
-
-        if !is_sender_different
-            && !message_group.is_empty()
+            message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
+        } else if !message_group.is_empty()
             && last_timestamp.signed_duration_since(message.timestamp) > chrono::Duration::minutes(5)
         {
             event_history = event_history.push(push_to_msg_group(&mut message_group));
-            message_group.push(sender_body_creator(&sender_display_name).into());
+            message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
         }
 
         let mut message_body_widgets = Vec::with_capacity(2);

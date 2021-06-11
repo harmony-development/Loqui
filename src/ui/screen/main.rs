@@ -28,7 +28,7 @@ use client::{
     },
     message::MessageId,
     smol_str::SmolStr,
-    tracing::{error, trace},
+    tracing::error,
     IndexMap,
 };
 use iced_aw::{modal, Modal};
@@ -48,7 +48,10 @@ use crate::{
     },
     label, label_button, length, space,
     ui::{
-        component::{event_history::SHOWN_MSGS_LIMIT, *},
+        component::{
+            event_history::{EventHistoryButsState, SHOWN_MSGS_LIMIT},
+            *,
+        },
         screen::{make_query_perm, map_send_msg, map_to_nothing, ClientExt, ResultExt},
         style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
     },
@@ -137,7 +140,7 @@ pub enum Message {
 pub struct MainScreen {
     // Event history area state
     event_history_state: scrollable::State,
-    history_buts_sate: [(button::State, button::State, button::State, button::State); SHOWN_MSGS_LIMIT],
+    history_buts_sate: EventHistoryButsState,
     send_file_but_state: button::State,
     composer_state: text_input::State,
     scroll_to_bottom_but_state: button::State,
@@ -909,7 +912,11 @@ impl MainScreen {
                 }
             }
             Message::SelectedMember(user_id) => {
-                trace!("member: {}", user_id);
+                let modal = self.profile_edit_modal.inner_mut();
+                modal.user_id = user_id;
+                modal.is_edit = false;
+                self.profile_edit_modal.show(true);
+                return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
             }
             Message::SelectedChannelMenuOption(option) => match option.as_str() {
                 "New Channel" => {
@@ -953,9 +960,11 @@ impl MainScreen {
                     });
                 }
                 "Edit Profile" => {
-                    self.profile_edit_modal.inner_mut().user_id = client
+                    let modal = self.profile_edit_modal.inner_mut();
+                    modal.user_id = client
                         .user_id
                         .expect("we dont go to main screen if we dont have a user id");
+                    modal.is_edit = true;
                     self.profile_edit_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
                 }
