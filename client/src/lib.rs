@@ -26,6 +26,7 @@ use harmony_rust_sdk::{
                 delete_message, send_message, update_message_text, SendMessage, SendMessageSelfBuilder,
                 UpdateMessageTextRequest,
             },
+            profile::{self, ProfileUpdate},
             EventSource,
         },
         rest::FileId,
@@ -45,6 +46,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use tokio::task::JoinError;
 
 use crate::channel::ChanPerms;
 
@@ -142,12 +144,22 @@ impl Client {
         })
     }
 
-    pub async fn logout(homeserver: Option<(String, u64)>, content_store: Arc<ContentStore>) -> ClientResult<()> {
-        if let Some((homeserver, user_id)) = homeserver {
-            tokio::fs::remove_file(content_store.session_path(&homeserver, user_id)).await?;
-        }
-        tokio::fs::remove_file(content_store.latest_session_file()).await?;
-        Ok(())
+    pub fn logout(
+        &self,
+        full_logout: bool,
+    ) -> impl Future<Output = Result<ClientResult<()>, JoinError>> + Send + Sync + 'static {
+        let inner = self.inner_arc();
+        let content_store = self.content_store_arc();
+        let user_id = self.user_id.unwrap();
+
+        tokio::spawn(async move {
+            profile::profile_update(&inner, ProfileUpdate::default().new_status(UserStatus::Offline)).await?;
+            if full_logout {
+                tokio::fs::remove_file(content_store.session_path(inner.homeserver_url().as_str(), user_id)).await?;
+            }
+            tokio::fs::remove_file(content_store.latest_session_file()).await?;
+            Ok(())
+        })
     }
 
     #[inline(always)]

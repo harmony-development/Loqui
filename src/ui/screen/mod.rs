@@ -28,6 +28,7 @@ use client::{
                 event::{Event, GuildAddedToList, GuildUpdated, ProfileUpdated},
                 GetGuildListRequest, GetUserResponse, QueryPermissionsResponse,
             },
+            harmonytypes::UserStatus,
             rest::FileId,
         },
         client::{
@@ -36,7 +37,7 @@ use client::{
                 chat::{
                     guild::{get_guild, get_guild_list},
                     permissions::{self, QueryPermissions, QueryPermissionsSelfBuilder},
-                    profile::{get_user, get_user_bulk},
+                    profile::{self, get_user, get_user_bulk, ProfileUpdate},
                     EventSource, GuildId, UserId,
                 },
                 harmonytypes::Message as HarmonyMessage,
@@ -344,10 +345,18 @@ impl Application for ScreenManager {
             Message::Nothing => {}
             Message::Exit => {
                 let sock = self.cur_socket.take();
+                let inner = self.client.as_ref().map(|c| c.inner_arc());
                 return Command::perform(
                     async move {
                         if let Some(sock) = sock {
                             let _ = sock.close().await;
+                        }
+                        if let Some(inner) = inner {
+                            let _ = profile::profile_update(
+                                &inner,
+                                ProfileUpdate::default().new_status(UserStatus::Offline),
+                            )
+                            .await;
                         }
                     },
                     |_| Message::ExitReady,
@@ -490,10 +499,15 @@ impl Application for ScreenManager {
                             update_username: true,
                             is_bot: self_profile.is_bot,
                             new_avatar: self_profile.user_avatar,
-                            new_status: self_profile.user_status,
+                            new_status: UserStatus::OnlineUnspecified.into(),
                             new_username: self_profile.user_name,
                             user_id: self_id,
                         }));
+                        profile::profile_update(
+                            &inner,
+                            ProfileUpdate::default().new_status(UserStatus::OnlineUnspecified),
+                        )
+                        .await?;
                         ClientResult::Ok(events)
                     },
                     Message::EventsReceived,

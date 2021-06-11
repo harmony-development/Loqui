@@ -58,11 +58,10 @@ impl LogoutModal {
 
     pub fn update(&mut self, msg: Message, client: &Client) -> Command<TopLevelMessage> {
         if msg {
-            let content_store = client.content_store_arc();
-            let homeserver_user_id = (client.inner().homeserver_url().to_string(), client.user_id.unwrap());
-
-            Command::perform(Client::logout(Some(homeserver_user_id), content_store), |result| {
-                result.map_to_msg_def(|_| TopLevelMessage::Logout(TopLevelScreen::Login(LoginScreen::new()).into()))
+            Command::perform(client.logout(true), |result| {
+                result
+                    .unwrap()
+                    .map_to_msg_def(|_| TopLevelMessage::Logout(TopLevelScreen::Login(LoginScreen::new()).into()))
             })
         } else {
             Command::none()

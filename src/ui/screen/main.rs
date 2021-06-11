@@ -958,9 +958,8 @@ impl MainScreen {
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
                 }
                 "Switch Account" => {
-                    let content_store = client.content_store_arc();
-                    return Command::perform(Client::logout(None, content_store), |result| {
-                        result.map_to_msg_def(|_| TopLevelMessage::PopScreen)
+                    return Command::perform(client.logout(false), |result| {
+                        result.unwrap().map_to_msg_def(|_| TopLevelMessage::PopScreen)
                     });
                 }
                 "Edit Profile" => {
