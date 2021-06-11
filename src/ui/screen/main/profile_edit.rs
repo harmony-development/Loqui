@@ -55,11 +55,16 @@ impl ProfileEditModal {
             {
                 Image::new(handle.clone()).height(length!(+)).width(length!(+)).into()
             } else {
-                label!(user_profile.username.chars().next().unwrap_or('U').to_ascii_uppercase())
-                    .size((DEF_SIZE * 3) + 4)
-                    .into()
+                fill_container(
+                    label!(user_profile.username.chars().next().unwrap_or('U').to_ascii_uppercase())
+                        .size((DEF_SIZE * 3) + 4),
+                )
+                .into()
             };
-            let mut avatar_but = Button::new(&mut self.avatar_but, fill_container(user_img)).style(theme);
+            let mut avatar_but = Button::new(&mut self.avatar_but, user_img)
+                .height(length!(+))
+                .width(length!(+))
+                .style(theme);
             if self.is_edit {
                 avatar_but = avatar_but.on_press(Message::UploadPfp);
             }
@@ -69,8 +74,18 @@ impl ProfileEditModal {
                 user_profile.username.clone()
             };
             let username = label!(username_text).size(DEF_SIZE + 12);
+            let status_color = Color {
+                a: 0.5,
+                ..theme.status_color(user_profile.status)
+            };
             let mut profile_widgets = Vec::with_capacity(4);
-            profile_widgets.push(avatar_but.width(length!(=96)).height(length!(=96)).into());
+            profile_widgets.push(
+                fill_container(avatar_but)
+                    .style(theme.round().with_border_color(status_color))
+                    .width(length!(=96))
+                    .height(length!(=96))
+                    .into(),
+            );
             profile_widgets.push(space!(w+).into());
             profile_widgets.push(username.into());
             if !self.is_edit {
@@ -114,8 +129,9 @@ impl ProfileEditModal {
             label!("No profile loaded yet.").into()
         };
 
+        let profile_header_text = if self.is_edit { "Edit profile" } else { "Profile" };
         Container::new(
-            Card::new(label!("Edit profile").width(length!(= MAX_LENGTH)), content)
+            Card::new(label!(profile_header_text).width(length!(= MAX_LENGTH)), content)
                 .style(theme.round())
                 .on_close(Message::Back),
         )

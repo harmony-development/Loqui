@@ -1,5 +1,5 @@
 use crate::color;
-use client::bool_ext::BoolExt;
+use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::UserStatus};
 use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, Color};
 
 pub const DEF_SIZE: u16 = 20;
@@ -39,6 +39,16 @@ impl Theme {
 
     pub const fn calculate_sender_color(&self, name_len: usize) -> Color {
         Theme::SENDER_COLORS[name_len % Theme::SENDER_COLORS.len()]
+    }
+
+    pub fn status_color(&self, status: UserStatus) -> Color {
+        match status {
+            UserStatus::Offline => ALT_COLOR,
+            UserStatus::DoNotDisturb => color!(160, 0, 0),
+            UserStatus::Idle => color!(160, 100, 0),
+            UserStatus::OnlineUnspecified => color!(0, 160, 0),
+            UserStatus::Streaming => color!(160, 160, 0),
+        }
     }
 
     pub const fn secondary(mut self) -> Self {

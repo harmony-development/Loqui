@@ -18,7 +18,11 @@ use crate::{
     },
 };
 use chrono::{Datelike, Timelike};
-use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::r#override::Reason, smol_str::SmolStr};
+use client::{
+    bool_ext::BoolExt,
+    harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
+    smol_str::SmolStr,
+};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
@@ -92,9 +96,8 @@ pub fn build_event_history<'a>(
             .some(current_user_id)
             .unwrap_or(message.sender);
 
-        let name_to_use = members
-            .get(&id_to_use)
-            .map_or_else(SmolStr::default, |member| member.username.clone());
+        let member = members.get(&id_to_use);
+        let name_to_use = member.map_or_else(SmolStr::default, |member| member.username.clone());
         let override_reason = message
             .overrides
             .as_ref()
@@ -117,12 +120,17 @@ pub fn build_event_history<'a>(
             .map_or(name_to_use, |ov| ov.name.as_str().into());
         let sender_color = theme.calculate_sender_color(sender_display_name.len());
         let sender_avatar_url = message.overrides.as_ref().map_or_else(
-            || members.get(&id_to_use).map(|m| m.avatar_url.as_ref()).flatten(),
+            || member.map(|m| m.avatar_url.as_ref()).flatten(),
             |ov| ov.avatar_url.as_ref(),
         );
+        let sender_status = member.map_or(UserStatus::Offline, |m| m.status);
         let sender_body_creator = |sender_display_name: &str, avatar_but_state: &'a mut button::State| {
             let mut widgets = Vec::with_capacity(3);
 
+            let status_color = Color {
+                a: 0.5,
+                ..theme.status_color(sender_status)
+            };
             let pfp: Element<Message> = if let Some(handle) = sender_avatar_url
                 .map(|u| thumbnail_cache.get_thumbnail(&u))
                 .flatten()
@@ -139,11 +147,17 @@ pub fn build_event_history<'a>(
                 .into()
             };
             let pfp_but = Button::new(avatar_but_state, pfp)
-                .width(length!(= AVATAR_WIDTH))
-                .height(length!(= AVATAR_WIDTH))
+                .height(length!(+))
+                .width(length!(+))
                 .on_press(Message::SelectedMember(id_to_use))
                 .style(theme);
-            widgets.push(pfp_but.into());
+            widgets.push(
+                fill_container(pfp_but)
+                    .width(length!(= AVATAR_WIDTH))
+                    .height(length!(= AVATAR_WIDTH))
+                    .style(theme.round().with_border_color(status_color))
+                    .into(),
+            );
 
             widgets.push(
                 label!(sender_display_name)

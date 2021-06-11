@@ -266,6 +266,10 @@ impl MainScreen {
                 if matches!(member.status, UserStatus::Offline) {
                     username = username.color(ALT_COLOR);
                 }
+                let status_color = Color {
+                    a: 0.5,
+                    ..theme.status_color(member.status)
+                };
                 let pfp: Element<Message> = if let Some(handle) = member
                     .avatar_url
                     .as_ref()
@@ -282,7 +286,7 @@ impl MainScreen {
                     fill_container(pfp)
                         .width(length!(= AVATAR_WIDTH))
                         .height(length!(= AVATAR_WIDTH))
-                        .style(theme.round())
+                        .style(theme.round().with_border_color(status_color))
                         .into(),
                 ];
 
