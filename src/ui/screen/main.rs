@@ -21,6 +21,7 @@ use client::{
                 self,
                 channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
                 guild::get_guild_members,
+                profile::{self, ProfileUpdate},
                 GuildId,
             },
             rest::download_extract_file,
@@ -134,6 +135,7 @@ pub enum Message {
     TryShowUpdateChannelModal(u64, u64),
     CopyIdToClipboard(u64),
     OpenCreateJoinGuild,
+    ChangeUserStatus(UserStatus),
 }
 
 #[derive(Debug, Default)]
@@ -154,6 +156,7 @@ pub struct MainScreen {
     channels_buts_state: Vec<(button::State, button::State, button::State)>,
     members_buts_state: Vec<button::State>,
     members_list_state: scrollable::State,
+    status_list: pick_list::State<UserStatus>,
 
     logout_modal: modal::State<LogoutModal>,
     create_channel_modal: modal::State<ChannelCreationModal>,
@@ -207,10 +210,9 @@ impl MainScreen {
             .into()];
 
         let current_user_id = client.user_id.unwrap();
-        let current_username = client
-            .members
-            .get(&current_user_id)
-            .map_or(SmolStr::new_inline("Loading..."), |member| member.username.clone());
+        let current_profile = client.members.get(&current_user_id);
+        let current_username =
+            current_profile.map_or(SmolStr::new_inline("Loading..."), |member| member.username.clone());
 
         // TODO: show user avatar next to name
         let menu = PickList::new(
@@ -224,6 +226,21 @@ impl MainScreen {
             ],
             Some(current_username),
             Message::SelectedMenuOption,
+        )
+        .width(length!(+))
+        .style(theme);
+
+        let status_menu = PickList::new(
+            &mut self.status_list,
+            vec![
+                UserStatus::OnlineUnspecified,
+                UserStatus::DoNotDisturb,
+                UserStatus::Idle,
+                UserStatus::Offline,
+                UserStatus::Streaming,
+            ],
+            Some(current_profile.map_or(UserStatus::OnlineUnspecified, |m| m.status)),
+            Message::ChangeUserStatus,
         )
         .width(length!(+))
         .style(theme);
@@ -266,10 +283,7 @@ impl MainScreen {
                 if matches!(member.status, UserStatus::Offline) {
                     username = username.color(ALT_COLOR);
                 }
-                let status_color = Color {
-                    a: 0.5,
-                    ..theme.status_color(member.status)
-                };
+                let status_color = theme.status_color(member.status);
                 let pfp: Element<Message> = if let Some(handle) = member
                     .avatar_url
                     .as_ref()
@@ -477,9 +491,14 @@ impl MainScreen {
             }
             screen_widgets.push(
                 Container::new(
-                    Column::with_children(vec![menu.into(), members_list.into()])
-                        .width(length!(+))
-                        .height(length!(+)),
+                    Column::with_children(vec![
+                        menu.into(),
+                        members_list.into(),
+                        space!(h+).into(),
+                        status_menu.into(),
+                    ])
+                    .width(length!(+))
+                    .height(length!(+)),
                 )
                 .width(length!(= 200))
                 .height(length!(+))
@@ -494,7 +513,7 @@ impl MainScreen {
 
             screen_widgets.push(
                 Container::new(
-                    Column::with_children(vec![menu.into()])
+                    Column::with_children(vec![menu.into(), space!(h+).into(), status_menu.into()])
                         .width(length!(+))
                         .height(length!(+)),
                 )
@@ -623,6 +642,14 @@ impl MainScreen {
         }
 
         match msg {
+            Message::ChangeUserStatus(new_status) => {
+                return client.mk_cmd(
+                    |inner| async move {
+                        profile::profile_update(&inner, ProfileUpdate::default().new_status(new_status)).await
+                    },
+                    |_| TopLevelMessage::Nothing,
+                );
+            }
             Message::OpenCreateJoinGuild => {
                 return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
                     super::GuildDiscovery::default(),

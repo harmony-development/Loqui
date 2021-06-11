@@ -36,13 +36,6 @@ pub struct ProfileEditModal {
 }
 
 impl ProfileEditModal {
-    pub fn new(user_id: u64) -> Self {
-        Self {
-            user_id,
-            ..Default::default()
-        }
-    }
-
     pub fn view(&mut self, theme: Theme, client: &Client, thumbnail_cache: &ThumbnailCache) -> Element<Message> {
         const MAX_LENGTH: u16 = 380 + (PADDING * 2) - SPACING;
 
@@ -61,10 +54,7 @@ impl ProfileEditModal {
                 )
                 .into()
             };
-            let mut avatar_but = Button::new(&mut self.avatar_but, user_img)
-                .height(length!(+))
-                .width(length!(+))
-                .style(theme);
+            let mut avatar_but = Button::new(&mut self.avatar_but, user_img).style(theme);
             if self.is_edit {
                 avatar_but = avatar_but.on_press(Message::UploadPfp);
             }
@@ -74,18 +64,8 @@ impl ProfileEditModal {
                 user_profile.username.clone()
             };
             let username = label!(username_text).size(DEF_SIZE + 12);
-            let status_color = Color {
-                a: 0.5,
-                ..theme.status_color(user_profile.status)
-            };
             let mut profile_widgets = Vec::with_capacity(4);
-            profile_widgets.push(
-                fill_container(avatar_but)
-                    .style(theme.round().with_border_color(status_color))
-                    .width(length!(=96))
-                    .height(length!(=96))
-                    .into(),
-            );
+            profile_widgets.push(avatar_but.width(length!(=96)).height(length!(=96)).into());
             profile_widgets.push(space!(w+).into());
             profile_widgets.push(username.into());
             if !self.is_edit {

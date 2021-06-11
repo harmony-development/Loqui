@@ -45,9 +45,9 @@ impl Theme {
         match status {
             UserStatus::Offline => ALT_COLOR,
             UserStatus::DoNotDisturb => color!(160, 0, 0),
-            UserStatus::Idle => color!(160, 100, 0),
+            UserStatus::Idle => color!(200, 140, 0),
             UserStatus::OnlineUnspecified => color!(0, 160, 0),
-            UserStatus::Streaming => color!(160, 160, 0),
+            UserStatus::Streaming => color!(160, 0, 160),
         }
     }
 
@@ -79,6 +79,43 @@ impl Theme {
         let mut style = style.style();
         style.border_color = color;
         TempBorderColor(style).into()
+    }
+
+    pub fn with_border_color_but(self, color: Color) -> Box<dyn button::StyleSheet> {
+        struct TempBorderColor(Box<dyn button::StyleSheet>, Color);
+
+        impl button::StyleSheet for TempBorderColor {
+            fn active(&self) -> button::Style {
+                button::Style {
+                    border_color: self.1,
+                    ..self.0.active()
+                }
+            }
+
+            fn hovered(&self) -> button::Style {
+                button::Style {
+                    border_color: self.1,
+                    ..self.0.hovered()
+                }
+            }
+
+            fn pressed(&self) -> button::Style {
+                button::Style {
+                    border_color: self.1,
+                    ..self.0.pressed()
+                }
+            }
+
+            fn disabled(&self) -> button::Style {
+                button::Style {
+                    border_color: self.1,
+                    ..self.0.disabled()
+                }
+            }
+        }
+
+        let style: Box<dyn button::StyleSheet> = self.into();
+        TempBorderColor(style, color).into()
     }
 }
 

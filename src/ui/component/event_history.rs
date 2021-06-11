@@ -127,10 +127,7 @@ pub fn build_event_history<'a>(
         let sender_body_creator = |sender_display_name: &str, avatar_but_state: &'a mut button::State| {
             let mut widgets = Vec::with_capacity(3);
 
-            let status_color = Color {
-                a: 0.5,
-                ..theme.status_color(sender_status)
-            };
+            let status_color = theme.status_color(sender_status);
             let pfp: Element<Message> = if let Some(handle) = sender_avatar_url
                 .map(|u| thumbnail_cache.get_thumbnail(&u))
                 .flatten()
@@ -139,20 +136,10 @@ pub fn build_event_history<'a>(
                 // TODO: Add `border_radius` styling for `Image` so we can use it here
                 Image::new(handle).height(length!(+)).width(length!(+)).into()
             } else {
-                fill_container(label!(sender_display_name
-                    .chars()
-                    .next()
-                    .unwrap_or('u')
-                    .to_ascii_uppercase()))
-                .into()
+                label!(sender_display_name.chars().next().unwrap_or('u').to_ascii_uppercase()).into()
             };
-            let pfp_but = Button::new(avatar_but_state, pfp)
-                .height(length!(+))
-                .width(length!(+))
-                .on_press(Message::SelectedMember(id_to_use))
-                .style(theme);
             widgets.push(
-                fill_container(pfp_but)
+                fill_container(pfp)
                     .width(length!(= AVATAR_WIDTH))
                     .height(length!(= AVATAR_WIDTH))
                     .style(theme.round().with_border_color(status_color))
@@ -176,10 +163,14 @@ pub fn build_event_history<'a>(
                 );
             }
 
-            row(widgets)
+            let content = row(widgets)
                 .max_height(AVATAR_WIDTH as u32)
                 .spacing(MSG_LR_PADDING)
-                .padding(0)
+                .padding(0);
+
+            Button::new(avatar_but_state, content)
+                .on_press(Message::SelectedMember(id_to_use))
+                .style(theme.secondary())
                 .into()
         };
 
