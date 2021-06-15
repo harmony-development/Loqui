@@ -7,14 +7,14 @@ use crate::{
         member::Members,
         message::{Content as IcyContent, EmbedHeading},
     },
-    color, label, space,
-    ui::{
-        component::*,
-        screen::main::{Message, Mode},
-        style::{
-            Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR, MESSAGE_SENDER_SIZE,
-            MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
-        },
+    color,
+    component::*,
+    label,
+    screen::main::{Message, Mode},
+    space,
+    style::{
+        Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
+        MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
     },
 };
 use chrono::{Datelike, Timelike};

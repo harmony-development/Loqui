@@ -11,11 +11,9 @@ use super::{ClientExt, Message as TopLevelMessage, Screen as TopLevelScreen};
 
 use crate::{
     client::{error::ClientError, Client},
+    component::*,
     label, label_button, length, space,
-    ui::{
-        component::*,
-        style::{Theme, ERROR_COLOR, PADDING, SUCCESS_COLOR},
-    },
+    style::{Theme, ERROR_COLOR, PADDING, SUCCESS_COLOR},
 };
 
 #[derive(Clone, Debug)]

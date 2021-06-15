@@ -1,12 +1,10 @@
 use super::Message as TopLevelMessage;
 use crate::{
     client::{content::ContentStore, error::ClientError, Client, Session},
+    component::*,
     label, label_button,
-    ui::{
-        component::*,
-        screen::{ClientExt, ResultExt},
-        style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING},
-    },
+    screen::{ClientExt, ResultExt},
+    style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING},
 };
 use client::{
     error::ClientResult,

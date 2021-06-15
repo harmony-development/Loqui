@@ -1,11 +1,9 @@
 use client::smol_str::SmolStr;
 
 use crate::{
+    component::*,
     label_button, length, space,
-    ui::{
-        component::*,
-        style::{Theme, DEF_SIZE, PADDING},
-    },
+    style::{Theme, DEF_SIZE, PADDING},
 };
 
 #[derive(Debug, Clone)]

@@ -47,15 +47,14 @@ use crate::{
         message::{Attachment, Content as IcyContent, Message as IcyMessage},
         Client,
     },
-    label, label_button, length, space,
-    ui::{
-        component::{
-            event_history::{EventHistoryButsState, SHOWN_MSGS_LIMIT},
-            *,
-        },
-        screen::{make_query_perm, map_send_msg, map_to_nothing, ClientExt, ResultExt},
-        style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
+    component::{
+        event_history::{EventHistoryButsState, SHOWN_MSGS_LIMIT},
+        *,
     },
+    label, label_button, length,
+    screen::{make_query_perm, map_send_msg, map_to_nothing, ClientExt, ResultExt},
+    space,
+    style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
 };
 
 use self::{edit_channel::UpdateChannelModal, quick_switcher::QuickSwitcherModal};

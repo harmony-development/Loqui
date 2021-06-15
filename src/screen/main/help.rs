@@ -1,9 +1,6 @@
 use iced_aw::Card;
 
-use crate::{
-    length,
-    ui::{component::*, style::*},
-};
+use crate::{component::*, length, style::*};
 
 pub type Message = bool;
 

@@ -2,12 +2,11 @@ use super::super::{LoginScreen, Message as TopLevelMessage, Screen as TopLevelSc
 
 use crate::{
     client::{error::ClientError, Client},
-    label, label_button, length, space,
-    ui::{
-        component::*,
-        screen::ResultExt,
-        style::{Theme, DEF_SIZE, ERROR_COLOR},
-    },
+    component::*,
+    label, label_button, length,
+    screen::ResultExt,
+    space,
+    style::{Theme, DEF_SIZE, ERROR_COLOR},
 };
 
 pub type Message = bool;

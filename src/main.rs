@@ -1,13 +1,16 @@
 #![windows_subsystem = "windows"]
 
 use client::content::ContentStore;
-use ui::{screen::ScreenManager, style::DEF_SIZE};
+use screen::ScreenManager;
+use style::DEF_SIZE;
 
 use iced::{Application, Settings};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 pub use client;
-pub mod ui;
+pub mod component;
+pub mod screen;
+pub mod style;
 
 fn main() {
     // Create the content store

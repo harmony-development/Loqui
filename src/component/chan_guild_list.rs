@@ -3,12 +3,11 @@ use crate::{
         channel::Channels,
         guild::{Guild, Guilds},
     },
-    label, space,
-    ui::{
-        component::*,
-        screen::main::Message,
-        style::{Theme, DEF_SIZE, PADDING, SPACING},
-    },
+    component::*,
+    label,
+    screen::main::Message,
+    space,
+    style::{Theme, DEF_SIZE, PADDING, SPACING},
 };
 
 use iced::{tooltip::Position, Tooltip};

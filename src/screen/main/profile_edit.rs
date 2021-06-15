@@ -6,12 +6,11 @@ use iced_aw::Card;
 
 use crate::{
     client::Client,
-    length, space,
-    ui::{
-        component::*,
-        screen::{map_to_nothing, ClientExt},
-        style::*,
-    },
+    component::*,
+    length,
+    screen::{map_to_nothing, ClientExt},
+    space,
+    style::*,
 };
 
 use super::super::{select_upload_files, Message as TopLevelMessage};

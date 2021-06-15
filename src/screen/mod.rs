@@ -16,7 +16,8 @@ use crate::{
         message::{Attachment, Message as IcyMessage, MessageId},
         Client, PostProcessEvent, Session,
     },
-    ui::{component::*, style::Theme},
+    component::*,
+    style::Theme,
 };
 
 use client::{

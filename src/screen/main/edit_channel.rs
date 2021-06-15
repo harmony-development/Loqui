@@ -4,12 +4,10 @@ use iced_aw::Card;
 
 use crate::{
     client::{error::ClientError, Client},
+    component::*,
     label, label_button, length,
-    ui::{
-        component::*,
-        screen::{map_to_nothing, ClientExt},
-        style::{Theme, ERROR_COLOR, PADDING, SPACING},
-    },
+    screen::{map_to_nothing, ClientExt},
+    style::{Theme, ERROR_COLOR, PADDING, SPACING},
 };
 
 #[derive(Clone, Debug)]

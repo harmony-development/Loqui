@@ -3,11 +3,9 @@ use std::path::PathBuf;
 use super::super::Message as TopLevelMessage;
 
 use crate::{
+    component::*,
     label_button, length,
-    ui::{
-        component::*,
-        style::{Theme, PADDING, SPACING},
-    },
+    style::{Theme, PADDING, SPACING},
 };
 
 use iced::image::{viewer, Viewer};
