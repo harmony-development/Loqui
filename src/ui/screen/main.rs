@@ -115,10 +115,7 @@ pub enum Message {
     /// Sent twhen the user selects a different channel.
     ChannelChanged(u64),
     /// Sent when the user scrolls the message history.
-    MessageHistoryScrolled {
-        prev_scroll_perc: f32,
-        scroll_perc: f32,
-    },
+    MessageHistoryScrolled(f32),
     /// Sent when the user selects an option from the bottom menu.
     SelectedMenuOption(SmolStr),
     SelectedChannelMenuOption(SmolStr),
@@ -176,6 +173,7 @@ pub struct MainScreen {
     error_text: String,
     error_close_but_state: button::State,
     mode: Mode,
+    prev_scroll_perc: f32,
 }
 
 impl MainScreen {
@@ -879,12 +877,9 @@ impl MainScreen {
                 self.logout_modal.show(false);
                 return self.logout_modal.inner_mut().update(confirm, client);
             }
-            Message::MessageHistoryScrolled {
-                prev_scroll_perc,
-                scroll_perc,
-            } => {
+            Message::MessageHistoryScrolled(scroll_perc) => {
                 if let (Some(guild_id), Some(channel_id)) = (self.current_guild_id, self.current_channel_id) {
-                    if scroll_perc < 0.01 && scroll_perc <= prev_scroll_perc {
+                    if scroll_perc < 0.01 && scroll_perc <= self.prev_scroll_perc {
                         if let Some((oldest_msg_id, disp, reached_top, loading_messages_history, looking_at_message)) =
                             client
                                 .get_channel(guild_id, channel_id)
@@ -928,7 +923,7 @@ impl MainScreen {
                                 );
                             }
                         }
-                    } else if scroll_perc > 0.99 && scroll_perc >= prev_scroll_perc {
+                    } else if scroll_perc > 0.99 && scroll_perc >= self.prev_scroll_perc {
                         if let Some((disp, looking_at_message)) = client
                             .get_channel(guild_id, channel_id)
                             .map(|channel| (channel.messages.len(), &mut channel.looking_at_message))
@@ -941,6 +936,7 @@ impl MainScreen {
                         }
                     }
                 }
+                self.prev_scroll_perc = scroll_perc;
             }
             Message::SelectedMember(user_id) => {
                 let modal = self.profile_edit_modal.inner_mut();
@@ -1034,7 +1030,7 @@ impl MainScreen {
                 if let (Some(guild_id), Some(channel_id)) = (self.current_guild_id, self.current_channel_id) {
                     if sent_channel_id == channel_id {
                         scroll_to_bottom(client, guild_id, channel_id);
-                        self.event_history_state.scroll_to_bottom();
+                        self.event_history_state.snap_to(1.0);
                     }
                 }
             }
@@ -1127,7 +1123,7 @@ impl MainScreen {
                         };
                         if let Some(cmd) = client.send_msg_cmd(guild_id, channel_id, Duration::from_secs(0), message) {
                             scroll_to_bottom(client, guild_id, channel_id);
-                            self.event_history_state.scroll_to_bottom();
+                            self.event_history_state.snap_to(1.0);
                             return Command::perform(cmd, map_send_msg);
                         }
                     }
@@ -1234,7 +1230,7 @@ impl MainScreen {
                 {
                     if *disp_at >= disp.saturating_sub(SHOWN_MSGS_LIMIT) {
                         *disp_at = disp.saturating_sub(1);
-                        self.event_history_state.scroll_to_bottom();
+                        self.event_history_state.snap_to(1.0);
                     }
                     let mut cmds = Vec::with_capacity(2);
                     let guild_id = self.current_guild_id.unwrap();

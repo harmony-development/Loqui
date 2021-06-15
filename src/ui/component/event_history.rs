@@ -49,11 +49,7 @@ pub fn build_event_history<'a>(
     theme: Theme,
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
-        .on_scroll(|scroll_perc, prev_scroll_perc| Message::MessageHistoryScrolled {
-            prev_scroll_perc,
-            scroll_perc,
-        })
-        .snap_to_bottom(true)
+        .on_scroll(Message::MessageHistoryScrolled)
         .width(length!(+))
         .height(length!(+))
         .style(theme)
