@@ -14,16 +14,6 @@
   outputs = inputs: inputs.nixCargoIntegration.lib.makeOutputs {
     root = ./.;
     overrides = {
-      pkgs = common: prev: {
-        overlays = [
-          (final: prev: {
-            llvmPackages_12 = prev.llvmPackages_12 // {
-              clang = prev.lib.hiPrio prev.llvmPackages_12.clang;
-              bintools = prev.lib.setPrio (-20) prev.llvmPackages_12.bintools;
-            };
-          })
-        ] ++ prev.overlays;
-      };
       shell = common: prev: {
         env = prev.env ++ [
           {
