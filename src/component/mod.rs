@@ -1,5 +1,7 @@
 pub mod chan_guild_list;
 pub mod event_history;
+#[cfg(feature = "markdown")]
+pub mod markdown;
 
 use crate::length;
 pub use crate::{align, color, label};

@@ -206,8 +206,12 @@ pub fn build_event_history<'a>(
         });
 
         if let Some(text) = msg_text {
+            #[cfg(feature = "markdown")]
+            let message_text = super::markdown::markdown_svg(text);
+            #[cfg(not(feature = "markdown"))]
             let mut message_text = label!(text).size(MESSAGE_SIZE);
 
+            #[cfg(not(feature = "markdown"))]
             if !message.id.is_ack() || message.being_edited.is_some() {
                 message_text = message_text.color(color!(200, 200, 200));
             } else if mode == message.id.id().map_or(Mode::Normal, Mode::EditingMessage) {
