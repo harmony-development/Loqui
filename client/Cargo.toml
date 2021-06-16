@@ -8,12 +8,12 @@ repository = "https://github.com/harmony-development/crust"
 homepage = "https://github.com/harmony-development/crust"
 
 [dependencies]
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client", "parking_lot"] }
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client"] }
 
 infer = "0.5.0"
 directories-next = "2.0.0"
 
-tokio = { version = "1.6", features = ["parking_lot", "time", "fs"] }
+tokio = { version = "1.7", features = ["parking_lot", "time", "fs"] }
 rand = "0.8"
 ahash = "0.7"
 indexmap = "1.6.1"

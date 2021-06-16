@@ -1500,7 +1500,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#3f1ae23494f291b465b0aeda5f4c88f6ed82e55d"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#be750506a1d8f5eed98dd1917c0f294b4e72d3ac"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1510,11 +1510,10 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#3f1ae23494f291b465b0aeda5f4c88f6ed82e55d"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#be750506a1d8f5eed98dd1917c0f294b4e72d3ac"
 dependencies = [
  "derive-new",
  "derive_more",
- "futures",
  "harmony_derive",
  "hrpc",
  "hrpc-build",
@@ -1559,9 +1558,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f160152b91f2462611d45e4a01eb386f5cd25882e871944cb968edea5e6fcff"
+checksum = "0c0ab7c7a463e6f01cecb6c8de9dd9de263fc2e2f59810f41269c1c6abe8fda2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2003,8 +2002,8 @@ dependencies = [
 
 [[package]]
 name = "linemd"
-version = "0.2.1"
-source = "git+https://github.com/yusdacra/linemd.git#b33c8772c5a2502f04300748a5fadf5d2a869f40"
+version = "0.3.0"
+source = "git+https://github.com/yusdacra/linemd.git#53d10cd736e83d9c79b5e626f2b47aeb27644262"
 
 [[package]]
 name = "linked-hash-map"
@@ -2918,9 +2917,9 @@ checksum = "be9e29cb19c8fe84169fcb07f8f11e66bc9e6e0280efd4715c54818296f8a4a8"
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "742739e41cd49414de871ea5e549afb7e2a3ac77b589bcbebe8c82fab37147fc"
+checksum = "5ab49abadf3f9e1c4bc499e8845e152ad87d2ad2d30371841171169e9d75feee"
 dependencies = [
  "bitflags",
 ]
