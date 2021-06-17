@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     convert::identity,
+    fmt::{self, Display, Formatter},
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -13,14 +14,17 @@ use client::{
     error::ClientResult,
     harmony_rust_sdk::{
         api::{
-            chat::event::{ChannelCreated, Event, MemberJoined, MessageSent},
+            chat::{
+                event::{ChannelCreated, Event, MemberJoined, MessageSent},
+                RemoveGuildFromGuildListRequest,
+            },
             harmonytypes::UserStatus,
         },
         client::api::{
             chat::{
                 self,
                 channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
-                guild::get_guild_members,
+                guild::{self, get_guild_members},
                 profile::{self, ProfileUpdate},
                 GuildId,
             },
@@ -80,6 +84,54 @@ impl Default for Mode {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProfileMenuOption {
+    EditProfile,
+    Help,
+    Logout,
+    SwitchAccount,
+    Exit,
+    Custom(SmolStr),
+}
+
+impl Display for ProfileMenuOption {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let w = match self {
+            ProfileMenuOption::EditProfile => "Edit Profile",
+            ProfileMenuOption::Help => "Help",
+            ProfileMenuOption::Logout => "Logout",
+            ProfileMenuOption::SwitchAccount => "Switch Account",
+            ProfileMenuOption::Exit => "Exit",
+            ProfileMenuOption::Custom(s) => s.as_str(),
+        };
+
+        f.write_str(w)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GuildMenuOption {
+    NewChannel,
+    EditGuild,
+    CopyGuildId,
+    LeaveGuild,
+    Custom(SmolStr),
+}
+
+impl Display for GuildMenuOption {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let w = match self {
+            GuildMenuOption::NewChannel => "New Channel",
+            GuildMenuOption::EditGuild => "Edit Guild",
+            GuildMenuOption::CopyGuildId => "Copy Guild ID",
+            GuildMenuOption::LeaveGuild => "Leave Guild",
+            GuildMenuOption::Custom(s) => s.as_str(),
+        };
+
+        f.write_str(w)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     EditLastMessage,
@@ -116,8 +168,8 @@ pub enum Message {
     /// Sent when the user scrolls the message history.
     MessageHistoryScrolled(f32),
     /// Sent when the user selects an option from the bottom menu.
-    SelectedMenuOption(SmolStr),
-    SelectedChannelMenuOption(SmolStr),
+    SelectedMenuOption(ProfileMenuOption),
+    SelectedChannelMenuOption(GuildMenuOption),
     SelectedMember(u64),
     LogoutChoice(bool),
     ChannelViewPerm(u64, u64, bool),
@@ -144,8 +196,8 @@ pub struct MainScreen {
     scroll_to_bottom_but_state: button::State,
 
     // Room area state
-    channel_menu_state: pick_list::State<SmolStr>,
-    menu_state: pick_list::State<SmolStr>,
+    channel_menu_state: pick_list::State<GuildMenuOption>,
+    menu_state: pick_list::State<ProfileMenuOption>,
     guilds_list_state: scrollable::State,
     guilds_buts_state: Vec<button::State>,
     channels_list_state: scrollable::State,
@@ -215,13 +267,13 @@ impl MainScreen {
         let menu = PickList::new(
             &mut self.menu_state,
             vec![
-                SmolStr::new_inline("Edit Profile"),
-                SmolStr::new_inline("Help"),
-                SmolStr::new_inline("Switch Account"),
-                SmolStr::new_inline("Logout"),
-                SmolStr::new_inline("Exit"),
+                ProfileMenuOption::EditProfile,
+                ProfileMenuOption::Help,
+                ProfileMenuOption::SwitchAccount,
+                ProfileMenuOption::Logout,
+                ProfileMenuOption::Exit,
             ],
-            Some(current_username),
+            Some(ProfileMenuOption::Custom(current_username)),
             Message::SelectedMenuOption,
         )
         .width(length!(+))
@@ -309,16 +361,18 @@ impl MainScreen {
                 );
             }
 
+            // [tag:guild_menu_entry]
             let channel_menu_entries = vec![
-                SmolStr::new_inline("New Channel"),   // [tag:new_channel_menu_entry]
-                SmolStr::new_inline("Edit Guild"),    // [tag:edit_guild_menu_entry]
-                SmolStr::new_inline("Copy Guild ID"), // [tag:copy_guild_id_menu_entry]
+                GuildMenuOption::NewChannel,
+                GuildMenuOption::EditGuild,
+                GuildMenuOption::CopyGuildId,
+                GuildMenuOption::LeaveGuild,
             ];
 
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
                 channel_menu_entries,
-                Some(guild.name.as_str().into()),
+                Some(GuildMenuOption::Custom(guild.name.as_str().into())),
                 Message::SelectedChannelMenuOption,
             )
             .width(length!(+))
@@ -944,15 +998,15 @@ impl MainScreen {
                 self.profile_edit_modal.show(true);
                 return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
             }
-            Message::SelectedChannelMenuOption(option) => match option.as_str() {
-                "New Channel" => {
-                    self.create_channel_modal.inner_mut().guild_id = self.current_guild_id.unwrap(); // [ref:new_channel_menu_entry]
+            Message::SelectedChannelMenuOption(option) => match option {
+                GuildMenuOption::NewChannel => {
+                    self.create_channel_modal.inner_mut().guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
                     self.create_channel_modal.show(true);
                     self.error_text.clear();
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
                 }
-                "Edit Guild" => {
-                    let guild_id = self.current_guild_id.unwrap(); // [ref:edit_guild_menu_entry]
+                GuildMenuOption::EditGuild => {
+                    let guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
                     return make_query_perm(client, guild_id, 0, "guild.manage.change-information", |p, gid, _| {
                         if p.ok {
                             TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
@@ -965,26 +1019,42 @@ impl MainScreen {
                         }
                     });
                 }
-                "Copy Guild ID" => {
+                GuildMenuOption::LeaveGuild => {
+                    let guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
+                    if let Some(homeserver) = client.guilds.get(&guild_id).map(|g| g.homeserver.clone()) {
+                        return client.mk_cmd(
+                            |inner| async move {
+                                guild::leave_guild(&inner, GuildId::new(guild_id)).await?;
+                                guild::remove_guild_from_guild_list(
+                                    &inner,
+                                    RemoveGuildFromGuildListRequest { guild_id, homeserver },
+                                )
+                                .await
+                            },
+                            |_| TopLevelMessage::Nothing,
+                        );
+                    }
+                }
+                GuildMenuOption::CopyGuildId => {
                     clip.write(
                         self.current_guild_id
-                            .expect("this menu is only shown if a guild is selected") // [ref:copy_guild_id_menu_entry]
+                            .expect("this menu is only shown if a guild is selected") // [ref:guild_menu_entry]
                             .to_string(),
                     );
                 }
                 _ => {}
             },
-            Message::SelectedMenuOption(option) => match option.as_str() {
-                "Logout" => {
+            Message::SelectedMenuOption(option) => match option {
+                ProfileMenuOption::Logout => {
                     self.logout_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
                 }
-                "Switch Account" => {
+                ProfileMenuOption::SwitchAccount => {
                     return Command::perform(client.logout(false), |result| {
                         result.unwrap().map_to_msg_def(|_| TopLevelMessage::PopScreen)
                     });
                 }
-                "Edit Profile" => {
+                ProfileMenuOption::EditProfile => {
                     let modal = self.profile_edit_modal.inner_mut();
                     modal.user_id = client
                         .user_id
@@ -993,11 +1063,11 @@ impl MainScreen {
                     self.profile_edit_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
                 }
-                "Help" => {
+                ProfileMenuOption::Help => {
                     self.help_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
                 }
-                "Exit" => {
+                ProfileMenuOption::Exit => {
                     return Command::perform(async { TopLevelMessage::Exit }, identity);
                 }
                 _ => {}

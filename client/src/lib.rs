@@ -482,11 +482,14 @@ impl Client {
                     }
                 };
             }
-            Event::GuildAddedToList(GuildAddedToList {
-                guild_id,
-                homeserver: _,
-            }) => {
-                self.guilds.insert(guild_id, Default::default());
+            Event::GuildAddedToList(GuildAddedToList { guild_id, homeserver }) => {
+                self.guilds.insert(
+                    guild_id,
+                    Guild {
+                        homeserver,
+                        ..Default::default()
+                    },
+                );
                 post.push(PostProcessEvent::FetchGuildData(guild_id));
             }
             Event::GuildRemovedFromList(GuildRemovedFromList {

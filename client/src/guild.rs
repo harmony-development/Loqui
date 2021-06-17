@@ -11,6 +11,7 @@ pub struct Guild {
     pub picture: Option<FileId>,
     pub channels: Channels,
     pub members: AHashSet<u64>,
+    pub homeserver: String,
 }
 
 impl Guild {
