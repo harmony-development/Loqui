@@ -29,12 +29,12 @@ jobs:
     - name: Install nix
       uses: cachix/install-nix-action@v13
       with:
-        install_url: https://github.com/numtide/nix-unstable-installer/releases/download/nix-2.4pre20210415_76980a1/install
+        install_url: https://github.com/numtide/nix-unstable-installer/releases/download/nix-2.4pre20210604_8e6ee1b/install
         extra_nix_config: |
           experimental-features = nix-command flakes
       
     - name: Check tagref
-      run: nix run nixpkgs#tagref
+      run: nix-shell -p tagref --run "tagref && tagref list-unused"
 
   build:
     runs-on: ${{ matrix.os }}
@@ -77,25 +77,25 @@ jobs:
       if: ${{ matrix.os == 'macOS-latest' }}
       run: cargo install cargo-bundle
     
-    - name: Build
+    - name: Build macOS
       if: ${{ matrix.os == 'macOS-latest' }}
       run: cargo bundle --release
 
-    - name: Artifact
+    - name: Artifact macOS
       if: ${{ matrix.os == 'macOS-latest' }}
       uses: actions/upload-artifact@v2.2.2
       with:
         name: build-macos
         path: target/release/bundle/osx/Crust.app
 
-    - name: Artifact
+    - name: Artifact Linux
       if: ${{ matrix.os == 'ubuntu-latest' }}
       uses: actions/upload-artifact@v2.2.2
       with:
         name: build-linux
         path: target/release/crust
 
-    - name: Artifact
+    - name: Artifact Windows
       if: ${{ matrix.os == 'windows-latest' }}
       uses: actions/upload-artifact@v2.2.2
       with:
