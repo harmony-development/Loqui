@@ -34,7 +34,7 @@ jobs:
           experimental-features = nix-command flakes
       
     - name: Check tagref
-      run: nix-shell -p tagref --run "tagref && tagref list-unused"
+      run: nix shell nixpkgs#tagref -c sh -c 'tagref && tagref list-unused'
 
   build:
     runs-on: ${{ matrix.os }}
