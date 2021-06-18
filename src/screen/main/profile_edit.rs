@@ -21,6 +21,7 @@ pub enum Message {
     ChangeName,
     UpdateNewUsername(String),
     Back,
+    IsBotChecked(bool),
 }
 
 #[derive(Debug, Default)]
@@ -32,11 +33,12 @@ pub struct ProfileEditModal {
     username_edit: text_input::State,
     username_change_but: button::State,
     current_username: String,
+    is_bot: bool,
 }
 
 impl ProfileEditModal {
     pub fn view(&mut self, theme: Theme, client: &Client, thumbnail_cache: &ThumbnailCache) -> Element<Message> {
-        const MAX_LENGTH: u16 = 380 + (PADDING * 2) - SPACING;
+        const MAX_LENGTH: u16 = 390 + (PADDING * 2) - SPACING;
 
         let content: Element<Message> = if let Some(user_profile) = client.members.get(&self.user_id) {
             let user_img: Element<Message> = if let Some(handle) = user_profile
@@ -66,10 +68,20 @@ impl ProfileEditModal {
             let mut profile_widgets = Vec::with_capacity(4);
             profile_widgets.push(avatar_but.width(length!(=96)).height(length!(=96)).into());
             profile_widgets.push(space!(w+).into());
-            profile_widgets.push(username.into());
-            if !self.is_edit {
-                profile_widgets.push(space!(w+).into())
-            }
+            let is_bot = if self.is_edit {
+                Checkbox::new(self.is_bot, "Bot", Message::IsBotChecked)
+                    .style(theme)
+                    .into()
+            } else if user_profile.is_bot {
+                label!("Bot").size(DEF_SIZE + 4).into()
+            } else {
+                space!(w = 0).into()
+            };
+            profile_widgets.push(
+                Column::with_children(vec![username.into(), space!(h = 48).into(), is_bot])
+                    .align_items(Align::End)
+                    .into(),
+            );
             let profile_widgets = row(profile_widgets);
 
             let mut widgets = Vec::with_capacity(2);
@@ -91,6 +103,7 @@ impl ProfileEditModal {
                     )
                     .on_press(Message::ChangeName)
                     .style(theme);
+
                     row(vec![
                         username_field.width(length!(=256)).into(),
                         space!(w+).into(),
@@ -123,6 +136,19 @@ impl ProfileEditModal {
     pub fn update(&mut self, msg: Message, client: &Client) -> (Command<TopLevelMessage>, bool) {
         (
             match msg {
+                Message::IsBotChecked(is_bot) => {
+                    self.is_bot = is_bot;
+                    client.mk_cmd(
+                        |inner| async move {
+                            profile_update(
+                                &inner,
+                                ProfileUpdate::default().new_is_bot(is_bot),
+                            )
+                            .await
+                        },
+                        map_to_nothing,
+                    )
+                }
                 Message::UpdateNewUsername(new) => {
                     self.current_username = new;
                     Command::none()
@@ -130,7 +156,13 @@ impl ProfileEditModal {
                 Message::ChangeName => {
                     let username = self.current_username.drain(..).collect::<String>();
                     client.mk_cmd(
-                        |inner| async move { profile_update(&inner, ProfileUpdate::default().new_username(username)).await },
+                        |inner| async move {
+                            profile_update(
+                                &inner,
+                                ProfileUpdate::default().new_username(username),
+                            )
+                            .await
+                        },
                         map_to_nothing,
                     )
                 }

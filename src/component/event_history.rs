@@ -103,6 +103,8 @@ pub fn build_event_history<'a>(
 
         let member = members.get(&id_to_use);
         let name_to_use = member.map_or_else(SmolStr::default, |member| member.username.clone());
+        let sender_status = member.map_or(UserStatus::Offline, |m| m.status);
+        let is_sender_bot = member.map_or(false, |m| m.is_bot);
         let override_reason = message
             .overrides
             .as_ref()
@@ -128,9 +130,8 @@ pub fn build_event_history<'a>(
             || member.map(|m| m.avatar_url.as_ref()).flatten(),
             |ov| ov.avatar_url.as_ref(),
         );
-        let sender_status = member.map_or(UserStatus::Offline, |m| m.status);
         let sender_body_creator = |sender_display_name: &str, avatar_but_state: &'a mut button::State| {
-            let mut widgets = Vec::with_capacity(3);
+            let mut widgets = Vec::with_capacity(4);
 
             let status_color = theme.status_color(sender_status);
             let pfp: Element<Message> = if let Some(handle) = sender_avatar_url
@@ -157,6 +158,10 @@ pub fn build_event_history<'a>(
                     .size(MESSAGE_SENDER_SIZE)
                     .into(),
             );
+
+            if is_sender_bot {
+                widgets.push(label!("Bot").size(MESSAGE_SENDER_SIZE - 4).into());
+            }
 
             if let Some(reason) = &override_reason {
                 widgets.push(

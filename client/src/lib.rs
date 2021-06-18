@@ -380,14 +380,14 @@ impl Client {
                 metadata: _,
                 update_metadata: _,
             }) => {
-                if let Some(channel) = self.get_channel(guild_id, channel_id) {
+                if let Some(guild) = self.get_guild(guild_id) {
                     if update_name {
-                        channel.name = name.into();
+                        if let Some(channel) = guild.channels.get_mut(&channel_id) {
+                            channel.name = name.into();
+                        }
                     }
-                }
 
-                if update_order {
-                    if let Some(guild) = self.get_guild(guild_id) {
+                    if update_order {
                         guild.update_channel_order(previous_id, next_id, channel_id);
                     }
                 }
@@ -461,8 +461,8 @@ impl Client {
                 update_avatar,
                 new_status,
                 update_status,
-                is_bot: _,
-                update_is_bot: _,
+                is_bot,
+                update_is_bot,
             }) => {
                 let member = self.members.entry(user_id).or_default();
                 if update_username {
@@ -480,7 +480,10 @@ impl Client {
                             ..Attachment::new_unknown(id)
                         }));
                     }
-                };
+                }
+                if update_is_bot {
+                    member.is_bot = is_bot;
+                }
             }
             Event::GuildAddedToList(GuildAddedToList { guild_id, homeserver }) => {
                 self.guilds.insert(
