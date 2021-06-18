@@ -4,13 +4,13 @@ pub mod event_history;
 pub mod markdown;
 
 use crate::length;
-pub use crate::{align, color, label};
+pub use crate::{color, label};
 pub use chan_guild_list::build_channel_list;
 use client::{harmony_rust_sdk::api::rest::FileId, IndexMap};
 pub use event_history::build_event_history;
 pub use iced::{
-    button, pick_list, scrollable, text_input, Align, Button, Color, Column, Command, Container, Element, Image,
-    Length, PickList, Row, Scrollable, Space, Subscription, Text, TextInput,
+    button, pick_list, scrollable, text_input, Align, Button, Checkbox, Color, Column, Command, Container, Element,
+    Image, Length, PickList, Row, Rule, Scrollable, Space, Subscription, Text, TextInput, Toggler,
 };
 pub use iced_aw::Icon;
 
@@ -18,14 +18,14 @@ use super::style::{PADDING, SPACING};
 
 pub fn column<M>(children: Vec<Element<M>>) -> Column<M> {
     Column::with_children(children)
-        .align_items(align!(|))
+        .align_items(Align::Center)
         .padding(PADDING / 2)
         .spacing(SPACING)
 }
 
 pub fn row<M>(children: Vec<Element<M>>) -> Row<M> {
     Row::with_children(children)
-        .align_items(align!(|))
+        .align_items(Align::Center)
         .padding(PADDING / 2)
         .spacing(SPACING)
 }
@@ -125,19 +125,6 @@ macro_rules! length {
     };
     (% $u:expr) => {
         ::iced::Length::FillPortion($u)
-    };
-}
-
-#[macro_export]
-macro_rules! align {
-    (>|) => {
-        ::iced::Align::End
-    };
-    (|) => {
-        ::iced::Align::Center
-    };
-    (|<) => {
-        ::iced::Align::Start
     };
 }
 

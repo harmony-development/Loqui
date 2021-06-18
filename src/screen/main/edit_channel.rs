@@ -58,7 +58,7 @@ impl UpdateChannelModal {
                 name_text_edit.into(),
                 update.width(length!(= 80)).into(),
             ])
-            .align_items(align!(|))
+            .align_items(Align::Center)
             .spacing(SPACING * 2)
             .into(),
         );

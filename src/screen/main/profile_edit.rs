@@ -102,7 +102,7 @@ impl ProfileEditModal {
 
             Column::with_children(widgets)
                 .max_width((MAX_LENGTH + PADDING + SPACING) as u32)
-                .align_items(align!(|<))
+                .align_items(Align::Start)
                 .into()
         } else {
             label!("No profile loaded yet.").into()

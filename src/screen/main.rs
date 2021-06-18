@@ -354,7 +354,7 @@ impl MainScreen {
                 ];
 
                 members_list = members_list.push(
-                    Button::new(state, Row::with_children(content).align_items(align!(|)))
+                    Button::new(state, Row::with_children(content).align_items(Align::Center))
                         .style(theme.secondary())
                         .on_press(Message::SelectedMember(**user_id))
                         .width(length!(+)),

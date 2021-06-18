@@ -1,6 +1,8 @@
 use crate::color;
 use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::UserStatus};
-use iced::{button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, Color};
+use iced::{
+    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color,
+};
 
 pub const DEF_SIZE: u16 = 20;
 pub const MESSAGE_TIMESTAMP_SIZE: u16 = 14;
@@ -214,7 +216,13 @@ impl From<Theme> for Box<dyn pick_list::StyleSheet> {
 
 impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::Rule.into())
+        theme.dark.map_or_default(|| {
+            if theme.secondary {
+                dark::RuleBright.into()
+            } else {
+                dark::Rule.into()
+            }
+        })
     }
 }
 
@@ -227,6 +235,12 @@ impl From<Theme> for Box<dyn iced_aw::modal::StyleSheet> {
 impl From<Theme> for Box<dyn iced_aw::card::StyleSheet> {
     fn from(theme: Theme) -> Self {
         theme.dark.map_or_default(|| dark::Card.into())
+    }
+}
+
+impl From<Theme> for Box<dyn toggler::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        theme.dark.map_or_default(|| dark::Toggler.into())
     }
 }
 
@@ -260,13 +274,44 @@ mod light {
 mod dark {
     use crate::color;
     use iced::{
-        button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, Color,
+        button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler,
+        Color,
     };
     use iced_aw::{card, modal};
 
-    const DARK_BG: Color = color!(0x36, 0x39, 0x3F);
-    const BRIGHT_BG: Color = color!(0x44, 0x48, 0x4F);
-    const ACCENT: Color = color!(0x60, 0x64, 0x6B);
+    const DARK_BG: Color = color!(0x26, 0x29, 0x2F);
+    const BRIGHT_BG: Color = color!(0x36, 0x39, 0x3F);
+    const DISABLED: Color = color!(0x44, 0x48, 0x4F);
+    const ACCENT: Color = color!(0xB0, 0x49, 0x53);
+    const DISABLED_TEXT: Color = color!(0xDD, 0xDD, 0xDD);
+
+    pub struct Toggler;
+
+    impl toggler::StyleSheet for Toggler {
+        fn active(&self, is_active: bool) -> toggler::Style {
+            let mut style = toggler::Style {
+                background: DARK_BG,
+                foreground: ACCENT,
+                background_border: Some(BRIGHT_BG),
+                foreground_border: None,
+            };
+
+            if !is_active {
+                style.foreground = DISABLED;
+            }
+
+            style
+        }
+
+        fn hovered(&self, _is_active: bool) -> toggler::Style {
+            toggler::Style {
+                background: DARK_BG,
+                foreground: ACCENT,
+                background_border: Some(BRIGHT_BG),
+                foreground_border: Some(BRIGHT_BG),
+            }
+        }
+    }
 
     pub struct Card;
 
@@ -474,7 +519,11 @@ mod dark {
         }
 
         fn disabled(&self) -> button::Style {
-            self.hovered()
+            button::Style {
+                background: DISABLED.into(),
+                text_color: DISABLED_TEXT,
+                ..self.active()
+            }
         }
     }
 
@@ -526,7 +575,11 @@ mod dark {
         }
 
         fn disabled(&self) -> button::Style {
-            self.hovered()
+            button::Style {
+                background: DISABLED.into(),
+                text_color: DISABLED_TEXT,
+                ..self.active()
+            }
         }
     }
 
@@ -660,8 +713,8 @@ mod dark {
                 text_color: Color::WHITE,
                 selected_background: ACCENT.into(),
                 selected_text_color: Color::WHITE,
-                border_width: 0.0,
-                ..pick_list::Menu::default()
+                border_width: 3.0,
+                border_color: Color::TRANSPARENT,
             }
         }
 
@@ -669,7 +722,9 @@ mod dark {
             pick_list::Style {
                 background: DARK_BG.into(),
                 text_color: Color::WHITE,
-                border_width: 0.0,
+                border_width: 8.0,
+                border_radius: 8.0,
+                border_color: DARK_BG,
                 ..pick_list::Style::default()
             }
         }
@@ -677,6 +732,7 @@ mod dark {
         fn hovered(&self) -> pick_list::Style {
             pick_list::Style {
                 background: ACCENT.into(),
+                border_color: ACCENT,
                 ..self.active()
             }
         }
@@ -687,10 +743,21 @@ mod dark {
     impl rule::StyleSheet for Rule {
         fn style(&self) -> rule::Style {
             rule::Style {
+                color: DARK_BG,
+                width: 3,
+                radius: 8.0,
+                fill_mode: rule::FillMode::Padded(10),
+            }
+        }
+    }
+
+    pub struct RuleBright;
+
+    impl rule::StyleSheet for RuleBright {
+        fn style(&self) -> rule::Style {
+            rule::Style {
                 color: BRIGHT_BG,
-                width: 2,
-                radius: 1.0,
-                fill_mode: rule::FillMode::Padded(15),
+                ..Rule.style()
             }
         }
     }

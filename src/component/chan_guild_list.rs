@@ -25,38 +25,39 @@ pub fn build_channel_list<'a>(
 ) -> Element<'a, Message> {
     let mut channel_list = Scrollable::new(state)
         .style(theme)
-        .align_items(align!(|<))
+        .align_items(Align::Start)
         .height(length!(+))
         .spacing(SPACING)
         .padding(PADDING / 4);
 
     for ((channel_id, channel), (button_state, edit_state, copy_state)) in channels.iter().zip(buttons_state.iter_mut())
     {
-        let channel_name_prefix = if channel.is_category {
-            Icon::ListNested
+        let (channel_name_prefix, channel_prefix_size) = if channel.is_category {
+            (Icon::ListNested, DEF_SIZE - 4)
         } else {
-            Icon::Hash
+            (Icon::Hash, DEF_SIZE)
         };
 
-        let mut content_widgets = Vec::with_capacity(6);
-        content_widgets.push(
-            icon(channel_name_prefix)
-                .size(DEF_SIZE - 2)
-                .vertical_alignment(iced::VerticalAlignment::Bottom)
-                .into(),
-        );
+        let mut content_widgets = Vec::with_capacity(7);
+        let icon_content = icon(channel_name_prefix).size(channel_prefix_size);
+        let icon_content = if channel.is_category {
+            Column::with_children(vec![space!(h = SPACING - (SPACING / 4)).into(), icon_content.into()])
+                .align_items(Align::Center)
+                .into()
+        } else {
+            icon_content.into()
+        };
+        content_widgets.push(icon_content);
+        if channel.is_category {
+            content_widgets.push(space!(w = SPACING).into());
+        }
         content_widgets.push(label!(channel.name.as_str()).size(DEF_SIZE - 2).into());
         content_widgets.push(space!(w+).into());
         content_widgets.push(
-            Button::new(
-                copy_state,
-                icon(Icon::Clipboard)
-                    .vertical_alignment(iced::VerticalAlignment::Top)
-                    .size(DEF_SIZE - 8),
-            )
-            .style(theme)
-            .on_press(Message::CopyIdToClipboard(*channel_id))
-            .into(),
+            Button::new(copy_state, icon(Icon::Clipboard).size(DEF_SIZE - 8))
+                .style(theme)
+                .on_press(Message::CopyIdToClipboard(*channel_id))
+                .into(),
         );
 
         if channel.user_perms.manage_channel {
@@ -69,15 +70,24 @@ pub fn build_channel_list<'a>(
             );
         }
 
-        let mut but = Button::new(button_state, Row::with_children(content_widgets).align_items(align!(|)))
-            .width(length!(+))
-            .style(theme.secondary());
+        let mut but = Button::new(
+            button_state,
+            Row::with_children(content_widgets).align_items(Align::Center),
+        )
+        .width(length!(+))
+        .style(theme.secondary());
 
-        if current_channel_id != Some(*channel_id) {
+        if channel.is_category {
+            but = but.style(theme.embed());
+        } else if current_channel_id != Some(*channel_id) {
             but = but.on_press(on_button_press(*channel_id));
         }
 
         channel_list = channel_list.push(but);
+
+        if channel.is_category {
+            channel_list = channel_list.push(Rule::horizontal(SPACING).style(theme.secondary()));
+        }
     }
 
     channel_list.into()
@@ -95,7 +105,7 @@ pub fn build_guild_list<'a>(
 ) -> Element<'a, Message> {
     let mut guild_list = Scrollable::new(state)
         .style(theme)
-        .align_items(align!(|<))
+        .align_items(Align::Start)
         .height(length!(+))
         .spacing(SPACING)
         .padding(PADDING / 4);
@@ -150,6 +160,10 @@ pub fn build_guild_list<'a>(
                 .gap(8)
                 .style(theme.secondary()),
         );
+
+        if index < buttons_state_len - 1 {
+            guild_list = guild_list.push(Rule::horizontal(SPACING).style(theme.secondary()));
+        }
     }
 
     guild_list.into()

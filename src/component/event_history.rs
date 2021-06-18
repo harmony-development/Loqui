@@ -53,7 +53,7 @@ pub fn build_event_history<'a>(
         .width(length!(+))
         .height(length!(+))
         .style(theme)
-        .align_items(align!(|<))
+        .align_items(Align::Start)
         .spacing(SPACING * 2)
         .padding(PADDING);
 
@@ -79,7 +79,16 @@ pub fn build_event_history<'a>(
     let mut message_group = vec![];
 
     let push_to_msg_group = |msg_group: &mut Vec<Element<'a, Message>>| {
-        Container::new(column(msg_group.drain(..).collect()).align_items(align!(|<))).style(theme.round())
+        let mut content = Vec::with_capacity(msg_group.len() + 1);
+        content.append(msg_group);
+        content.push(space!(h = MSG_LR_PADDING - (SPACING / 2)).into());
+
+        Container::new(
+            Column::with_children(content)
+                .spacing(SPACING)
+                .align_items(Align::Start),
+        )
+        .style(theme.round())
     };
 
     for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state, avatar_but_state)) in
@@ -159,10 +168,10 @@ pub fn build_event_history<'a>(
                 );
             }
 
-            let content = row(widgets)
+            let content = Row::with_children(widgets)
+                .align_items(Align::Center)
                 .max_height(AVATAR_WIDTH as u32)
-                .spacing(MSG_LR_PADDING)
-                .padding(0);
+                .spacing(MSG_LR_PADDING);
 
             Button::new(avatar_but_state, content)
                 .on_press(Message::SelectedMember(id_to_use))
@@ -183,7 +192,14 @@ pub fn build_event_history<'a>(
                     .size(DATE_SEPERATOR_SIZE)
                     .color(color!(153, 153, 153)),
             )
-            .height(length!(-));
+            .height(length!(-))
+            .width(length!(-));
+            let date_time_seperator = Row::with_children(vec![
+                Rule::horizontal(SPACING).style(theme).into(),
+                date_time_seperator.into(),
+                Rule::horizontal(SPACING).style(theme).into(),
+            ])
+            .align_items(Align::Center);
 
             event_history = event_history.push(push_to_msg_group(&mut message_group));
             event_history = event_history.push(date_time_seperator);
@@ -344,11 +360,10 @@ pub fn build_event_history<'a>(
             }
         }
 
-        let msg_body = column(message_body_widgets)
-            .align_items(align!(|<))
-            .padding(0)
+        let msg_body = Column::with_children(message_body_widgets)
+            .align_items(Align::Start)
             .spacing(MSG_LR_PADDING);
-        let mut message_row = Vec::with_capacity(2);
+        let mut message_row = Vec::with_capacity(3);
 
         let maybe_timestamp = if is_sender_different || last_timestamp.minute() != message.timestamp.minute() {
             let message_timestamp = message.timestamp.format("%H:%M").to_string();
@@ -359,11 +374,16 @@ pub fn build_event_history<'a>(
 
             Column::with_children(vec![
                 space!(h = PADDING / 8).into(),
-                Row::with_children(vec![timestamp_label.into(), space!(h = PADDING / 2).into()]).into(),
+                Row::with_children(vec![
+                    space!(w = PADDING / 2).into(),
+                    timestamp_label.into(),
+                    space!(w = MSG_LR_PADDING).into(),
+                ])
+                .into(),
             ])
             .into()
         } else {
-            space!(w = PADDING * 2 - (PADDING / 4 + PADDING / 16)).into()
+            space!(w = PADDING * 2 - (PADDING / 4 + PADDING / 16) + PADDING).into()
         };
         message_row.push(maybe_timestamp);
         message_row.push(msg_body.into());
@@ -375,7 +395,12 @@ pub fn build_event_history<'a>(
             message_row.push(but.into());
         }
 
-        message_group.push(row(message_row).align_items(align!(|<)).padding(0).into());
+        message_group.push(
+            Row::with_children(message_row)
+                .align_items(Align::Start)
+                .spacing(SPACING)
+                .into(),
+        );
 
         last_sender_id = Some(id_to_use);
         last_sender_name = Some(sender_display_name);

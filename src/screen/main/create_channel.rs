@@ -3,7 +3,7 @@ use std::convert::identity;
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
 use client::harmony_rust_sdk::{
     api::chat::Place,
-    client::api::chat::channel::{self, CreateChannel},
+    client::api::chat::channel::{self, CreateChannel, CreateChannelSelfBuilder},
 };
 use iced_aw::Card;
 
@@ -40,6 +40,7 @@ pub enum Message {
     CreateChannel,
     CreatedChannel { guild_id: u64, channel_id: u64 },
     GoBack,
+    IsCategoryToggle(bool),
 }
 
 #[derive(Default, Debug)]
@@ -50,6 +51,7 @@ pub struct ChannelCreationModal {
     channel_creation_state: ChannelState,
     channel_name_field: String,
     error_text: String,
+    is_category: bool,
     pub guild_id: u64,
 }
 
@@ -66,6 +68,8 @@ impl ChannelCreationModal {
         .style(theme);
 
         let mut create = label_button!(&mut self.channel_create_but_state, "Create").style(theme);
+
+        let is_category = Checkbox::new(self.is_category, "Category", Message::IsCategoryToggle).style(theme);
 
         if let ChannelState::None | ChannelState::Created { .. } = &self.channel_creation_state {
             if !self.channel_name_field.is_empty() {
@@ -91,15 +95,19 @@ impl ChannelCreationModal {
             create_widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
         }
         create_widgets.push(
-            Row::with_children(vec![create_text_edit.into(), create.width(length!(= 80)).into()])
-                .align_items(align!(|))
-                .spacing(SPACING * 2)
-                .into(),
+            Row::with_children(vec![
+                is_category.width(length!(= 100)).into(),
+                create_text_edit.into(),
+                create.width(length!(= 80)).into(),
+            ])
+            .align_items(Align::Center)
+            .spacing(SPACING * 2)
+            .into(),
         );
 
         Container::new(
             Card::new(
-                label!("Create channel").width(length!(= 380 + PADDING + SPACING)),
+                label!("Create channel").width(length!(= 480 + ((SPACING * 2) + SPACING) + PADDING)),
                 column(create_widgets),
             )
             .style(theme.round())
@@ -114,6 +122,9 @@ impl ChannelCreationModal {
     pub fn update(&mut self, msg: Message, client: &Client) -> (Command<TopLevelMessage>, bool) {
         let mut go_back = false;
         match msg {
+            Message::IsCategoryToggle(is_category) => {
+                self.is_category = is_category;
+            }
             Message::ChannelNameChanged(new_name) => {
                 self.channel_name_field = new_name;
             }
@@ -125,13 +136,14 @@ impl ChannelCreationModal {
                     name: channel_name.clone(),
                 };
                 let guild_id = self.guild_id;
+                let is_category = self.is_category;
 
                 return (
                     client.mk_cmd(
                         |inner| async move {
                             let result = channel::create_channel(
                                 &inner,
-                                CreateChannel::new(guild_id, channel_name, Place::top(0)),
+                                CreateChannel::new(guild_id, channel_name, Place::top(0)).is_category(is_category),
                             )
                             .await;
                             result.map(|response| {
