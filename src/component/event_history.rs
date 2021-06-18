@@ -16,6 +16,7 @@ use crate::{
         Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
         MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
     },
+    IOSEVKA,
 };
 use chrono::{Datelike, Timelike};
 use client::{
@@ -23,6 +24,7 @@ use client::{
     harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
     smol_str::SmolStr,
 };
+use iced::Font;
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 const MSG_LR_PADDING: u16 = SPACING * 2;
@@ -81,7 +83,7 @@ pub fn build_event_history<'a>(
     let push_to_msg_group = |msg_group: &mut Vec<Element<'a, Message>>| {
         let mut content = Vec::with_capacity(msg_group.len() + 1);
         content.append(msg_group);
-        content.push(space!(h = MSG_LR_PADDING - (SPACING / 2)).into());
+        content.push(space!(h = PADDING / 4).into());
 
         Container::new(
             Column::with_children(content)
@@ -368,27 +370,25 @@ pub fn build_event_history<'a>(
         let msg_body = Column::with_children(message_body_widgets)
             .align_items(Align::Start)
             .spacing(MSG_LR_PADDING);
-        let mut message_row = Vec::with_capacity(3);
+        let mut message_row = Vec::with_capacity(4);
 
         let maybe_timestamp = if is_sender_different || last_timestamp.minute() != message.timestamp.minute() {
             let message_timestamp = message.timestamp.format("%H:%M").to_string();
 
-            let timestamp_label = label!(message_timestamp)
-                .size(MESSAGE_TIMESTAMP_SIZE)
-                .color(color!(160, 160, 160));
-
-            Column::with_children(vec![
-                space!(h = PADDING / 8).into(),
-                Row::with_children(vec![
-                    space!(w = PADDING / 2).into(),
-                    timestamp_label.into(),
-                    space!(w = MSG_LR_PADDING).into(),
-                ])
-                .into(),
-            ])
+            Container::new(
+                label!(message_timestamp)
+                    .size(MESSAGE_TIMESTAMP_SIZE)
+                    .color(color!(160, 160, 160))
+                    .font(IOSEVKA)
+                    .width(length!(+)),
+            )
+            .padding([PADDING / 8, 0, 0, MSG_LR_PADDING - (MSG_LR_PADDING / 4) + 1])
+            .width(length!(= DEF_SIZE * 2))
+            .center_x()
+            .center_y()
             .into()
         } else {
-            space!(w = PADDING * 2 - (PADDING / 4 + PADDING / 16) + PADDING).into()
+            space!(w = DEF_SIZE * 2).into()
         };
         message_row.push(maybe_timestamp);
         message_row.push(msg_body.into());
@@ -399,6 +399,7 @@ pub fn build_event_history<'a>(
                 .style(theme.secondary());
             message_row.push(but.into());
         }
+        message_row.push(space!(w = PADDING / 4).into());
 
         message_group.push(
             Row::with_children(message_row)

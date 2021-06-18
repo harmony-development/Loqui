@@ -4,13 +4,19 @@ use client::content::ContentStore;
 use screen::ScreenManager;
 use style::DEF_SIZE;
 
-use iced::{Application, Settings};
+use iced::{Application, Font, Settings};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 pub use client;
 pub mod component;
 pub mod screen;
 pub mod style;
+
+const IOSEVKA_BYTES: &[u8] = include_bytes!("fonts/Iosevka.ttf");
+const IOSEVKA: Font = Font::External {
+    name: "Iosevka Fixed Regular",
+    bytes: IOSEVKA_BYTES,
+};
 
 fn main() {
     // Create the content store
@@ -40,7 +46,7 @@ fn main() {
     let mut settings = Settings::with_flags(content_store);
     settings.window.size = (1280, 720);
     settings.antialiasing = false;
-    settings.default_font = Some(include_bytes!("NotoSans-Regular.ttf"));
+    settings.default_font = Some(include_bytes!("fonts/Inter.otf"));
     settings.default_text_size = DEF_SIZE;
 
     ScreenManager::run(settings).unwrap();
