@@ -38,7 +38,7 @@ pub struct ProfileEditModal {
 
 impl ProfileEditModal {
     pub fn view(&mut self, theme: Theme, client: &Client, thumbnail_cache: &ThumbnailCache) -> Element<Message> {
-        const MAX_LENGTH: u16 = 390 + (PADDING * 2) - SPACING;
+        const MAX_LENGTH: u16 = 400 + (PADDING * 2) - SPACING;
 
         let content: Element<Message> = if let Some(user_profile) = client.members.get(&self.user_id) {
             let user_img: Element<Message> = if let Some(handle) = user_profile

@@ -127,7 +127,6 @@ pub fn build_event_history<'a>(
             .overrides
             .as_ref()
             .map_or(name_to_use, |ov| ov.name.as_str().into());
-        let sender_color = theme.calculate_sender_color(sender_display_name.len());
         let sender_avatar_url = message.overrides.as_ref().map_or_else(
             || member.map(|m| m.avatar_url.as_ref()).flatten(),
             |ov| ov.avatar_url.as_ref(),
@@ -154,12 +153,7 @@ pub fn build_event_history<'a>(
                     .into(),
             );
 
-            widgets.push(
-                label!(sender_display_name)
-                    .color(sender_color)
-                    .size(MESSAGE_SENDER_SIZE)
-                    .into(),
-            );
+            widgets.push(label!(sender_display_name).size(MESSAGE_SENDER_SIZE).into());
 
             if is_sender_bot {
                 widgets.push(label!("Bot").size(MESSAGE_SENDER_SIZE - 4).into());

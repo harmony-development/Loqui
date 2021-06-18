@@ -279,11 +279,12 @@ mod dark {
     };
     use iced_aw::{card, modal};
 
-    const DARK_BG: Color = color!(0x26, 0x29, 0x2F);
-    const BRIGHT_BG: Color = color!(0x36, 0x39, 0x3F);
-    const DISABLED: Color = color!(0x44, 0x48, 0x4F);
-    const ACCENT: Color = color!(0xB0, 0x49, 0x53);
+    const DARK_BG: Color = color!(0x0A, 0x0D, 0x13);
+    const BRIGHT_BG: Color = color!(0x16, 0x19, 0x1F);
+    const DISABLED: Color = color!(0x26, 0x29, 0x2F);
+    const ACCENT: Color = color!(0x6A, 0x9A, 0xA9);
     const DISABLED_TEXT: Color = color!(0xDD, 0xDD, 0xDD);
+    const TEXT_COLOR: Color = color!(0xEE, 0xEE, 0xEE);
 
     pub struct Toggler;
 
@@ -322,11 +323,12 @@ mod dark {
                 head_background: BRIGHT_BG.into(),
                 border_color: BRIGHT_BG,
                 foot_background: DARK_BG.into(),
-                body_text_color: Color::WHITE,
-                foot_text_color: Color::WHITE,
-                head_text_color: Color::WHITE,
-                close_color: Color::WHITE,
+                body_text_color: TEXT_COLOR,
+                foot_text_color: TEXT_COLOR,
+                head_text_color: TEXT_COLOR,
+                close_color: TEXT_COLOR,
                 border_width: 0.0,
+                border_radius: 6.0,
                 ..Default::default()
             }
         }
@@ -348,7 +350,7 @@ mod dark {
         fn style(&self) -> container::Style {
             container::Style {
                 background: DARK_BG.into(),
-                text_color: Color::WHITE.into(),
+                text_color: Some(TEXT_COLOR),
                 ..container::Style::default()
             }
         }
@@ -434,11 +436,11 @@ mod dark {
         }
 
         fn value_color(&self) -> Color {
-            Color::WHITE
+            TextInput.value_color()
         }
 
         fn selection_color(&self) -> Color {
-            ACCENT
+            TextInput.selection_color()
         }
 
         fn hovered(&self) -> text_input::Style {
@@ -475,7 +477,7 @@ mod dark {
         }
 
         fn value_color(&self) -> Color {
-            Color::WHITE
+            TEXT_COLOR
         }
 
         fn selection_color(&self) -> Color {
@@ -498,7 +500,7 @@ mod dark {
             button::Style {
                 background: DARK_BG.into(),
                 border_radius: 8.0,
-                text_color: Color::WHITE,
+                text_color: TEXT_COLOR,
                 ..button::Style::default()
             }
         }
@@ -554,7 +556,7 @@ mod dark {
             button::Style {
                 background: BRIGHT_BG.into(),
                 border_radius: 8.0,
-                text_color: Color::WHITE,
+                text_color: TEXT_COLOR,
                 ..button::Style::default()
             }
         }
@@ -710,9 +712,9 @@ mod dark {
         fn menu(&self) -> pick_list::Menu {
             pick_list::Menu {
                 background: BRIGHT_BG.into(),
-                text_color: Color::WHITE,
+                text_color: TEXT_COLOR,
                 selected_background: ACCENT.into(),
-                selected_text_color: Color::WHITE,
+                selected_text_color: TEXT_COLOR,
                 border_width: 3.0,
                 border_color: Color::TRANSPARENT,
             }
@@ -721,7 +723,7 @@ mod dark {
         fn active(&self) -> pick_list::Style {
             pick_list::Style {
                 background: DARK_BG.into(),
-                text_color: Color::WHITE,
+                text_color: TEXT_COLOR,
                 border_width: 8.0,
                 border_radius: 8.0,
                 border_color: DARK_BG,

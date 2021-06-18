@@ -96,7 +96,7 @@ impl ChannelCreationModal {
         }
         create_widgets.push(
             Row::with_children(vec![
-                is_category.width(length!(= 100)).into(),
+                is_category.width(length!(= 110)).into(),
                 create_text_edit.into(),
                 create.width(length!(= 80)).into(),
             ])
@@ -107,7 +107,7 @@ impl ChannelCreationModal {
 
         Container::new(
             Card::new(
-                label!("Create channel").width(length!(= 480 + ((SPACING * 2) + SPACING) + PADDING)),
+                label!("Create channel").width(length!(= 490 + ((SPACING * 2) + SPACING) + PADDING)),
                 column(create_widgets),
             )
             .style(theme.round())
