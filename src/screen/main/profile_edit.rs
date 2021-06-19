@@ -33,7 +33,6 @@ pub struct ProfileEditModal {
     username_edit: text_input::State,
     username_change_but: button::State,
     current_username: String,
-    is_bot: bool,
 }
 
 impl ProfileEditModal {
@@ -74,7 +73,7 @@ impl ProfileEditModal {
             );
             profile_widgets.push(space!(w+).into());
             let is_bot = if self.is_edit {
-                Checkbox::new(self.is_bot, "Bot", Message::IsBotChecked)
+                Checkbox::new(user_profile.is_bot, "Bot", Message::IsBotChecked)
                     .style(theme)
                     .into()
             } else if user_profile.is_bot {
@@ -141,19 +140,10 @@ impl ProfileEditModal {
     pub fn update(&mut self, msg: Message, client: &Client) -> (Command<TopLevelMessage>, bool) {
         (
             match msg {
-                Message::IsBotChecked(is_bot) => {
-                    self.is_bot = is_bot;
-                    client.mk_cmd(
-                        |inner| async move {
-                            profile_update(
-                                &inner,
-                                ProfileUpdate::default().new_is_bot(is_bot),
-                            )
-                            .await
-                        },
-                        map_to_nothing,
-                    )
-                }
+                Message::IsBotChecked(is_bot) => client.mk_cmd(
+                    |inner| async move { profile_update(&inner, ProfileUpdate::default().new_is_bot(is_bot)).await },
+                    map_to_nothing,
+                ),
                 Message::UpdateNewUsername(new) => {
                     self.current_username = new;
                     Command::none()
