@@ -137,13 +137,20 @@ impl ChannelCreationModal {
                 };
                 let guild_id = self.guild_id;
                 let is_category = self.is_category;
+                let after = client
+                    .guilds
+                    .get(&guild_id)
+                    .map(|g| g.channels.last().map(|(k, _)| *k))
+                    .flatten()
+                    .unwrap_or(0);
 
                 return (
                     client.mk_cmd(
                         |inner| async move {
                             let result = channel::create_channel(
                                 &inner,
-                                CreateChannel::new(guild_id, channel_name, Place::top(0)).is_category(is_category),
+                                CreateChannel::new(guild_id, channel_name, Place::bottom(after))
+                                    .is_category(is_category),
                             )
                             .await;
                             result.map(|response| {
