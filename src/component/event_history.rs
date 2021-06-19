@@ -159,7 +159,7 @@ pub fn build_event_history<'a>(
                     .into(),
             );
 
-            widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING * 2).into());
+            widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING).into());
             widgets.push(
                 Container::new(label!(sender_display_name).size(MESSAGE_SENDER_SIZE))
                     .style(theme.secondary().round().border_width(0.0))
