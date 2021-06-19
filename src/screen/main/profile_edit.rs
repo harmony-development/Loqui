@@ -44,7 +44,7 @@ impl ProfileEditModal {
             let user_img: Element<Message> = if let Some(handle) = user_profile
                 .avatar_url
                 .as_ref()
-                .map(|id| thumbnail_cache.get_thumbnail(id))
+                .map(|id| thumbnail_cache.profile_avatars.get(id))
                 .flatten()
             {
                 Image::new(handle.clone()).height(length!(+)).width(length!(+)).into()
@@ -66,7 +66,12 @@ impl ProfileEditModal {
             };
             let username = label!(username_text).size(DEF_SIZE + 12);
             let mut profile_widgets = Vec::with_capacity(4);
-            profile_widgets.push(avatar_but.width(length!(=96)).height(length!(=96)).into());
+            profile_widgets.push(
+                avatar_but
+                    .width(length!(= PROFILE_AVATAR_WIDTH))
+                    .height(length!(= PROFILE_AVATAR_WIDTH))
+                    .into(),
+            );
             profile_widgets.push(space!(w+).into());
             let is_bot = if self.is_edit {
                 Checkbox::new(self.is_bot, "Bot", Message::IsBotChecked)

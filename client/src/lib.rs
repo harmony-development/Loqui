@@ -323,6 +323,7 @@ impl Client {
                         {
                             post.push(PostProcessEvent::FetchThumbnail(Attachment {
                                 kind: "image".into(),
+                                name: "avatar".into(),
                                 ..Attachment::new_unknown(id)
                             }));
                         }
@@ -477,6 +478,7 @@ impl Client {
                     if let Some(id) = parsed {
                         post.push(PostProcessEvent::FetchThumbnail(Attachment {
                             kind: "image".into(),
+                            name: "avatar".into(),
                             ..Attachment::new_unknown(id)
                         }));
                     }
@@ -558,6 +560,7 @@ impl Client {
             if let Some(id) = overrides.avatar_url.clone() {
                 post.push(PostProcessEvent::FetchThumbnail(Attachment {
                     kind: "image".into(),
+                    name: "avatar".into(),
                     ..Attachment::new_unknown(id)
                 }));
             }

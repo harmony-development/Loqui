@@ -336,7 +336,7 @@ impl MainScreen {
                 let pfp: Element<Message> = if let Some(handle) = member
                     .avatar_url
                     .as_ref()
-                    .map(|hmc| thumbnail_cache.get_thumbnail(hmc))
+                    .map(|hmc| thumbnail_cache.avatars.get(hmc))
                     .flatten()
                 {
                     Image::new(handle.clone())
@@ -1108,7 +1108,7 @@ impl MainScreen {
                 attachment,
                 is_thumbnail,
             } => {
-                let maybe_thumb = thumbnail_cache.get_thumbnail(&attachment.id).cloned();
+                let maybe_thumb = thumbnail_cache.thumbnails.get(&attachment.id).cloned();
                 let content_path = client.content_store().content_path(&attachment.id);
                 return if content_path.exists() {
                     Command::perform(
@@ -1119,6 +1119,7 @@ impl MainScreen {
 
                                 TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
+                                    avatar: None,
                                     thumbnail: ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec()),
                                     open: true,
                                 }
@@ -1146,6 +1147,7 @@ impl MainScreen {
                             Ok(if is_thumbnail && maybe_thumb.is_none() {
                                 TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
+                                    avatar: None,
                                     thumbnail: ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec()),
                                     open: true,
                                 }

@@ -140,7 +140,7 @@ pub fn build_event_history<'a>(
 
             let status_color = theme.status_color(sender_status);
             let pfp: Element<Message> = if let Some(handle) = sender_avatar_url
-                .map(|u| thumbnail_cache.get_thumbnail(&u))
+                .map(|u| thumbnail_cache.avatars.get(u))
                 .flatten()
                 .cloned()
             {
@@ -260,7 +260,7 @@ pub fn build_event_history<'a>(
                         let mut heading = Vec::with_capacity(3);
 
                         if let Some(img_url) = &h.icon {
-                            if let Some(handle) = thumbnail_cache.get_thumbnail(img_url) {
+                            if let Some(handle) = thumbnail_cache.thumbnails.get(img_url) {
                                 heading.push(
                                     Image::new(handle.clone())
                                         .height(length!(=24))
@@ -348,7 +348,8 @@ pub fn build_event_history<'a>(
                 let does_content_exist = content_store.content_exists(&attachment.id);
 
                 let content: Element<Message> = if let Some(thumbnail_image) = thumbnail_cache
-                    .get_thumbnail(&attachment.id)
+                    .thumbnails
+                    .get(&attachment.id)
                     // FIXME: Don't hardcode this length, calculate it using the size of the window
                     .map(|handle| Image::new(handle.clone()).width(length!(= 320)))
                 {

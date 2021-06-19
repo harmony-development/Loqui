@@ -135,7 +135,7 @@ pub fn build_guild_list<'a>(
             let content = guild
                 .picture
                 .as_ref()
-                .map(|guild_picture| thumbnail_cache.get_thumbnail(&guild_picture))
+                .map(|guild_picture| thumbnail_cache.thumbnails.get(guild_picture))
                 .flatten()
                 .map_or_else::<Element<Message>, _, _>(
                     || {

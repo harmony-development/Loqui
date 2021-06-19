@@ -18,6 +18,7 @@ pub const SUCCESS_COLOR: Color = color!(. 0.0, 1.0, 0.0);
 pub const ALT_COLOR: Color = color!(. 0.5, 0.5, 0.5);
 
 pub const AVATAR_WIDTH: u16 = 44;
+pub const PROFILE_AVATAR_WIDTH: u16 = 96;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {

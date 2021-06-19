@@ -17,7 +17,7 @@ use crate::{
         Client, PostProcessEvent, Session,
     },
     component::*,
-    style::Theme,
+    style::{Theme, AVATAR_WIDTH, PROFILE_AVATAR_WIDTH},
 };
 
 use client::{
@@ -67,6 +67,7 @@ pub enum Message {
     DownloadedThumbnail {
         data: Attachment,
         thumbnail: ImageHandle,
+        avatar: Option<(ImageHandle, ImageHandle)>,
         open: bool,
     },
     EventsReceived(Vec<Event>),
@@ -578,13 +579,23 @@ impl Application for ScreenManager {
                     return Command::perform(cmd, map_send_msg);
                 }
             }
-            Message::DownloadedThumbnail { data, thumbnail, open } => {
+            Message::DownloadedThumbnail {
+                data,
+                thumbnail,
+                avatar,
+                open,
+            } => {
                 let path = self.content_store.content_path(&data.id);
-                self.thumbnail_cache.put_thumbnail(data.id, thumbnail.clone());
+                if let Some((profile_avatar, avatar)) = avatar {
+                    self.thumbnail_cache.put_avatar_thumbnail(data.id.clone(), avatar);
+                    self.thumbnail_cache
+                        .put_profile_avatar_thumbnail(data.id.clone(), profile_avatar);
+                }
                 if let (Screen::Main(screen), true) = (self.screens.current_mut(), open) {
-                    screen.image_viewer_modal.inner_mut().image_handle = Some((thumbnail, (path, data.name)));
+                    screen.image_viewer_modal.inner_mut().image_handle = Some((thumbnail.clone(), (path, data.name)));
                     screen.image_viewer_modal.show(true);
                 }
+                self.thumbnail_cache.put_thumbnail(data.id, thumbnail);
             }
             Message::EventsReceived(events) => {
                 if self.client.is_some() {
@@ -813,35 +824,57 @@ fn make_query_perm(
 }
 
 fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &ThumbnailCache) -> Command<Message> {
-    if !thumbnail_cache.has_thumbnail(&data.id) {
+    let is_avatar = data.name == "avatar";
+    if !thumbnail_cache.thumbnails.contains_key(&data.id) {
         let content_path = client.content_store().content_path(&data.id);
 
         let inner = client.inner_arc();
+        let process_image = move |data: &[u8]| {
+            let image = image::load_from_memory(data).unwrap();
+            let avatar = is_avatar.then(|| {
+                let bgra = image
+                    .resize(
+                        AVATAR_WIDTH as u32 - 4,
+                        AVATAR_WIDTH as u32 - 4,
+                        image::imageops::FilterType::Lanczos3,
+                    )
+                    .into_bgra8();
+                let avatar = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
+                let bgra = image
+                    .resize(
+                        PROFILE_AVATAR_WIDTH as u32,
+                        PROFILE_AVATAR_WIDTH as u32,
+                        image::imageops::FilterType::Lanczos3,
+                    )
+                    .into_bgra8();
+                let profile_avatar = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
+                (profile_avatar, avatar)
+            });
+            let bgra = image.into_bgra8();
+            (
+                ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec()),
+                avatar,
+            )
+        };
 
         Command::perform(
             async move {
-                match tokio::fs::read(&content_path).await {
-                    Ok(raw) => {
-                        let bgra = image::load_from_memory(&raw).unwrap().into_bgra8();
-                        Ok(Message::DownloadedThumbnail {
-                            data,
-                            thumbnail: ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec()),
-                            open: false,
-                        })
-                    }
+                let (thumbnail, avatar) = match tokio::fs::read(&content_path).await {
+                    Ok(raw) => process_image(&raw),
                     Err(err) => {
                         warn!("couldn't read thumbnail for ID {} from disk: {}", data.id, err);
                         let file =
                             harmony_rust_sdk::client::api::rest::download_extract_file(&inner, data.id.clone()).await?;
                         tokio::fs::write(content_path, file.data()).await?;
-                        let bgra = image::load_from_memory(file.data()).unwrap().into_bgra8();
-                        Ok(Message::DownloadedThumbnail {
-                            data,
-                            thumbnail: ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec()),
-                            open: false,
-                        })
+                        process_image(file.data())
                     }
-                }
+                };
+                Ok(Message::DownloadedThumbnail {
+                    data,
+                    avatar,
+                    thumbnail,
+                    open: false,
+                })
             },
             |msg: ClientResult<_>| msg.unwrap_or_else(Into::into),
         )

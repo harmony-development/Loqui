@@ -144,9 +144,17 @@ pub fn get_image_size_from_handle(handle: &ImageHandle) -> usize {
     }
 }
 
+enum Cache {
+    Thumb,
+    Avatar,
+    ProfileAvat,
+}
+
 #[derive(Debug)]
 pub struct ThumbnailCache {
-    thumbnails: IndexMap<FileId, ImageHandle>,
+    pub thumbnails: IndexMap<FileId, ImageHandle>,
+    pub avatars: IndexMap<FileId, ImageHandle>,
+    pub profile_avatars: IndexMap<FileId, ImageHandle>,
     max_size: usize,
 }
 
@@ -161,49 +169,55 @@ impl ThumbnailCache {
     pub fn new(max_size: usize) -> Self {
         Self {
             thumbnails: IndexMap::default(),
+            avatars: IndexMap::default(),
+            profile_avatars: IndexMap::default(),
             max_size,
         }
     }
 
+    #[inline(always)]
     pub fn put_thumbnail(&mut self, thumbnail_id: FileId, thumbnail: ImageHandle) {
+        self.internal_put_thumbnail(Cache::Thumb, thumbnail_id, thumbnail);
+    }
+
+    #[inline(always)]
+    pub fn put_avatar_thumbnail(&mut self, thumbnail_id: FileId, thumbnail: ImageHandle) {
+        self.internal_put_thumbnail(Cache::Avatar, thumbnail_id, thumbnail)
+    }
+
+    #[inline(always)]
+    pub fn put_profile_avatar_thumbnail(&mut self, thumbnail_id: FileId, thumbnail: ImageHandle) {
+        self.internal_put_thumbnail(Cache::ProfileAvat, thumbnail_id, thumbnail)
+    }
+
+    fn internal_put_thumbnail(&mut self, cache: Cache, thumbnail_id: FileId, thumbnail: ImageHandle) {
+        let map = match cache {
+            Cache::Avatar => &mut self.avatars,
+            Cache::ProfileAvat => &mut self.profile_avatars,
+            Cache::Thumb => &mut self.thumbnails,
+        };
+
         let thumbnail_size = get_image_size_from_handle(&thumbnail);
-        let cache_size = self.len();
+        let cache_size: usize = map.values().map(get_image_size_from_handle).sum();
 
         if cache_size + thumbnail_size > self.max_size {
             let mut current_size = 0;
             let mut remove_upto = 0;
-            for (index, size) in self.thumbnails.values().map(get_image_size_from_handle).enumerate() {
+            for (index, size) in map.values().map(get_image_size_from_handle).enumerate() {
                 if current_size >= thumbnail_size {
                     remove_upto = index + 1;
                     break;
                 }
                 current_size += size;
             }
+            let len = map.len();
             for index in 0..remove_upto {
-                self.thumbnails.shift_remove_index(index);
+                if index < len {
+                    map.shift_remove_index(index);
+                }
             }
         } else {
-            self.thumbnails.insert(thumbnail_id, thumbnail);
+            map.insert(thumbnail_id, thumbnail);
         }
-    }
-
-    pub fn len(&self) -> usize {
-        self.thumbnails.values().map(get_image_size_from_handle).sum()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() < 1
-    }
-
-    pub fn has_thumbnail(&self, thumbnail_id: &FileId) -> bool {
-        self.thumbnails.contains_key(thumbnail_id)
-    }
-
-    pub fn get_thumbnail(&self, thumbnail_id: &FileId) -> Option<&ImageHandle> {
-        self.thumbnails.get(thumbnail_id)
-    }
-
-    pub fn invalidate_thumbnail(&mut self, thumbnail_id: &FileId) {
-        self.thumbnails.remove(thumbnail_id);
     }
 }
