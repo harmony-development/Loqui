@@ -27,7 +27,6 @@ use client::{
 use iced::Font;
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
-const MSG_LR_PADDING: u16 = SPACING * 2;
 pub type EventHistoryButsState = [(
     button::State,
     button::State,
@@ -35,6 +34,11 @@ pub type EventHistoryButsState = [(
     button::State,
     button::State,
 ); SHOWN_MSGS_LIMIT];
+
+const MSG_LR_PADDING: u16 = AVATAR_WIDTH / 4;
+const RIGHT_TIMESTAMP_PADDING: u16 = MSG_LR_PADDING;
+const LEFT_TIMESTAMP_PADDING: u16 = MSG_LR_PADDING + (MSG_LR_PADDING / 4);
+const TIMESTAMP_WIDTH: u16 = DEF_SIZE * 2 + RIGHT_TIMESTAMP_PADDING + LEFT_TIMESTAMP_PADDING;
 
 #[allow(clippy::mutable_key_type)]
 #[allow(clippy::too_many_arguments)]
@@ -78,7 +82,7 @@ pub fn build_event_history<'a>(
     let mut last_timestamp = first_message.timestamp;
     let mut last_sender_id = None;
     let mut last_sender_name = None;
-    let mut message_group = vec![];
+    let mut message_group = Vec::with_capacity(SHOWN_MSGS_LIMIT);
 
     let push_to_msg_group = |msg_group: &mut Vec<Element<'a, Message>>| {
         let mut content = Vec::with_capacity(msg_group.len() + 1);
@@ -90,7 +94,7 @@ pub fn build_event_history<'a>(
                 .spacing(SPACING)
                 .align_items(Align::Start),
         )
-        .style(theme.round())
+        .style(theme.round().border_width(0.0))
     };
 
     for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state, avatar_but_state)) in
@@ -132,7 +136,7 @@ pub fn build_event_history<'a>(
             |ov| ov.avatar_url.as_ref(),
         );
         let sender_body_creator = |sender_display_name: &str, avatar_but_state: &'a mut button::State| {
-            let mut widgets = Vec::with_capacity(4);
+            let mut widgets = Vec::with_capacity(7);
 
             let status_color = theme.status_color(sender_status);
             let pfp: Element<Message> = if let Some(handle) = sender_avatar_url
@@ -140,8 +144,10 @@ pub fn build_event_history<'a>(
                 .flatten()
                 .cloned()
             {
-                // TODO: Add `border_radius` styling for `Image` so we can use it here
-                Image::new(handle).height(length!(+)).width(length!(+)).into()
+                Image::new(handle)
+                    .height(length!(= AVATAR_WIDTH - 4))
+                    .width(length!(= AVATAR_WIDTH - 4))
+                    .into()
             } else {
                 label!(sender_display_name.chars().next().unwrap_or('u').to_ascii_uppercase()).into()
             };
@@ -149,17 +155,27 @@ pub fn build_event_history<'a>(
                 fill_container(pfp)
                     .width(length!(= AVATAR_WIDTH))
                     .height(length!(= AVATAR_WIDTH))
-                    .style(theme.round().with_border_color(status_color))
+                    .style(theme.round().border_color(status_color))
                     .into(),
             );
 
-            widgets.push(label!(sender_display_name).size(MESSAGE_SENDER_SIZE).into());
+            widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING * 2).into());
+            widgets.push(
+                Container::new(label!(sender_display_name).size(MESSAGE_SENDER_SIZE))
+                    .style(theme.secondary().round().border_width(0.0))
+                    .padding([PADDING / 2, PADDING / 2])
+                    .center_x()
+                    .center_y()
+                    .into(),
+            );
 
             if is_sender_bot {
+                widgets.push(space!(w = SPACING * 2).into());
                 widgets.push(label!("Bot").size(MESSAGE_SENDER_SIZE - 4).into());
             }
 
             if let Some(reason) = &override_reason {
+                widgets.push(space!(w = SPACING * 2).into());
                 widgets.push(
                     label!(reason)
                         .color(ALT_COLOR)
@@ -171,8 +187,7 @@ pub fn build_event_history<'a>(
 
             let content = Row::with_children(widgets)
                 .align_items(Align::Center)
-                .max_height(AVATAR_WIDTH as u32)
-                .spacing(MSG_LR_PADDING);
+                .max_height(AVATAR_WIDTH as u32);
 
             Button::new(avatar_but_state, content)
                 .on_press(Message::SelectedMember(id_to_use))
@@ -318,7 +333,7 @@ pub fn build_event_history<'a>(
                         .spacing(SPACING / 2)
                         .align_items(Align::Start),
                 )
-                .style(theme.round().secondary().with_border_color(Color::from_rgb8(
+                .style(theme.round().secondary().border_color(Color::from_rgb8(
                     embeds.color.0,
                     embeds.color.1,
                     embeds.color.2,
@@ -376,13 +391,13 @@ pub fn build_event_history<'a>(
                     .font(IOSEVKA)
                     .width(length!(+)),
             )
-            .padding([PADDING / 8, 0, 0, MSG_LR_PADDING - (MSG_LR_PADDING / 4) + 1])
-            .width(length!(= DEF_SIZE * 2))
+            .padding([PADDING / 8, RIGHT_TIMESTAMP_PADDING, 0, LEFT_TIMESTAMP_PADDING])
+            .width(length!(= TIMESTAMP_WIDTH))
             .center_x()
             .center_y()
             .into()
         } else {
-            space!(w = DEF_SIZE * 2).into()
+            space!(w = TIMESTAMP_WIDTH).into()
         };
         message_row.push(maybe_timestamp);
         message_row.push(msg_body.into());

@@ -339,7 +339,10 @@ impl MainScreen {
                     .map(|hmc| thumbnail_cache.get_thumbnail(hmc))
                     .flatten()
                 {
-                    Image::new(handle.clone()).width(length!(+)).into()
+                    Image::new(handle.clone())
+                        .width(length!(= AVATAR_WIDTH - 4))
+                        .height(length!(= AVATAR_WIDTH - 4))
+                        .into()
                 } else {
                     label!(member.username.chars().next().unwrap_or('u').to_ascii_uppercase()).into()
                 };
@@ -349,7 +352,7 @@ impl MainScreen {
                     fill_container(pfp)
                         .width(length!(= AVATAR_WIDTH))
                         .height(length!(= AVATAR_WIDTH))
-                        .style(theme.round().with_border_color(status_color))
+                        .style(theme.round().border_color(status_color))
                         .into(),
                 ];
 
@@ -832,9 +835,7 @@ impl MainScreen {
                 }
             }
             Message::ChangeMode(mode) => {
-                if let (Mode::Normal, Mode::EditingMessage(mid)) | (Mode::EditMessage, Mode::EditingMessage(mid)) =
-                    (self.mode, mode)
-                {
+                if let (Mode::Normal | Mode::EditMessage, Mode::EditingMessage(mid)) = (self.mode, mode) {
                     if let (Some(gid), Some(cid)) = (self.current_guild_id, self.current_channel_id) {
                         self.composer_state.focus();
                         if let Some(msg) = client
@@ -1211,7 +1212,7 @@ impl MainScreen {
 
                 return Command::perform(
                     async move {
-                        let ids = super::select_upload_files(&inner, content_store).await?;
+                        let ids = super::select_upload_files(&inner, content_store, false).await?;
                         Ok(TopLevelMessage::SendMessage {
                             message: IcyMessage {
                                 content: IcyContent::Files(

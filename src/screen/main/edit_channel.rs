@@ -71,7 +71,7 @@ impl UpdateChannelModal {
             .style(theme.round())
             .on_close(Message::GoBack),
         )
-        .style(theme.round())
+        .style(theme.round().border_width(0.0))
         .center_x()
         .center_y()
         .into()

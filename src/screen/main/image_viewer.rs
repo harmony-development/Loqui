@@ -48,7 +48,7 @@ impl ImageViewerModal {
                 .style(theme.round())
                 .on_close(Message::Close),
             )
-            .style(theme.round())
+            .style(theme.round().border_width(0.0))
             .center_x()
             .center_y()
             .into()

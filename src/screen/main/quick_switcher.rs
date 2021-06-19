@@ -77,7 +77,7 @@ impl QuickSwitcherModal {
             Column::with_children(vec![
                 space!(h % 2).into(),
                 Container::new(column(result_widgets))
-                    .style(theme.round())
+                    .style(theme.round().border_width(0.0))
                     .height(length!(%6))
                     .into(),
                 space!(h % 2).into(),

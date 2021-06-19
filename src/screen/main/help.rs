@@ -19,7 +19,7 @@ impl HelpModal {
             .style(theme.round())
             .on_close(true),
         )
-        .style(theme.round())
+        .style(theme.round().border_width(0.0))
         .center_x()
         .center_y()
         .into()

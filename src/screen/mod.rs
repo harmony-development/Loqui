@@ -853,14 +853,19 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
 async fn select_upload_files(
     inner: &InnerClient,
     content_store: Arc<ContentStore>,
+    one: bool,
 ) -> ClientResult<Vec<(FileId, String, String, usize)>> {
     use crate::client::content;
     use harmony_rust_sdk::client::api::rest::upload_extract_id;
 
-    let handles = rfd::AsyncFileDialog::new()
-        .pick_files()
-        .await
-        .ok_or_else(|| ClientError::Custom("File selection error".to_string()))?;
+    let file_dialog = rfd::AsyncFileDialog::new();
+
+    let handles = if one {
+        file_dialog.pick_file().await.map(|f| vec![f])
+    } else {
+        file_dialog.pick_files().await
+    }
+    .ok_or_else(|| ClientError::Custom("File selection error (no file selected?)".to_string()))?;
     let mut ids = Vec::with_capacity(handles.len());
 
     for handle in handles {

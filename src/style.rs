@@ -17,7 +17,7 @@ pub const ERROR_COLOR: Color = color!(. 1.0, 0.0, 0.0);
 pub const SUCCESS_COLOR: Color = color!(. 0.0, 1.0, 0.0);
 pub const ALT_COLOR: Color = color!(. 0.5, 0.5, 0.5);
 
-pub const AVATAR_WIDTH: u16 = 32;
+pub const AVATAR_WIDTH: u16 = 44;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {
@@ -25,6 +25,7 @@ pub struct Theme {
     secondary: bool,
     round: bool,
     embed: bool,
+    overrides: OverrideStyle,
 }
 
 impl Theme {
@@ -68,56 +69,19 @@ impl Theme {
         self
     }
 
-    pub fn with_border_color(self, color: Color) -> Box<dyn container::StyleSheet> {
-        struct TempBorderColor(container::Style);
-
-        impl container::StyleSheet for TempBorderColor {
-            fn style(&self) -> container::Style {
-                self.0
-            }
-        }
-
-        let style: Box<dyn container::StyleSheet> = self.into();
-        let mut style = style.style();
-        style.border_color = color;
-        TempBorderColor(style).into()
+    pub fn border_color(mut self, color: Color) -> Self {
+        self.overrides.border_color = Some(color);
+        self
     }
 
-    pub fn with_border_color_but(self, color: Color) -> Box<dyn button::StyleSheet> {
-        struct TempBorderColor(Box<dyn button::StyleSheet>, Color);
+    pub fn border_radius(mut self, radius: f32) -> Self {
+        self.overrides.border_radius = Some(radius);
+        self
+    }
 
-        impl button::StyleSheet for TempBorderColor {
-            fn active(&self) -> button::Style {
-                button::Style {
-                    border_color: self.1,
-                    ..self.0.active()
-                }
-            }
-
-            fn hovered(&self) -> button::Style {
-                button::Style {
-                    border_color: self.1,
-                    ..self.0.hovered()
-                }
-            }
-
-            fn pressed(&self) -> button::Style {
-                button::Style {
-                    border_color: self.1,
-                    ..self.0.pressed()
-                }
-            }
-
-            fn disabled(&self) -> button::Style {
-                button::Style {
-                    border_color: self.1,
-                    ..self.0.disabled()
-                }
-            }
-        }
-
-        let style: Box<dyn button::StyleSheet> = self.into();
-        TempBorderColor(style, color).into()
+    pub fn border_width(mut self, width: f32) -> Self {
+        self.overrides.border_width = Some(width);
+        self
     }
 }
 
@@ -128,6 +92,7 @@ impl Default for Theme {
             secondary: false,
             round: false,
             embed: false,
+            overrides: Default::default(),
         }
     }
 }
@@ -137,14 +102,14 @@ impl From<Theme> for Box<dyn container::StyleSheet> {
         theme.dark.map_or_default(|| {
             if theme.secondary {
                 if theme.round {
-                    dark::BrightRoundContainer.into()
+                    dark::BrightRoundContainer(theme.overrides).into()
                 } else {
-                    dark::BrightContainer.into()
+                    dark::BrightContainer(theme.overrides).into()
                 }
             } else if theme.round {
-                dark::RoundContainer.into()
+                dark::RoundContainer(theme.overrides).into()
             } else {
-                dark::Container.into()
+                dark::Container(theme.overrides).into()
             }
         })
     }
@@ -244,6 +209,28 @@ impl From<Theme> for Box<dyn toggler::StyleSheet> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct OverrideStyle {
+    border_color: Option<Color>,
+    border_radius: Option<f32>,
+    border_width: Option<f32>,
+}
+
+impl OverrideStyle {
+    fn container(self, mut style: container::Style) -> container::Style {
+        if let Some(color) = self.border_color {
+            style.border_color = color;
+        }
+        if let Some(radius) = self.border_radius {
+            style.border_radius = radius;
+        }
+        if let Some(width) = self.border_width {
+            style.border_width = width;
+        }
+        style
+    }
+}
+
 mod light {
     use crate::color;
     use iced::{button, Color, Vector};
@@ -278,6 +265,8 @@ mod dark {
         Color,
     };
     use iced_aw::{card, modal};
+
+    use super::OverrideStyle;
 
     const DARK_BG: Color = color!(0x0A, 0x0D, 0x13);
     const BRIGHT_BG: Color = color!(0x16, 0x19, 0x1F);
@@ -344,52 +333,52 @@ mod dark {
         }
     }
 
-    pub struct Container;
+    pub struct Container(pub(super) OverrideStyle);
 
     impl container::StyleSheet for Container {
         fn style(&self) -> container::Style {
-            container::Style {
+            self.0.container(container::Style {
                 background: DARK_BG.into(),
                 text_color: Some(TEXT_COLOR),
                 ..container::Style::default()
-            }
+            })
         }
     }
 
-    pub struct RoundContainer;
+    pub struct RoundContainer(pub(super) OverrideStyle);
 
     impl container::StyleSheet for RoundContainer {
         fn style(&self) -> container::Style {
-            container::Style {
+            self.0.container(container::Style {
                 border_color: DARK_BG,
                 border_radius: 8.0,
                 border_width: 2.0,
-                ..Container.style()
-            }
+                ..Container(self.0).style()
+            })
         }
     }
 
-    pub struct BrightRoundContainer;
+    pub struct BrightRoundContainer(pub(super) OverrideStyle);
 
     impl container::StyleSheet for BrightRoundContainer {
         fn style(&self) -> container::Style {
-            container::Style {
+            self.0.container(container::Style {
                 border_color: BRIGHT_BG,
                 border_radius: 8.0,
                 border_width: 2.0,
-                ..BrightContainer.style()
-            }
+                ..BrightContainer(self.0).style()
+            })
         }
     }
 
-    pub struct BrightContainer;
+    pub struct BrightContainer(pub(super) OverrideStyle);
 
     impl container::StyleSheet for BrightContainer {
         fn style(&self) -> container::Style {
-            container::Style {
+            self.0.container(container::Style {
                 background: BRIGHT_BG.into(),
-                ..Container.style()
-            }
+                ..Container(self.0).style()
+            })
         }
     }
 
