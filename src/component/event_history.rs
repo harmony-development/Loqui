@@ -137,6 +137,14 @@ pub fn build_event_history<'a>(
         );
         let sender_body_creator = |sender_display_name: &str, avatar_but_state: &'a mut button::State| {
             let mut widgets = Vec::with_capacity(7);
+            let label_container = |label| {
+                Container::new(label)
+                    .style(theme.secondary().round().border_width(0.0))
+                    .padding([PADDING / 2, PADDING / 2])
+                    .center_x()
+                    .center_y()
+                    .into()
+            };
 
             let status_color = theme.status_color(sender_status);
             let pfp: Element<Message> = if let Some(handle) = sender_avatar_url
@@ -160,29 +168,18 @@ pub fn build_event_history<'a>(
             );
 
             widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING).into());
-            widgets.push(
-                Container::new(label!(sender_display_name).size(MESSAGE_SENDER_SIZE))
-                    .style(theme.secondary().round().border_width(0.0))
-                    .padding([PADDING / 2, PADDING / 2])
-                    .center_x()
-                    .center_y()
-                    .into(),
-            );
+            widgets.push(label_container(label!(sender_display_name).size(MESSAGE_SENDER_SIZE)));
 
             if is_sender_bot {
                 widgets.push(space!(w = SPACING * 2).into());
-                widgets.push(label!("Bot").size(MESSAGE_SENDER_SIZE - 4).into());
+                widgets.push(label_container(label!("Bot").size(MESSAGE_SENDER_SIZE - 4)));
             }
 
             if let Some(reason) = &override_reason {
                 widgets.push(space!(w = SPACING * 2).into());
-                widgets.push(
-                    label!(reason)
-                        .color(ALT_COLOR)
-                        .size(MESSAGE_SIZE)
-                        .width(length!(-))
-                        .into(),
-                );
+                widgets.push(label_container(
+                    label!(reason).color(ALT_COLOR).size(MESSAGE_SIZE).width(length!(-)),
+                ));
             }
 
             let content = Row::with_children(widgets)
