@@ -271,7 +271,7 @@ mod dark {
     const DARK_BG: Color = color!(0x0A, 0x0D, 0x13);
     const BRIGHT_BG: Color = color!(0x16, 0x19, 0x1F);
     const DISABLED: Color = color!(0x26, 0x29, 0x2F);
-    const ACCENT: Color = color!(0x6A, 0x9A, 0xA9);
+    const ACCENT: Color = color!(0x00, 0x8F, 0xCF); // 00BFFF
     const DISABLED_TEXT: Color = color!(0xDD, 0xDD, 0xDD);
     const TEXT_COLOR: Color = color!(0xEE, 0xEE, 0xEE);
 
