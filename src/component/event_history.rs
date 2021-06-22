@@ -23,6 +23,7 @@ use client::{
     bool_ext::BoolExt,
     harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
     smol_str::SmolStr,
+    OptionExt,
 };
 use iced::Font;
 
@@ -147,40 +148,38 @@ pub fn build_event_history<'a>(
             };
 
             let status_color = theme.status_color(sender_status);
-            let pfp: Element<Message> = if let Some(handle) = sender_avatar_url
+            let pfp: Element<Message> = sender_avatar_url
                 .map(|u| thumbnail_cache.avatars.get(u))
                 .flatten()
                 .cloned()
+                .map_or_else(
+                    || label!(sender_display_name.chars().next().unwrap_or('u').to_ascii_uppercase()).into(),
+                    |handle| {
+                        const LEN: Length = length!(= AVATAR_WIDTH - 4);
+                        Image::new(handle).height(LEN).width(LEN).into()
+                    },
+                );
+
             {
-                Image::new(handle)
-                    .height(length!(= AVATAR_WIDTH - 4))
-                    .width(length!(= AVATAR_WIDTH - 4))
-                    .into()
-            } else {
-                label!(sender_display_name.chars().next().unwrap_or('u').to_ascii_uppercase()).into()
-            };
-            widgets.push(
-                fill_container(pfp)
-                    .width(length!(= AVATAR_WIDTH))
-                    .height(length!(= AVATAR_WIDTH))
-                    .style(theme.round().border_color(status_color))
-                    .into(),
-            );
+                const LEN: Length = length!(= AVATAR_WIDTH);
+                let theme = theme.round().border_color(status_color);
+                widgets.push(fill_container(pfp).width(LEN).height(LEN).style(theme).into());
+            }
 
             widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING).into());
             widgets.push(label_container(label!(sender_display_name).size(MESSAGE_SENDER_SIZE)));
 
-            if is_sender_bot {
+            is_sender_bot.and_do(|| {
                 widgets.push(space!(w = SPACING * 2).into());
                 widgets.push(label_container(label!("Bot").size(MESSAGE_SENDER_SIZE - 4)));
-            }
+            });
 
-            if let Some(reason) = &override_reason {
+            override_reason.as_ref().and_do(|reason| {
                 widgets.push(space!(w = SPACING * 2).into());
                 widgets.push(label_container(
                     label!(reason).color(ALT_COLOR).size(MESSAGE_SIZE).width(length!(-)),
                 ));
-            }
+            });
 
             let content = Row::with_children(widgets)
                 .align_items(Align::Center)
@@ -194,8 +193,9 @@ pub fn build_event_history<'a>(
 
         let is_sender_different =
             last_sender_id.as_ref() != Some(&id_to_use) || last_sender_name.as_ref() != Some(&sender_display_name);
+
         if is_sender_different {
-            if !message_group.is_empty() {
+            if message_group.is_empty().not() {
                 event_history = event_history.push(push_to_msg_group(&mut message_group));
             }
             message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
@@ -207,17 +207,15 @@ pub fn build_event_history<'a>(
             )
             .height(length!(-))
             .width(length!(-));
-            let date_time_seperator = Row::with_children(vec![
-                Rule::horizontal(SPACING).style(theme).into(),
-                date_time_seperator.into(),
-                Rule::horizontal(SPACING).style(theme).into(),
-            ])
-            .align_items(Align::Center);
+            let rule = || Rule::horizontal(SPACING).style(theme);
+            let date_time_seperator =
+                Row::with_children(vec![rule().into(), date_time_seperator.into(), rule().into()])
+                    .align_items(Align::Center);
 
             event_history = event_history.push(push_to_msg_group(&mut message_group));
             event_history = event_history.push(date_time_seperator);
             message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
-        } else if !message_group.is_empty()
+        } else if message_group.is_empty().not()
             && last_timestamp.signed_duration_since(message.timestamp) > chrono::Duration::minutes(5)
         {
             event_history = event_history.push(push_to_msg_group(&mut message_group));
@@ -234,7 +232,7 @@ pub fn build_event_history<'a>(
             }
         });
 
-        if let Some(text) = msg_text {
+        msg_text.and_do(|text| {
             #[cfg(feature = "markdown")]
             let message_text = super::markdown::markdown_svg(text);
             #[cfg(not(feature = "markdown"))]
@@ -248,12 +246,12 @@ pub fn build_event_history<'a>(
             }
 
             message_body_widgets.push(message_text.into());
-        }
+        });
 
         if let IcyContent::Embeds(embeds) = &message.content {
             let put_heading =
                 |embed: &mut Vec<Element<'a, Message>>, h: &EmbedHeading, state: &'a mut button::State| {
-                    if !(h.text.is_empty() && h.subtext.is_empty()) {
+                    (h.text.is_empty() && h.subtext.is_empty()).not().and_do(move || {
                         let mut heading = Vec::with_capacity(3);
 
                         if let Some(img_url) = &h.icon {
@@ -282,7 +280,7 @@ pub fn build_event_history<'a>(
                         }
 
                         embed.push(but.into());
-                    }
+                    });
                 };
 
             let mut embed = Vec::with_capacity(5);
@@ -344,24 +342,22 @@ pub fn build_event_history<'a>(
                 let is_thumbnail = matches!(attachment.kind.split('/').next(), Some("image"));
                 let does_content_exist = content_store.content_exists(&attachment.id);
 
-                let content: Element<Message> = if let Some(thumbnail_image) = thumbnail_cache
-                    .thumbnails
-                    .get(&attachment.id)
-                    // FIXME: Don't hardcode this length, calculate it using the size of the window
-                    .map(|handle| Image::new(handle.clone()).width(length!(= 320)))
-                {
-                    let text = if does_content_exist {
-                        label!(&attachment.name)
-                    } else {
-                        label!("Download {}", attachment.name)
-                    };
-                    Column::with_children(vec![text.size(DEF_SIZE - 4).into(), thumbnail_image.into()])
-                        .spacing(SPACING)
-                        .into()
-                } else {
-                    let text = if does_content_exist { "Open" } else { "Download" };
-                    label!("{} {}", text, attachment.name).into()
-                };
+                let content: Element<Message> = thumbnail_cache.thumbnails.get(&attachment.id).map_or_else(
+                    || {
+                        let text = does_content_exist.some("Open").unwrap_or("Download");
+                        label!("{} {}", text, attachment.name).into()
+                    },
+                    |handle| {
+                        // TODO: Don't hardcode this length, calculate it using the size of the window
+                        let image = Image::new(handle.clone()).width(length!(= 320));
+                        let text = does_content_exist
+                            .map_or_else(|| label!("Download {}", attachment.name), || label!(&attachment.name));
+
+                        Column::with_children(vec![text.size(DEF_SIZE - 4).into(), image.into()])
+                            .spacing(SPACING)
+                            .into()
+                    },
+                );
                 message_body_widgets.push(
                     Button::new(media_open_button_state, content)
                         .on_press(Message::OpenContent {
@@ -379,24 +375,26 @@ pub fn build_event_history<'a>(
             .spacing(MSG_LR_PADDING);
         let mut message_row = Vec::with_capacity(4);
 
-        let maybe_timestamp = if is_sender_different || last_timestamp.minute() != message.timestamp.minute() {
-            let message_timestamp = message.timestamp.format("%H:%M").to_string();
+        let maybe_timestamp = (is_sender_different || last_timestamp.minute() != message.timestamp.minute())
+            .map_or_else(
+                || space!(w = TIMESTAMP_WIDTH).into(),
+                || {
+                    let message_timestamp = message.timestamp.format("%H:%M").to_string();
 
-            Container::new(
-                label!(message_timestamp)
-                    .size(MESSAGE_TIMESTAMP_SIZE)
-                    .color(color!(160, 160, 160))
-                    .font(IOSEVKA)
-                    .width(length!(+)),
-            )
-            .padding([PADDING / 8, RIGHT_TIMESTAMP_PADDING, 0, LEFT_TIMESTAMP_PADDING])
-            .width(length!(= TIMESTAMP_WIDTH))
-            .center_x()
-            .center_y()
-            .into()
-        } else {
-            space!(w = TIMESTAMP_WIDTH).into()
-        };
+                    Container::new(
+                        label!(message_timestamp)
+                            .size(MESSAGE_TIMESTAMP_SIZE)
+                            .color(color!(160, 160, 160))
+                            .font(IOSEVKA)
+                            .width(length!(+)),
+                    )
+                    .padding([PADDING / 8, RIGHT_TIMESTAMP_PADDING, 0, LEFT_TIMESTAMP_PADDING])
+                    .width(length!(= TIMESTAMP_WIDTH))
+                    .center_x()
+                    .center_y()
+                    .into()
+                },
+            );
         message_row.push(maybe_timestamp);
         message_row.push(msg_body.into());
 
@@ -419,7 +417,7 @@ pub fn build_event_history<'a>(
         last_sender_name = Some(sender_display_name);
         last_timestamp = message.timestamp;
     }
-    if !message_group.is_empty() {
+    if message_group.is_empty().not() {
         event_history = event_history.push(push_to_msg_group(&mut message_group));
     }
     event_history.into()

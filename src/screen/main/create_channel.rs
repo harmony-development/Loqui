@@ -1,4 +1,4 @@
-use std::convert::identity;
+use std::{convert::identity, ops::Not};
 
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
 use client::harmony_rust_sdk::{
@@ -72,7 +72,7 @@ impl ChannelCreationModal {
         let is_category = Checkbox::new(self.is_category, "Category", Message::IsCategoryToggle).style(theme);
 
         if let ChannelState::None | ChannelState::Created { .. } = &self.channel_creation_state {
-            if !self.channel_name_field.is_empty() {
+            if self.channel_name_field.is_empty().not() {
                 create_text_edit = create_text_edit.on_submit(Message::CreateChannel);
                 create = create.on_press(Message::CreateChannel);
             }
@@ -91,7 +91,7 @@ impl ChannelCreationModal {
             _ => {}
         }
 
-        if !self.error_text.is_empty() {
+        if self.error_text.is_empty().not() {
             create_widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
         }
         create_widgets.push(
@@ -154,12 +154,10 @@ impl ChannelCreationModal {
                             )
                             .await;
                             result.map(|response| {
-                                TopLevelMessage::MainScreen(ParentMessage::ChannelCreationMessage(
-                                    Message::CreatedChannel {
-                                        guild_id,
-                                        channel_id: response.channel_id,
-                                    },
-                                ))
+                                TopLevelMessage::main(ParentMessage::ChannelCreationMessage(Message::CreatedChannel {
+                                    guild_id,
+                                    channel_id: response.channel_id,
+                                }))
                             })
                         },
                         identity,

@@ -165,7 +165,7 @@ impl ProfileEditModal {
                     let content_store = client.content_store_arc();
                     client.mk_cmd(
                         |inner| async move {
-                            let id = select_upload_files(&inner, content_store, true).await?.remove(0).0;
+                            let id = select_upload_files(&inner, content_store, true).await?.remove(0).id;
                             profile_update(&inner, ProfileUpdate::default().new_avatar(Some(id)))
                                 .await
                                 .map_err(ClientError::Internal)

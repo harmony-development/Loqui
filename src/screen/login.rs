@@ -195,7 +195,7 @@ impl LoginScreen {
             screen.waiting = true;
             client.mk_cmd(
                 |inner| async move { inner.next_auth_step(response).await },
-                |step| TopLevelMessage::LoginScreen(Message::AuthStep(step)),
+                |step| TopLevelMessage::login(Message::AuthStep(step)),
             )
         }
 
@@ -210,7 +210,7 @@ impl LoginScreen {
                     self.waiting = true;
                     return client.mk_cmd(
                         |inner| async move { inner.prev_auth_step().await },
-                        |step| TopLevelMessage::LoginScreen(Message::AuthStep(Some(step))),
+                        |step| TopLevelMessage::login(Message::AuthStep(Some(step))),
                     );
                 }
             }

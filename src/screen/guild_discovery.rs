@@ -1,10 +1,14 @@
+use std::ops::Not;
+
 use client::{
+    bool_ext::BoolExt,
     error::ClientResult,
     harmony_rust_sdk::{
         api::chat::InviteId,
         client::api::chat::{guild::AddGuildToGuildListRequest, *},
     },
     tracing::debug,
+    OptionExt,
 };
 
 use super::{ClientExt, Message as TopLevelMessage, Screen as TopLevelScreen};
@@ -71,7 +75,7 @@ impl GuildDiscovery {
         if self.joining_guild.is_none() {
             back = back.on_press(Message::GoBack);
 
-            if !self.guild_name.is_empty() {
+            if self.guild_name.is_empty().not() {
                 create_text_edit = create_text_edit.on_submit(Message::CreateGuild);
                 create = create.on_press(Message::CreateGuild);
             }
@@ -88,30 +92,29 @@ impl GuildDiscovery {
                     join = join.on_press(msg);
                 }
                 Err(e) => {
-                    if !self.invite.is_empty() {
+                    self.invite.is_empty().not().and_do(|| {
                         debug!("{}", e); // We don't print this as an error since it'll spam the logs
                         texts.push(label!(e.to_string()).color(ERROR_COLOR).into());
-                    }
+                    });
                 }
             }
         }
 
-        if let Some(name) = self
-            .joined_guild
+        self.joined_guild
             .as_ref()
             .map(|id| client.guilds.get(id).map(|r| &r.name))
             .flatten()
-        {
-            texts.push(label!("Successfully joined guild {}", name).color(SUCCESS_COLOR).into());
-        }
+            .and_do(|name| texts.push(label!("Successfully joined guild {}", name).color(SUCCESS_COLOR).into()));
 
-        if let Some(name) = self.joining_guild.as_ref() {
-            texts.push(label!("Joining guild {}", name).into());
-        }
+        self.joining_guild
+            .as_ref()
+            .and_do(|name| texts.push(label!("Joining guild {}", name).into()));
 
-        if !self.error_text.is_empty() {
-            texts.push(label!(&self.error_text).color(ERROR_COLOR).into());
-        }
+        let err_text = &self.error_text;
+        self.error_text
+            .is_empty()
+            .not()
+            .and_do(|| texts.push(label!(err_text).color(ERROR_COLOR).into()));
 
         create_widgets.push(create_text_edit.into());
         create_widgets.push(
@@ -181,7 +184,7 @@ impl GuildDiscovery {
                         .await?;
                         ClientResult::Ok(guild_id)
                     },
-                    |id| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(id)),
+                    |id| TopLevelMessage::guild_discovery(Message::JoinedGuild(id)),
                 );
             }
             Message::JoinGuild(invite) => {
@@ -202,7 +205,7 @@ impl GuildDiscovery {
                         .await?;
                         ClientResult::Ok(guild_id)
                     },
-                    |id| TopLevelMessage::GuildDiscovery(Message::JoinedGuild(id)),
+                    |id| TopLevelMessage::guild_discovery(Message::JoinedGuild(id)),
                 );
             }
             Message::JoinedGuild(room_id) => {

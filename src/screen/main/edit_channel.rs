@@ -1,3 +1,5 @@
+use std::ops::Not;
+
 use super::super::Message as TopLevelMessage;
 use client::{bool_ext::BoolExt, harmony_rust_sdk::client::api::chat::channel};
 use iced_aw::Card;
@@ -42,14 +44,14 @@ impl UpdateChannelModal {
 
         let mut update = label_button!(&mut self.channel_update_but_state, "Update").style(theme);
 
-        if !self.channel_name_field.is_empty() {
+        if self.channel_name_field.is_empty().not() {
             name_text_edit = name_text_edit.on_submit(Message::UpdateChannel);
             update = update.on_press(Message::UpdateChannel);
         }
 
         let mut widgets = Vec::with_capacity(2);
 
-        if !self.error_text.is_empty() {
+        if self.error_text.is_empty().not() {
             widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
         }
         widgets.push(

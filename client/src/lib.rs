@@ -598,3 +598,47 @@ fn post_heading(post: &mut Vec<PostProcessEvent>, embed: &Embed) {
     inner(embed.header.as_ref());
     inner(embed.footer.as_ref());
 }
+
+pub trait ResultExt<T, E> {
+    fn ok_do<F: FnOnce(T)>(self, f: F);
+    fn err_do<F: FnOnce(E)>(self, f: F);
+}
+
+pub trait OptionExt<T> {
+    fn and_do<F: FnOnce(T)>(self, f: F) -> Self;
+    fn or_do<F: FnOnce()>(self, f: F) -> Self;
+}
+
+impl<T, E> ResultExt<T, E> for Result<T, E> {
+    #[inline(always)]
+    fn ok_do<F: FnOnce(T)>(self, f: F) {
+        if let Ok(val) = self {
+            f(val);
+        }
+    }
+
+    #[inline(always)]
+    fn err_do<F: FnOnce(E)>(self, f: F) {
+        if let Err(val) = self {
+            f(val);
+        }
+    }
+}
+
+impl<T> OptionExt<T> for Option<T> {
+    #[inline(always)]
+    fn and_do<F: FnOnce(T)>(self, f: F) -> Self {
+        if let Some(val) = self {
+            f(val);
+            None
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    fn or_do<F: FnOnce()>(self, f: F) -> Self {
+        self.is_none().and_do(f);
+        None
+    }
+}

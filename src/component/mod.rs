@@ -6,7 +6,7 @@ pub mod markdown;
 use crate::length;
 pub use crate::{color, label};
 pub use chan_guild_list::build_channel_list;
-use client::{harmony_rust_sdk::api::rest::FileId, IndexMap};
+use client::{bool_ext::BoolExt, harmony_rust_sdk::api::rest::FileId, IndexMap};
 pub use event_history::build_event_history;
 pub use iced::{
     button, pick_list, scrollable, text_input, Align, Button, Checkbox, Color, Column, Command, Container, Element,
@@ -200,24 +200,28 @@ impl ThumbnailCache {
         let thumbnail_size = get_image_size_from_handle(&thumbnail);
         let cache_size: usize = map.values().map(get_image_size_from_handle).sum();
 
-        if cache_size + thumbnail_size > self.max_size {
-            let mut current_size = 0;
-            let mut remove_upto = 0;
-            for (index, size) in map.values().map(get_image_size_from_handle).enumerate() {
-                if current_size >= thumbnail_size {
-                    remove_upto = index + 1;
-                    break;
+        (cache_size + thumbnail_size > self.max_size)
+            .and_do(|| {
+                let mut current_size = 0;
+                let mut remove_upto = 0;
+
+                for (index, size) in map.values().map(get_image_size_from_handle).enumerate() {
+                    if current_size >= thumbnail_size {
+                        remove_upto = index + 1;
+                        break;
+                    }
+                    current_size += size;
                 }
-                current_size += size;
-            }
-            let len = map.len();
-            for index in 0..remove_upto {
-                if index < len {
-                    map.shift_remove_index(index);
-                }
-            }
-        } else {
-            map.insert(thumbnail_id, thumbnail);
-        }
+
+                let len = map.len();
+                (0..remove_upto).for_each(|index| {
+                    (index < len).and_do(|| {
+                        map.shift_remove_index(index);
+                    });
+                });
+            })
+            .or_do(|| {
+                map.insert(thumbnail_id, thumbnail);
+            });
     }
 }
