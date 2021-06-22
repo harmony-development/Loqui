@@ -1013,13 +1013,13 @@ impl MainScreen {
                     return make_query_perm(client, guild_id, 0, "guild.manage.change-information", |p, gid, _| {
                         p.ok.map_or_else(
                             || {
-                                TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
-                                    super::GuildSettings::new(gid),
+                                TopLevelMessage::Error(Box::new(ClientError::Custom(
+                                    "Not permitted to edit guild information".to_string(),
                                 )))
                             },
                             || {
-                                TopLevelMessage::Error(Box::new(ClientError::Custom(
-                                    "Not permitted to edit guild information".to_string(),
+                                TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
+                                    super::GuildSettings::new(gid),
                                 )))
                             },
                         )
