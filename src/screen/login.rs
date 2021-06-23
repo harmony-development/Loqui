@@ -24,7 +24,7 @@ use client::{
     smol_str::SmolStr,
     AHashMap, IndexMap, InnerSession,
 };
-use std::sync::Arc;
+use std::{ops::Not, sync::Arc};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
@@ -103,7 +103,7 @@ impl LoginScreen {
 
         let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 1);
 
-        if !self.current_error.is_empty() {
+        if self.current_error.is_empty().not() {
             let error_text = label!(&self.current_error).color(ERROR_COLOR).size(DEF_SIZE - 2);
             widgets.push(error_text.into());
         }
@@ -149,7 +149,7 @@ impl LoginScreen {
             widgets.push(input.into());
         }
 
-        if !self.choices.is_empty() {
+        if self.choices.is_empty().not() {
             let mut sorted_choices = self.choices.iter_mut().collect::<Vec<_>>();
             sorted_choices.sort_unstable_by_key(|(name, _)| name.as_str());
             for (name, state) in &mut self.choices {
@@ -240,21 +240,36 @@ impl LoginScreen {
                         )
                         .await?;
                         let user_id = client.user_id.unwrap();
-                        let user_profile = profile::get_user(client.inner(), UserId::new(user_id)).await?;
                         let session_file = client.content_store().session_path(&homeserver, user_id);
                         let latest = client.content_store().latest_session_file();
-                        let _ = tokio::fs::remove_file(latest).await;
-                        tokio::fs::hard_link(session_file.as_path(), latest)
-                            .await
-                            .map_err(|err| {
-                                ClientError::Custom(format!(
-                                    "couldn't link session file ({}) to latest session ({}): {}",
-                                    session_file.to_string_lossy(),
-                                    latest.to_string_lossy(),
-                                    err
-                                ))
-                            })?;
-                        Ok((client, user_profile))
+                        match profile::get_user(client.inner(), UserId::new(user_id)).await {
+                            Ok(user_profile) => {
+                                let _ = tokio::fs::remove_file(latest).await;
+                                tokio::fs::hard_link(session_file.as_path(), latest)
+                                    .await
+                                    .map_err(|err| {
+                                        ClientError::Custom(format!(
+                                            "couldn't link session file ({}) to latest session ({}): {}",
+                                            session_file.display(),
+                                            latest.display(),
+                                            err
+                                        ))
+                                    })?;
+                                Ok((client, user_profile))
+                            }
+                            Err(err) => {
+                                let err_text = err.to_string();
+                                if err_text.contains("invalid-session") {
+                                    let _ = tokio::fs::remove_file(latest).await;
+                                    let _ = tokio::fs::remove_file(session_file).await;
+                                    Err(ClientError::Custom(
+                                        "This session is invalid, please login again!".to_string(),
+                                    ))
+                                } else {
+                                    Err(err.into())
+                                }
+                            }
+                        }
                     },
                     |result: ClientResult<_>| {
                         result.map_to_msg_def(|(client, profile)| {
@@ -351,7 +366,7 @@ impl LoginScreen {
                                     tokio::fs::write(session_file.as_path(), ser).await.map_err(|err| {
                                         ClientError::Custom(format!(
                                             "couldn't write session file to {}: {}",
-                                            session_file.to_string_lossy(),
+                                            session_file.display(),
                                             err
                                         ))
                                     })?;
@@ -362,8 +377,8 @@ impl LoginScreen {
                                         .map_err(|err| {
                                             ClientError::Custom(format!(
                                                 "couldn't link session file ({}) to latest session ({}): {}",
-                                                session_file.to_string_lossy(),
-                                                latest.to_string_lossy(),
+                                                session_file.display(),
+                                                latest.display(),
                                                 err
                                             ))
                                         })?;

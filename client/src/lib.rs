@@ -153,13 +153,22 @@ impl Client {
         let user_id = self.user_id.unwrap();
 
         tokio::spawn(async move {
-            profile::profile_update(&inner, ProfileUpdate::default().new_status(UserStatus::Offline)).await?;
-            if full_logout {
-                tokio::fs::remove_file(content_store.session_path(inner.homeserver_url().as_str(), user_id)).await?;
-            }
-            tokio::fs::remove_file(content_store.latest_session_file()).await?;
-            Ok(())
+            let _ = profile::profile_update(&inner, ProfileUpdate::default().new_status(UserStatus::Offline)).await;
+            Self::remove_session(user_id, inner.homeserver_url().as_str(), &content_store, full_logout).await
         })
+    }
+
+    pub async fn remove_session(
+        user_id: u64,
+        homeserver_url: &str,
+        content_store: &Arc<ContentStore>,
+        full_logout: bool,
+    ) -> ClientResult<()> {
+        if full_logout {
+            tokio::fs::remove_file(content_store.session_path(homeserver_url, user_id)).await?;
+        }
+        tokio::fs::remove_file(content_store.latest_session_file()).await?;
+        Ok(())
     }
 
     #[inline(always)]

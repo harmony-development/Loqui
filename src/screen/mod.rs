@@ -796,10 +796,10 @@ impl Application for ScreenManager {
                 )
                 .and_do(|| self.socket_reset = true);
 
-                // Return to login screen if its a connection error, or invalid session
-                (err_disp.contains("invalid-session") || err_disp.contains("connect error")).and_do(|| {
+                // Return to login screen if its a connection error
+                if err_disp.contains("invalid-session") || err_disp.contains("connect error") {
                     self.update(Message::Logout(Screen::Login(LoginScreen::new()).into()), clip);
-                });
+                }
 
                 return self.screens.current_mut().on_error(*err);
             }
