@@ -2,11 +2,7 @@ use std::ops::Not;
 
 use client::{
     bool_ext::BoolExt,
-    error::ClientResult,
-    harmony_rust_sdk::{
-        api::chat::InviteId,
-        client::api::chat::{guild::AddGuildToGuildListRequest, *},
-    },
+    harmony_rust_sdk::{api::chat::InviteId, client::api::chat::*},
     tracing::debug,
     OptionExt,
 };
@@ -171,18 +167,9 @@ impl GuildDiscovery {
 
                 return client.mk_cmd(
                     |inner| async move {
-                        let guild_id = guild::create_guild(&inner, guild::CreateGuild::new(guild_name))
-                            .await?
-                            .guild_id;
-                        guild::add_guild_to_guild_list(
-                            &inner,
-                            AddGuildToGuildListRequest {
-                                guild_id,
-                                homeserver: inner.homeserver_url().to_string(),
-                            },
-                        )
-                        .await?;
-                        ClientResult::Ok(guild_id)
+                        guild::create_guild(&inner, guild::CreateGuild::new(guild_name))
+                            .await
+                            .map(|g| g.guild_id)
                     },
                     |id| TopLevelMessage::guild_discovery(Message::JoinedGuild(id)),
                 );
@@ -193,18 +180,7 @@ impl GuildDiscovery {
                 self.error_text.clear();
 
                 return client.mk_cmd(
-                    |inner| async move {
-                        let guild_id = guild::join_guild(&inner, invite).await?.guild_id;
-                        guild::add_guild_to_guild_list(
-                            &inner,
-                            AddGuildToGuildListRequest {
-                                guild_id,
-                                homeserver: inner.homeserver_url().to_string(),
-                            },
-                        )
-                        .await?;
-                        ClientResult::Ok(guild_id)
-                    },
+                    |inner| async move { guild::join_guild(&inner, invite).await.map(|e| e.guild_id) },
                     |id| TopLevelMessage::guild_discovery(Message::JoinedGuild(id)),
                 );
             }

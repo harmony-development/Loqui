@@ -16,7 +16,7 @@ use client::{
         api::{
             chat::{
                 event::{ChannelCreated, Event, MemberJoined, MessageSent},
-                GetChannelMessagesResponse, QueryPermissionsResponse, RemoveGuildFromGuildListRequest,
+                GetChannelMessagesResponse, QueryPermissionsResponse,
             },
             harmonytypes::UserStatus,
         },
@@ -1027,19 +1027,10 @@ impl MainScreen {
                 }
                 GuildMenuOption::LeaveGuild => {
                     let guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
-                    if let Some(homeserver) = client.guilds.get(&guild_id).map(|g| g.homeserver.clone()) {
-                        return client.mk_cmd(
-                            |inner| async move {
-                                guild::leave_guild(&inner, GuildId::new(guild_id)).await?;
-                                guild::remove_guild_from_guild_list(
-                                    &inner,
-                                    RemoveGuildFromGuildListRequest { guild_id, homeserver },
-                                )
-                                .await
-                            },
-                            |_| TopLevelMessage::Nothing,
-                        );
-                    }
+                    return client.mk_cmd(
+                        |inner| async move { guild::leave_guild(&inner, GuildId::new(guild_id)).await },
+                        |_| TopLevelMessage::Nothing,
+                    );
                 }
                 GuildMenuOption::CopyGuildId => {
                     clip.write(
