@@ -28,7 +28,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     
-    - name: Install nix
+    - name: Install tagref
       run: curl -L https://github.com/stepchowfun/tagref/releases/download/v1.5.0/tagref-x86_64-unknown-linux-gnu > tagref && chmod +x tagref
       
     - name: Check tagref
@@ -53,8 +53,10 @@ jobs:
     - name: Install rust
       uses: actions-rs/toolchain@v1.0.7
       with:
+        toolchain: stable
         default: true
         override: true
+        components: rustfmt,clippy
 
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
