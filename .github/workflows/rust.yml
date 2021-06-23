@@ -18,6 +18,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTC_FORCE_INCREMENTAL: 1
+  CARGO_INCREMENTAL: 1
 
 jobs:
   tagref:
