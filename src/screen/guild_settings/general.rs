@@ -17,7 +17,7 @@ pub struct General {
 
 impl General {
     pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {
-        label!("asd").into()
+        label!("").into()
     }
 
     pub fn update(&mut self, msg: Message, client: &Client) -> Command<super::Message> {

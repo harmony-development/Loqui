@@ -54,11 +54,6 @@ jobs:
   
     - name: Install rust
       uses: actions-rs/toolchain@v1.0.7
-      with:
-        toolchain: 1.53.0
-        default: true
-        override: true
-        components: rustfmt,clippy
 
     - name: Cache rust
       uses: Swatinem/rust-cache@v1

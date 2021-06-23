@@ -88,7 +88,6 @@ runtimeLibs = [
 
 [workspace.metadata.nix]
 cCompiler = "llvmPackages_12.clang"
-nativeBuildInputs = ["lld_12"]
 devshell.name = "crust-shell"
 devshell.commands = [{ package = "tagref" }]
 env.RUSTC_FORCE_INCREMENTAL = "1"
