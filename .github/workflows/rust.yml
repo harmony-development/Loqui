@@ -52,6 +52,9 @@ jobs:
   
     - name: Install rust
       uses: actions-rs/toolchain@v1.0.7
+      with:
+        default: true
+        override: true
 
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
