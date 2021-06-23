@@ -2,8 +2,9 @@ use super::Message as TopLevelMessage;
 use crate::{
     client::{content::ContentStore, error::ClientError, Client, Session},
     component::*,
-    label, label_button,
+    label, label_button, length,
     screen::{ClientExt, ResultExt},
+    space,
     style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING},
 };
 use client::{
@@ -182,7 +183,13 @@ impl LoginScreen {
 
         let field_panel = column(widgets);
 
-        fill_container(field_panel).style(theme).into()
+        fill_container(Row::with_children(vec![
+            space!(w % 3).into(),
+            field_panel.width(length!(% 5)).into(),
+            space!(w % 3).into(),
+        ]))
+        .style(theme)
+        .into()
     }
 
     pub fn update(
