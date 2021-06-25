@@ -45,6 +45,7 @@
         ];
       };
       shell = common: prev: {
+        packages = prev.packages ++ [ common.pkgs.mold ];
         env = prev.env ++ [
           {
             name = "XDG_DATA_DIRS";
