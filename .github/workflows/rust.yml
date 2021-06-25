@@ -44,13 +44,38 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
 
-    - name: Install dependencies
+    - name: Install nix
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      uses: cachix/install-nix-action@v13
+      with:
+        install_url: https://github.com/numtide/nix-unstable-installer/releases/download/nix-2.4pre20210604_8e6ee1b/install
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+        nix_path: nixpkgs=channel:nixos-unstable
+
+    - name: Setup cachix
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      uses: cachix/cachix-action@v10
+      with:
+        name: harmony
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+    - name: Enter devshell
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
-        sudo apt update -yy
-        sudo apt install -yy --no-install-recommends clang libgtk-3-0 libgtk-3-dev protobuf-compiler libpango1.0-0 libpango1.0-dev libglib2.0-0 libglib2.0-dev python3 pkg-config cmake openssl libx11-dev libxcb1-dev libfreetype6 libfreetype6-dev fontconfig libfontconfig-dev expat libcairo2-dev libcairo2 libatk1.0-0 libatk1.0-dev libgdk-pixbuf2.0-0 libgdk-pixbuf2.0-dev clang lld
+          nix build .#devShell.x86_64-linux 
+          source result
+          echo "$DEVSHELL_DIR/bin" >> $GITHUB_PATH
+          echo "PROTOC=$PROTOC" >> $GITHUB_ENV
+          echo "PROTOC_INCLUDE=$PROTOC_INCLUDE" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "C_INCLUDE_PATH=$C_INCLUDE_PATH" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=$LIBRARY_PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "RUSTFLAGS=$RUSTFLAGS" >> $GITHUB_ENV
   
     - name: Install rust
+      if: ${{ matrix.os != 'ubuntu-latest' }}
       uses: actions-rs/toolchain@v1.0.7
       with:
         toolchain: stable
@@ -85,6 +110,10 @@ jobs:
       with:
         name: build-macos
         path: target/release/bundle/osx/Crust.app
+
+    - name: Compress binary
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: upx target/release/crust
 
     - name: Artifact Linux
       if: ${{ matrix.os == 'ubuntu-latest' }}
