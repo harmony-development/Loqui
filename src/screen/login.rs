@@ -3,7 +3,7 @@ use crate::{
     client::{content::ContentStore, error::ClientError, Client, Session},
     component::*,
     label, label_button, length,
-    screen::{ClientExt, ResultExt},
+    screen::{try_convert_err_to_login_err, ClientExt, ResultExt},
     space,
     style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING},
 };
@@ -231,23 +231,14 @@ impl LoginScreen {
                 let content_store = content_store.clone();
                 return Command::perform(
                     async move {
-                        let Session {
-                            session_token,
-                            user_name: _,
-                            user_id,
-                            homeserver,
-                        } = session;
                         let client = Client::new(
-                            homeserver.parse().unwrap(),
-                            Some(InnerSession {
-                                user_id: user_id.parse().unwrap(),
-                                session_token: session_token.into(),
-                            }),
+                            session.homeserver.parse().unwrap(),
+                            Some(session.clone().into()),
                             content_store,
                         )
                         .await?;
                         let user_id = client.user_id.unwrap();
-                        let session_file = client.content_store().session_path(&homeserver, user_id);
+                        let session_file = client.content_store().session_path(&session.homeserver, user_id);
                         let latest = client.content_store().latest_session_file();
                         match profile::get_user(client.inner(), UserId::new(user_id)).await {
                             Ok(user_profile) => {
@@ -265,16 +256,8 @@ impl LoginScreen {
                                 Ok((client, user_profile))
                             }
                             Err(err) => {
-                                let err_text = err.to_string();
-                                if err_text.contains("invalid-session") {
-                                    let _ = tokio::fs::remove_file(latest).await;
-                                    let _ = tokio::fs::remove_file(session_file).await;
-                                    Err(ClientError::Custom(
-                                        "This session is invalid, please login again!".to_string(),
-                                    ))
-                                } else {
-                                    Err(err.into())
-                                }
+                                let err = err.into();
+                                Err(try_convert_err_to_login_err(&err, &session).unwrap_or(err))
                             }
                         }
                     },

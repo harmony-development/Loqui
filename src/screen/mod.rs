@@ -412,9 +412,14 @@ impl Application for ScreenManager {
                     let raw = tokio::fs::read(content_store.latest_session_file()).await?;
                     let session: Session = toml::de::from_slice(&raw).map_err(|_| ClientError::MissingLoginInfo)?;
                     let client =
-                        Client::new(session.homeserver.parse().unwrap(), Some(session.into()), content_store).await?;
-                    let user_profile = get_user(client.inner(), UserId::new(client.user_id.unwrap())).await?;
-                    Ok((client, user_profile))
+                        Client::new(session.homeserver.parse().unwrap(), Some(session.clone().into()), content_store).await?;
+                    get_user(client.inner(), UserId::new(client.user_id.unwrap()))
+                        .await
+                        .map(|user_profile| (client, user_profile))
+                        .map_err(|err| {
+                            let err = err.into();
+                            try_convert_err_to_login_err(&err, &session).unwrap_or(err)
+                        })
                 },
                 |result: ClientResult<_>| {
                     result.map_to_msg_def(|(client, profile)| Message::LoginComplete(Some(client), Some(profile)))
@@ -1024,4 +1029,16 @@ async fn select_upload_files(
     }
 
     Ok(ids)
+}
+
+fn try_convert_err_to_login_err(err: &ClientError, session: &Session) -> Option<ClientError> {
+    let err_text = err.to_string();
+    if err_text.contains("invalid-session") {
+        Some(ClientError::Custom(format!(
+            "This session ({} with ID {} on homeserver {}) is invalid, please login again!",
+            session.user_name, session.user_id, session.homeserver
+        )))
+    } else {
+        None
+    }
 }
