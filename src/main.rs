@@ -22,7 +22,6 @@ fn main() {
     // Create the content store
     let content_store = ContentStore::default();
     content_store.create_req_dirs().unwrap();
-
     let term_logger = fmt::layer();
     let log_file = content_store.log_file();
     let file_appender = tracing_appender::rolling::never(log_file.parent().unwrap(), log_file.file_name().unwrap());

@@ -183,7 +183,7 @@ impl Screen {
                 .view(theme, client.unwrap()) // This will not panic cause [ref:client_set_before_main_view]
                 .map(ScreenMessage::GuildDiscovery),
             Screen::GuildSettings(screen) => screen
-                .view(theme, client.unwrap()) // This will not panic cause [ref:client_set_before_main_view]
+                .view(theme, client.unwrap(), &thumbnail_cache) // This will not panic cause [ref:client_set_before_main_view]
                 .map(ScreenMessage::GuildSettings),
         }
         .map(Message::ChildMessage)
