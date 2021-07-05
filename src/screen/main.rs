@@ -1112,7 +1112,11 @@ impl MainScreen {
                                 TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
                                     avatar: None,
-                                    thumbnail: ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec()),
+                                    thumbnail: Some(ImageHandle::from_pixels(
+                                        bgra.width(),
+                                        bgra.height(),
+                                        bgra.into_vec(),
+                                    )),
                                     open: true,
                                 }
                             } else if is_thumbnail {
@@ -1140,7 +1144,11 @@ impl MainScreen {
                                 TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
                                     avatar: None,
-                                    thumbnail: ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec()),
+                                    thumbnail: Some(ImageHandle::from_pixels(
+                                        bgra.width(),
+                                        bgra.height(),
+                                        bgra.into_vec(),
+                                    )),
                                     open: true,
                                 }
                             } else if is_thumbnail {

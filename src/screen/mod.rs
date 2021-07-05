@@ -73,7 +73,7 @@ pub enum Message {
     Nothing,
     DownloadedThumbnail {
         data: Attachment,
-        thumbnail: ImageHandle,
+        thumbnail: Option<ImageHandle>,
         avatar: Option<(ImageHandle, ImageHandle)>,
         open: bool,
     },
@@ -411,8 +411,12 @@ impl Application for ScreenManager {
                 async move {
                     let raw = tokio::fs::read(content_store.latest_session_file()).await?;
                     let session: Session = toml::de::from_slice(&raw).map_err(|_| ClientError::MissingLoginInfo)?;
-                    let client =
-                        Client::new(session.homeserver.parse().unwrap(), Some(session.clone().into()), content_store).await?;
+                    let client = Client::new(
+                        session.homeserver.parse().unwrap(),
+                        Some(session.clone().into()),
+                        content_store,
+                    )
+                    .await?;
                     get_user(client.inner(), UserId::new(client.user_id.unwrap()))
                         .await
                         .map(|user_profile| (client, user_profile))
@@ -685,11 +689,14 @@ impl Application for ScreenManager {
                     self.thumbnail_cache
                         .put_profile_avatar_thumbnail(data.id.clone(), profile_avatar);
                 });
-                if let (Screen::Main(screen), true) = (self.screens.current_mut(), open) {
-                    screen.image_viewer_modal.inner_mut().image_handle = Some((thumbnail.clone(), (path, data.name)));
-                    screen.image_viewer_modal.show(true);
-                }
-                self.thumbnail_cache.put_thumbnail(data.id, thumbnail);
+                thumbnail.and_do(|thumbnail| {
+                    if let (Screen::Main(screen), true) = (self.screens.current_mut(), open) {
+                        screen.image_viewer_modal.inner_mut().image_handle =
+                            Some((thumbnail.clone(), (path, data.name)));
+                        screen.image_viewer_modal.show(true);
+                    }
+                    self.thumbnail_cache.put_thumbnail(data.id, thumbnail);
+                });
             }
             Message::EventsReceived(events) => {
                 if self.client.is_some() {
@@ -946,8 +953,10 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
 
                     (profile_avatar, avatar)
                 });
-                let bgra = image.into_bgra8();
-                let content = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
+                let content = is_avatar.not().then(|| {
+                    let bgra = image.into_bgra8();
+                    ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec())
+                });
                 (content, avatar)
             };
 
