@@ -53,7 +53,7 @@
           }
           {
             name = "RUSTFLAGS";
-            eval = "-Clink-arg=-fuse-ld=$DEVSHELL_DIR/bin/mold";
+            value = "-Clink-arg=-fuse-ld=${common.pkgs.mold}/bin/mold -Cprefer-dynamic=yes";
           }
         ];
         commands = prev.commands ++ [

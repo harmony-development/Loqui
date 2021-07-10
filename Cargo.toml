@@ -88,6 +88,7 @@ runtimeLibs = [
 
 [workspace.metadata.nix]
 cCompiler = "llvmPackages_12.clang"
+devshell.packages = ["cargo-deny"]
 devshell.name = "crust-shell"
 devshell.commands = [{ package = "tagref" }]
 env.RUSTC_FORCE_INCREMENTAL = "1"
@@ -96,3 +97,6 @@ env.RUSTC_FORCE_INCREMENTAL = "1"
 name = "Crust"
 genericName = "Harmony Client"
 categories = "Network;"
+
+[patch.crates-io]
+twox-hash = { git = "https://github.com/shepmaster/twox-hash.git", branch = "dependabot/cargo/rand-gte-0.3.10-and-lt-0.9" }
