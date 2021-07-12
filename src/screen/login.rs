@@ -23,7 +23,7 @@ use client::{
         },
     },
     smol_str::SmolStr,
-    AHashMap, IndexMap, InnerSession,
+    AHashMap, IndexMap,
 };
 use std::{ops::Not, sync::Arc};
 

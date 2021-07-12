@@ -59,7 +59,7 @@ impl ContentStore {
 
     pub fn content_path(&self, id: &FileId) -> PathBuf {
         let normalized_id = urlencoding::encode(id.as_str());
-        self.content_dir().join(normalized_id)
+        self.content_dir().join(normalized_id.as_ref())
     }
 
     pub fn content_mimetype(&self, id: &FileId) -> String {
