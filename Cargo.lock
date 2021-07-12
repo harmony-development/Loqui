@@ -312,7 +312,7 @@ dependencies = [
  "smol_str",
  "tokio",
  "tracing",
- "urlencoding",
+ "urlencoding 2.0.0",
 ]
 
 [[package]]
@@ -1559,7 +1559,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
- "urlencoding",
+ "urlencoding 1.3.3",
 ]
 
 [[package]]
@@ -3957,6 +3957,12 @@ name = "urlencoding"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a1f0175e03a0973cf4afd476bef05c26e228520400eb1fd473ad417b1c00ffb"
+
+[[package]]
+name = "urlencoding"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d95bbc99edfcbbd61cc6e43dab325bbff0aa481fec3996051ada8409d506d528"
 
 [[package]]
 name = "usvg"
