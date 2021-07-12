@@ -140,8 +140,7 @@ impl ChannelCreationModal {
                 let after = client
                     .guilds
                     .get(&guild_id)
-                    .map(|g| g.channels.last().map(|(k, _)| *k))
-                    .flatten()
+                    .and_then(|g| g.channels.last().map(|(k, _)| *k))
                     .unwrap_or(0);
 
                 return (

@@ -203,8 +203,7 @@ impl Client {
 
     pub fn get_channel(&mut self, guild_id: u64, channel_id: u64) -> Option<&mut Channel> {
         self.get_guild(guild_id)
-            .map(|guild| guild.channels.get_mut(&channel_id))
-            .flatten()
+            .and_then(|guild| guild.channels.get_mut(&channel_id))
     }
 
     #[inline(always)]
@@ -327,8 +326,7 @@ impl Client {
                         if let Some(id) = message
                             .overrides
                             .as_ref()
-                            .map(|overrides| overrides.avatar_url.clone())
-                            .flatten()
+                            .and_then(|overrides| overrides.avatar_url.clone())
                         {
                             post.push(PostProcessEvent::FetchThumbnail(Attachment {
                                 kind: "image".into(),
@@ -597,7 +595,7 @@ impl Client {
 
 fn post_heading(post: &mut Vec<PostProcessEvent>, embed: &Embed) {
     let mut inner = |h: Option<&EmbedHeading>| {
-        if let Some(id) = h.map(|h| h.icon.clone()).flatten() {
+        if let Some(id) = h.and_then(|h| h.icon.clone()) {
             post.push(PostProcessEvent::FetchThumbnail(Attachment {
                 kind: "image".into(),
                 ..Attachment::new_unknown(id)

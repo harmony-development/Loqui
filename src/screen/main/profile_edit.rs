@@ -43,8 +43,7 @@ impl ProfileEditModal {
             let user_img: Element<Message> = if let Some(handle) = user_profile
                 .avatar_url
                 .as_ref()
-                .map(|id| thumbnail_cache.profile_avatars.get(id))
-                .flatten()
+                .and_then(|id| thumbnail_cache.profile_avatars.get(id))
             {
                 Image::new(handle.clone()).height(length!(+)).width(length!(+)).into()
             } else {

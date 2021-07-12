@@ -131,8 +131,7 @@ pub fn build_guild_list<'a>(
             let content = guild
                 .picture
                 .as_ref()
-                .map(|guild_picture| thumbnail_cache.thumbnails.get(guild_picture))
-                .flatten()
+                .and_then(|guild_picture| thumbnail_cache.thumbnails.get(guild_picture))
                 .map_or_else::<Element<Message>, _, _>(
                     || {
                         label!(guild.name.chars().next().unwrap_or('u').to_ascii_uppercase())

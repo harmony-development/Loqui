@@ -115,8 +115,7 @@ pub fn build_event_history<'a>(
         let override_reason = message
             .overrides
             .as_ref()
-            .map(|overrides| overrides.reason.as_ref())
-            .flatten()
+            .and_then(|overrides| overrides.reason.as_ref())
             .map(|reason| match reason {
                 Reason::Bridge(_) => {
                     format!("bridged by {}", name_to_use)
@@ -133,7 +132,7 @@ pub fn build_event_history<'a>(
             .as_ref()
             .map_or(name_to_use, |ov| ov.name.as_str().into());
         let sender_avatar_url = message.overrides.as_ref().map_or_else(
-            || member.map(|m| m.avatar_url.as_ref()).flatten(),
+            || member.and_then(|m| m.avatar_url.as_ref()),
             |ov| ov.avatar_url.as_ref(),
         );
         let sender_body_creator = |sender_display_name: &str, avatar_but_state: &'a mut button::State| {
@@ -149,8 +148,7 @@ pub fn build_event_history<'a>(
 
             let status_color = theme.status_color(sender_status);
             let pfp: Element<Message> = sender_avatar_url
-                .map(|u| thumbnail_cache.avatars.get(u))
-                .flatten()
+                .and_then(|u| thumbnail_cache.avatars.get(u))
                 .cloned()
                 .map_or_else(
                     || label!(sender_display_name.chars().next().unwrap_or('u').to_ascii_uppercase()).into(),

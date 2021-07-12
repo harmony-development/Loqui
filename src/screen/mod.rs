@@ -638,10 +638,8 @@ impl Application for ScreenManager {
             } => {
                 self.client
                     .as_mut()
-                    .map(|client| client.get_channel(guild_id, channel_id))
-                    .flatten()
-                    .map(|channel| channel.messages.get_mut(&MessageId::Unack(transaction_id)))
-                    .flatten()
+                    .and_then(|client| client.get_channel(guild_id, channel_id))
+                    .and_then(|channel| channel.messages.get_mut(&MessageId::Unack(transaction_id)))
                     .and_do(|msg| msg.id = MessageId::Ack(message_id));
             }
             Message::MessageEdited {
@@ -652,10 +650,8 @@ impl Application for ScreenManager {
             } => {
                 self.client
                     .as_mut()
-                    .map(|client| client.get_channel(guild_id, channel_id))
-                    .flatten()
-                    .map(|c| c.messages.get_mut(&MessageId::Ack(message_id)))
-                    .flatten()
+                    .and_then(|client| client.get_channel(guild_id, channel_id))
+                    .and_then(|c| c.messages.get_mut(&MessageId::Ack(message_id)))
                     .and_do(|msg| msg.being_edited = None);
 
                 if let Some(err) = err {
@@ -671,8 +667,7 @@ impl Application for ScreenManager {
                 let maybe_cmd = self
                     .client
                     .as_mut()
-                    .map(|c| c.send_msg_cmd(guild_id, channel_id, retry_after, message))
-                    .flatten();
+                    .and_then(|c| c.send_msg_cmd(guild_id, channel_id, retry_after, message));
                 if let Some(cmd) = maybe_cmd {
                     return Command::perform(cmd, map_send_msg);
                 }

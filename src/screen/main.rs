@@ -314,8 +314,7 @@ impl MainScreen {
         if let Some((guild, guild_id)) = self
             .current_guild_id
             .as_ref()
-            .map(|id| Some((guilds.get(id)?, *id)))
-            .flatten()
+            .and_then(|id| Some((guilds.get(id)?, *id)))
         {
             let mut sorted_members = guild
                 .members
@@ -352,8 +351,7 @@ impl MainScreen {
                     let pfp: Element<Message> = member
                         .avatar_url
                         .as_ref()
-                        .map(|hmc| thumbnail_cache.avatars.get(hmc))
-                        .flatten()
+                        .and_then(|hmc| thumbnail_cache.avatars.get(hmc))
                         .map_or_else(
                             || label!(member.username.chars().next().unwrap_or('u').to_ascii_uppercase()).into(),
                             |handle| {
@@ -429,8 +427,7 @@ impl MainScreen {
             if let Some((channel, channel_id)) = self
                 .current_channel_id
                 .as_ref()
-                .map(|id| Some((guild.channels.get(id)?, *id)))
-                .flatten()
+                .and_then(|id| Some((guild.channels.get(id)?, *id)))
             {
                 let message_history_list = build_event_history(
                     client.content_store(),
@@ -455,8 +452,7 @@ impl MainScreen {
 
                         member
                             .typing_in_channel
-                            .map(|(g, c, _)| (g == guild_id && c == channel_id).then(|| member.username.as_str()))
-                            .flatten()
+                            .and_then(|(g, c, _)| (g == guild_id && c == channel_id).then(|| member.username.as_str()))
                     })
                     .collect::<Vec<_>>();
                 let typing_members_count = typing_names.len();
@@ -696,8 +692,7 @@ impl MainScreen {
             client
                 .guilds
                 .get_mut(&guild_id)
-                .map(|guild| guild.channels.get_mut(&channel_id))
-                .flatten()
+                .and_then(|guild| guild.channels.get_mut(&channel_id))
                 .and_do(|c| c.looking_at_message = c.looking_at_message.saturating_sub(1));
         }
 
@@ -821,16 +816,12 @@ impl MainScreen {
             Message::EditLastMessage => {
                 let current_user_id = client.user_id.expect("literally how?");
                 if let (Some(guild_id), Some(channel_id)) = (self.current_guild_id, self.current_channel_id) {
-                    if let Some(mid) = client
-                        .get_channel(guild_id, channel_id)
-                        .map(|c| {
-                            c.messages
-                                .iter()
-                                .rev()
-                                .find_map(|(id, m)| id.id().map(|id| (m.sender == current_user_id).some(id)).flatten())
-                        })
-                        .flatten()
-                    {
+                    if let Some(mid) = client.get_channel(guild_id, channel_id).and_then(|c| {
+                        c.messages
+                            .iter()
+                            .rev()
+                            .find_map(|(id, m)| id.id().and_then(|id| (m.sender == current_user_id).some(id)))
+                    }) {
                         return self.update(
                             Message::ChangeMode(Mode::EditingMessage(mid)),
                             client,
@@ -846,8 +837,7 @@ impl MainScreen {
                         self.composer_state.focus();
                         if let Some(msg) = client
                             .get_channel(gid, cid)
-                            .map(|c| c.messages.get(&MessageId::Ack(mid)))
-                            .flatten()
+                            .and_then(|c| c.messages.get(&MessageId::Ack(mid)))
                         {
                             if let IcyContent::Text(text) = &msg.content {
                                 self.message.clear();
@@ -942,18 +932,15 @@ impl MainScreen {
 
                 if scroll_perc < 0.01 && scroll_perc <= self.prev_scroll_perc {
                     if let Some((oldest_msg_id, disp, reached_top, loading_messages_history, looking_at_message)) =
-                        client
-                            .get_channel(guild_id, channel_id)
-                            .map(|channel| {
-                                Some((
-                                    channel.messages.values().next().map(|m| m.id.id()).flatten(),
-                                    channel.messages.len(),
-                                    channel.reached_top,
-                                    &mut channel.loading_messages_history,
-                                    &mut channel.looking_at_message,
-                                ))
-                            })
-                            .flatten()
+                        client.get_channel(guild_id, channel_id).and_then(|channel| {
+                            Some((
+                                channel.messages.values().next().and_then(|m| m.id.id()),
+                                channel.messages.len(),
+                                channel.reached_top,
+                                &mut channel.loading_messages_history,
+                                &mut channel.looking_at_message,
+                            ))
+                        })
                     {
                         (*looking_at_message == disp.saturating_sub(1))
                             .and_do(|| *looking_at_message = disp.saturating_sub(SHOWN_MSGS_LIMIT + 1))
@@ -1173,8 +1160,7 @@ impl MainScreen {
                             let new_content: String = self.message.drain(..).collect::<String>().trim().into();
                             if let Some(msg) = client
                                 .get_channel(guild_id, channel_id)
-                                .map(|c| c.messages.get_mut(&MessageId::Ack(message_id)))
-                                .flatten()
+                                .and_then(|c| c.messages.get_mut(&MessageId::Ack(message_id)))
                             {
                                 msg.being_edited = Some(new_content.clone());
                             }

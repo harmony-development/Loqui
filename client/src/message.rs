@@ -320,8 +320,7 @@ impl From<HarmonyMessage> for Message {
         Message {
             content: message
                 .content
-                .map(|c| c.content)
-                .flatten()
+                .and_then(|c| c.content)
                 .map(|c| c.into())
                 .unwrap_or_default(),
             id: MessageId::Ack(message.message_id),

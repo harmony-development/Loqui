@@ -98,8 +98,7 @@ impl GuildDiscovery {
 
         self.joined_guild
             .as_ref()
-            .map(|id| client.guilds.get(id).map(|r| &r.name))
-            .flatten()
+            .and_then(|id| client.guilds.get(id).map(|r| &r.name))
             .and_do(|name| texts.push(label!("Successfully joined guild {}", name).color(SUCCESS_COLOR).into()));
 
         self.joining_guild
