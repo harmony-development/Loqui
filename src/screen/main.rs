@@ -832,14 +832,15 @@ impl MainScreen {
                 }
             }
             Message::ChangeMode(mode) => {
-                if let (Mode::Normal, Mode::EditingMessage(mid)) = (self.mode, mode) {
+                if let Mode::EditingMessage(mid) = mode {
                     if let (Some(gid), Some(cid)) = (self.current_guild_id, self.current_channel_id) {
-                        self.composer_state.focus();
                         if let Some(msg) = client
                             .get_channel(gid, cid)
                             .and_then(|c| c.messages.get(&MessageId::Ack(mid)))
                         {
+                            self.composer_state.focus();
                             if let IcyContent::Text(text) = &msg.content {
+                                client::tracing::debug!("editing message: {} / \"{}\"", mid, text);
                                 self.message.clear();
                                 self.message.push_str(text);
                             }
@@ -932,14 +933,14 @@ impl MainScreen {
 
                 if scroll_perc < 0.01 && scroll_perc <= self.prev_scroll_perc {
                     if let Some((oldest_msg_id, disp, reached_top, loading_messages_history, looking_at_message)) =
-                        client.get_channel(guild_id, channel_id).and_then(|channel| {
-                            Some((
+                        client.get_channel(guild_id, channel_id).map(|channel| {
+                            (
                                 channel.messages.values().next().and_then(|m| m.id.id()),
                                 channel.messages.len(),
                                 channel.reached_top,
                                 &mut channel.loading_messages_history,
                                 &mut channel.looking_at_message,
-                            ))
+                            )
                         })
                     {
                         (*looking_at_message == disp.saturating_sub(1))

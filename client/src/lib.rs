@@ -337,8 +337,12 @@ impl Client {
 
                         message.post_process(&mut post);
 
-                        if let Some(msg) = channel.messages.get_mut(&MessageId::Unack(echo_id)) {
-                            *msg = message;
+                        if let Some(msg_index) = channel.messages.get_index_of(&MessageId::Unack(echo_id)) {
+                            channel.messages.insert(MessageId::Ack(message_id), message);
+                            channel
+                                .messages
+                                .swap_indices(msg_index, channel.messages.len().saturating_sub(1));
+                            channel.messages.pop();
                         } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
                             *msg = message;
                         } else {

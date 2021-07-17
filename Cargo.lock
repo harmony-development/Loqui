@@ -1424,9 +1424,9 @@ dependencies = [
 
 [[package]]
 name = "glyph_brush_layout"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15cf18cf985bd942f05e14552b63c9d08f7d0ed1ec79a977eb9747c9e065f497"
+checksum = "cc32c2334f00ca5ac3695c5009ae35da21da8c62d255b5b96d56e2597a637a38"
 dependencies = [
  "ab_glyph",
  "approx",
@@ -1533,7 +1533,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#36744cf92d0ffc7325bb1d7e064e2a242e7ab006"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#0b8e599127e6d9b33eb775a3c04ffa2032772cfb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1543,7 +1543,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#36744cf92d0ffc7325bb1d7e064e2a242e7ab006"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#0b8e599127e6d9b33eb775a3c04ffa2032772cfb"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1597,9 +1597,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.10.3"
+version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490b99a7899d6190eda4bb726abc685c176167bb7dbcde43c09f24e34e9a4b88"
+checksum = "f83a4fa1a960b7fe943a53bc77c8c04b57511273066fa414ef49a854b28a0678"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2493,9 +2493,9 @@ checksum = "28988d872ab76095a6e6ac88d99b54fd267702734fd7ffe610ca27f533ddb95a"
 
 [[package]]
 name = "ordered-float"
-version = "2.6.0"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dea6388d3d5498ec651701f14edbaf463c924b5d8829fb2848ccf0bcc7b3c69"
+checksum = "039f02eb0f69271f26abe3202189275d7aa2258b903cb0281b5de710a2570ff3"
 dependencies = [
  "num-traits",
 ]
@@ -4247,9 +4247,9 @@ dependencies = [
 
 [[package]]
 name = "wgpu-core"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2af5c8acd3ae5781a277cdf65a17f3a7135de5ae782775620e74ea16c9d47770"
+checksum = "c45bceb912c11584306d19e3ed36df88c398a15556371f98901b371699141ce6"
 dependencies = [
  "arrayvec",
  "bitflags",

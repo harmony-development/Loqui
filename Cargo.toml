@@ -88,6 +88,7 @@ runtimeLibs = [
 
 [workspace.metadata.nix]
 cCompiler = "llvmPackages_12.clang"
+buildInputs = ["libxkbcommon"]
 devshell.packages = ["cargo-deny"]
 devshell.name = "crust-shell"
 devshell.commands = [{ package = "tagref" }]
