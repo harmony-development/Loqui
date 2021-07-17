@@ -18,7 +18,7 @@ use crate::{
     },
     IOSEVKA,
 };
-use chrono::{Datelike, Timelike};
+use chrono::{Datelike, TimeZone, Timelike};
 use client::{
     bool_ext::BoolExt,
     harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
@@ -75,12 +75,14 @@ pub fn build_event_history<'a>(
         .take(timeline_range_end - timeline_range_start)
         .map(|(_, m)| m);
 
+    let timezone = chrono::Local::now().timezone();
+
     let first_message = if let Some(msg) = displayable_events.next() {
         msg
     } else {
         return event_history.into();
     };
-    let mut last_timestamp = first_message.timestamp;
+    let mut last_timestamp = timezone.from_utc_datetime(&first_message.timestamp);
     let mut last_sender_id = None;
     let mut last_sender_name = None;
     let mut message_group = Vec::with_capacity(SHOWN_MSGS_LIMIT);
@@ -108,6 +110,7 @@ pub fn build_event_history<'a>(
             .some(current_user_id)
             .unwrap_or(message.sender);
 
+        let message_timestamp = timezone.from_utc_datetime(&message.timestamp);
         let member = members.get(&id_to_use);
         let name_to_use = member.map_or_else(SmolStr::default, |member| member.username.clone());
         let sender_status = member.map_or(UserStatus::Offline, |m| m.status);
@@ -197,9 +200,9 @@ pub fn build_event_history<'a>(
                 event_history = event_history.push(push_to_msg_group(&mut message_group));
             }
             message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
-        } else if message.timestamp.day() != last_timestamp.day() {
+        } else if message_timestamp.day() != last_timestamp.day() {
             let date_time_seperator = fill_container(
-                label!(message.timestamp.format("[%d %B %Y]").to_string())
+                label!(message_timestamp.format("[%d %B %Y]").to_string())
                     .size(DATE_SEPERATOR_SIZE)
                     .color(color!(153, 153, 153)),
             )
@@ -214,7 +217,7 @@ pub fn build_event_history<'a>(
             event_history = event_history.push(date_time_seperator);
             message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
         } else if message_group.is_empty().not()
-            && last_timestamp.signed_duration_since(message.timestamp) > chrono::Duration::minutes(5)
+            && last_timestamp.signed_duration_since(message_timestamp) > chrono::Duration::minutes(5)
         {
             event_history = event_history.push(push_to_msg_group(&mut message_group));
             message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
@@ -373,11 +376,11 @@ pub fn build_event_history<'a>(
             .spacing(MSG_LR_PADDING);
         let mut message_row = Vec::with_capacity(4);
 
-        let maybe_timestamp = (is_sender_different || last_timestamp.minute() != message.timestamp.minute())
+        let maybe_timestamp = (is_sender_different || last_timestamp.minute() != message_timestamp.minute())
             .map_or_else(
                 || space!(w = TIMESTAMP_WIDTH).into(),
                 || {
-                    let message_timestamp = message.timestamp.format("%H:%M").to_string();
+                    let message_timestamp = message_timestamp.format("%H:%M").to_string();
 
                     Container::new(
                         label!(message_timestamp)
@@ -413,7 +416,7 @@ pub fn build_event_history<'a>(
 
         last_sender_id = Some(id_to_use);
         last_sender_name = Some(sender_display_name);
-        last_timestamp = message.timestamp;
+        last_timestamp = message_timestamp;
     }
     if message_group.is_empty().not() {
         event_history = event_history.push(push_to_msg_group(&mut message_group));
