@@ -111,7 +111,14 @@ impl GuildDiscovery {
             .not()
             .and_do(|| texts.push(label!(err_text).color(ERROR_COLOR).into()));
 
-        create_widgets.push(create_text_edit.into());
+        create_widgets.push(
+            row(vec![
+                space!(w % 2).into(),
+                create_text_edit.width(length!(% 6)).into(),
+                space!(w % 2).into(),
+            ])
+            .into(),
+        );
         create_widgets.push(
             row(vec![
                 space!(w % 3).into(),
@@ -120,7 +127,14 @@ impl GuildDiscovery {
             ])
             .into(),
         );
-        widgets.push(join_text_edit.into());
+        widgets.push(
+            row(vec![
+                space!(w % 2).into(),
+                join_text_edit.width(length!(% 6)).into(),
+                space!(w % 2).into(),
+            ])
+            .into(),
+        );
         widgets.push(
             row(vec![
                 space!(w % 3).into(),
