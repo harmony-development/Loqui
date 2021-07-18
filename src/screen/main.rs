@@ -1265,11 +1265,13 @@ impl MainScreen {
                             TopLevelMessage::EventsReceived,
                         );
                     } else {
-                        self.current_channel_id = self
+                        let switch_to = self
                             .guild_last_channels
                             .get(&guild_id)
                             .copied()
-                            .or_else(|| Some(*guild.channels.first().unwrap().0));
+                            .unwrap_or_else(|| *guild.channels.first().unwrap().0);
+
+                        return self.update(Message::ChannelChanged(switch_to), client, thumbnail_cache, clip);
                     }
                 }
             }
