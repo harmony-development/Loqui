@@ -2,6 +2,7 @@ use std::{
     cmp::Ordering,
     convert::identity,
     fmt::{self, Display, Formatter},
+    ops::Not,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -773,7 +774,9 @@ impl MainScreen {
                             .flat_map(|(gid, g)| {
                                 g.channels
                                     .iter()
-                                    .map(move |(cid, c)| (*gid, *cid, c.name.as_str()))
+                                    .filter_map(move |(cid, c)| {
+                                        c.is_category.not().then(|| (*gid, *cid, c.name.as_str()))
+                                    })
                                     .flat_map(|(gid, cid, name)| {
                                         Some((matcher.fuzzy(name, pattern, false)?.0, gid, cid, name))
                                     })
