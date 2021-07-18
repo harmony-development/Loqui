@@ -83,20 +83,8 @@ pub fn build_event_history<'a>(
         return event_history.into();
     };
     let mut last_timestamp = timezone.from_utc_datetime(&first_message.timestamp);
-    let mut last_sender_id = first_message
-        .id
-        .is_ack()
-        .not()
-        .some(current_user_id)
-        .unwrap_or(first_message.sender);
-    let mut last_sender_name = {
-        let member = members.get(&last_sender_id);
-        let name_to_use = member.map_or_else(SmolStr::default, |member| member.username.clone());
-        first_message
-            .overrides
-            .as_ref()
-            .map_or(name_to_use, |ov| ov.name.as_str().into())
-    };
+    let mut last_sender_id = None;
+    let mut last_sender_name = None;
     let mut message_group = Vec::with_capacity(SHOWN_MSGS_LIMIT);
 
     let push_to_msg_group = |msg_group: &mut Vec<Element<'a, Message>>| {
@@ -204,7 +192,8 @@ pub fn build_event_history<'a>(
                 .into()
         };
 
-        let is_sender_different = last_sender_id != id_to_use || last_sender_name != sender_display_name;
+        let is_sender_different =
+            last_sender_id.as_ref() != Some(&id_to_use) || last_sender_name.as_ref() != Some(&sender_display_name);
 
         if is_sender_different {
             if message_group.is_empty().not() {
@@ -425,8 +414,8 @@ pub fn build_event_history<'a>(
                 .into(),
         );
 
-        last_sender_id = id_to_use;
-        last_sender_name = sender_display_name;
+        last_sender_id = Some(id_to_use);
+        last_sender_name = Some(sender_display_name);
         last_timestamp = message_timestamp;
     }
     if message_group.is_empty().not() {
