@@ -1,3 +1,5 @@
+use std::convert::identity;
+
 use super::{super::Screen as TopLevelScreen, GuildMetaData};
 use crate::{
     client::error::ClientError,
@@ -5,15 +7,18 @@ use crate::{
     label_button, length,
     screen::{
         guild_settings::{Message as ParentMessage, Tab},
-        Client, Message as TopLevelMessage, ScreenMessage as TopLevelScreenMessage,
+        Client, ClientExt, Message as TopLevelMessage,
     },
     space,
     style::Theme,
 };
-use client::harmony_rust_sdk::{
-    api::exports::hrpc::url::Url,
-    client::api::chat::invite::{
-        create_invite, delete_invite, get_guild_invites_response::Invite, CreateInviteRequest, DeleteInviteRequest,
+use client::{
+    error::ClientResult,
+    harmony_rust_sdk::{
+        api::exports::hrpc::url::Url,
+        client::api::chat::invite::{
+            create_invite, delete_invite, get_guild_invites_response::Invite, CreateInviteRequest, DeleteInviteRequest,
+        },
     },
 };
 use iced::Element;
@@ -30,10 +35,9 @@ pub enum InviteMessage {
     CreateInvitePressed,
     InviteCreated((String, i32)),
     InvitesLoaded(Vec<Invite>),
-    GoBack(),
+    GoBack,
     DeleteInvitePressed(usize),
     InviteDeleted(usize),
-    Nothing,
 }
 
 #[derive(Debug, Default)]
@@ -64,11 +68,10 @@ impl InviteTab {
                 self.invite_uses_value = s;
             }
             InviteMessage::CreateInvitePressed => {
-                let inner = client.inner().clone();
                 let uses = self.invite_uses_value.clone();
                 let name = self.invite_name_value.clone();
-                return Command::perform(
-                    async move {
+                return client.mk_cmd(
+                    |inner| async move {
                         let uses: i32 = match uses.parse() {
                             Ok(val) => val,
                             Err(err) => return Err(ClientError::Custom(err.to_string())),
@@ -79,11 +82,11 @@ impl InviteTab {
                             guild_id,
                         };
                         let name = create_invite(&inner, request).await?.name;
-                        Ok(TopLevelMessage::ChildMessage(TopLevelScreenMessage::GuildSettings(
-                            ParentMessage::Invite(InviteMessage::InviteCreated((name, uses))),
+                        Ok(TopLevelMessage::guild_settings(ParentMessage::Invite(
+                            InviteMessage::InviteCreated((name, uses)),
                         )))
                     },
-                    |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
+                    identity,
                 );
             }
             InviteMessage::InvitesLoaded(invites) => {
@@ -105,30 +108,27 @@ impl InviteTab {
                     meta_data.invites = Some(vec![new_invite]);
                 }
             }
-            InviteMessage::GoBack() => {
+            InviteMessage::GoBack => {
                 // Return to main screen
                 return TopLevelScreen::push_screen_cmd(TopLevelScreen::Main(Box::new(
                     super::super::MainScreen::default(),
                 )));
             }
             InviteMessage::DeleteInvitePressed(n) => {
-                let inner = client.inner().clone();
                 let invite_id = meta_data.invites.as_ref().unwrap()[n].invite_id.clone();
-                return Command::perform(
-                    async move {
-                        let request = DeleteInviteRequest { guild_id, invite_id };
-                        delete_invite(&inner, request).await?;
-                        Ok(TopLevelMessage::ChildMessage(TopLevelScreenMessage::GuildSettings(
-                            ParentMessage::Invite(InviteMessage::InviteDeleted(n)),
+                return client.mk_cmd(
+                    |inner| async move {
+                        delete_invite(&inner, DeleteInviteRequest { guild_id, invite_id }).await?;
+                        ClientResult::Ok(TopLevelMessage::guild_settings(ParentMessage::Invite(
+                            InviteMessage::InviteDeleted(n),
                         )))
                     },
-                    |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
+                    identity,
                 );
             }
             InviteMessage::InviteDeleted(n) => {
                 meta_data.invites.as_mut().unwrap().remove(n);
             }
-            _ => {}
         }
 
         Command::none()
@@ -180,7 +180,7 @@ impl Tab for InviteTab {
                 url.set_path(&cur_invite.invite_id);
                 invites_column.push(
                     row(vec![
-                        label!(url.as_str().clone()).width(length!(+)).into(),
+                        label!(url.as_str()).width(length!(+)).into(),
                         label!(cur_invite.possible_uses.to_string())
                             .width(length!(= POS_USES_WIDTH))
                             .into(),
@@ -234,7 +234,7 @@ impl Tab for InviteTab {
         widgets.push(
             label_button!(&mut self.back_but_state, "Back")
                 .style(theme)
-                .on_press(ParentMessage::Invite(InviteMessage::GoBack()))
+                .on_press(ParentMessage::Invite(InviteMessage::GoBack))
                 .into(),
         );
 

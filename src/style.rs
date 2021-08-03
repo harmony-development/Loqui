@@ -1,7 +1,8 @@
 use crate::color;
 use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::UserStatus};
 use iced::{
-    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color, Background
+    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler,
+    Background, Color,
 };
 use iced_aw::tabs;
 
@@ -96,16 +97,10 @@ impl Default for Theme {
             embed: false,
             overrides: Default::default(),
         }
-
     }
 }
 
-
 pub struct TabBar;
-
-
-
-
 
 impl From<Theme> for Box<dyn tabs::StyleSheet> {
     fn from(theme: Theme) -> Self {
@@ -253,9 +248,9 @@ impl OverrideStyle {
 
 mod light {
     use crate::color;
-    use iced::{button, Color, Vector, Background};
-    use iced_aw::tabs;
+    use iced::{button, Background, Color, Vector};
     use iced_aw::style::tab_bar::Style;
+    use iced_aw::tabs;
 
     pub struct TabBar;
 
@@ -267,11 +262,7 @@ mod light {
                 Background::Color(Color::WHITE)
             };
 
-            let text_color = if is_selected {
-                Color::WHITE
-            } else {
-                Color::BLACK
-            };
+            let text_color = if is_selected { Color::WHITE } else { Color::BLACK };
 
             Style {
                 background: None,
@@ -293,7 +284,7 @@ mod light {
                 tab_label_background,
                 icon_color: text_color,
                 text_color,
-                .. self.active(is_selected)
+                ..self.active(is_selected)
             }
         }
     }
@@ -322,12 +313,12 @@ mod light {
 }
 
 mod dark {
-    use iced_aw::tabs::Style;
-use crate::color;
+    use crate::color;
     use iced::{
         button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler,
-        Color, Background,
+        Background, Color,
     };
+    use iced_aw::tabs::Style;
     use iced_aw::{card, modal, tabs};
 
     use super::OverrideStyle;
@@ -377,11 +368,7 @@ use crate::color;
                 Background::Color(BRIGHT_BG)
             };
 
-            let text_color = if is_selected {
-                Color::WHITE
-            } else {
-                Color::BLACK
-            };
+            let text_color = if is_selected { Color::WHITE } else { Color::BLACK };
 
             Style {
                 background: None,
@@ -403,11 +390,10 @@ use crate::color;
                 tab_label_background,
                 icon_color: text_color,
                 text_color,
-                .. self.active(is_selected)
+                ..self.active(is_selected)
             }
         }
     }
-
 
     pub struct Card;
 
