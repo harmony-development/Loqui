@@ -1,5 +1,11 @@
 use harmony_rust_sdk::{
-    api::exports::hrpc::url::{ParseError, Url},
+    api::{
+        exports::{
+            hrpc::url::{ParseError, Url},
+            prost::Message,
+        },
+        harmonytypes::Error,
+    },
     client::error::{ClientError as InnerClientError, HmcParseError},
 };
 use std::fmt::{self, Display};
@@ -63,13 +69,20 @@ impl Display for ClientError {
                     harmony_rust_sdk::api::exports::hrpc::client::ClientError::EndpointError { raw_error, .. },
                 ) = err
                 {
-                    write!(
-                        fmt,
-                        "API error: {}",
-                        std::str::from_utf8(raw_error)
-                            .unwrap_or("couldn't parse error")
-                            .replace('\n', " "),
-                    )
+                    match Error::decode(raw_error.clone()) {
+                        Ok(err) => {
+                            write!(fmt, "API error: {} | {}", err.identifier, err.human_message)
+                        }
+                        Err(_) => {
+                            write!(
+                                fmt,
+                                "API error: {}",
+                                std::str::from_utf8(raw_error)
+                                    .unwrap_or("couldn't parse error")
+                                    .replace('\n', " "),
+                            )
+                        }
+                    }
                 } else {
                     write!(fmt, "{}", err)
                 }
