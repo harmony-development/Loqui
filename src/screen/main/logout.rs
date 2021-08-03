@@ -61,9 +61,9 @@ impl LogoutModal {
     pub fn update(&mut self, msg: Message, client: &Client) -> Command<TopLevelMessage> {
         msg.map_or_else(Command::none, || {
             Command::perform(client.logout(true), |result| {
-                result
-                    .unwrap()
-                    .map_to_msg_def(|_| TopLevelMessage::Logout(TopLevelScreen::Login(LoginScreen::new()).into()))
+                result.unwrap().map_to_msg_def(|_| {
+                    TopLevelMessage::Logout(TopLevelScreen::Login(LoginScreen::new().into()).into())
+                })
             })
         })
     }

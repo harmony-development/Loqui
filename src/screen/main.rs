@@ -708,7 +708,7 @@ impl MainScreen {
             }
             Message::OpenCreateJoinGuild => {
                 return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
-                    super::GuildDiscovery::default(),
+                    super::GuildDiscovery::default().into(),
                 ));
             }
             Message::CopyIdToClipboard(id) => clip.write(id.to_string()),
@@ -881,12 +881,12 @@ impl MainScreen {
                 return cmd;
             }
             Message::ChannelCreationMessage(msg) => {
-                let (cmd, go_back) = self.create_channel_modal.inner_mut().update(msg, &client);
+                let (cmd, go_back) = self.create_channel_modal.inner_mut().update(msg, client);
                 self.create_channel_modal.show(!go_back);
                 return cmd;
             }
             Message::UpdateChannelMessage(msg) => {
-                let (cmd, go_back) = self.update_channel_modal.inner_mut().update(msg, &client);
+                let (cmd, go_back) = self.update_channel_modal.inner_mut().update(msg, client);
                 self.update_channel_modal.show(!go_back);
                 return cmd;
             }
@@ -1010,7 +1010,7 @@ impl MainScreen {
                             },
                             || {
                                 TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
-                                    super::GuildSettings::new(gid),
+                                    super::GuildSettings::new(gid).into(),
                                 )))
                             },
                         )

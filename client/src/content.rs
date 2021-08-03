@@ -9,7 +9,7 @@ pub const LOG_FILENAME: &str = "log";
 pub const CONTENT_DIR_NAME: &str = "content";
 
 pub fn infer_type_from_bytes(data: &[u8]) -> String {
-    infer::get(&data)
+    infer::get(data)
         .map(|filetype| filetype.mime_type().to_string())
         .unwrap_or_else(|| String::from("application/octet-stream"))
 }
@@ -79,7 +79,7 @@ impl ContentStore {
 
         create_dir_all(self.content_dir())?;
         create_dir_all(self.sessions_dir())?;
-        create_dir_all(self.log_file().parent().unwrap_or(&Path::new(".")))?;
+        create_dir_all(self.log_file().parent().unwrap_or_else(|| Path::new(".")))?;
 
         Ok(())
     }

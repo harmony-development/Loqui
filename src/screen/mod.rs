@@ -137,10 +137,10 @@ impl Message {
 
 #[derive(Debug)]
 pub enum Screen {
-    Login(LoginScreen),
+    Login(Box<LoginScreen>),
     Main(Box<MainScreen>),
-    GuildDiscovery(GuildDiscovery),
-    GuildSettings(GuildSettings),
+    GuildDiscovery(Box<GuildDiscovery>),
+    GuildSettings(Box<GuildSettings>),
 }
 
 impl Screen {
@@ -183,7 +183,7 @@ impl Screen {
                 .view(theme, client.unwrap()) // This will not panic cause [ref:client_set_before_main_view]
                 .map(ScreenMessage::GuildDiscovery),
             Screen::GuildSettings(screen) => screen
-                .view(theme, client.unwrap(), &thumbnail_cache) // This will not panic cause [ref:client_set_before_main_view]
+                .view(theme, client.unwrap(), thumbnail_cache) // This will not panic cause [ref:client_set_before_main_view]
                 .map(ScreenMessage::GuildSettings),
         }
         .map(Message::ChildMessage)
@@ -307,7 +307,7 @@ impl ScreenManager {
     pub fn new(content_store: Arc<ContentStore>) -> Self {
         Self {
             theme: Theme::default(),
-            screens: ScreenStack::new(Screen::Login(LoginScreen::new())),
+            screens: ScreenStack::new(Screen::Login(LoginScreen::new().into())),
             client: None,
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
@@ -805,7 +805,7 @@ impl Application for ScreenManager {
 
                 // Return to login screen if its a connection error
                 if err_disp.contains("invalid-session") || err_disp.contains("connect error") {
-                    self.update(Message::Logout(Screen::Login(LoginScreen::new()).into()), clip);
+                    self.update(Message::Logout(Screen::Login(LoginScreen::new().into()).into()), clip);
                 }
 
                 return self.screens.current_mut().on_error(*err);
