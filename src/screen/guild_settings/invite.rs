@@ -10,7 +10,7 @@ use crate::{
         Client, ClientExt, Message as TopLevelMessage,
     },
     space,
-    style::Theme,
+    style::{Theme, PADDING},
 };
 use client::{
     error::ClientResult,
@@ -212,6 +212,7 @@ impl Tab for InviteTab {
                     |s| ParentMessage::Invite(InviteMessage::InviteNameChanged(s)),
                 )
                 .style(theme)
+                .padding(PADDING / 2)
                 .into(),
                 TextInput::new(
                     &mut self.invite_uses_state,
@@ -220,6 +221,7 @@ impl Tab for InviteTab {
                     |s| ParentMessage::Invite(InviteMessage::InviteUsesChanged(s)),
                 )
                 .width(length!(= 200))
+                .padding(PADDING / 2)
                 .style(theme)
                 .into(),
                 Button::new(&mut self.create_invite_but_state, label!("Create"))

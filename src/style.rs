@@ -1,8 +1,7 @@
 use crate::color;
 use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::UserStatus};
 use iced::{
-    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler,
-    Background, Color,
+    button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color,
 };
 use iced_aw::tabs;
 
@@ -363,12 +362,12 @@ mod dark {
     impl tabs::StyleSheet for TabBar {
         fn active(&self, is_selected: bool) -> tabs::Style {
             let tab_label_background = if is_selected {
-                Background::Color(DARK_BG)
-            } else {
                 Background::Color(BRIGHT_BG)
+            } else {
+                Background::Color(DARK_BG)
             };
 
-            let text_color = if is_selected { Color::WHITE } else { Color::BLACK };
+            let text_color = if is_selected { ACCENT } else { Color::WHITE };
 
             Style {
                 background: None,
@@ -383,8 +382,8 @@ mod dark {
         }
 
         fn hovered(&self, is_selected: bool) -> tabs::Style {
-            let tab_label_background = Background::Color(DARK_BG);
-            let text_color = Color::WHITE;
+            let tab_label_background = Background::Color(BRIGHT_BG);
+            let text_color = ACCENT;
 
             Style {
                 tab_label_background,
