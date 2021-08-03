@@ -62,7 +62,11 @@ impl GuildSettings {
             Message::TabSelected(selected) => {
                 self.active_tab = selected;
                 match selected {
+                    0 => {
+                        self.general_tab.error_message.clear();
+                    }
                     1 => {
+                        self.invite_tab.error_message.clear();
                         // Invite tab
                         // Is Triggered when the invite tab is clicked
                         // Triggers the fetch of the invites, receiving is handled in invite.rs
@@ -117,8 +121,11 @@ impl GuildSettings {
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
-        self.current_error = error.to_string();
-        Command::none()
+        match self.active_tab {
+            0 => self.general_tab.on_error(error),
+            1 => self.invite_tab.on_error(error),
+            _ => Command::none(),
+        }
     }
 }
 

@@ -10,7 +10,7 @@ use crate::{
         Client, ClientExt, Message as TopLevelMessage,
     },
     space,
-    style::{Theme, PADDING},
+    style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING},
 };
 use client::{
     error::ClientResult,
@@ -50,6 +50,7 @@ pub struct InviteTab {
     invite_list_state: scrollable::State,
     back_but_state: button::State,
     delete_invite_but_states: Vec<button::State>,
+    pub error_message: String,
 }
 
 impl InviteTab {
@@ -133,6 +134,11 @@ impl InviteTab {
 
         Command::none()
     }
+
+    pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
+        self.error_message = error.to_string();
+        Command::none()
+    }
 }
 
 impl Tab for InviteTab {
@@ -151,7 +157,10 @@ impl Tab for InviteTab {
         theme: Theme,
         _: &ThumbnailCache,
     ) -> Element<'_, ParentMessage> {
-        let mut widgets = vec![];
+        let mut widgets = Vec::with_capacity(10);
+        if !self.error_message.is_empty() {
+            widgets.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
+        }
         // If there are any invites, create invite list
         if let Some(invites) = &meta_data.invites {
             // Create header for invite list

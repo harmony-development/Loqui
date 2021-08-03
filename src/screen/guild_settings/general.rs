@@ -2,7 +2,6 @@ use super::{
     super::{Message as TopLevelMessage, Screen as TopLevelScreen},
     GuildMetaData,
 };
-use crate::screen::{guild_settings::TabLabel, ClientExt};
 use crate::{
     client::Client,
     component::*,
@@ -13,8 +12,12 @@ use crate::{
     },
     style::{Theme, PADDING},
 };
+use crate::{
+    screen::{guild_settings::TabLabel, ClientExt},
+    style::{DEF_SIZE, ERROR_COLOR},
+};
 use client::{
-    error::ClientResult,
+    error::{ClientError, ClientResult},
     harmony_rust_sdk::client::api::chat::guild::{update_guild_information, UpdateGuildInformation},
 };
 use iced_aw::Icon;
@@ -37,6 +40,7 @@ pub struct GeneralTab {
     back_but_state: button::State,
     loading_text: Option<String>,
     guild_id: u64,
+    pub error_message: String,
 }
 
 impl GeneralTab {
@@ -99,6 +103,11 @@ impl GeneralTab {
         }
         Command::none()
     }
+
+    pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
+        self.error_message = error.to_string();
+        Command::none()
+    }
 }
 
 impl Tab for GeneralTab {
@@ -119,8 +128,9 @@ impl Tab for GeneralTab {
     ) -> Element<'_, ParentMessage> {
         let name_edit_but_state = &mut self.name_edit_but_state;
         let guild = client.guilds.get(&self.guild_id).unwrap();
-        let mut back = label_button!(&mut self.back_but_state, "Back").style(theme);
-        back = back.on_press(ParentMessage::General(GeneralMessage::GoBack));
+        let back = label_button!(&mut self.back_but_state, "Back")
+            .style(theme)
+            .on_press(ParentMessage::General(GeneralMessage::GoBack));
         let ui_text_input_row = row(vec![
             TextInput::new(
                 &mut self.name_edit_state,
@@ -158,25 +168,19 @@ impl Tab for GeneralTab {
             .style(theme)
             .into();
 
-        if let Some(ldg_text) = &self.loading_text {
-            let content = Container::new(column(vec![
-                label!("Icon").into(),
-                ui_image_but,
-                label!("Name").into(),
-                label!(ldg_text).into(),
-                ui_text_input_row,
-                back.into(),
-            ]));
-            content.into()
-        } else {
-            let content = Container::new(column(vec![
-                label!("Icon").into(),
-                ui_image_but,
-                label!("Name").into(),
-                ui_text_input_row,
-                back.into(),
-            ]));
-            content.into()
+        let mut content = Vec::with_capacity(7);
+        if !self.error_message.is_empty() {
+            content.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
         }
+        content.push(label!("Icon").into());
+        content.push(ui_image_but);
+        content.push(label!("Name").into());
+        if let Some(ldg_text) = &self.loading_text {
+            content.push(label!(ldg_text).into());
+        }
+        content.push(ui_text_input_row);
+        content.push(back.into());
+
+        column(content).into()
     }
 }
