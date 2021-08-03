@@ -542,7 +542,7 @@ impl Client {
                     }
                 }
             }
-            x => todo!("implement {:?}", x),
+            x => tracing::warn!("implement {:?}", x),
         }
 
         post
