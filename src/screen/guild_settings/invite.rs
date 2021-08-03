@@ -155,48 +155,51 @@ impl Tab for InviteTab {
         // If there are any invites, create invite list
         if let Some(invites) = &meta_data.invites {
             // Create header for invite list
-            let mut invites_column = vec![row(vec![
-                label!("Invite Id").width(length!(+)).into(),
-                label!("Possible uses").width(length!(= POS_USES_WIDTH)).into(),
-                label!("Uses").width(length!(= USES_WIDTH)).into(),
-                space!(w = DEL_WIDTH).into(),
-            ])
-            .into()];
-            // Recreation of Url is neccessary because otherwise the scheme of the url can't be set to `harmony://`
+            let invites_table = row(vec![
+                label!("Invite Id").width(length!(% 19)).into(),
+                space!(w % 22).into(),
+                label!("Possible uses").width(length!(% 3)).into(),
+                space!(w % 3).into(),
+                label!("Uses").width(length!(% 3)).into(),
+                space!(w % 1).into(),
+            ]);
             let homeserver_url = client.inner().homeserver_url();
-            let mut url;
-            if let Some(port) = homeserver_url.port() {
-                url = Url::parse(format!("harmony://{}:{}/", homeserver_url.host().unwrap(), port).as_str()).unwrap();
-            } else {
-                url = Url::parse(format!("harmony://{}/", homeserver_url.host().unwrap()).as_str()).unwrap();
-            }
-            url.set_scheme("harmony").unwrap();
+            let mut url = Url::parse(
+                format!(
+                    "harmony://{}:{}/",
+                    homeserver_url.host().unwrap(),
+                    homeserver_url.port().unwrap_or(2289)
+                )
+                .as_str(),
+            )
+            .unwrap();
             self.delete_invite_but_states
                 .resize_with(invites.len(), Default::default);
+            let mut invites_scrollable = Scrollable::new(&mut self.invite_list_state)
+                .style(theme)
+                .align_items(Align::Center);
             // Create each line of the invite list
             for (n, (cur_invite, del_but_state)) in
                 invites.iter().zip(self.delete_invite_but_states.iter_mut()).enumerate()
             {
                 url.set_path(&cur_invite.invite_id);
-                invites_column.push(
-                    row(vec![
-                        label!(url.as_str()).width(length!(+)).into(),
-                        label!(cur_invite.possible_uses.to_string())
-                            .width(length!(= POS_USES_WIDTH))
-                            .into(),
-                        label!(cur_invite.use_count.to_string())
-                            .width(length!(= USES_WIDTH))
-                            .into(),
-                        Button::new(del_but_state, icon(Icon::Trash))
-                            .width(length!(= DEL_WIDTH))
-                            .style(theme)
-                            .on_press(ParentMessage::Invite(InviteMessage::DeleteInvitePressed(n)))
-                            .into(),
-                    ])
-                    .into(),
-                );
+                invites_scrollable = invites_scrollable.push(row(vec![
+                    label!(url.as_str()).width(length!(+)).into(),
+                    label!(cur_invite.possible_uses.to_string())
+                        .width(length!(= POS_USES_WIDTH))
+                        .into(),
+                    label!(cur_invite.use_count.to_string())
+                        .width(length!(= USES_WIDTH))
+                        .into(),
+                    Button::new(del_but_state, icon(Icon::Trash))
+                        .width(length!(= DEL_WIDTH))
+                        .style(theme)
+                        .on_press(ParentMessage::Invite(InviteMessage::DeleteInvitePressed(n)))
+                        .into(),
+                ]));
             }
-            widgets.push(column(invites_column).into());
+            widgets.push(invites_table.into());
+            widgets.push(invites_scrollable.into());
         // If there aren't any invites
         } else {
             widgets.push(label!("Fetching invites").into());
