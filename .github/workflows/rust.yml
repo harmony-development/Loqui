@@ -106,14 +106,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/download-artifact@v2
-      with:
-        name: build-macos
-    - uses: actions/download-artifact@v2
-      with:
-        name: build-linux
-    - uses: actions/download-artifact@v2
-      with:
-        name: build-windows
+
+    - name: Display structure of downloaded files
+      run: ls -R
 
     - name: Upload release
       env:
