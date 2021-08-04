@@ -4,6 +4,13 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 
 ![Crust](resources/screenshot.png)
 
+## Running
+
+- Get a binary from the release labeled `Continous release`
+    - `crust` is the Linux binary
+    - `crust.exe` is the Windows binary
+    - `Crust.app` is app bundle for MacOS
+
 ## Requirements
 - Current stable Rust and Cargo.
 - Make sure you have a working Vulkan setup.
