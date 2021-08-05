@@ -163,22 +163,20 @@ impl Tab for GeneralTab {
 
         let ui_image_but = Button::new(&mut self.icon_edit_but_state, ui_update_guild_icon)
             .on_press(ParentMessage::General(GeneralMessage::UploadGuildImage))
-            .height(length!(= 50))
-            .width(length!(= 50))
+            .height(length!(= 128))
+            .width(length!(= 128))
             .style(theme)
             .into();
 
-        let mut content = Vec::with_capacity(7);
+        let mut content = Vec::with_capacity(5);
         if !self.error_message.is_empty() {
             content.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
         }
-        content.push(label!("Icon").into());
         content.push(ui_image_but);
-        content.push(label!("Name").into());
         if let Some(ldg_text) = &self.loading_text {
             content.push(label!(ldg_text).into());
         }
-        content.push(ui_text_input_row);
+        content.push(row(vec![label!("Name").into(), ui_text_input_row]).into());
         content.push(back.into());
 
         column(content).into()
