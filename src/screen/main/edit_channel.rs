@@ -1,7 +1,10 @@
 use std::ops::Not;
 
-use super::super::Message as TopLevelMessage;
-use client::{bool_ext::BoolExt, harmony_rust_sdk::client::api::chat::channel};
+use super::{super::Message as TopLevelMessage, Message as ParentMessage};
+use client::{
+    bool_ext::BoolExt,
+    harmony_rust_sdk::{api::chat::DeleteChannelRequest, client::api::chat::channel},
+};
 use iced_aw::Card;
 
 use crate::{
@@ -16,6 +19,7 @@ use crate::{
 pub enum Message {
     ChannelNameChanged(String),
     UpdateChannel,
+    DeleteChannel,
     GoBack,
 }
 
@@ -24,6 +28,7 @@ pub struct UpdateChannelModal {
     back_but_state: button::State,
     channel_name_textedit_state: text_input::State,
     channel_update_but_state: button::State,
+    channel_delete_but_state: button::State,
     pub channel_name_field: String,
     pub guild_id: u64,
     pub channel_id: u64,
@@ -56,7 +61,7 @@ impl UpdateChannelModal {
         }
         widgets.push(
             Row::with_children(vec![
-                label!("Channel name").width(length!(= 100)).into(),
+                label!("Channel name").width(length!(= 120)).into(),
                 name_text_edit.into(),
                 update.width(length!(= 80)).into(),
             ])
@@ -64,14 +69,19 @@ impl UpdateChannelModal {
             .spacing(SPACING * 2)
             .into(),
         );
+        widgets.push(
+            label_button!(&mut self.channel_delete_but_state, "Delete")
+                .on_press(Message::DeleteChannel)
+                .style(theme)
+                .into(),
+        );
+
+        let length = length!(= 500 + PADDING + (SPACING * 3));
 
         Container::new(
-            Card::new(
-                label!("Update channel information").width(length!(= 480 + PADDING + (SPACING * 3))),
-                column(widgets),
-            )
-            .style(theme.round())
-            .on_close(Message::GoBack),
+            Card::new(label!("Update channel information").width(length), column(widgets))
+                .style(theme.round())
+                .on_close(Message::GoBack),
         )
         .style(theme.round().border_width(0.0))
         .center_x()
@@ -109,6 +119,21 @@ impl UpdateChannelModal {
                         map_to_nothing,
                     ),
                     go_back,
+                );
+            }
+            Message::DeleteChannel => {
+                self.error_text.clear();
+                let guild_id = self.guild_id;
+                let channel_id = self.channel_id;
+
+                return (
+                    client.mk_cmd(
+                        |inner| async move {
+                            channel::delete_channel(&inner, DeleteChannelRequest { guild_id, channel_id }).await
+                        },
+                        |_| TopLevelMessage::main(ParentMessage::UpdateChannelMessage(Message::GoBack)),
+                    ),
+                    false,
                 );
             }
             Message::GoBack => {

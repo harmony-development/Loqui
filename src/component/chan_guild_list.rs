@@ -52,10 +52,13 @@ pub fn build_channel_list<'a>(
                 .is_category
                 .and_do(|| content_widgets.push(space!(w = SPACING).into()));
             content_widgets.push(
-                label!(truncate_string(channel.name.to_string(), 17))
-                    .color(read_color)
-                    .size(DEF_SIZE - 2)
-                    .into(),
+                label!(truncate_string(
+                    channel.name.to_string(),
+                    channel.user_perms.manage_channel.then(|| 15).unwrap_or(17)
+                ))
+                .color(read_color)
+                .size(DEF_SIZE - 2)
+                .into(),
             );
             content_widgets.push(space!(w+).into());
             content_widgets.push(
