@@ -170,10 +170,14 @@ pub fn build_event_history<'a>(
             widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING).into());
             widgets.push(label_container(label!(sender_display_name).size(MESSAGE_SENDER_SIZE)));
 
-            (!matches!(override_reason_raw, Some(Reason::Bridge(_))) && is_sender_bot).and_do(|| {
-                widgets.push(space!(w = SPACING * 2).into());
-                widgets.push(label_container(label!("Bot").size(MESSAGE_SENDER_SIZE - 4)));
-            });
+            (!matches!(
+                override_reason_raw,
+                Some(Reason::Bridge(_) | Reason::SystemPlurality(_))
+            ) && is_sender_bot)
+                .and_do(|| {
+                    widgets.push(space!(w = SPACING * 2).into());
+                    widgets.push(label_container(label!("Bot").size(MESSAGE_SENDER_SIZE - 4)));
+                });
 
             override_reason.as_ref().and_do(|reason| {
                 widgets.push(space!(w = SPACING * 2).into());

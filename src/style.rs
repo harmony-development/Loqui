@@ -85,6 +85,11 @@ impl Theme {
         self.overrides.border_width = Some(width);
         self
     }
+
+    pub fn background_color(mut self, color: Color) -> Self {
+        self.overrides.background_color = Some(color);
+        self
+    }
 }
 
 impl Default for Theme {
@@ -228,6 +233,7 @@ struct OverrideStyle {
     border_color: Option<Color>,
     border_radius: Option<f32>,
     border_width: Option<f32>,
+    background_color: Option<Color>,
 }
 
 impl OverrideStyle {
@@ -240,6 +246,9 @@ impl OverrideStyle {
         }
         if let Some(width) = self.border_width {
             style.border_width = width;
+        }
+        if let Some(color) = self.background_color {
+            style.background = Some(color.into());
         }
         style
     }

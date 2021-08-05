@@ -1047,10 +1047,10 @@ fn try_convert_err_to_login_err(err: &ClientError, session: &Session) -> Option<
     }
 }
 
-fn truncate_username(mut username: String) -> String {
-    if username.chars().count() > 10 {
-        username.truncate(username.chars().take(10).map(char::len_utf8).sum());
-        username.push('…');
+pub fn truncate_string(mut value: String, new_len: usize) -> String {
+    if value.chars().count() > new_len {
+        value.truncate(value.chars().take(new_len).map(char::len_utf8).sum());
+        value.push('…');
     }
-    username
+    value
 }

@@ -5,7 +5,7 @@ use crate::{
     },
     component::*,
     label,
-    screen::main::Message,
+    screen::{main::Message, truncate_string},
     space,
     style::{Theme, ALT_COLOR, AVATAR_WIDTH, DEF_SIZE, PADDING, SPACING},
 };
@@ -52,7 +52,7 @@ pub fn build_channel_list<'a>(
                 .is_category
                 .and_do(|| content_widgets.push(space!(w = SPACING).into()));
             content_widgets.push(
-                label!(channel.name.as_str())
+                label!(truncate_string(channel.name.to_string(), 17))
                     .color(read_color)
                     .size(DEF_SIZE - 2)
                     .into(),
