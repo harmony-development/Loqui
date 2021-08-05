@@ -354,6 +354,9 @@ impl Client {
                             channel.looking_at_message = disp.saturating_sub(1);
                             post.push(PostProcessEvent::GoToFirstMsgOnChannel(channel_id));
                         }
+                        if !channel.looking_at_channel {
+                            channel.has_unread = true;
+                        }
                     }
                 }
             }
@@ -424,6 +427,8 @@ impl Client {
                             looking_at_message: 0,
                             messages: Default::default(),
                             reached_top: false,
+                            has_unread: false,
+                            looking_at_channel: false,
                             user_perms: ChanPerms {
                                 manage_channel: false,
                                 send_msg: false,

@@ -14,6 +14,8 @@ pub struct Channel {
     pub loading_messages_history: bool,
     pub reached_top: bool,
     pub user_perms: ChanPerms,
+    pub has_unread: bool,
+    pub looking_at_channel: bool,
 }
 
 #[derive(Debug, Clone)]

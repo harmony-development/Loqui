@@ -979,6 +979,9 @@ impl MainScreen {
                         let disp = c.messages.len();
                         if c.looking_at_message > disp.saturating_sub(SHOWN_MSGS_LIMIT) {
                             c.looking_at_message = disp.saturating_sub(1);
+                            if c.has_unread {
+                                c.has_unread = false;
+                            }
                         } else {
                             c.looking_at_message = c.looking_at_message.saturating_add(1).min(disp);
                         }
@@ -1282,6 +1285,12 @@ impl MainScreen {
             Message::ChannelChanged(channel_id) => {
                 let guild_id = self.current_guild_id.unwrap();
 
+                if let Some(channel_id) = self.current_channel_id {
+                    client
+                        .get_channel(guild_id, channel_id)
+                        .and_do(|c| c.looking_at_channel = false);
+                }
+
                 self.mode = Mode::Normal;
                 self.message.clear();
                 self.current_channel_id = Some(channel_id);
@@ -1290,8 +1299,10 @@ impl MainScreen {
                 if let Some(c) = client.get_channel(guild_id, channel_id) {
                     let disp = c.messages.len();
                     let reached_top = c.reached_top;
+                    c.looking_at_channel = true;
 
                     (c.looking_at_message >= disp.saturating_sub(SHOWN_MSGS_LIMIT)).and_do(|| {
+                        c.has_unread = false;
                         c.looking_at_message = disp.saturating_sub(1);
                         self.event_history_state.snap_to(1.0);
                     });

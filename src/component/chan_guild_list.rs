@@ -7,7 +7,7 @@ use crate::{
     label,
     screen::main::Message,
     space,
-    style::{Theme, DEF_SIZE, PADDING, SPACING},
+    style::{Theme, ALT_COLOR, AVATAR_WIDTH, DEF_SIZE, PADDING, SPACING},
 };
 
 use client::{bool_ext::BoolExt, channel::Channel};
@@ -36,8 +36,10 @@ pub fn build_channel_list<'a>(
                 .some((Icon::ListNested, DEF_SIZE - 4))
                 .unwrap_or((Icon::Hash, DEF_SIZE));
 
+            let read_color = channel.has_unread.then(|| Color::WHITE).unwrap_or(ALT_COLOR);
+
             let mut content_widgets = Vec::with_capacity(7);
-            let icon_content = icon(channel_name_prefix).size(channel_prefix_size);
+            let icon_content = icon(channel_name_prefix).color(read_color).size(channel_prefix_size);
             let icon_content = if channel.is_category {
                 Column::with_children(vec![space!(h = SPACING - (SPACING / 4)).into(), icon_content.into()])
                     .align_items(Align::Center)
@@ -49,7 +51,12 @@ pub fn build_channel_list<'a>(
             channel
                 .is_category
                 .and_do(|| content_widgets.push(space!(w = SPACING).into()));
-            content_widgets.push(label!(channel.name.as_str()).size(DEF_SIZE - 2).into());
+            content_widgets.push(
+                label!(channel.name.as_str())
+                    .color(read_color)
+                    .size(DEF_SIZE - 2)
+                    .into(),
+            );
             content_widgets.push(space!(w+).into());
             content_widgets.push(
                 Button::new(copy_state, icon(Icon::Clipboard).size(DEF_SIZE - 8))
@@ -119,7 +126,13 @@ pub fn build_guild_list<'a>(
     type Item<'a, 'b> = ((&'b u64, &'b Guild), (usize, &'a mut button::State));
     let process_item = |mut list: Scrollable<'a, Message>, ((guild_id, guild), (index, button_state)): Item<'a, '_>| {
         let mk_but = |state: &'a mut button::State, content: Element<'a, Message>| {
-            Button::new(state, fill_container(content))
+            let theme = if guild.channels.values().any(|c| c.has_unread) {
+                theme.round().border_color(Color::WHITE)
+            } else {
+                theme
+            };
+
+            Button::new(state, fill_container(content).style(theme))
                 .width(length!(+))
                 .style(theme.secondary())
         };
@@ -138,7 +151,7 @@ pub fn build_guild_list<'a>(
                             .size(DEF_SIZE + 10)
                             .into()
                     },
-                    |handle| Image::new(handle.clone()).into(),
+                    |handle| Image::new(handle.clone()).width(length!(= AVATAR_WIDTH - 4)).into(),
                 );
 
             let mut but = mk_but(button_state, content);
