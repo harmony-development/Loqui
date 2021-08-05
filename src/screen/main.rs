@@ -541,10 +541,10 @@ impl MainScreen {
                     .into(),
                 ]);
 
-                screen_widgets.push(fill_container(message_area).style(theme.secondary()).into());
+                screen_widgets.push(fill_container(message_area).style(theme).into());
             } else {
                 let no_selected_channel_warning =
-                    fill_container(label!("Select a channel").size(35).color(ALT_COLOR)).style(theme.secondary());
+                    fill_container(label!("Select a channel").size(35).color(ALT_COLOR)).style(theme);
 
                 screen_widgets.push(no_selected_channel_warning.into());
             }
@@ -566,7 +566,7 @@ impl MainScreen {
             );
         } else {
             let no_selected_guild_warning =
-                fill_container(label!("Select / join a guild").size(35).color(ALT_COLOR)).style(theme.secondary());
+                fill_container(label!("Select / join a guild").size(35).color(ALT_COLOR)).style(theme);
 
             screen_widgets.push(no_selected_guild_warning.into());
             screen_widgets.push(
