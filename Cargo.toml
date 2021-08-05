@@ -98,6 +98,3 @@ env.RUSTC_FORCE_INCREMENTAL = "1"
 name = "Crust"
 genericName = "Harmony Client"
 categories = "Network;"
-
-[patch.crates-io]
-twox-hash = { git = "https://github.com/shepmaster/twox-hash.git", branch = "dependabot/cargo/rand-gte-0.3.10-and-lt-0.9" }

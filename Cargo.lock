@@ -1533,7 +1533,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#234acc2f862571894916bfb7c6c06ec474f84d36"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#eb4e00a55fae4fc615c5df401059d59f9763d6aa"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1543,7 +1543,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#234acc2f862571894916bfb7c6c06ec474f84d36"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#eb4e00a55fae4fc615c5df401059d59f9763d6aa"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1931,9 +1931,9 @@ checksum = "8eaf4bc02d17cbdd7ff4c7438cafcdf7fb9a4613313ad11b4f8fefe7d3fa0130"
 
 [[package]]
 name = "jobserver"
-version = "0.1.22"
+version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "972f5ae5d1cb9c6ae417789196c803205313edde988685da5e3aae0827b9e7fd"
+checksum = "f5ca711fd837261e14ec9e674f092cbb931d3fa1482b017ae59328ddc6f3212b"
 dependencies = [
  "libc",
 ]
@@ -3855,10 +3855,11 @@ dependencies = [
 
 [[package]]
 name = "twox-hash"
-version = "1.6.0"
-source = "git+https://github.com/shepmaster/twox-hash.git?branch=dependabot/cargo/rand-gte-0.3.10-and-lt-0.9#cf2282897dccf938a5b36882415d479a3f0f4215"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "rand",
  "static_assertions",
 ]
