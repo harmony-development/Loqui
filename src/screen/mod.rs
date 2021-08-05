@@ -48,7 +48,6 @@ use client::{
             Client as InnerClient, EventsSocket,
         },
     },
-    smol_str::SmolStr,
     tracing::{debug, error, warn},
     OptionExt,
 };

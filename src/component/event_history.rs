@@ -115,21 +115,21 @@ pub fn build_event_history<'a>(
         let name_to_use = member.map_or_else(SmolStr::default, |member| member.username.clone());
         let sender_status = member.map_or(UserStatus::Offline, |m| m.status);
         let is_sender_bot = member.map_or(false, |m| m.is_bot);
-        let override_reason = message
+        let override_reason_raw = message
             .overrides
             .as_ref()
-            .and_then(|overrides| overrides.reason.as_ref())
-            .map(|reason| match reason {
-                Reason::Bridge(_) => {
-                    format!("bridged by {}", name_to_use)
-                }
-                Reason::SystemMessage(_) => "system message".to_string(),
-                Reason::UserDefined(reason) => reason.to_string(),
-                Reason::Webhook(_) => {
-                    format!("webhook by {}", name_to_use)
-                }
-                Reason::SystemPlurality(_) => "plurality".to_string(),
-            });
+            .and_then(|overrides| overrides.reason.as_ref());
+        let override_reason = override_reason_raw.map(|reason| match reason {
+            Reason::Bridge(_) => {
+                format!("bridged by {}", name_to_use)
+            }
+            Reason::SystemMessage(_) => "system message".to_string(),
+            Reason::UserDefined(reason) => reason.to_string(),
+            Reason::Webhook(_) => {
+                format!("webhook by {}", name_to_use)
+            }
+            Reason::SystemPlurality(_) => "plurality".to_string(),
+        });
         let sender_display_name = message
             .overrides
             .as_ref()
@@ -170,7 +170,7 @@ pub fn build_event_history<'a>(
             widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING).into());
             widgets.push(label_container(label!(sender_display_name).size(MESSAGE_SENDER_SIZE)));
 
-            is_sender_bot.and_do(|| {
+            (!matches!(override_reason_raw, Some(Reason::Bridge(_))) && is_sender_bot).and_do(|| {
                 widgets.push(space!(w = SPACING * 2).into());
                 widgets.push(label_container(label!("Bot").size(MESSAGE_SENDER_SIZE - 4)));
             });
