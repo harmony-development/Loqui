@@ -57,7 +57,7 @@ use crate::{
         *,
     },
     label, label_button, length,
-    screen::{make_query_perm, map_send_msg, map_to_nothing, ClientExt, ResultExt},
+    screen::{make_query_perm, map_send_msg, map_to_nothing, truncate_username, ClientExt, ResultExt},
     space,
     style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
 };
@@ -278,8 +278,9 @@ impl MainScreen {
 
         let current_user_id = client.user_id.unwrap();
         let current_profile = client.members.get(&current_user_id);
-        let current_username =
-            current_profile.map_or(SmolStr::new_inline("Loading..."), |member| member.username.clone());
+        let current_username = current_profile.map_or(SmolStr::new_inline("Loading..."), |member| {
+            truncate_username(member.username.to_string()).into()
+        });
 
         // TODO: show user avatar next to name
         let menu = PickList::new(
@@ -343,7 +344,7 @@ impl MainScreen {
                     .spacing(SPACING)
                     .padding(PADDING),
                 |mut list, (state, (user_id, member))| {
-                    let mut username = label!(member.username.as_str());
+                    let mut username = label!(truncate_username(member.username.to_string()));
                     // Set text color to a more dimmed one if the user is offline
                     if matches!(member.status, UserStatus::Offline) {
                         username = username.color(ALT_COLOR)

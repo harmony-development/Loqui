@@ -48,6 +48,7 @@ use client::{
             Client as InnerClient, EventsSocket,
         },
     },
+    smol_str::SmolStr,
     tracing::{debug, error, warn},
     OptionExt,
 };
@@ -1045,4 +1046,12 @@ fn try_convert_err_to_login_err(err: &ClientError, session: &Session) -> Option<
     } else {
         None
     }
+}
+
+fn truncate_username(mut username: String) -> String {
+    if username.chars().count() > 10 {
+        username.truncate(username.chars().take(10).map(char::len_utf8).sum());
+        username.push('…');
+    }
+    username
 }
