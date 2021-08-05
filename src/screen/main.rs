@@ -695,7 +695,7 @@ impl MainScreen {
                 .guilds
                 .get_mut(&guild_id)
                 .and_then(|guild| guild.channels.get_mut(&channel_id))
-                .and_do(|c| c.looking_at_message = c.looking_at_message.saturating_sub(1));
+                .and_do(|c| c.looking_at_message = c.messages.len().saturating_sub(1));
         }
 
         match msg {

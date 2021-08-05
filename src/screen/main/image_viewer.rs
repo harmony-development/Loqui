@@ -37,7 +37,8 @@ impl ImageViewerModal {
                         Container::new(Viewer::new(&mut self.viewer_state, handle).width(length!(= 720)))
                             .center_x()
                             .center_y()
-                            .width(length!(= 720)),
+                            .width(length!(= 720))
+                            .max_height(720),
                     )
                     .foot(
                         label_button!(&mut self.external_but_state, "Open externally")
