@@ -776,10 +776,12 @@ impl MainScreen {
                                 g.channels
                                     .iter()
                                     .filter_map(move |(cid, c)| {
-                                        c.is_category.not().then(|| (*gid, *cid, c.name.as_str()))
+                                        c.is_category
+                                            .not()
+                                            .then(|| (*gid, *cid, SmolStr::from(format!("{} | {}", c.name, g.name))))
                                     })
                                     .flat_map(|(gid, cid, name)| {
-                                        Some((matcher.fuzzy(name, pattern, false)?.0, gid, cid, name))
+                                        Some((matcher.fuzzy(&name, pattern, false)?.0, gid, cid, name))
                                     })
                             })
                             .collect::<Vec<_>>();
@@ -790,7 +792,7 @@ impl MainScreen {
                             .map(|(_, gid, cid, name)| quick_switcher::SearchResult::Channel {
                                 guild_id: gid,
                                 id: cid,
-                                name: name.into(),
+                                name,
                             })
                             .collect()
                     };
@@ -803,8 +805,14 @@ impl MainScreen {
                                 guild_id: *gid,
                                 id: *cid,
                                 name: client
-                                    .get_channel(*gid, *cid)
-                                    .map_or(SmolStr::new_inline("unknown"), |c| c.name.clone()),
+                                    .guilds
+                                    .get(gid)
+                                    .and_then(|g| {
+                                        g.channels
+                                            .get(cid)
+                                            .map(|c| SmolStr::from(format!("{} | {}", c.name, g.name)))
+                                    })
+                                    .unwrap_or_else(|| SmolStr::new_inline("unknown")),
                             })
                             .collect()
                     } else if let Some(pattern) = new_term.strip_prefix('*').map(str::trim) {
