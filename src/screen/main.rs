@@ -195,6 +195,8 @@ pub enum Message {
     OpenCreateJoinGuild,
     /// Sent when the user picks a new status
     ChangeUserStatus(UserStatus),
+    ReplyToMessage(u64),
+    GotoReply(MessageId),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -234,6 +236,7 @@ pub struct MainScreen {
     pub current_channel_id: Option<u64>,
     /// The message the user is currently typing.
     message: String,
+    reply_to: Option<u64>,
     /// The last error in string form.
     error_text: String,
     /// Error "popup" close button state
@@ -699,6 +702,20 @@ impl MainScreen {
         }
 
         match msg {
+            Message::GotoReply(message_id) => {
+                let guild_id = self.current_guild_id.unwrap();
+                let channel_id = self.current_channel_id.unwrap();
+
+                if let Some(channel) = client.get_channel(guild_id, channel_id) {
+                    if let Some(pos) = channel.messages.iter().position(|(id, _)| message_id.eq(id)) {
+                        channel.looking_at_message = pos.saturating_sub(SHOWN_MSGS_LIMIT);
+                        self.event_history_state.snap_to(1.0);
+                    }
+                }
+            }
+            Message::ReplyToMessage(message_id) => {
+                self.reply_to = Some(message_id);
+            }
             Message::ChangeUserStatus(new_status) => {
                 return client.mk_cmd(
                     |inner| async move {
@@ -1195,6 +1212,7 @@ impl MainScreen {
                             let message = IcyMessage {
                                 content: IcyContent::Text(self.message.drain(..).collect::<String>().trim().into()),
                                 sender: client.user_id.unwrap(),
+                                reply_to: self.reply_to.take(),
                                 ..Default::default()
                             };
                             if let Some(cmd) =

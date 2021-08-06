@@ -107,6 +107,11 @@ pub enum PostProcessEvent {
     FetchThumbnail(Attachment),
     GoToFirstMsgOnChannel(u64),
     CheckPermsForChannel(u64, u64),
+    FetchMessage {
+        guild_id: u64,
+        channel_id: u64,
+        message_id: u64,
+    },
 }
 
 #[derive(Clone)]
@@ -234,6 +239,7 @@ impl Client {
                     .content(harmony_rust_sdk::api::harmonytypes::Content {
                         content: Some(message.content.clone().into()),
                     })
+                    .in_reply_to(message.reply_to.unwrap_or(0))
                     .echo_id(echo_id)
                     .overrides(message.overrides.clone().map(Into::into));
 
@@ -335,6 +341,14 @@ impl Client {
                                 ..Attachment::new_unknown(id)
                             }));
                         }
+
+                        /*if let Some(message_id) = message.reply_to {
+                            post.push(PostProcessEvent::FetchMessage {
+                                guild_id,
+                                channel_id,
+                                message_id,
+                            });
+                        }*/
 
                         message.post_process(&mut post);
 

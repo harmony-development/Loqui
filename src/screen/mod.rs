@@ -27,8 +27,8 @@ use client::{
         self,
         api::{
             chat::{
-                event::{Event, GuildAddedToList, GuildUpdated, ProfileUpdated},
-                GetGuildListRequest, GetUserResponse, QueryPermissionsResponse,
+                event::{Event, GuildAddedToList, GuildUpdated, MessageSent, ProfileUpdated},
+                GetGuildListRequest, GetMessageRequest, GetUserResponse, QueryPermissionsResponse,
             },
             harmonytypes::UserStatus,
             rest::FileId,
@@ -38,6 +38,7 @@ use client::{
                 auth::AuthStepResponse,
                 chat::{
                     guild::{get_guild, get_guild_list},
+                    message::get_message,
                     permissions::{self, QueryPermissions, QueryPermissionsSelfBuilder},
                     profile::{self, get_user, get_user_bulk, ProfileUpdate},
                     EventSource, GuildId, UserId,
@@ -384,6 +385,33 @@ impl ScreenManager {
                                 update_picture: true,
                                 update_metadata: true,
                             })]
+                        })
+                    },
+                    Message::EventsReceived,
+                ),
+                PostProcessEvent::FetchMessage {
+                    guild_id,
+                    channel_id,
+                    message_id,
+                } => client.mk_cmd(
+                    |inner| async move {
+                        get_message(
+                            &inner,
+                            GetMessageRequest {
+                                guild_id,
+                                channel_id,
+                                message_id,
+                            },
+                        )
+                        .await
+                        .map(|message| {
+                            vec![Event::SentMessage(
+                                (MessageSent {
+                                    echo_id: 0,
+                                    message: message.message,
+                                })
+                                .into(),
+                            )]
                         })
                     },
                     Message::EventsReceived,

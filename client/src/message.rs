@@ -227,6 +227,7 @@ pub struct Message {
     pub timestamp: NaiveDateTime,
     pub overrides: Option<Override>,
     pub being_edited: Option<String>,
+    pub reply_to: Option<u64>,
 }
 
 impl Message {
@@ -259,6 +260,7 @@ impl Default for Message {
             },
             overrides: None,
             being_edited: None,
+            reply_to: None,
         }
     }
 }
@@ -318,6 +320,7 @@ impl From<harmonytypes::Embed> for Embed {
 impl From<HarmonyMessage> for Message {
     fn from(message: HarmonyMessage) -> Self {
         Message {
+            reply_to: (message.in_reply_to != 0).then(|| message.in_reply_to),
             content: message
                 .content
                 .and_then(|c| c.content)

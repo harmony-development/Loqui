@@ -10,7 +10,10 @@ use crate::{
     color,
     component::*,
     label,
-    screen::main::{Message, Mode},
+    screen::{
+        main::{Message, Mode},
+        truncate_string,
+    },
     space,
     style::{
         Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
@@ -22,6 +25,7 @@ use chrono::{Datelike, TimeZone, Timelike};
 use client::{
     bool_ext::BoolExt,
     harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
+    message::MessageId,
     smol_str::SmolStr,
     OptionExt,
 };
@@ -29,6 +33,8 @@ use iced::Font;
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 pub type EventHistoryButsState = [(
+    button::State,
+    button::State,
     button::State,
     button::State,
     button::State,
@@ -100,8 +106,18 @@ pub fn build_event_history<'a>(
         .style(theme.round().border_width(0.0))
     };
 
-    for (message, (media_open_button_state, h_embed_but, f_embed_but, edit_but_state, avatar_but_state)) in
-        (std::iter::once(first_message).chain(displayable_events)).zip(buts_sate.iter_mut())
+    for (
+        message,
+        (
+            media_open_button_state,
+            h_embed_but,
+            f_embed_but,
+            edit_but_state,
+            avatar_but_state,
+            reply_but_state,
+            goto_reply_state,
+        ),
+    ) in (std::iter::once(first_message).chain(displayable_events)).zip(buts_sate.iter_mut())
     {
         let id_to_use = message
             .id
@@ -378,45 +394,112 @@ pub fn build_event_history<'a>(
         let msg_body = Column::with_children(message_body_widgets)
             .align_items(Align::Start)
             .spacing(MSG_LR_PADDING);
-        let mut message_row = Vec::with_capacity(4);
+        let mut message_row = Vec::with_capacity(5);
 
-        let maybe_timestamp = (is_sender_different || last_timestamp.minute() != message_timestamp.minute())
-            .map_or_else(
-                || space!(w = TIMESTAMP_WIDTH).into(),
-                || {
-                    let message_timestamp = message_timestamp.format("%H:%M").to_string();
+        let maybe_reply_message = message
+            .reply_to
+            .and_then(|id| channel.messages.get(&MessageId::Ack(id)));
 
-                    Container::new(
-                        label!(message_timestamp)
-                            .size(MESSAGE_TIMESTAMP_SIZE)
-                            .color(color!(160, 160, 160))
-                            .font(IOSEVKA)
-                            .width(length!(+)),
-                    )
-                    .padding([PADDING / 8, RIGHT_TIMESTAMP_PADDING, 0, LEFT_TIMESTAMP_PADDING])
-                    .width(length!(= TIMESTAMP_WIDTH))
-                    .center_x()
-                    .center_y()
-                    .into()
-                },
-            );
+        let maybe_timestamp = (maybe_reply_message.is_some()
+            || is_sender_different
+            || last_timestamp.minute() != message_timestamp.minute())
+        .map_or_else(
+            || space!(w = TIMESTAMP_WIDTH).into(),
+            || {
+                let message_timestamp = message_timestamp.format("%H:%M").to_string();
+
+                Container::new(
+                    label!(message_timestamp)
+                        .size(MESSAGE_TIMESTAMP_SIZE)
+                        .color(color!(160, 160, 160))
+                        .font(IOSEVKA)
+                        .width(length!(+)),
+                )
+                .padding([PADDING / 8, RIGHT_TIMESTAMP_PADDING, 0, LEFT_TIMESTAMP_PADDING])
+                .width(length!(= TIMESTAMP_WIDTH))
+                .center_x()
+                .center_y()
+                .into()
+            },
+        );
         message_row.push(maybe_timestamp);
         message_row.push(msg_body.into());
 
-        if let (Some(id), true) = (message.id.id(), msg_text.is_some() && current_user_id == message.sender) {
-            let but = Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 10))
-                .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
+        if let Some(id) = message.id.id() {
+            let but = Button::new(reply_but_state, icon(Icon::Reply).size(MESSAGE_SIZE - 10))
+                .on_press(Message::ReplyToMessage(id))
                 .style(theme.secondary());
             message_row.push(but.into());
+            if msg_text.is_some() && current_user_id == message.sender {
+                let but = Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 10))
+                    .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
+                    .style(theme.secondary());
+                message_row.push(but.into());
+            }
         }
         message_row.push(space!(w = PADDING / 4).into());
 
-        message_group.push(
+        let mut message_col = Vec::with_capacity(2);
+
+        if let Some(reply_message) = maybe_reply_message {
+            let name_to_use = members
+                .get(&reply_message.sender)
+                .map_or_else(SmolStr::default, |member| member.username.clone());
+            let author_name = reply_message
+                .overrides
+                .as_ref()
+                .map_or(name_to_use, |ov| ov.name.as_str().into());
+            let color = color!(200, 200, 200);
+
+            let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
+            let content = label!(match &reply_message.content {
+                IcyContent::Text(text) => truncate_string(text.replace('\n', " "), 40),
+                IcyContent::Files(files) => {
+                    let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
+                        names.push_str(", ");
+                        names.push_str(name);
+                        names
+                    });
+                    format!("sent file(s): {}", file_names)
+                }
+                IcyContent::Embeds(_) => "sent an embed".to_string(),
+            })
+            .size(MESSAGE_SIZE - 4)
+            .color(color);
+
+            message_col.push(
+                Row::with_children(vec![
+                    space!(w = TIMESTAMP_WIDTH / 5).into(),
+                    Row::with_children(vec![
+                        icon(Icon::Reply).size(MESSAGE_SIZE).into(),
+                        Button::new(
+                            goto_reply_state,
+                            Row::with_children(vec![author.into(), content.into()])
+                                .align_items(Align::Center)
+                                .spacing(SPACING / 2)
+                                .padding(PADDING / 5),
+                        )
+                        .on_press(Message::GotoReply(reply_message.id))
+                        .style(theme.round())
+                        .into(),
+                    ])
+                    .spacing(SPACING)
+                    .align_items(Align::Center)
+                    .into(),
+                ])
+                .align_items(Align::Center)
+                .into(),
+            );
+        }
+
+        message_col.push(
             Row::with_children(message_row)
                 .align_items(Align::Start)
                 .spacing(SPACING)
                 .into(),
         );
+
+        message_group.push(Column::with_children(message_col).align_items(Align::Start).into());
 
         last_sender_id = Some(id_to_use);
         last_sender_name = Some(sender_display_name);

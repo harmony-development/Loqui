@@ -47,6 +47,7 @@ fn main() {
     settings.antialiasing = false;
     settings.default_font = Some(include_bytes!("fonts/Inter.otf"));
     settings.default_text_size = DEF_SIZE;
+    settings.text_multithreading = true;
 
     ScreenManager::run(settings).unwrap();
 }
