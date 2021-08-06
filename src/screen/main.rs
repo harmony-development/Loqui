@@ -513,7 +513,7 @@ impl MainScreen {
                     fill_container(label!("You don't have permission to send a message here"))
                         .padding((PADDING / 4) * 3)
                         .height(length!(-))
-                        .style(theme.secondary())
+                        .style(theme)
                         .into()
                 };
 
