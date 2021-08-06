@@ -6,7 +6,7 @@ pub type Message = bool;
 
 const HELP: &str = include_str!("help.txt");
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct HelpModal;
 
 impl HelpModal {

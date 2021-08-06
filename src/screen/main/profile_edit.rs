@@ -24,7 +24,7 @@ pub enum Message {
     IsBotChecked(bool),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ProfileEditModal {
     pub user_id: u64,
     pub is_edit: bool,

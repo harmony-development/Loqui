@@ -40,7 +40,7 @@ pub enum InviteMessage {
     InviteDeleted(usize),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct InviteTab {
     invite_name_state: text_input::State,
     invite_name_value: String,

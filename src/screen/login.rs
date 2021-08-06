@@ -57,7 +57,7 @@ pub enum Message {
     UseSession(Session),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct LoginScreen {
     fields: IndexMap<SmolStr, (text_input::State, String, String)>,
     choices: AHashMap<SmolStr, button::State>,

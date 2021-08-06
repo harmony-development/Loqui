@@ -43,7 +43,7 @@ pub enum Message {
     IsCategoryToggle(bool),
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct ChannelCreationModal {
     create_channel_back_but_state: button::State,
     channel_name_textedit_state: text_input::State,

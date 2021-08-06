@@ -13,7 +13,7 @@ use crate::{
 
 pub type Message = bool;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct LogoutModal {
     logout_approve_but_state: button::State,
     logout_cancel_but_state: button::State,

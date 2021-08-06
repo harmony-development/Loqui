@@ -19,7 +19,7 @@ pub enum SearchResult {
     Channel { guild_id: u64, id: u64, name: SmolStr },
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct QuickSwitcherModal {
     search_state: text_input::State,
     results_buts_state: [button::State; 8],

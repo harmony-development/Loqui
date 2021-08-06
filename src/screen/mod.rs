@@ -54,7 +54,7 @@ use client::{
 use iced::{executor, futures::future, Application, Command, Element, Subscription};
 use std::{convert::identity, future::Future, ops::Not, sync::Arc, time::Duration};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ScreenMessage {
     LoginScreen(login::Message),
     MainScreen(main::Message),
@@ -62,7 +62,7 @@ pub enum ScreenMessage {
     GuildSettings(guild_settings::Message),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Message {
     ChildMessage(ScreenMessage),
     PopScreen,
@@ -80,7 +80,7 @@ pub enum Message {
     EventsReceived(Vec<Event>),
     SocketEvent {
         socket: Box<EventsSocket>,
-        event: Option<harmony_rust_sdk::client::error::ClientResult<Event>>,
+        event: Option<Result<Event, ClientError>>,
     },
     GetEventsBackwardsResponse {
         messages: Vec<HarmonyMessage>,
@@ -135,7 +135,7 @@ impl Message {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Screen {
     Login(Box<LoginScreen>),
     Main(Box<MainScreen>),
@@ -547,7 +547,7 @@ impl Application for ScreenManager {
                                     }
                                     Message::SocketEvent {
                                         socket,
-                                        event: Some(ev),
+                                        event: Some(ev.map_err(Into::into)),
                                     }
                                 },
                                 identity,

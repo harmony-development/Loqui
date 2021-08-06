@@ -31,7 +31,7 @@ pub enum GeneralMessage {
     UploadGuildImage,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct GeneralTab {
     name_edit_state: text_input::State,
     name_edit_field: String,

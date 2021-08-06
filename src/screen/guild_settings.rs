@@ -21,12 +21,12 @@ use iced_aw::{TabLabel, Tabs, ICON_FONT};
 
 const TAB_PADDING: u16 = 16;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GuildMetaData {
     invites: Option<Vec<Invite>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GuildSettings {
     guild_id: u64,
     active_tab: usize,

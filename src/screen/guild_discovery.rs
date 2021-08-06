@@ -26,7 +26,7 @@ pub enum Message {
     GoBack,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct GuildDiscovery {
     direct_join_textedit_state: text_input::State,
     direct_join_but_state: button::State,

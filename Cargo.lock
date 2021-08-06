@@ -1703,7 +1703,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1716,7 +1716,7 @@ dependencies = [
 [[package]]
 name = "iced_aw"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced_aw.git?branch=crust#c4bac2bdf9ee459cb9f9921f46f37fe462baa8cd"
+source = "git+https://github.com/yusdacra/iced_aw.git?branch=crust#3c565436ad7e74f39b7bf7f513e67fcd9ffefdf4"
 dependencies = [
  "dodrio",
  "iced_graphics",
@@ -1730,12 +1730,15 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
+dependencies = [
+ "bitflags",
+]
 
 [[package]]
 name = "iced_futures"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
 dependencies = [
  "futures",
  "log",
@@ -1746,7 +1749,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
 dependencies = [
  "bytemuck",
  "font-kit",
@@ -1761,7 +1764,7 @@ dependencies = [
 [[package]]
 name = "iced_native"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1773,7 +1776,7 @@ dependencies = [
 [[package]]
 name = "iced_style"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
 dependencies = [
  "iced_core",
 ]
@@ -1781,7 +1784,7 @@ dependencies = [
 [[package]]
 name = "iced_web"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
 dependencies = [
  "dodrio",
  "iced_core",
@@ -1797,7 +1800,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
 dependencies = [
  "bytemuck",
  "futures",
@@ -1817,7 +1820,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#36fa24c01be53224aba86527fd4369b93e946d92"
+source = "git+https://github.com/yusdacra/iced.git?branch=crust#b5f6c542e06999c9c10a8f90d78e8535b57379c1"
 dependencies = [
  "iced_futures",
  "iced_graphics",
@@ -4380,7 +4383,7 @@ dependencies = [
 [[package]]
 name = "winit"
 version = "0.25.0"
-source = "git+https://github.com/iced-rs/winit?rev=44a9a6fc442fcfa3fa0dfc2d5a2f86fdf4aba10c#44a9a6fc442fcfa3fa0dfc2d5a2f86fdf4aba10c"
+source = "git+https://github.com/iced-rs/winit?rev=844485272a7412cb35cdbfac3524decdf59475ca#844485272a7412cb35cdbfac3524decdf59475ca"
 dependencies = [
  "bitflags",
  "cocoa",

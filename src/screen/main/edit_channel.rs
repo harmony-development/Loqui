@@ -23,7 +23,7 @@ pub enum Message {
     GoBack,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct UpdateChannelModal {
     back_but_state: button::State,
     channel_name_textedit_state: text_input::State,

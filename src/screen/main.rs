@@ -197,7 +197,7 @@ pub enum Message {
     ChangeUserStatus(UserStatus),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct MainScreen {
     // Event history area state
     event_history_state: scrollable::State,
@@ -1355,7 +1355,6 @@ impl MainScreen {
 
         fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<TopLevelMessage> {
             type Ke = keyboard::Event;
-            type Km = keyboard::Modifiers;
             type Kc = keyboard::KeyCode;
             type We = window::Event;
 
@@ -1365,8 +1364,8 @@ impl MainScreen {
                 }) => Some(TopLevelMessage::main(Message::ChangeMode(Mode::Normal))),
                 Event::Keyboard(Ke::KeyReleased {
                     key_code: Kc::K,
-                    modifiers: Km { control: true, .. },
-                }) => Some(TopLevelMessage::main(Message::QuickSwitch)),
+                    modifiers,
+                }) => modifiers.control().then(|| TopLevelMessage::main(Message::QuickSwitch)),
                 Event::Keyboard(Ke::KeyReleased { key_code: Kc::Up, .. }) => {
                     Some(TopLevelMessage::main(Message::EditLastMessage))
                 }

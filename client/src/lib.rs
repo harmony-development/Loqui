@@ -109,6 +109,7 @@ pub enum PostProcessEvent {
     CheckPermsForChannel(u64, u64),
 }
 
+#[derive(Clone)]
 pub struct Client {
     inner: InnerClient,
     pub guilds: Guilds,
