@@ -34,3 +34,4 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 
 ### Nix
 - For flakes: `nix profile install github:harmony-development/crust`
+- For non-flakes: `nix-env -i -f "https://github.com/harmony-development/crust/tarball/master"`
