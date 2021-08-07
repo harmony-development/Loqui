@@ -600,7 +600,10 @@ impl MainScreen {
             Column::with_children(vec![
                 fill_container(
                     Row::with_children(vec![
-                        label!(&self.error_text).color(ERROR_COLOR).width(length!(+)).into(),
+                        label!(truncate_string(self.error_text.clone(), 128))
+                            .color(ERROR_COLOR)
+                            .width(length!(+))
+                            .into(),
                         space!(w+).into(),
                         label_button!(&mut self.error_close_but_state, "Close")
                             .on_press(Message::ClearError)
