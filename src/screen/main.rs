@@ -1484,11 +1484,11 @@ impl MainScreen {
                     let msg = if modifiers.control() {
                         if modifiers.alt() {
                             TopLevelMessage::main(Message::NextBeforeGuild(true))
-                        } else if modifiers.shift() {
-                            TopLevelMessage::main(Message::NextBeforeChannel(true))
                         } else {
                             return None;
                         }
+                    } else if modifiers.alt() {
+                        TopLevelMessage::main(Message::NextBeforeChannel(true))
                     } else {
                         TopLevelMessage::main(Message::EditLastMessage)
                     };
@@ -1501,11 +1501,11 @@ impl MainScreen {
                     let msg = if modifiers.control() {
                         if modifiers.alt() {
                             TopLevelMessage::main(Message::NextBeforeGuild(false))
-                        } else if modifiers.shift() {
-                            TopLevelMessage::main(Message::NextBeforeChannel(false))
                         } else {
                             return None;
                         }
+                    } else if modifiers.alt() {
+                        TopLevelMessage::main(Message::NextBeforeChannel(false))
                     } else {
                         return None;
                     };
