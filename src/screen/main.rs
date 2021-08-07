@@ -922,7 +922,7 @@ impl MainScreen {
                 let modal_state = self.update_channel_modal.inner_mut();
                 let chan = client
                     .get_channel(guild_id, channel_id)
-                    .expect("channel not found in client?"); // should never panic, if it does it means client data is corrupted [ref:update_channel_exists_check]
+                    .expect("channel not found in client?"); // should never panic, if it does it means client data is corrupted
                 chan.user_perms.manage_channel = true;
                 modal_state.channel_name_field.clear();
                 modal_state.channel_name_field.push_str(&chan.name);
