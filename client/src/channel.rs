@@ -16,6 +16,7 @@ pub struct Channel {
     pub user_perms: ChanPerms,
     pub has_unread: bool,
     pub looking_at_channel: bool,
+    pub init_fetching: bool,
 }
 
 #[derive(Debug, Clone)]

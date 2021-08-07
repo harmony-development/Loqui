@@ -79,6 +79,11 @@ pub enum Message {
         open: bool,
     },
     EventsReceived(Vec<Event>),
+    InitialLoad {
+        guild_id: u64,
+        channel_id: Option<u64>,
+        events: Result<Vec<Event>, Box<ClientError>>,
+    },
     SocketEvent {
         socket: Box<EventsSocket>,
         event: Option<Result<Event, ClientError>>,
@@ -863,6 +868,27 @@ impl Application for ScreenManager {
                 return self.screens.current_mut().on_error(*err);
             }
             Message::WindowFocusChanged(focus) => self.is_window_focused = focus,
+            Message::InitialLoad {
+                guild_id,
+                channel_id,
+                events,
+            } => {
+                if let Some(client) = self.client.as_mut() {
+                    channel_id
+                        .and_do(|channel_id| {
+                            client
+                                .get_channel(guild_id, channel_id)
+                                .and_do(|c| c.init_fetching = false);
+                        })
+                        .or_do(|| {
+                            client.get_guild(guild_id).and_do(|g| g.init_fetching = false);
+                        });
+                }
+                return match events {
+                    Ok(events) => self.update(Message::EventsReceived(events), clip),
+                    Err(err) => self.update(Message::Error(err), clip),
+                };
+            }
         }
         Command::none()
     }
@@ -876,6 +902,7 @@ impl Application for ScreenManager {
             match ev {
                 Event::Window(We::Unfocused) => Some(Message::WindowFocusChanged(false)),
                 Event::Window(We::Focused) => Some(Message::WindowFocusChanged(true)),
+                Event::Window(We::CloseRequested) => Some(Message::Exit),
                 _ => None,
             }
         });

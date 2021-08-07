@@ -197,6 +197,8 @@ pub enum Message {
     ChangeUserStatus(UserStatus),
     ReplyToMessage(u64),
     GotoReply(MessageId),
+    NextBeforeGuild(bool),
+    NextBeforeChannel(bool),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1253,9 +1255,11 @@ impl MainScreen {
                 self.message.clear();
                 self.current_guild_id = Some(guild_id);
                 if let Some(guild) = client.get_guild(guild_id) {
-                    if guild.channels.is_empty() {
-                        return client.mk_cmd(
-                            |inner| async move {
+                    if guild.channels.is_empty() && !guild.init_fetching {
+                        guild.init_fetching = true;
+                        let inner = client.inner_arc();
+                        return Command::perform(
+                            async move {
                                 let guildid = GuildId::new(guild_id);
                                 let channels_list = get_guild_channels(&inner, guildid).await?.channels;
                                 let mut events = Vec::with_capacity(channels_list.len());
@@ -1315,7 +1319,11 @@ impl MainScreen {
 
                                 ClientResult::<_>::Ok(events)
                             },
-                            TopLevelMessage::EventsReceived,
+                            move |res| TopLevelMessage::InitialLoad {
+                                guild_id,
+                                channel_id: None,
+                                events: res.map_err(Box::new),
+                            },
                         );
                     } else {
                         let switch_to = self
@@ -1355,7 +1363,7 @@ impl MainScreen {
 
                     let mut cmds = Vec::with_capacity(2);
                     // Try to messages if we dont have any and we arent at the top
-                    (!reached_top && disp == 0).and_do(|| {
+                    if !reached_top && disp == 0 && !c.init_fetching {
                         let convert_to_event = |m: GetChannelMessagesResponse| {
                             m.messages
                                 .into_iter()
@@ -1368,14 +1376,83 @@ impl MainScreen {
                                 .rev()
                                 .collect()
                         };
-                        let cmd_logic = |inner| async move {
-                            get_channel_messages(&inner, GetChannelMessages::new(guild_id, channel_id))
-                                .await
-                                .map(convert_to_event)
-                        };
-                        cmds.push(client.mk_cmd(cmd_logic, TopLevelMessage::EventsReceived));
-                    });
+                        c.init_fetching = true;
+                        let inner = client.inner_arc();
+                        cmds.push(Command::perform(
+                            async move {
+                                get_channel_messages(&inner, GetChannelMessages::new(guild_id, channel_id))
+                                    .await
+                                    .map(convert_to_event)
+                                    .map_err(ClientError::from)
+                            },
+                            move |res| TopLevelMessage::InitialLoad {
+                                guild_id,
+                                channel_id: Some(channel_id),
+                                events: res.map_err(Box::new),
+                            },
+                        ));
+                    }
                     return Command::batch(cmds);
+                }
+            }
+            Message::NextBeforeGuild(before) => {
+                let change_guild_to = if let Some(guild_pos) = self
+                    .current_guild_id
+                    .and_then(|guild_id| client.guilds.get_index_of(&guild_id))
+                {
+                    if before {
+                        if guild_pos == 0 {
+                            client.guilds.last().map(|(id, _)| *id)
+                        } else {
+                            client.guilds.get_index(guild_pos - 1).map(|(id, _)| *id)
+                        }
+                    } else if guild_pos == client.guilds.len().saturating_sub(1) {
+                        client.guilds.first().map(|(id, _)| *id)
+                    } else {
+                        client.guilds.get_index(guild_pos + 1).map(|(id, _)| *id)
+                    }
+                } else if before {
+                    client.guilds.last().map(|(id, _)| *id)
+                } else {
+                    client.guilds.first().map(|(id, _)| *id)
+                };
+
+                if let Some(guild_id) = change_guild_to {
+                    return Command::perform(ready(TopLevelMessage::main(Message::GuildChanged(guild_id))), identity);
+                }
+            }
+            Message::NextBeforeChannel(before) => {
+                let change_channel_to =
+                    if let Some(guild) = self.current_guild_id.and_then(|guild_id| client.guilds.get(&guild_id)) {
+                        if let Some(chan_pos) = self
+                            .current_channel_id
+                            .and_then(|channel_id| guild.channels.get_index_of(&channel_id))
+                        {
+                            if before {
+                                if chan_pos == 0 {
+                                    guild.channels.last().map(|(id, _)| *id)
+                                } else {
+                                    guild.channels.get_index(chan_pos - 1).map(|(id, _)| *id)
+                                }
+                            } else if chan_pos == guild.channels.len().saturating_sub(1) {
+                                guild.channels.first().map(|(id, _)| *id)
+                            } else {
+                                guild.channels.get_index(chan_pos + 1).map(|(id, _)| *id)
+                            }
+                        } else if before {
+                            guild.channels.last().map(|(id, _)| *id)
+                        } else {
+                            guild.channels.first().map(|(id, _)| *id)
+                        }
+                    } else {
+                        None
+                    };
+
+                if let Some(channel_id) = change_channel_to {
+                    return Command::perform(
+                        ready(TopLevelMessage::main(Message::ChannelChanged(channel_id))),
+                        identity,
+                    );
                 }
             }
         }
@@ -1384,12 +1461,11 @@ impl MainScreen {
     }
 
     pub fn subscription(&self) -> Subscription<TopLevelMessage> {
-        use iced_native::{keyboard, window, Event};
+        use iced_native::{keyboard, Event};
 
         fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<TopLevelMessage> {
             type Ke = keyboard::Event;
             type Kc = keyboard::KeyCode;
-            type We = window::Event;
 
             match ev {
                 Event::Keyboard(Ke::KeyReleased {
@@ -1399,10 +1475,40 @@ impl MainScreen {
                     key_code: Kc::K,
                     modifiers,
                 }) => modifiers.control().then(|| TopLevelMessage::main(Message::QuickSwitch)),
-                Event::Keyboard(Ke::KeyReleased { key_code: Kc::Up, .. }) => {
-                    Some(TopLevelMessage::main(Message::EditLastMessage))
+                Event::Keyboard(Ke::KeyReleased {
+                    key_code: Kc::Up,
+                    modifiers,
+                }) => {
+                    let msg = if modifiers.control() {
+                        if modifiers.alt() {
+                            TopLevelMessage::main(Message::NextBeforeGuild(true))
+                        } else if modifiers.shift() {
+                            TopLevelMessage::main(Message::NextBeforeChannel(true))
+                        } else {
+                            return None;
+                        }
+                    } else {
+                        TopLevelMessage::main(Message::EditLastMessage)
+                    };
+                    Some(msg)
                 }
-                Event::Window(We::CloseRequested) => Some(TopLevelMessage::Exit),
+                Event::Keyboard(Ke::KeyReleased {
+                    key_code: Kc::Down,
+                    modifiers,
+                }) => {
+                    let msg = if modifiers.control() {
+                        if modifiers.alt() {
+                            TopLevelMessage::main(Message::NextBeforeGuild(false))
+                        } else if modifiers.shift() {
+                            TopLevelMessage::main(Message::NextBeforeChannel(false))
+                        } else {
+                            return None;
+                        }
+                    } else {
+                        return None;
+                    };
+                    Some(msg)
+                }
                 _ => None,
             }
         }

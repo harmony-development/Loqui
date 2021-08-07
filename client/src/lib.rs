@@ -147,7 +147,7 @@ impl Client {
         content_store: Arc<ContentStore>,
     ) -> ClientResult<Self> {
         Ok(Self {
-            guilds: Guilds::new(),
+            guilds: Guilds::default(),
             members: Members::new(),
             user_id: session.as_ref().map(|s| s.user_id),
             content_store,
@@ -486,6 +486,7 @@ impl Client {
                                 manage_channel: false,
                                 send_msg: false,
                             },
+                            init_fetching: false,
                         },
                     );
                     guild.update_channel_order(previous_id, next_id, channel_id);

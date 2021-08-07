@@ -1,9 +1,11 @@
-use ahash::{AHashMap, AHashSet};
+use ahash::AHashSet;
 use harmony_rust_sdk::client::api::rest::FileId;
+
+use crate::IndexMap;
 
 use super::channel::Channels;
 
-pub type Guilds = AHashMap<u64, Guild>;
+pub type Guilds = IndexMap<u64, Guild>;
 
 #[derive(Debug, Clone, Default)]
 pub struct Guild {
@@ -13,6 +15,7 @@ pub struct Guild {
     pub members: AHashSet<u64>,
     pub homeserver: String,
     pub user_perms: GuildPerms,
+    pub init_fetching: bool,
 }
 
 impl Guild {
