@@ -1290,16 +1290,19 @@ impl MainScreen {
                                         ok: send_msg_perm,
                                     }));
                                 }
-                                let channel_events = channels_list.into_iter().map(|c| {
-                                    Event::CreatedChannel(ChannelCreated {
-                                        guild_id,
-                                        channel_id: c.channel_id,
-                                        is_category: c.is_category,
-                                        name: c.channel_name,
-                                        metadata: c.metadata,
-                                        ..Default::default()
+                                let channel_events = channels_list
+                                    .into_iter()
+                                    .map(|c| {
+                                        Event::CreatedChannel(ChannelCreated {
+                                            guild_id,
+                                            channel_id: c.channel_id,
+                                            is_category: c.is_category,
+                                            name: c.channel_name,
+                                            metadata: c.metadata,
+                                            ..Default::default()
+                                        })
                                     })
-                                });
+                                    .rev();
                                 events.extend(channel_events);
                                 events.reverse();
 
