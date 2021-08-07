@@ -24,10 +24,6 @@ use client::{
 use iced::Element;
 use iced_aw::{Icon, TabLabel};
 
-const POS_USES_WIDTH: u16 = 200;
-const USES_WIDTH: u16 = 80;
-const DEL_WIDTH: u16 = 30;
-
 #[derive(Debug, Clone)]
 pub enum InviteMessage {
     InviteNameChanged(String),
@@ -166,11 +162,11 @@ impl Tab for InviteTab {
             // Create header for invite list
             let invites_table = row(vec![
                 label!("Invite Id").width(length!(% 19)).into(),
-                space!(w % 22).into(),
-                label!("Possible uses").width(length!(% 3)).into(),
+                space!(w % 20).into(),
+                label!("Possible uses").width(length!(% 4)).into(),
                 space!(w % 3).into(),
                 label!("Uses").width(length!(% 3)).into(),
-                space!(w % 1).into(),
+                space!(w % 3).into(),
             ]);
             let homeserver_url = client.inner().homeserver_url();
             let mut url = Url::parse(
@@ -193,15 +189,13 @@ impl Tab for InviteTab {
             {
                 url.set_path(&cur_invite.invite_id);
                 invites_scrollable = invites_scrollable.push(row(vec![
-                    label!(url.as_str()).width(length!(+)).into(),
-                    label!(cur_invite.possible_uses.to_string())
-                        .width(length!(= POS_USES_WIDTH))
-                        .into(),
-                    label!(cur_invite.use_count.to_string())
-                        .width(length!(= USES_WIDTH))
-                        .into(),
+                    label!(url.as_str()).width(length!(% 19)).into(),
+                    space!(w % 22).into(),
+                    label!(cur_invite.possible_uses.to_string()).width(length!(% 3)).into(),
+                    space!(w % 3).into(),
+                    label!(cur_invite.use_count.to_string()).width(length!(% 3)).into(),
+                    space!(w % 1).into(),
                     Button::new(del_but_state, icon(Icon::Trash))
-                        .width(length!(= DEL_WIDTH))
                         .style(theme)
                         .on_press(ParentMessage::Invite(InviteMessage::DeleteInvitePressed(n)))
                         .into(),
