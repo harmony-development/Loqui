@@ -112,6 +112,11 @@ pub enum PostProcessEvent {
         channel_id: u64,
         message_id: u64,
     },
+    SendNotification {
+        unread_message: bool,
+        mention: bool,
+        content: String,
+    },
 }
 
 #[derive(Clone)]
@@ -374,6 +379,16 @@ impl Client {
                         }*/
 
                         message.post_process(&mut post);
+
+                        if let Content::Text(text) = &message.content {
+                            if text.contains(&format!("<@{}>", message.sender)) {
+                                post.push(PostProcessEvent::SendNotification {
+                                    unread_message: false,
+                                    mention: true,
+                                    content: "new mention".to_string(),
+                                });
+                            }
+                        }
 
                         if let Some(msg_index) = channel.messages.get_index_of(&MessageId::Unack(echo_id)) {
                             channel.messages.insert(MessageId::Ack(message_id), message);

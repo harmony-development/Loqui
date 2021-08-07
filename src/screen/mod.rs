@@ -28,7 +28,7 @@ use client::{
         api::{
             chat::{
                 event::{Event, GuildAddedToList, GuildUpdated, MessageSent, PermissionUpdated, ProfileUpdated},
-                GetGuildListRequest, GetMessageRequest, GetUserResponse, QueryPermissionsResponse,
+                GetGuildListRequest, GetMessageRequest, GetUserResponse,
             },
             harmonytypes::UserStatus,
             rest::FileId,
@@ -53,7 +53,7 @@ use client::{
     OptionExt,
 };
 use iced::{executor, futures::future, Application, Command, Element, Subscription};
-use std::{convert::identity, future::Future, ops::Not, sync::Arc, time::Duration};
+use std::{borrow::Cow, convert::identity, future::Future, ops::Not, sync::Arc, time::Duration};
 
 #[derive(Debug, Clone)]
 pub enum ScreenMessage {
@@ -112,6 +112,7 @@ pub enum Message {
     Error(Box<ClientError>),
     Exit,
     ExitReady,
+    WindowFocusChanged(bool),
 }
 
 impl Message {
@@ -302,6 +303,7 @@ pub struct ScreenManager {
     cur_socket: Option<Box<EventsSocket>>,
     socket_reset: bool,
     should_exit: bool,
+    is_window_focused: bool,
 }
 
 impl ScreenManager {
@@ -315,12 +317,19 @@ impl ScreenManager {
             cur_socket: None,
             socket_reset: false,
             should_exit: false,
+            is_window_focused: true,
         }
     }
 
     fn process_post_event(&mut self, post: PostProcessEvent, clip: &mut iced::Clipboard) -> Command<Message> {
         if let Some(client) = self.client.as_mut() {
             match post {
+                PostProcessEvent::SendNotification { content, .. } => {
+                    if !self.is_window_focused {
+                        // TODO: send notif
+                    }
+                    Command::none()
+                }
                 PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => client.mk_cmd(
                     |inner| async move {
                         let query = |check_for: &str| {
@@ -853,12 +862,25 @@ impl Application for ScreenManager {
 
                 return self.screens.current_mut().on_error(*err);
             }
+            Message::WindowFocusChanged(focus) => self.is_window_focused = focus,
         }
         Command::none()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        self.screens.current().subscription()
+        use iced_native::{window, Event};
+
+        let sub = iced_native::subscription::events_with(|ev, _| {
+            type We = window::Event;
+
+            match ev {
+                Event::Window(We::Unfocused) => Some(Message::WindowFocusChanged(false)),
+                Event::Window(We::Focused) => Some(Message::WindowFocusChanged(true)),
+                _ => None,
+            }
+        });
+
+        Subscription::batch([self.screens.current().subscription(), sub])
     }
 
     fn view(&mut self) -> Element<Self::Message> {
@@ -945,24 +967,6 @@ fn map_send_msg(data: (u64, u64, u64, IcyMessage, Duration, Option<u64>)) -> Mes
             message_id,
             transaction_id,
         },
-    )
-}
-
-fn make_query_perm(
-    client: &Client,
-    guild_id: u64,
-    channel_id: u64,
-    check_for: &str,
-    f: impl FnOnce(QueryPermissionsResponse, u64, u64) -> Message + Send + 'static,
-) -> Command<Message> {
-    let query = permissions::QueryPermissions::new(guild_id, check_for.to_string()).channel_id(channel_id);
-    client.mk_cmd(
-        |inner| async move {
-            permissions::query_has_permission(&inner, query)
-                .await
-                .map(|p| f(p, guild_id, channel_id))
-        },
-        identity,
     )
 }
 
@@ -1090,10 +1094,13 @@ fn try_convert_err_to_login_err(err: &ClientError, session: &Session) -> Option<
     }
 }
 
-pub fn truncate_string(mut value: String, new_len: usize) -> String {
+pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
     if value.chars().count() > new_len {
+        let mut value = value.to_string();
         value.truncate(value.chars().take(new_len).map(char::len_utf8).sum());
         value.push('…');
+        Cow::Owned(value)
+    } else {
+        Cow::Borrowed(value)
     }
-    value
 }

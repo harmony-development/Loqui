@@ -453,7 +453,7 @@ pub fn build_event_history<'a>(
 
             let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
             let content = label!(match &reply_message.content {
-                IcyContent::Text(text) => truncate_string(text.replace('\n', " "), 40),
+                IcyContent::Text(text) => truncate_string(&text.replace('\n', " "), 40).to_string(),
                 IcyContent::Files(files) => {
                     let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
                         names.push_str(", ");

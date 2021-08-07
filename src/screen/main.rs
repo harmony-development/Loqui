@@ -17,7 +17,7 @@ use client::{
         api::{
             chat::{
                 event::{ChannelCreated, Event, MemberJoined, MessageSent, PermissionUpdated},
-                GetChannelMessagesResponse, QueryPermissionsResponse,
+                GetChannelMessagesResponse,
             },
             harmonytypes::UserStatus,
         },
@@ -59,7 +59,7 @@ use crate::{
         *,
     },
     label, label_button, length,
-    screen::{make_query_perm, map_send_msg, map_to_nothing, truncate_string, ClientExt, ResultExt},
+    screen::{map_send_msg, map_to_nothing, truncate_string, ClientExt, ResultExt},
     space,
     style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
 };
@@ -282,7 +282,7 @@ impl MainScreen {
         let current_user_id = client.user_id.unwrap();
         let current_profile = client.members.get(&current_user_id);
         let current_username = current_profile.map_or(SmolStr::new_inline("Loading..."), |member| {
-            truncate_string(member.username.to_string(), 16).into()
+            truncate_string(&member.username, 16).into()
         });
 
         // TODO: show user avatar next to name
@@ -347,7 +347,7 @@ impl MainScreen {
                     .spacing(SPACING)
                     .padding(PADDING),
                 |mut list, (state, (user_id, member))| {
-                    let mut username = label!(truncate_string(member.username.to_string(), 10));
+                    let mut username = label!(truncate_string(&member.username, 10));
                     // Set text color to a more dimmed one if the user is offline
                     if matches!(member.status, UserStatus::Offline) {
                         username = username.color(ALT_COLOR)
@@ -397,7 +397,7 @@ impl MainScreen {
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
                 channel_menu_entries,
-                Some(GuildMenuOption::Custom(truncate_string(guild.name.clone(), 16).into())),
+                Some(GuildMenuOption::Custom(truncate_string(&guild.name, 16).into())),
                 Message::SelectedGuildMenuOption,
             )
             .width(length!(+))
@@ -600,7 +600,7 @@ impl MainScreen {
             Column::with_children(vec![
                 fill_container(
                     Row::with_children(vec![
-                        label!(truncate_string(self.error_text.clone(), 128))
+                        label!(truncate_string(&self.error_text, 128))
                             .color(ERROR_COLOR)
                             .width(length!(+))
                             .into(),
@@ -734,11 +734,7 @@ impl MainScreen {
             }
             Message::CopyIdToClipboard(id) => clip.write(id.to_string()),
             Message::ChannelViewPerm(guild_id, channel_id, ok) => {
-                client
-                    .get_channel(guild_id, channel_id)
-                    .unwrap() // [ref:channel_view_perm_exists_check]
-                    .user_perms
-                    .send_msg = ok;
+                client.get_channel(guild_id, channel_id).unwrap().user_perms.send_msg = ok;
             }
             Message::QuickSwitch => {
                 self.quick_switcher_modal.show(!self.quick_switcher_modal.is_shown());
@@ -1355,10 +1351,6 @@ impl MainScreen {
                     });
 
                     let mut cmds = Vec::with_capacity(2);
-                    // [tag:channel_view_perm_exists_check]
-                    let handler = |p: QueryPermissionsResponse, gid, cid| {
-                        TopLevelMessage::main(Message::ChannelViewPerm(gid, cid, p.ok))
-                    };
                     // Try to messages if we dont have any and we arent at the top
                     (!reached_top && disp == 0).and_do(|| {
                         let convert_to_event = |m: GetChannelMessagesResponse| {

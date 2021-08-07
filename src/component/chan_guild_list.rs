@@ -53,7 +53,7 @@ pub fn build_channel_list<'a>(
                 .and_do(|| content_widgets.push(space!(w = SPACING).into()));
             content_widgets.push(
                 label!(truncate_string(
-                    channel.name.to_string(),
+                    &channel.name,
                     channel.user_perms.manage_channel.then(|| 15).unwrap_or(17)
                 ))
                 .color(read_color)
