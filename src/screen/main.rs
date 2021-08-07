@@ -1330,9 +1330,11 @@ impl MainScreen {
                             .guild_last_channels
                             .get(&guild_id)
                             .copied()
-                            .unwrap_or_else(|| *guild.channels.first().unwrap().0);
+                            .or_else(|| guild.channels.first().map(|(id, _)| *id));
 
-                        return self.update(Message::ChannelChanged(switch_to), client, thumbnail_cache, clip);
+                        if let Some(id) = switch_to {
+                            return self.update(Message::ChannelChanged(id), client, thumbnail_cache, clip);
+                        }
                     }
                 }
             }
