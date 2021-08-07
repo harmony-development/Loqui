@@ -319,6 +319,29 @@ impl Client {
         let mut post = Vec::new();
 
         match event {
+            Event::PermissionUpdated(perm) => {
+                let PermissionUpdated {
+                    guild_id,
+                    channel_id,
+                    query,
+                    ok,
+                } = perm;
+
+                match query.as_str() {
+                    "channels.manage.change-information" | "channel.manage.*" => {
+                        self.get_channel(guild_id, channel_id)
+                            .and_do(|c| c.user_perms.manage_channel = ok);
+                    }
+                    "messages.send" | "messages.*" => {
+                        self.get_channel(guild_id, channel_id)
+                            .and_do(|c| c.user_perms.send_msg = ok);
+                    }
+                    "guild.manage.change-information" | "guild.manage.*" => {
+                        self.get_guild(guild_id).and_do(|g| g.user_perms.change_info = ok);
+                    }
+                    _ => {}
+                }
+            }
             Event::SentMessage(message_sent) => {
                 let echo_id = message_sent.echo_id;
 

@@ -12,6 +12,7 @@ pub struct Guild {
     pub channels: Channels,
     pub members: AHashSet<u64>,
     pub homeserver: String,
+    pub user_perms: GuildPerms,
 }
 
 impl Guild {
@@ -36,4 +37,9 @@ impl Guild {
             }
         }
     }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct GuildPerms {
+    pub change_info: bool,
 }

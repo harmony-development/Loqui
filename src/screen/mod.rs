@@ -27,7 +27,7 @@ use client::{
         self,
         api::{
             chat::{
-                event::{Event, GuildAddedToList, GuildUpdated, MessageSent, ProfileUpdated},
+                event::{Event, GuildAddedToList, GuildUpdated, MessageSent, PermissionUpdated, ProfileUpdated},
                 GetGuildListRequest, GetMessageRequest, GetUserResponse, QueryPermissionsResponse,
             },
             harmonytypes::UserStatus,
@@ -39,7 +39,7 @@ use client::{
                 chat::{
                     guild::{get_guild, get_guild_list},
                     message::get_message,
-                    permissions::{self, QueryPermissions, QueryPermissionsSelfBuilder},
+                    permissions::{self, query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder},
                     profile::{self, get_user, get_user_bulk, ProfileUpdate},
                     EventSource, GuildId, UserId,
                 },
@@ -616,15 +616,30 @@ impl Application for ScreenManager {
                             get_user(&inner, UserId::new(self_id)).await?
                         };
                         let guilds = get_guild_list(&inner, GetGuildListRequest {}).await?.guilds;
-                        let mut events = guilds
-                            .into_iter()
-                            .map(|guild| {
-                                Event::GuildAddedToList(GuildAddedToList {
-                                    guild_id: guild.guild_id,
-                                    homeserver: guild.host,
-                                })
+                        let mut events = Vec::with_capacity(guilds.len() * 2);
+                        for guild in &guilds {
+                            let manage_query = "guild.manage.change-information".to_string();
+                            let manage_perm = query_has_permission(
+                                &inner,
+                                QueryPermissions::new(guild.guild_id, manage_query.clone()),
+                            )
+                            .await?
+                            .ok;
+
+                            events.push(Event::PermissionUpdated(PermissionUpdated {
+                                guild_id: guild.guild_id,
+                                channel_id: 0,
+                                query: manage_query,
+                                ok: manage_perm,
+                            }));
+                        }
+                        events.extend(guilds.into_iter().map(|guild| {
+                            Event::GuildAddedToList(GuildAddedToList {
+                                guild_id: guild.guild_id,
+                                homeserver: guild.host,
                             })
-                            .collect::<Vec<_>>();
+                        }));
+                        events.reverse();
                         events.push(Event::ProfileUpdated(ProfileUpdated {
                             update_avatar: true,
                             update_is_bot: true,

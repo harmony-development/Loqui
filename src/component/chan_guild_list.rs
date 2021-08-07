@@ -73,7 +73,7 @@ pub fn build_channel_list<'a>(
                 content_widgets.push(
                     Button::new(edit_state, icon(Icon::Pencil).size(DEF_SIZE - 8))
                         .style(theme)
-                        .on_press(Message::TryShowUpdateChannelModal(guild_id, *channel_id))
+                        .on_press(Message::ShowUpdateChannelModal(guild_id, *channel_id))
                         .into(),
                 );
             }
