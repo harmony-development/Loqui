@@ -7,9 +7,9 @@ It aims to be lightweight with a good out-of-the-box experience. Currently WIP
 ## Running
 
 - Get a binary from one of the links below (they are compressed with zip)
-    - [For Linux systems](https://nightly.link/harmony-development/Crust/workflows/rust/master/build-linux.zip)
-    - [For Windows systems](https://nightly.link/harmony-development/Crust/workflows/rust/master/build-windows.zip)
-    - [`.app` bundle for macOS systems](https://nightly.link/harmony-development/Crust/workflows/rust/master/build-macos.zip)
+    - [For Linux systems](https://nightly.link/harmony-development/Crust/workflows/rust/master/build-linux.zip?status=completed)
+    - [For Windows systems](https://nightly.link/harmony-development/Crust/workflows/rust/master/build-windows.zip?status=completed)
+    - [`.app` bundle for macOS systems](https://nightly.link/harmony-development/Crust/workflows/rust/master/build-macos.zip?status=completed)
 
 ## Building
 
