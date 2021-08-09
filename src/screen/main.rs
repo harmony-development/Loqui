@@ -33,6 +33,7 @@ use client::{
         },
     },
     message::MessageId,
+    render_text,
     smol_str::SmolStr,
     tracing::error,
     IndexMap, OptionExt,
@@ -828,14 +829,16 @@ impl MainScreen {
                 if let Mode::EditingMessage(mid) = mode {
                     if let (Some(gid), Some(cid)) = (self.current_guild_id, self.current_channel_id) {
                         if let Some(msg) = client
-                            .get_channel(gid, cid)
+                            .guilds
+                            .get(&gid)
+                            .and_then(|g| g.channels.get(&cid))
                             .and_then(|c| c.messages.get(&MessageId::Ack(mid)))
                         {
                             self.composer_state.focus();
                             if let IcyContent::Text(text) = &msg.content {
                                 client::tracing::debug!("editing message: {} / \"{}\"", mid, text);
                                 self.message.clear();
-                                self.message.push_str(text);
+                                self.message.push_str(&render_text(text, &client.members));
                             }
                         }
                     } else {
@@ -1100,10 +1103,29 @@ impl MainScreen {
                 };
             }
             Message::SendMessageComposer { guild_id, channel_id } => {
+                let replace_mentions = |text: &str| {
+                    let mut text = text.to_string();
+                    if let Some(guild) = client.guilds.get(&self.current_guild_id.unwrap()) {
+                        for (id, member) in client.members.iter().filter(|(id, _)| guild.members.contains(id)) {
+                            use client::byte_writer::Writer;
+                            use std::fmt::Write;
+
+                            let mut pattern_arr = [b'0'; 23];
+                            write!(Writer(&mut pattern_arr), "<@{}>", id).unwrap();
+                            text = text.replace(
+                                &format!("@{}", member.username),
+                                (unsafe { std::str::from_utf8_unchecked(&pattern_arr) }).trim_end_matches(|c| c != '>'),
+                            );
+                        }
+                    }
+                    text
+                };
+
                 if !self.message.trim().is_empty() {
                     match self.mode {
                         Mode::EditingMessage(message_id) => {
-                            let new_content: String = self.message.drain(..).collect::<String>().trim().into();
+                            let new_content = replace_mentions(self.message.trim());
+                            self.message.clear();
                             if let Some(msg) = client
                                 .get_channel(guild_id, channel_id)
                                 .and_then(|c| c.messages.get_mut(&MessageId::Ack(message_id)))
@@ -1123,11 +1145,12 @@ impl MainScreen {
                         }
                         Mode::Normal => {
                             let message = IcyMessage {
-                                content: IcyContent::Text(self.message.drain(..).collect::<String>().trim().into()),
+                                content: IcyContent::Text(replace_mentions(self.message.trim())),
                                 sender: client.user_id.unwrap(),
                                 reply_to: self.reply_to.take(),
                                 ..Default::default()
                             };
+                            self.message.clear();
                             if let Some(cmd) =
                                 client.send_msg_cmd(guild_id, channel_id, Duration::from_secs(0), message)
                             {
