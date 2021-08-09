@@ -378,7 +378,7 @@ impl MainScreen {
                     if highest_role.is_some() && highest_role.map(|(id, _)| *id) != last_role_id {
                         list = list.push(
                             Row::with_children(vec![
-                                label!(highest_role.unwrap().1.name.as_str()).size(DEF_SIZE - 4).into(),
+                                label!(highest_role.unwrap().1.name.as_str()).size(DEF_SIZE - 1).into(),
                                 Rule::horizontal(SPACING * 2).style(theme.secondary()).into(),
                             ])
                             .align_items(Align::Center),

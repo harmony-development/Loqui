@@ -4,6 +4,7 @@ mod create_edit_role;
 mod edit_channel;
 mod general;
 mod invite;
+mod manage_user_roles;
 mod members;
 mod roles;
 
@@ -30,6 +31,7 @@ use self::{
     create_channel::ChannelCreationModal,
     create_edit_role::RoleModal,
     edit_channel::UpdateChannelModal,
+    manage_user_roles::ManageUserRolesModal,
     members::{MembersMessage, MembersTab},
     roles::{RolesMessage, RolesTab},
 };
@@ -56,6 +58,7 @@ pub struct GuildSettings {
     update_channel_modal: modal::State<UpdateChannelModal>,
     create_channel_modal: modal::State<ChannelCreationModal>,
     role_modal: modal::State<RoleModal>,
+    manage_user_roles_modal: modal::State<ManageUserRolesModal>,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +72,7 @@ pub enum Message {
     UpdateChannelMessage(edit_channel::Message),
     ChannelCreationMessage(create_channel::Message),
     RoleMessage(create_edit_role::Message),
+    ManageUserRolesMessage(manage_user_roles::Message),
     /// Sent when the permission check for channel edits are complete.
     ShowUpdateChannelModal(u64),
     /// Sent when the user triggers an ID copy (guild ID, message ID etc.)
@@ -76,6 +80,7 @@ pub enum Message {
     CopyToClipboard(String),
     NewChannel,
     ShowEditRoleModal(u64),
+    ShowManageUserRoles(u64),
     NewRole,
 }
 
@@ -207,6 +212,12 @@ impl GuildSettings {
                 self.role_modal.show(true);
                 self.current_error.clear();
             }
+            Message::ShowManageUserRoles(user_id) => {
+                let mut modal_state = self.manage_user_roles_modal.inner_mut();
+                modal_state.user_id = user_id;
+                self.manage_user_roles_modal.show(true);
+                self.current_error.clear();
+            }
             Message::NewRole => {
                 let mut modal_state = self.role_modal.inner_mut();
                 modal_state.guild_id = self.guild_id;
@@ -217,12 +228,22 @@ impl GuildSettings {
                 self.role_modal.show(true);
                 self.current_error.clear();
             }
+            Message::ManageUserRolesMessage(message) => {
+                let (cmd, go_back) = self.manage_user_roles_modal.inner_mut().update(message, client);
+                self.manage_user_roles_modal.show(!go_back);
+                return cmd;
+            }
         }
 
         Command::none()
     }
 
-    pub fn view(&mut self, theme: Theme, client: &Client, thumbnail_cache: &ThumbnailCache) -> Element<'_, Message> {
+    pub fn view<'a>(
+        &'a mut self,
+        theme: Theme,
+        client: &'a Client,
+        thumbnail_cache: &ThumbnailCache,
+    ) -> Element<'_, Message> {
         let position = iced_aw::TabBarPosition::Top;
         let content = Tabs::new(self.active_tab, Message::TabSelected)
             .push(
@@ -278,6 +299,15 @@ impl GuildSettings {
         .style(theme)
         .backdrop(Message::RoleMessage(create_edit_role::Message::GoBack))
         .on_esc(Message::RoleMessage(create_edit_role::Message::GoBack));
+
+        // Show RoleModal
+        let guild_id = self.guild_id;
+        let content = Modal::new(&mut self.manage_user_roles_modal, content, move |state| {
+            state.view(theme, client, guild_id).map(Message::ManageUserRolesMessage)
+        })
+        .style(theme)
+        .backdrop(Message::ManageUserRolesMessage(manage_user_roles::Message::GoBack))
+        .on_esc(Message::ManageUserRolesMessage(manage_user_roles::Message::GoBack));
 
         content.into()
     }

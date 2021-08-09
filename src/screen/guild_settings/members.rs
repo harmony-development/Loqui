@@ -109,7 +109,7 @@ impl Tab for MembersTab {
                     Tooltip::new(
                         Button::new(edit_state, icon(Icon::Pencil))
                             .style(theme)
-                            .on_press(ParentMessage::ShowUpdateChannelModal(member_id)),
+                            .on_press(ParentMessage::ShowManageUserRoles(member_id)),
                         "Add role to member",
                         iced::tooltip::Position::Top,
                     )
