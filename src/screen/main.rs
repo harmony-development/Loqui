@@ -1005,6 +1005,7 @@ impl MainScreen {
             Message::SelectedMember(user_id) => {
                 let modal = self.profile_edit_modal.inner_mut();
                 modal.user_id = user_id;
+                modal.guild_id = self.current_guild_id;
                 modal.is_edit = false;
                 self.profile_edit_modal.show(true);
                 return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
@@ -1055,6 +1056,7 @@ impl MainScreen {
                     modal.user_id = client
                         .user_id
                         .expect("we dont go to main screen if we dont have a user id");
+                    modal.guild_id = None;
                     modal.is_edit = true;
                     self.profile_edit_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);

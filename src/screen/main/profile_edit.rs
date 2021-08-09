@@ -30,6 +30,7 @@ pub enum Message {
 #[derive(Debug, Default, Clone)]
 pub struct ProfileEditModal {
     pub user_id: u64,
+    pub guild_id: Option<u64>,
     pub is_edit: bool,
     avatar_but: button::State,
     back_but: button::State,
@@ -75,7 +76,7 @@ impl ProfileEditModal {
                 .on_press(Message::CopyId)
                 .style(theme),
                 "Click to copy",
-                iced::tooltip::Position::Bottom,
+                iced::tooltip::Position::Top,
             )
             .style(theme);
             let username = Tooltip::new(
@@ -103,12 +104,37 @@ impl ProfileEditModal {
             } else {
                 space!(w = 0).into()
             };
+            let guild = self.guild_id.and_then(|id| client.guilds.get(&id));
+            let roles: Element<Message> = match guild {
+                Some(guild) => {
+                    let roles = guild.members.get(&self.user_id).map_or_else(Vec::new, |user_roles| {
+                        guild
+                            .roles
+                            .iter()
+                            .filter(|(id, _)| user_roles.contains(id))
+                            .map(|(_, role)| {
+                                let color = Color::from_rgb8(role.color.0, role.color.1, role.color.2);
+                                Container::new(label!(role.name.as_str()).size(DEF_SIZE - 4).color(color))
+                                    .padding(SPACING / 2)
+                                    .style(theme.background_color(Color { a: 0.2, ..color }))
+                                    .into()
+                            })
+                            .collect::<Vec<_>>()
+                    });
+                    Row::with_children(roles)
+                        .align_items(Align::Center)
+                        .spacing(SPACING)
+                        .height(length!(= 48))
+                        .into()
+                }
+                None => space!(h = 48).into(),
+            };
             profile_widgets.push(
                 Column::with_children(vec![
                     username.into(),
                     space!(h = SPACING * 2).into(),
                     user_id.into(),
-                    space!(h = 48).into(),
+                    roles,
                     is_bot,
                 ])
                 .align_items(Align::End)
