@@ -98,12 +98,9 @@ pub fn build_event_history<'a>(
         content.append(msg_group);
         content.push(space!(h = PADDING / 4).into());
 
-        Container::new(
-            Column::with_children(content)
-                .spacing(SPACING)
-                .align_items(Align::Start),
-        )
-        .style(theme.round().border_width(0.0))
+        Column::with_children(content)
+            .spacing(SPACING)
+            .align_items(Align::Start)
     };
 
     for (
@@ -424,6 +421,7 @@ pub fn build_event_history<'a>(
         );
         message_row.push(maybe_timestamp);
         message_row.push(msg_body.into());
+        message_row.push(space!(w+).into());
 
         if let Some(id) = message.id.id() {
             let but = Button::new(reply_but_state, icon(Icon::Reply).size(MESSAGE_SIZE - 10))
@@ -437,7 +435,6 @@ pub fn build_event_history<'a>(
                 message_row.push(but.into());
             }
         }
-        message_row.push(space!(w = PADDING / 4).into());
 
         let mut message_col = Vec::with_capacity(2);
 
