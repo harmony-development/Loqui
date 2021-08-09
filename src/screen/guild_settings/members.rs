@@ -28,9 +28,9 @@ impl MembersTab {
     pub fn update(
         &mut self,
         message: MembersMessage,
-        client: &Client,
+        _: &Client,
         _: &mut GuildMetadata,
-        guild_id: u64,
+        _: u64,
     ) -> Command<TopLevelMessage> {
         match message {
             MembersMessage::GoBack => TopLevelScreen::pop_screen_cmd(),

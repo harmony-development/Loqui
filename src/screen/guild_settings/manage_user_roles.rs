@@ -1,27 +1,13 @@
-use std::{convert::identity, ops::Not};
-
-use super::{
-    super::{Message as TopLevelMessage, Screen as TopLevelScreen},
-    Message as ParentMessage,
-};
-use client::{
-    error::ClientResult,
-    harmony_rust_sdk::{
-        api::chat::Role,
-        client::api::chat::permissions::{
-            self, AddGuildRole, DeleteGuildRole, ManageUserRoles, ManageUserRolesSelfBuilder, ModifyGuildRole,
-            ModifyGuildRoleSelfBuilder,
-        },
-    },
-};
-use iced_aw::{number_input, Card};
+use super::super::Message as TopLevelMessage;
+use client::harmony_rust_sdk::client::api::chat::permissions::{self, ManageUserRoles, ManageUserRolesSelfBuilder};
+use iced_aw::Card;
 
 use crate::{
-    client::{error::ClientError, Client},
+    client::Client,
     component::*,
-    label, label_button, length,
+    label, length,
     screen::{map_to_nothing, ClientExt},
-    style::{Theme, ERROR_COLOR, PADDING, SPACING, SUCCESS_COLOR},
+    style::{Theme, PADDING, SPACING},
 };
 
 #[derive(Debug, Clone)]
