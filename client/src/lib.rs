@@ -605,6 +605,7 @@ impl Client {
                     if let Some(id) = parsed {
                         post.push(PostProcessEvent::FetchThumbnail(Attachment {
                             kind: "image".into(),
+                            name: "guild".into(),
                             ..Attachment::new_unknown(id)
                         }));
                     }

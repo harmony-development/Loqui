@@ -101,6 +101,7 @@ pub fn build_guild_list<'a>(
 
             Button::new(state, fill_container(content).style(theme))
                 .width(length!(+))
+                .height(length!(= 52))
                 .style(theme.secondary())
         };
 
@@ -111,14 +112,24 @@ pub fn build_guild_list<'a>(
             let content = guild
                 .picture
                 .as_ref()
-                .and_then(|guild_picture| thumbnail_cache.thumbnails.get(guild_picture))
+                .and_then(|guild_picture| {
+                    thumbnail_cache
+                        .avatars
+                        .get(guild_picture)
+                        .or_else(|| thumbnail_cache.thumbnails.get(guild_picture))
+                })
                 .map_or_else::<Element<Message>, _, _>(
                     || {
                         label!(guild.name.chars().next().unwrap_or('u').to_ascii_uppercase())
                             .size(DEF_SIZE + 10)
                             .into()
                     },
-                    |handle| Image::new(handle.clone()).width(length!(= AVATAR_WIDTH - 4)).into(),
+                    |handle| {
+                        Image::new(handle.clone())
+                            .width(length!(= AVATAR_WIDTH - 4))
+                            .height(length!(= AVATAR_WIDTH - 4))
+                            .into()
+                    },
                 );
 
             let mut but = mk_but(button_state, content);

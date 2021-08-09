@@ -16,7 +16,7 @@ use client::{
     harmony_rust_sdk::{
         api::{
             chat::{
-                event::{ChannelCreated, Event, MemberJoined, MessageSent, PermissionUpdated},
+                event::{ChannelCreated, Event, MemberJoined, MessageSent},
                 GetChannelMessagesResponse,
             },
             harmonytypes::UserStatus,
@@ -26,7 +26,6 @@ use client::{
                 self,
                 channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
                 guild::{self, get_guild_members},
-                permissions::{query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder},
                 profile::{self, ProfileUpdate},
                 GuildId,
             },
@@ -1190,52 +1189,16 @@ impl MainScreen {
                                 let guildid = GuildId::new(guild_id);
                                 let channels_list = get_guild_channels(&inner, guildid).await?.channels;
                                 let mut events = Vec::with_capacity(channels_list.len());
-                                for chan in &channels_list {
-                                    let manage_query = "channel.manage.change-information".to_string();
-                                    let manage_perm = query_has_permission(
-                                        &inner,
-                                        QueryPermissions::new(guild_id, manage_query.clone())
-                                            .channel_id(chan.channel_id),
-                                    )
-                                    .await?
-                                    .ok;
-                                    let send_msg_query = "message.send".to_string();
-                                    let send_msg_perm = query_has_permission(
-                                        &inner,
-                                        QueryPermissions::new(guild_id, send_msg_query.clone())
-                                            .channel_id(chan.channel_id),
-                                    )
-                                    .await?
-                                    .ok;
-
-                                    events.push(Event::PermissionUpdated(PermissionUpdated {
+                                events.extend(channels_list.into_iter().map(|c| {
+                                    Event::CreatedChannel(ChannelCreated {
                                         guild_id,
-                                        channel_id: chan.channel_id,
-                                        query: manage_query,
-                                        ok: manage_perm,
-                                    }));
-                                    events.push(Event::PermissionUpdated(PermissionUpdated {
-                                        guild_id,
-                                        channel_id: chan.channel_id,
-                                        query: send_msg_query,
-                                        ok: send_msg_perm,
-                                    }));
-                                }
-                                let channel_events = channels_list
-                                    .into_iter()
-                                    .map(|c| {
-                                        Event::CreatedChannel(ChannelCreated {
-                                            guild_id,
-                                            channel_id: c.channel_id,
-                                            is_category: c.is_category,
-                                            name: c.channel_name,
-                                            metadata: c.metadata,
-                                            ..Default::default()
-                                        })
+                                        channel_id: c.channel_id,
+                                        is_category: c.is_category,
+                                        name: c.channel_name,
+                                        metadata: c.metadata,
+                                        ..Default::default()
                                     })
-                                    .rev();
-                                events.extend(channel_events);
-                                events.reverse();
+                                }));
 
                                 let members = get_guild_members(&inner, guildid).await?.members;
                                 events.reserve(members.len());

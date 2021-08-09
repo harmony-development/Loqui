@@ -10,7 +10,7 @@ use crate::{
         guild_settings::{Message as ParentMessage, Tab},
         select_upload_files,
     },
-    style::{Theme, PADDING},
+    style::{Theme, PADDING, PROFILE_AVATAR_WIDTH},
 };
 use crate::{
     screen::{guild_settings::TabLabel, ClientExt},
@@ -150,7 +150,12 @@ impl Tab for GeneralTab {
             guild
                 .picture
                 .as_ref()
-                .map(|guild_picture| thumbnail_cache.thumbnails.get(guild_picture))
+                .map(|guild_picture| {
+                    thumbnail_cache
+                        .profile_avatars
+                        .get(guild_picture)
+                        .or_else(|| thumbnail_cache.thumbnails.get(guild_picture))
+                })
                 .flatten()
                 .map_or_else(
                     || Element::from(label!(guild.name.chars().next().unwrap_or('u').to_ascii_uppercase()).size(30)),
@@ -161,8 +166,8 @@ impl Tab for GeneralTab {
         let ui_image_but = Element::from(
             Button::new(&mut self.icon_edit_but_state, ui_update_guild_icon)
                 .on_press(GeneralMessage::UploadGuildImage)
-                .height(length!(= 128))
-                .width(length!(= 128))
+                .height(length!(= PROFILE_AVATAR_WIDTH))
+                .width(length!(= PROFILE_AVATAR_WIDTH))
                 .style(theme),
         )
         .map(ParentMessage::General);

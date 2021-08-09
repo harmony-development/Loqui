@@ -11,7 +11,6 @@ pub use main::MainScreen;
 
 use crate::{
     client::{
-        channel::ChanPerms,
         content::ContentStore,
         error::{ClientError, ClientResult},
         message::{Attachment, Message as IcyMessage, MessageId},
@@ -116,7 +115,6 @@ pub enum Message {
         message_id: u64,
         err: Option<Box<ClientError>>,
     },
-    UpdateChanPerms(ChanPerms, u64, u64),
     /// Sent whenever an error occurs.
     Error(Box<ClientError>),
     Exit,
@@ -349,16 +347,22 @@ impl ScreenManager {
                         };
                         let manage_channel = query("channels.manage.change-information").await?.ok;
                         let send_msg = query("messages.send").await?.ok;
-                        ClientResult::Ok(Message::UpdateChanPerms(
-                            ChanPerms {
-                                send_msg,
-                                manage_channel,
-                            },
-                            guild_id,
-                            channel_id,
-                        ))
+                        ClientResult::Ok(vec![
+                            Event::PermissionUpdated(PermissionUpdated {
+                                guild_id,
+                                channel_id,
+                                ok: manage_channel,
+                                query: "channels.manage.change-information".to_string(),
+                            }),
+                            Event::PermissionUpdated(PermissionUpdated {
+                                guild_id,
+                                channel_id,
+                                ok: send_msg,
+                                query: "messages.send".to_string(),
+                            }),
+                        ])
                     },
-                    identity,
+                    Message::EventsReceived,
                 ),
                 PostProcessEvent::FetchThumbnail(id) => make_thumbnail_command(client, id, &self.thumbnail_cache),
                 PostProcessEvent::FetchProfile(user_id) => client.mk_cmd(
@@ -393,8 +397,8 @@ impl ScreenManager {
                 }
                 PostProcessEvent::FetchGuildData(guild_id) => client.mk_cmd(
                     |inner| async move {
-                        get_guild(&inner, GuildId::new(guild_id)).await.map(|guild_data| {
-                            vec![Event::EditedGuild(GuildUpdated {
+                        let ev = get_guild(&inner, GuildId::new(guild_id)).await.map(|guild_data| {
+                            Event::EditedGuild(GuildUpdated {
                                 guild_id,
                                 metadata: guild_data.metadata,
                                 name: guild_data.guild_name,
@@ -402,8 +406,20 @@ impl ScreenManager {
                                 update_name: true,
                                 update_picture: true,
                                 update_metadata: true,
-                            })]
-                        })
+                            })
+                        })?;
+                        let query = "guild.manage.change-information".to_string();
+                        let perm = query_has_permission(&inner, QueryPermissions::new(guild_id, query.clone()))
+                            .await
+                            .map(|perm| {
+                                Event::PermissionUpdated(PermissionUpdated {
+                                    guild_id,
+                                    channel_id: 0,
+                                    ok: perm.ok,
+                                    query,
+                                })
+                            })?;
+                        ClientResult::Ok(vec![ev, perm])
                     },
                     Message::EventsReceived,
                 ),
@@ -547,12 +563,6 @@ impl Application for ScreenManager {
                 self.client = Some(client);
                 return cmd;
             }
-            Message::UpdateChanPerms(perms, guild_id, channel_id) => {
-                // [ref:channel_added_to_client]
-                self.client
-                    .as_mut()
-                    .and_do(|client| client.get_channel(guild_id, channel_id).unwrap().user_perms = perms);
-            }
             Message::SocketEvent { mut socket, event } => {
                 return if self.client.is_some() {
                     let mut cmds = Vec::with_capacity(2);
@@ -634,30 +644,13 @@ impl Application for ScreenManager {
                             get_user(&inner, UserId::new(self_id)).await?
                         };
                         let guilds = get_guild_list(&inner, GetGuildListRequest {}).await?.guilds;
-                        let mut events = Vec::with_capacity(guilds.len() * 2);
-                        for guild in &guilds {
-                            let manage_query = "guild.manage.change-information".to_string();
-                            let manage_perm = query_has_permission(
-                                &inner,
-                                QueryPermissions::new(guild.guild_id, manage_query.clone()),
-                            )
-                            .await?
-                            .ok;
-
-                            events.push(Event::PermissionUpdated(PermissionUpdated {
-                                guild_id: guild.guild_id,
-                                channel_id: 0,
-                                query: manage_query,
-                                ok: manage_perm,
-                            }));
-                        }
+                        let mut events = Vec::with_capacity(guilds.len() + 1);
                         events.extend(guilds.into_iter().map(|guild| {
                             Event::GuildAddedToList(GuildAddedToList {
                                 guild_id: guild.guild_id,
                                 homeserver: guild.host,
                             })
                         }));
-                        events.reverse();
                         events.push(Event::ProfileUpdated(ProfileUpdated {
                             update_avatar: true,
                             update_is_bot: true,
@@ -1003,7 +996,7 @@ fn map_send_msg(data: (u64, u64, u64, IcyMessage, Duration, Option<u64>)) -> Mes
 }
 
 fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &ThumbnailCache) -> Command<Message> {
-    let is_avatar = data.name == "avatar";
+    let is_thumbnailable = data.name == "avatar" || data.name == "guild";
     thumbnail_cache
         .thumbnails
         .contains_key(&data.id)
@@ -1014,7 +1007,7 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
             let inner = client.inner_arc();
             let process_image = move |data: &[u8]| {
                 let image = image::load_from_memory(data).unwrap();
-                let avatar = is_avatar.then(|| {
+                let avatar = is_thumbnailable.then(|| {
                     const RES_LEN: u32 = AVATAR_WIDTH as u32 - 4;
                     const FILTER: FilterType = FilterType::Lanczos3;
                     const PRES_LEN: u32 = PROFILE_AVATAR_WIDTH as u32;
@@ -1027,7 +1020,7 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
 
                     (profile_avatar, avatar)
                 });
-                let content = is_avatar.not().then(|| {
+                let content = is_thumbnailable.not().then(|| {
                     let bgra = image.into_bgra8();
                     ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec())
                 });
