@@ -115,6 +115,7 @@ pub enum PostProcessEvent {
     SendNotification {
         unread_message: bool,
         mention: bool,
+        title: String,
         content: String,
     },
 }
@@ -355,67 +356,80 @@ impl Client {
                     let channel_id = message.channel_id;
                     let message_id = message.message_id;
 
-                    if let Some(channel) = self.get_channel(guild_id, channel_id) {
-                        let message = Message::from(message);
+                    if let Some(guild) = self.guilds.get_mut(&guild_id) {
+                        if let Some(channel) = guild.channels.get_mut(&channel_id) {
+                            let message = Message::from(message);
 
-                        if let Some(id) = message
-                            .overrides
-                            .as_ref()
-                            .and_then(|overrides| overrides.avatar_url.clone())
-                        {
-                            post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                                kind: "image".into(),
-                                name: "avatar".into(),
-                                ..Attachment::new_unknown(id)
-                            }));
-                        }
-
-                        /*if let Some(message_id) = message.reply_to {
-                            post.push(PostProcessEvent::FetchMessage {
-                                guild_id,
-                                channel_id,
-                                message_id,
-                            });
-                        }*/
-
-                        message.post_process(&mut post);
-
-                        if let Content::Text(text) = &message.content {
-                            use byte_writer::Writer;
-                            use std::fmt::Write;
-
-                            let mut pattern_arr = [b'0'; 23];
-                            write!(Writer(&mut pattern_arr), "<@{}>", message.sender).unwrap();
-                            if text.contains(
-                                (unsafe { std::str::from_utf8_unchecked(&pattern_arr) }).trim_end_matches(|c| c != '>'),
-                            ) {
-                                post.push(PostProcessEvent::SendNotification {
-                                    unread_message: false,
-                                    mention: true,
-                                    content: "new mention".to_string(),
-                                });
+                            if let Some(id) = message
+                                .overrides
+                                .as_ref()
+                                .and_then(|overrides| overrides.avatar_url.clone())
+                            {
+                                post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                                    kind: "image".into(),
+                                    name: "avatar".into(),
+                                    ..Attachment::new_unknown(id)
+                                }));
                             }
-                        }
 
-                        if let Some(msg_index) = channel.messages.get_index_of(&MessageId::Unack(echo_id)) {
-                            channel.messages.insert(MessageId::Ack(message_id), message);
-                            channel
-                                .messages
-                                .swap_indices(msg_index, channel.messages.len().saturating_sub(1));
-                            channel.messages.pop();
-                        } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
-                            *msg = message;
-                        } else {
-                            channel.messages.insert(message.id, message);
-                        }
+                            /*if let Some(message_id) = message.reply_to {
+                                post.push(PostProcessEvent::FetchMessage {
+                                    guild_id,
+                                    channel_id,
+                                    message_id,
+                                });
+                            }*/
 
-                        let disp = channel.messages.len();
-                        if channel.looking_at_message >= disp.saturating_sub(32) {
-                            channel.looking_at_message = disp.saturating_sub(1);
-                            post.push(PostProcessEvent::GoToFirstMsgOnChannel(channel_id));
-                        }
-                        if !channel.looking_at_channel {
-                            channel.has_unread = true;
+                            message.post_process(&mut post);
+
+                            if let Content::Text(text) = &message.content {
+                                if !channel.looking_at_channel {
+                                    use byte_writer::Writer;
+                                    use std::fmt::Write;
+
+                                    let current_user_id = self.user_id.unwrap_or(0);
+
+                                    let mut pattern_arr = [b'0'; 23];
+                                    write!(Writer(&mut pattern_arr), "<@{}>", current_user_id).unwrap();
+
+                                    if text.contains(
+                                        (unsafe { std::str::from_utf8_unchecked(&pattern_arr) })
+                                            .trim_end_matches(|c| c != '>'),
+                                    ) {
+                                        let member_name = self
+                                            .members
+                                            .get(&message.sender)
+                                            .map_or("unknown", |m| m.username.as_str());
+                                        post.push(PostProcessEvent::SendNotification {
+                                            unread_message: false,
+                                            mention: true,
+                                            title: format!("{} | #{}", guild.name, channel.name),
+                                            content: format!("@{}: {}", member_name, render_text(text, &self.members)),
+                                        });
+                                    }
+                                }
+                            }
+
+                            if let Some(msg_index) = channel.messages.get_index_of(&MessageId::Unack(echo_id)) {
+                                channel.messages.insert(MessageId::Ack(message_id), message);
+                                channel
+                                    .messages
+                                    .swap_indices(msg_index, channel.messages.len().saturating_sub(1));
+                                channel.messages.pop();
+                            } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
+                                *msg = message;
+                            } else {
+                                channel.messages.insert(message.id, message);
+                            }
+
+                            let disp = channel.messages.len();
+                            if channel.looking_at_message >= disp.saturating_sub(32) {
+                                channel.looking_at_message = disp.saturating_sub(1);
+                                post.push(PostProcessEvent::GoToFirstMsgOnChannel(channel_id));
+                            }
+                            if !channel.looking_at_channel {
+                                channel.has_unread = true;
+                            }
                         }
                     }
                 }
@@ -744,4 +758,33 @@ pub mod byte_writer {
             Ok(())
         }
     }
+}
+
+pub fn render_text(textt: &str, members: &Members) -> String {
+    use byte_writer::Writer;
+    use regex::Regex;
+    use std::fmt::Write;
+
+    lazy_static::lazy_static! {
+        static ref MENTION: Regex = Regex::new("<@(?P<id>[0-9]*)>").unwrap();
+        static ref EMOTE: Regex = Regex::new("<:(.*):>").unwrap();
+    }
+
+    // TODO: this is horribly inefficient
+    let mut text = textt.to_string();
+    for capture in MENTION.captures_iter(textt) {
+        let user_id = capture.name("id").unwrap().as_str();
+        if let Ok(parsed_user_id) = user_id.parse::<u64>() {
+            let member_name = members
+                .get(&parsed_user_id)
+                .map_or_else(|| "unknown user", |m| m.username.as_str());
+            let mut pattern_arr = [b'0'; 23];
+            write!(Writer(&mut pattern_arr), "<@{}>", user_id).unwrap();
+            text = text.replace(
+                (unsafe { std::str::from_utf8_unchecked(&pattern_arr) }).trim_end_matches(|c| c != '>'),
+                &format!("@{}", member_name),
+            );
+        }
+    }
+    text
 }

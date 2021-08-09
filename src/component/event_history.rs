@@ -251,32 +251,7 @@ pub fn build_event_history<'a>(
         });
 
         msg_text.and_do(|textt| {
-            use client::byte_writer::Writer;
-            use regex::Regex;
-            use std::fmt::Write;
-
-            lazy_static::lazy_static! {
-                static ref MENTION: Regex = Regex::new("<@(?P<id>[0-9]*)>").unwrap();
-                static ref EMOTE: Regex = Regex::new("<:(.*):>").unwrap();
-            }
-
-            // TODO: this is horribly inefficient
-            let mut text = textt.to_string();
-            for capture in MENTION.captures_iter(textt) {
-                let user_id = capture.name("id").unwrap().as_str();
-                if let Ok(parsed_user_id) = user_id.parse::<u64>() {
-                    let member_name = members
-                        .get(&parsed_user_id)
-                        .map_or_else(|| "unknown user", |m| m.username.as_str());
-                    let mut pattern_arr = [b'0'; 23];
-                    write!(Writer(&mut pattern_arr), "<@{}>", user_id).unwrap();
-                    text = text.replace(
-                        (unsafe { std::str::from_utf8_unchecked(&pattern_arr) }).trim_end_matches(|c| c != '>'),
-                        &format!("@{}", member_name),
-                    );
-                }
-            }
-
+            let text = client::render_text(textt, members);
             #[cfg(feature = "markdown")]
             let message_text = super::markdown::markdown_svg(text);
             #[cfg(not(feature = "markdown"))]

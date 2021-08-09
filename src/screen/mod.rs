@@ -331,9 +331,12 @@ impl ScreenManager {
     fn process_post_event(&mut self, post: PostProcessEvent, clip: &mut iced::Clipboard) -> Command<Message> {
         if let Some(client) = self.client.as_mut() {
             match post {
-                PostProcessEvent::SendNotification { content, .. } => {
+                PostProcessEvent::SendNotification { content, title, .. } => {
                     if !self.is_window_focused {
-                        // TODO: send notif
+                        let _ = notify_rust::Notification::new()
+                            .summary(&title)
+                            .body(&truncate_string(&content, 50))
+                            .show();
                     }
                     Command::none()
                 }
