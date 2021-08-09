@@ -840,9 +840,9 @@ pub fn render_text(textt: &str, members: &Members) -> String {
 
 pub mod color {
     pub fn encode_rgb(color: (u8, u8, u8)) -> i64 {
-        let mut c = (color.0 * 255) as i64;
-        c = (c << 8) + (color.1 * 255) as i64;
-        c = (c << 8) + (color.2 * 255) as i64;
+        let mut c = color.0 as i64;
+        c = (c << 8) + color.1 as i64;
+        c = (c << 8) + color.2 as i64;
         c as i64
     }
 

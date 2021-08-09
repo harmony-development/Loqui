@@ -1861,13 +1861,14 @@ dependencies = [
 [[package]]
 name = "iced_aw"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced_aw.git?branch=crust#3c565436ad7e74f39b7bf7f513e67fcd9ffefdf4"
+source = "git+https://github.com/yusdacra/iced_aw.git?branch=crust#4ffcfbf814d5c7509ff891fd7681346f8d6df03a"
 dependencies = [
  "dodrio",
  "iced_graphics",
  "iced_native",
  "iced_style",
  "iced_web",
+ "num-traits",
  "wasm-bindgen",
  "web-sys",
 ]

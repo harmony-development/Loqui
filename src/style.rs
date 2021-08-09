@@ -3,7 +3,7 @@ use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::UserStatus}
 use iced::{
     button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color,
 };
-use iced_aw::tabs;
+use iced_aw::{number_input, tabs};
 
 pub const DEF_SIZE: u16 = 20;
 pub const MESSAGE_TIMESTAMP_SIZE: u16 = 14;
@@ -228,6 +228,12 @@ impl From<Theme> for Box<dyn toggler::StyleSheet> {
     }
 }
 
+impl From<Theme> for Box<dyn number_input::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        theme.dark.map_or_default(|| dark::NumberInput.into())
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct OverrideStyle {
     border_color: Option<Color>,
@@ -327,7 +333,7 @@ mod dark {
         Background, Color,
     };
     use iced_aw::tabs::Style;
-    use iced_aw::{card, modal, tabs};
+    use iced_aw::{card, modal, number_input, tabs};
 
     use super::OverrideStyle;
 
@@ -337,6 +343,17 @@ mod dark {
     const ACCENT: Color = color!(0x00, 0x8F, 0xCF); // 00BFFF
     const DISABLED_TEXT: Color = color!(0xDD, 0xDD, 0xDD);
     const TEXT_COLOR: Color = color!(0xEE, 0xEE, 0xEE);
+
+    pub struct NumberInput;
+
+    impl number_input::StyleSheet for NumberInput {
+        fn active(&self) -> number_input::Style {
+            number_input::Style {
+                button_background: Some(DARK_BG.into()),
+                icon_color: TEXT_COLOR,
+            }
+        }
+    }
 
     pub struct Toggler;
 

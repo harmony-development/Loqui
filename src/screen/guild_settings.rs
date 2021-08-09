@@ -1,8 +1,10 @@
 mod channel_ordering;
 mod create_channel;
+mod create_edit_role;
 mod edit_channel;
 mod general;
 mod invite;
+mod roles;
 
 use crate::{
     client::{error::ClientError, Client},
@@ -23,7 +25,12 @@ use client::harmony_rust_sdk::client::api::chat::invite::{
 use iced::Element;
 use iced_aw::{modal, Modal, TabLabel, Tabs, ICON_FONT};
 
-use self::{create_channel::ChannelCreationModal, edit_channel::UpdateChannelModal};
+use self::{
+    create_channel::ChannelCreationModal,
+    create_edit_role::RoleModal,
+    edit_channel::UpdateChannelModal,
+    roles::{RolesMessage, RolesTab},
+};
 
 const TAB_PADDING: u16 = 16;
 
@@ -39,11 +46,13 @@ pub struct GuildSettings {
     general_tab: GeneralTab,
     invite_tab: InviteTab,
     ordering_tab: OrderingTab,
+    roles_tab: RolesTab,
     current_error: String,
     meta_data: GuildMetadata,
     back_button: button::State,
     update_channel_modal: modal::State<UpdateChannelModal>,
     create_channel_modal: modal::State<ChannelCreationModal>,
+    role_modal: modal::State<RoleModal>,
 }
 
 #[derive(Debug, Clone)]
@@ -52,14 +61,18 @@ pub enum Message {
     General(GeneralMessage),
     Invite(InviteMessage),
     Ordering(OrderingMessage),
+    Roles(RolesMessage),
     UpdateChannelMessage(edit_channel::Message),
     ChannelCreationMessage(create_channel::Message),
+    RoleMessage(create_edit_role::Message),
     /// Sent when the permission check for channel edits are complete.
     ShowUpdateChannelModal(u64),
     /// Sent when the user triggers an ID copy (guild ID, message ID etc.)
     CopyIdToClipboard(u64),
     CopyToClipboard(String),
     NewChannel,
+    ShowEditRoleModal(u64),
+    NewRole,
 }
 
 impl GuildSettings {
@@ -120,6 +133,9 @@ impl GuildSettings {
                     2 => {
                         self.ordering_tab.error_message.clear();
                     }
+                    3 => {
+                        self.roles_tab.error_message.clear();
+                    }
                     _ => {}
                 };
             }
@@ -138,6 +154,11 @@ impl GuildSettings {
                     .ordering_tab
                     .update(message, client, &mut self.meta_data, self.guild_id)
             }
+            Message::Roles(message) => {
+                return self
+                    .roles_tab
+                    .update(message, client, &mut self.meta_data, self.guild_id)
+            }
             Message::UpdateChannelMessage(msg) => {
                 let (cmd, go_back) = self.update_channel_modal.inner_mut().update(msg, client);
                 self.update_channel_modal.show(!go_back);
@@ -148,9 +169,40 @@ impl GuildSettings {
                 self.create_channel_modal.show(!go_back);
                 return cmd;
             }
+            Message::RoleMessage(msg) => {
+                let (cmd, go_back) = self.role_modal.inner_mut().update(msg, client);
+                self.role_modal.show(!go_back);
+                return cmd;
+            }
             Message::NewChannel => {
                 self.create_channel_modal.inner_mut().guild_id = self.guild_id;
                 self.create_channel_modal.show(true);
+                self.current_error.clear();
+            }
+            Message::ShowEditRoleModal(role_id) => {
+                let mut modal_state = self.role_modal.inner_mut();
+                modal_state.guild_id = self.guild_id;
+                modal_state.editing = Some(role_id);
+                let role = client
+                    .guilds
+                    .get(&self.guild_id)
+                    .and_then(|g| g.roles.get(&role_id))
+                    .cloned()
+                    .unwrap_or_default();
+                modal_state.is_hoist = role.hoist;
+                modal_state.is_pingable = role.pingable;
+                modal_state.role_name_field = role.name.to_string();
+                self.role_modal.show(true);
+                self.current_error.clear();
+            }
+            Message::NewRole => {
+                let mut modal_state = self.role_modal.inner_mut();
+                modal_state.guild_id = self.guild_id;
+                modal_state.editing = None;
+                modal_state.is_hoist = false;
+                modal_state.is_pingable = false;
+                modal_state.role_name_field.clear();
+                self.role_modal.show(true);
                 self.current_error.clear();
             }
         }
@@ -177,11 +229,16 @@ impl GuildSettings {
                 self.ordering_tab
                     .view(client, self.guild_id, &mut self.meta_data, theme, thumbnail_cache),
             )
+            .push(
+                self.roles_tab.tab_label(),
+                self.roles_tab
+                    .view(client, self.guild_id, &mut self.meta_data, theme, thumbnail_cache),
+            )
             .tab_bar_style(theme)
             .icon_font(ICON_FONT)
             .tab_bar_position(position);
 
-        // Show CreateChannelModal, if a guild is selected
+        // Show CreateChannelModal
         let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
             state.view(theme).map(Message::ChannelCreationMessage)
         })
@@ -189,13 +246,21 @@ impl GuildSettings {
         .backdrop(Message::ChannelCreationMessage(create_channel::Message::GoBack))
         .on_esc(Message::ChannelCreationMessage(create_channel::Message::GoBack));
 
-        // Show UpdateChannelModal, if a guild is selected
+        // Show UpdateChannelModal
         let content = Modal::new(&mut self.update_channel_modal, content, move |state| {
             state.view(theme).map(Message::UpdateChannelMessage)
         })
         .style(theme)
         .backdrop(Message::UpdateChannelMessage(edit_channel::Message::GoBack))
         .on_esc(Message::UpdateChannelMessage(edit_channel::Message::GoBack));
+
+        // Show RoleModal
+        let content = Modal::new(&mut self.role_modal, content, move |state| {
+            state.view(theme).map(Message::RoleMessage)
+        })
+        .style(theme)
+        .backdrop(Message::RoleMessage(create_edit_role::Message::GoBack))
+        .on_esc(Message::RoleMessage(create_edit_role::Message::GoBack));
 
         content.into()
     }
@@ -207,10 +272,14 @@ impl GuildSettings {
         if self.create_channel_modal.is_shown() {
             return self.create_channel_modal.inner_mut().on_error(&error);
         }
+        if self.role_modal.is_shown() {
+            return self.role_modal.inner_mut().on_error(&error);
+        }
         match self.active_tab {
             0 => self.general_tab.on_error(error),
             1 => self.invite_tab.on_error(error),
             2 => self.ordering_tab.on_error(error),
+            3 => self.roles_tab.on_error(error),
             _ => Command::none(),
         }
     }
