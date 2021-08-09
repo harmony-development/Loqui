@@ -16,8 +16,8 @@ use client::{
     harmony_rust_sdk::{
         api::{
             chat::{
-                event::{ChannelCreated, Event, MemberJoined, MessageSent},
-                GetChannelMessagesResponse,
+                event::{ChannelCreated, Event, MemberJoined, MessageSent, UserRolesUpdated},
+                GetChannelMessagesResponse, GetUserRolesRequest,
             },
             harmonytypes::UserStatus,
         },
@@ -26,6 +26,7 @@ use client::{
                 self,
                 channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
                 guild::{self, get_guild_members},
+                permissions::get_user_roles,
                 profile::{self, ProfileUpdate},
                 GuildId,
             },
@@ -310,7 +311,7 @@ impl MainScreen {
         {
             let mut sorted_members = guild
                 .members
-                .iter()
+                .keys()
                 .flat_map(|id| client.members.get(id).map(|m| (id, m)))
                 .collect::<Vec<_>>();
             sorted_members.sort_unstable_by(|(_, member), (_, other_member)| {
@@ -334,10 +335,16 @@ impl MainScreen {
                     .spacing(SPACING)
                     .padding(PADDING),
                 |mut list, (state, (user_id, member))| {
-                    let mut username = label!(truncate_string(&member.username, 10));
+                    let sender_name_color = guild.highest_role_for_member(**user_id).map_or(Color::WHITE, |role| {
+                        Color::from_rgb8(role.color.0, role.color.1, role.color.2)
+                    });
+                    let mut username = label!(truncate_string(&member.username, 10)).color(sender_name_color);
                     // Set text color to a more dimmed one if the user is offline
                     if matches!(member.status, UserStatus::Offline) {
-                        username = username.color(ALT_COLOR)
+                        username = username.color(Color {
+                            a: 0.4,
+                            ..sender_name_color
+                        });
                     }
                     let status_color = theme.status_color(member.status);
                     let pfp: Element<Message> = member
@@ -418,6 +425,7 @@ impl MainScreen {
                 let message_history_list = build_event_history(
                     client.content_store(),
                     thumbnail_cache,
+                    guild,
                     channel,
                     &client.members,
                     current_user_id,
@@ -1106,7 +1114,7 @@ impl MainScreen {
                 let replace_mentions = |text: &str| {
                     let mut text = text.to_string();
                     if let Some(guild) = client.guilds.get(&self.current_guild_id.unwrap()) {
-                        for (id, member) in client.members.iter().filter(|(id, _)| guild.members.contains(id)) {
+                        for (id, member) in client.members.iter().filter(|(id, _)| guild.members.contains_key(id)) {
                             use client::byte_writer::Writer;
                             use std::fmt::Write;
 
@@ -1213,29 +1221,43 @@ impl MainScreen {
                                 let channels_list = get_guild_channels(&inner, guildid).await?.channels;
                                 let mut events = Vec::with_capacity(channels_list.len());
                                 events.extend(channels_list.into_iter().map(|c| {
-                                    Event::CreatedChannel(ChannelCreated {
+                                    Ok(Event::CreatedChannel(ChannelCreated {
                                         guild_id,
                                         channel_id: c.channel_id,
                                         is_category: c.is_category,
                                         name: c.channel_name,
                                         metadata: c.metadata,
                                         ..Default::default()
-                                    })
+                                    }))
                                 }));
 
                                 let members = get_guild_members(&inner, guildid).await?.members;
-                                events.reserve(members.len());
+                                events.reserve(members.len() * 2);
+                                for id in &members {
+                                    events.push(
+                                        get_user_roles(&inner, GetUserRolesRequest { guild_id, user_id: *id })
+                                            .await
+                                            .map(|resp| {
+                                                Event::UserRolesUpdated(UserRolesUpdated {
+                                                    guild_id,
+                                                    user_id: *id,
+                                                    role_ids: resp.roles,
+                                                })
+                                            })
+                                            .map_err(Into::into),
+                                    );
+                                }
                                 let member_events = members
                                     .into_iter()
-                                    .map(|member_id| Event::JoinedMember(MemberJoined { member_id, guild_id }));
+                                    .map(|member_id| Ok(Event::JoinedMember(MemberJoined { member_id, guild_id })));
                                 events.extend(member_events);
 
-                                ClientResult::<_>::Ok(events)
+                                ClientResult::Ok(events)
                             },
-                            move |res| TopLevelMessage::InitialLoad {
+                            move |events| TopLevelMessage::InitialLoad {
                                 guild_id,
                                 channel_id: None,
-                                events: res.map_err(Box::new),
+                                events,
                             },
                         );
                     } else {
@@ -1283,10 +1305,10 @@ impl MainScreen {
                             m.messages
                                 .into_iter()
                                 .map(|msg| {
-                                    Event::SentMessage(Box::new(MessageSent {
+                                    Ok(Event::SentMessage(Box::new(MessageSent {
                                         message: Some(msg),
                                         ..Default::default()
-                                    }))
+                                    })))
                                 })
                                 .rev()
                                 .collect()
@@ -1300,10 +1322,10 @@ impl MainScreen {
                                     .map(convert_to_event)
                                     .map_err(ClientError::from)
                             },
-                            move |res| TopLevelMessage::InitialLoad {
+                            move |events| TopLevelMessage::InitialLoad {
                                 guild_id,
                                 channel_id: Some(channel_id),
-                                events: res.map_err(Box::new),
+                                events,
                             },
                         ));
                     }

@@ -26,7 +26,9 @@ use client::{
         self,
         api::{
             chat::{
-                event::{Event, GuildAddedToList, GuildUpdated, MessageSent, PermissionUpdated, ProfileUpdated},
+                event::{
+                    Event, GuildAddedToList, GuildUpdated, MessageSent, PermissionUpdated, ProfileUpdated, RoleCreated,
+                },
                 GetGuildListRequest, GetMessageRequest, GetUserResponse,
             },
             harmonytypes::UserStatus,
@@ -38,7 +40,9 @@ use client::{
                 chat::{
                     guild::{get_guild, get_guild_list},
                     message::get_message,
-                    permissions::{self, query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder},
+                    permissions::{
+                        self, get_guild_roles, query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder,
+                    },
                     profile::{self, get_user, get_user_bulk, ProfileUpdate},
                     EventSource, GuildId, UserId,
                 },
@@ -81,11 +85,12 @@ pub enum Message {
         avatar: Option<(ImageHandle, ImageHandle)>,
         open: bool,
     },
+    TryEventsReceived(Vec<ClientResult<Event>>),
     EventsReceived(Vec<Event>),
     InitialLoad {
         guild_id: u64,
         channel_id: Option<u64>,
-        events: Result<Vec<Event>, Box<ClientError>>,
+        events: ClientResult<Vec<ClientResult<Event>>>,
     },
     SocketEvent {
         socket: Box<EventsSocket>,
@@ -400,31 +405,53 @@ impl ScreenManager {
                 }
                 PostProcessEvent::FetchGuildData(guild_id) => client.mk_cmd(
                     |inner| async move {
-                        let ev = get_guild(&inner, GuildId::new(guild_id)).await.map(|guild_data| {
-                            Event::EditedGuild(GuildUpdated {
-                                guild_id,
-                                metadata: guild_data.metadata,
-                                name: guild_data.guild_name,
-                                picture: guild_data.guild_picture,
-                                update_name: true,
-                                update_picture: true,
-                                update_metadata: true,
-                            })
-                        })?;
-                        let query = "guild.manage.change-information".to_string();
-                        let perm = query_has_permission(&inner, QueryPermissions::new(guild_id, query.clone()))
-                            .await
-                            .map(|perm| {
-                                Event::PermissionUpdated(PermissionUpdated {
+                        let mut events = Vec::with_capacity(10);
+                        events.push(Ok(get_guild(&inner, GuildId::new(guild_id)).await.map(
+                            |guild_data| {
+                                Event::EditedGuild(GuildUpdated {
                                     guild_id,
-                                    channel_id: 0,
-                                    ok: perm.ok,
-                                    query,
+                                    metadata: guild_data.metadata,
+                                    name: guild_data.guild_name,
+                                    picture: guild_data.guild_picture,
+                                    update_name: true,
+                                    update_picture: true,
+                                    update_metadata: true,
                                 })
-                            })?;
-                        ClientResult::Ok(vec![ev, perm])
+                            },
+                        )?));
+                        let query = "guild.manage.change-information".to_string();
+                        events.push(
+                            query_has_permission(&inner, QueryPermissions::new(guild_id, query.clone()))
+                                .await
+                                .map(|perm| {
+                                    Event::PermissionUpdated(PermissionUpdated {
+                                        guild_id,
+                                        channel_id: 0,
+                                        ok: perm.ok,
+                                        query,
+                                    })
+                                })
+                                .map_err(Into::into),
+                        );
+                        events.extend(get_guild_roles(&inner, GuildId::new(guild_id)).await.map_or_else(
+                            |err| vec![Err(err.into())],
+                            |roles| {
+                                roles
+                                    .roles
+                                    .into_iter()
+                                    .map(|role| {
+                                        Ok(Event::RoleCreated(RoleCreated {
+                                            guild_id,
+                                            role_id: role.role_id,
+                                            role: Some(role),
+                                        }))
+                                    })
+                                    .collect::<Vec<_>>()
+                            },
+                        ));
+                        ClientResult::Ok(events)
                     },
-                    Message::EventsReceived,
+                    Message::TryEventsReceived,
                 ),
                 PostProcessEvent::FetchMessage {
                     guild_id,
@@ -886,9 +913,21 @@ impl Application for ScreenManager {
                         });
                 }
                 return match events {
-                    Ok(events) => self.update(Message::EventsReceived(events), clip),
-                    Err(err) => self.update(Message::Error(err), clip),
+                    Ok(events) => self.update(Message::TryEventsReceived(events), clip),
+                    Err(err) => self.update(Message::Error(err.into()), clip),
                 };
+            }
+            Message::TryEventsReceived(maybe_events) => {
+                let mut cmds = Vec::with_capacity(maybe_events.len());
+                let mut events = Vec::with_capacity(maybe_events.len());
+                for maybe_event in maybe_events {
+                    match maybe_event {
+                        Ok(event) => events.push(event),
+                        Err(err) => cmds.push(self.update(Message::Error(Box::new(err)), clip)),
+                    }
+                }
+                cmds.push(self.update(Message::EventsReceived(events), clip));
+                return Command::batch(cmds);
             }
         }
         Command::none()

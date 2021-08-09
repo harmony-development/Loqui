@@ -24,6 +24,7 @@ use crate::{
 use chrono::{Datelike, TimeZone, Timelike};
 use client::{
     bool_ext::BoolExt,
+    guild::Guild,
     harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
     message::MessageId,
     smol_str::SmolStr,
@@ -52,6 +53,7 @@ const TIMESTAMP_WIDTH: u16 = DEF_SIZE * 2 + RIGHT_TIMESTAMP_PADDING + LEFT_TIMES
 pub fn build_event_history<'a>(
     content_store: &ContentStore,
     thumbnail_cache: &ThumbnailCache,
+    guild: &Guild,
     channel: &Channel,
     members: &Members,
     current_user_id: u64,
@@ -181,7 +183,14 @@ pub fn build_event_history<'a>(
             }
 
             widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING).into());
-            widgets.push(label_container(label!(sender_display_name).size(MESSAGE_SENDER_SIZE)));
+            let sender_name_color = guild.highest_role_for_member(id_to_use).map_or(Color::WHITE, |role| {
+                Color::from_rgb8(role.color.0, role.color.1, role.color.2)
+            });
+            widgets.push(label_container(
+                label!(sender_display_name)
+                    .size(MESSAGE_SENDER_SIZE)
+                    .color(sender_name_color),
+            ));
 
             (!matches!(
                 override_reason_raw,

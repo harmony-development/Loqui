@@ -10,7 +10,7 @@ use rand::Rng;
 use smol_str::SmolStr;
 use std::{str::FromStr, time::UNIX_EPOCH};
 
-use crate::IndexMap;
+use crate::{color, IndexMap};
 
 use super::{content::MAX_THUMB_SIZE, post_heading, PostProcessEvent};
 
@@ -67,12 +67,7 @@ impl From<Embed> for harmonytypes::Embed {
     fn from(e: Embed) -> harmonytypes::Embed {
         harmonytypes::Embed {
             body: e.body,
-            color: {
-                let mut c = (e.color.0 * 255) as i64;
-                c = (c << 8) + (e.color.1 * 255) as i64;
-                c = (c << 8) + (e.color.2 * 255) as i64;
-                c as i64
-            },
+            color: color::encode_rgb(e.color),
             fields: e.fields.into_iter().map(Into::into).collect(),
             title: e.title,
             footer: e.footer.map(Into::into),
@@ -308,11 +303,7 @@ impl From<harmonytypes::Embed> for Embed {
                     body: f.body,
                 })
                 .collect(),
-            color: (
-                ((e.color >> 16) & 255) as u8,
-                ((e.color >> 8) & 255) as u8,
-                (e.color & 255) as u8,
-            ),
+            color: color::decode_rgb(e.color),
         }
     }
 }

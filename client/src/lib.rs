@@ -6,6 +6,7 @@ pub mod error;
 pub mod guild;
 pub mod member;
 pub mod message;
+pub mod role;
 
 use bool_ext::BoolExt;
 use channel::Channel;
@@ -531,7 +532,7 @@ impl Client {
                 }
 
                 if let Some(guild) = self.get_guild(guild_id) {
-                    guild.members.insert(member_id);
+                    guild.members.insert(member_id, Vec::new());
                 }
 
                 if !self.members.contains_key(&member_id) {
@@ -624,6 +625,54 @@ impl Client {
                         }));
                     }
                 }
+            }
+            Event::RoleCreated(RoleCreated {
+                guild_id,
+                role_id,
+                role,
+            }) => {
+                self.get_guild(guild_id).and_do(|g| {
+                    role.and_do(|role| {
+                        g.roles.insert(role_id, role.into());
+                    });
+                });
+            }
+            Event::RoleDeleted(RoleDeleted { guild_id, role_id }) => {
+                self.get_guild(guild_id).and_do(|g| {
+                    g.roles.remove(&role_id);
+                });
+            }
+            Event::RoleUpdated(RoleUpdated {
+                guild_id,
+                role_id,
+                role,
+            }) => {
+                self.get_guild(guild_id).and_do(|g| {
+                    role.and_do(|role| {
+                        g.roles.insert(role_id, role.into());
+                    });
+                });
+            }
+            Event::RoleMoved(RoleMoved {
+                guild_id,
+                role_id,
+                previous_id,
+                next_id,
+            }) => {
+                if previous_id != 0 && next_id != 0 {
+                    self.get_guild(guild_id).and_do(|g| {
+                        g.update_role_order(previous_id, next_id, role_id);
+                    });
+                }
+            }
+            Event::UserRolesUpdated(UserRolesUpdated {
+                guild_id,
+                user_id,
+                role_ids,
+            }) => {
+                self.get_guild(guild_id).and_do(|g| {
+                    g.members.get_mut(&user_id).and_do(|ids| *ids = role_ids);
+                });
             }
             x => tracing::warn!("implement {:?}", x),
         }
@@ -787,4 +836,21 @@ pub fn render_text(textt: &str, members: &Members) -> String {
         }
     }
     text
+}
+
+pub mod color {
+    pub fn encode_rgb(color: (u8, u8, u8)) -> i64 {
+        let mut c = (color.0 * 255) as i64;
+        c = (c << 8) + (color.1 * 255) as i64;
+        c = (c << 8) + (color.2 * 255) as i64;
+        c as i64
+    }
+
+    pub fn decode_rgb(color: i64) -> (u8, u8, u8) {
+        (
+            ((color >> 16) & 255) as u8,
+            ((color >> 8) & 255) as u8,
+            (color & 255) as u8,
+        )
+    }
 }
