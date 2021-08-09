@@ -862,7 +862,7 @@ impl MainScreen {
                 return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
             }
             Message::ProfileEditMsg(msg) => {
-                let (cmd, go_back) = self.profile_edit_modal.inner_mut().update(msg, client);
+                let (cmd, go_back) = self.profile_edit_modal.inner_mut().update(msg, client, clip);
                 self.profile_edit_modal.show(!go_back);
                 return cmd;
             }

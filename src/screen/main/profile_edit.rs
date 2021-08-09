@@ -22,6 +22,8 @@ pub enum Message {
     UpdateNewUsername(String),
     Back,
     IsBotChecked(bool),
+    CopyId,
+    CopyUsername(String),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -32,6 +34,8 @@ pub struct ProfileEditModal {
     back_but: button::State,
     username_edit: text_input::State,
     username_change_but: button::State,
+    username_but_state: button::State,
+    userid_but_state: button::State,
     current_username: String,
 }
 
@@ -62,7 +66,15 @@ impl ProfileEditModal {
             } else {
                 user_profile.username.clone()
             };
-            let username = label!(username_text).size(DEF_SIZE + 12);
+            let user_id = Button::new(
+                &mut self.userid_but_state,
+                label!(format!("ID {}", self.user_id)).size(DEF_SIZE - 4),
+            )
+            .on_press(Message::CopyId)
+            .style(theme);
+            let username = Button::new(&mut self.username_but_state, label!(username_text).size(DEF_SIZE + 12))
+                .on_press(Message::CopyUsername(user_profile.username.to_string()))
+                .style(theme);
             let mut profile_widgets = Vec::with_capacity(4);
             profile_widgets.push(
                 avatar_but
@@ -81,9 +93,15 @@ impl ProfileEditModal {
                 space!(w = 0).into()
             };
             profile_widgets.push(
-                Column::with_children(vec![username.into(), space!(h = 48).into(), is_bot])
-                    .align_items(Align::End)
-                    .into(),
+                Column::with_children(vec![
+                    username.into(),
+                    space!(h = SPACING * 2).into(),
+                    user_id.into(),
+                    space!(h = 48).into(),
+                    is_bot,
+                ])
+                .align_items(Align::End)
+                .into(),
             );
             let profile_widgets = row(profile_widgets);
 
@@ -136,7 +154,12 @@ impl ProfileEditModal {
         .into()
     }
 
-    pub fn update(&mut self, msg: Message, client: &Client) -> (Command<TopLevelMessage>, bool) {
+    pub fn update(
+        &mut self,
+        msg: Message,
+        client: &Client,
+        clip: &mut iced::Clipboard,
+    ) -> (Command<TopLevelMessage>, bool) {
         (
             match msg {
                 Message::IsBotChecked(is_bot) => client.mk_cmd(
@@ -173,6 +196,14 @@ impl ProfileEditModal {
                     )
                 }
                 Message::Back => return (Command::none(), true),
+                Message::CopyId => {
+                    clip.write(self.user_id.to_string());
+                    Command::none()
+                }
+                Message::CopyUsername(username) => {
+                    clip.write(username);
+                    Command::none()
+                }
             },
             false,
         )
