@@ -251,46 +251,27 @@ pub fn build_event_history<'a>(
         });
 
         msg_text.and_do(|textt| {
-            use core::{
-                fmt::{Error, Write},
-                mem,
-            };
+            use client::byte_writer::Writer;
             use regex::Regex;
+            use std::fmt::Write;
 
             lazy_static::lazy_static! {
-                static ref MENTION: Regex = Regex::new("<@([0-9]*)>").unwrap();
+                static ref MENTION: Regex = Regex::new("<@(?P<id>[0-9]*)>").unwrap();
                 static ref EMOTE: Regex = Regex::new("<:(.*):>").unwrap();
-            }
-
-            struct Writer<'a>(&'a mut [u8]);
-
-            impl Write for Writer<'_> {
-                fn write_str(&mut self, data: &str) -> Result<(), Error> {
-                    if data.len() > self.0.len() {
-                        return Err(Error);
-                    }
-
-                    let (a, b) = mem::replace(&mut self.0, &mut []).split_at_mut(data.len());
-                    a.copy_from_slice(data.as_bytes());
-                    self.0 = b;
-
-                    Ok(())
-                }
             }
 
             // TODO: this is horribly inefficient
             let mut text = textt.to_string();
             for capture in MENTION.captures_iter(textt) {
-                let user_id = capture.get(0).unwrap().as_str();
+                let user_id = capture.name("id").unwrap().as_str();
                 if let Ok(parsed_user_id) = user_id.parse::<u64>() {
                     let member_name = members
                         .get(&parsed_user_id)
                         .map_or_else(|| "unknown user", |m| m.username.as_str());
-                    const PATTERN_LENGTH: usize = "<@18446744073709551615>".len();
-                    let mut pattern_arr = [0_u8; PATTERN_LENGTH];
-                    write!(Writer(&mut pattern_arr), "<@{}>", parsed_user_id).unwrap();
+                    let mut pattern_arr = [b'0'; 23];
+                    write!(Writer(&mut pattern_arr), "<@{}>", user_id).unwrap();
                     text = text.replace(
-                        unsafe { std::str::from_utf8_unchecked(&pattern_arr) },
+                        (unsafe { std::str::from_utf8_unchecked(&pattern_arr) }).trim_end_matches(|c| c != '>'),
                         &format!("@{}", member_name),
                     );
                 }

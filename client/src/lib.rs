@@ -381,7 +381,14 @@ impl Client {
                         message.post_process(&mut post);
 
                         if let Content::Text(text) = &message.content {
-                            if text.contains(&format!("<@{}>", message.sender)) {
+                            use byte_writer::Writer;
+                            use std::fmt::Write;
+
+                            let mut pattern_arr = [b'0'; 23];
+                            write!(Writer(&mut pattern_arr), "<@{}>", message.sender).unwrap();
+                            if text.contains(
+                                (unsafe { std::str::from_utf8_unchecked(&pattern_arr) }).trim_end_matches(|c| c != '>'),
+                            ) {
                                 post.push(PostProcessEvent::SendNotification {
                                     unread_message: false,
                                     mention: true,
@@ -712,5 +719,28 @@ impl<T> OptionExt<T> for Option<T> {
     fn or_do<F: FnOnce()>(self, f: F) -> Self {
         self.is_none().and_do(f);
         None
+    }
+}
+
+pub mod byte_writer {
+    use core::{
+        fmt::{Error, Write},
+        mem,
+    };
+
+    pub struct Writer<'a>(pub &'a mut [u8]);
+
+    impl Write for Writer<'_> {
+        fn write_str(&mut self, data: &str) -> Result<(), Error> {
+            if data.len() > self.0.len() {
+                return Err(Error);
+            }
+
+            let (a, b) = mem::replace(&mut self.0, &mut []).split_at_mut(data.len());
+            a.copy_from_slice(data.as_bytes());
+            self.0 = b;
+
+            Ok(())
+        }
     }
 }
