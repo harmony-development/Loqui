@@ -1,6 +1,6 @@
 use std::convert::identity;
 
-use super::{super::Screen as TopLevelScreen, GuildMetaData};
+use super::{super::Screen as TopLevelScreen, GuildMetadata};
 use crate::{
     client::error::ClientError,
     component::*,
@@ -54,7 +54,7 @@ impl InviteTab {
         &mut self,
         message: InviteMessage,
         client: &Client,
-        meta_data: &mut GuildMetaData,
+        meta_data: &mut GuildMetadata,
         guild_id: u64,
     ) -> Command<TopLevelMessage> {
         match message {
@@ -107,9 +107,7 @@ impl InviteTab {
             }
             InviteMessage::GoBack => {
                 // Return to main screen
-                return TopLevelScreen::push_screen_cmd(TopLevelScreen::Main(Box::new(
-                    super::super::MainScreen::default(),
-                )));
+                return TopLevelScreen::pop_screen_cmd();
             }
             InviteMessage::DeleteInvitePressed(n) => {
                 let invite_id = meta_data.invites.as_ref().unwrap()[n].invite_id.clone();
@@ -138,6 +136,8 @@ impl InviteTab {
 }
 
 impl Tab for InviteTab {
+    type Message = InviteMessage;
+
     fn title(&self) -> String {
         String::from("Invites")
     }
@@ -149,10 +149,11 @@ impl Tab for InviteTab {
     fn content(
         &mut self,
         client: &Client,
-        meta_data: &mut GuildMetaData,
+        _: u64,
+        meta_data: &mut GuildMetadata,
         theme: Theme,
         _: &ThumbnailCache,
-    ) -> Element<'_, ParentMessage> {
+    ) -> Element<'_, InviteMessage> {
         let mut widgets = Vec::with_capacity(10);
         if !self.error_message.is_empty() {
             widgets.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
@@ -197,7 +198,7 @@ impl Tab for InviteTab {
                     space!(w % 1).into(),
                     Button::new(del_but_state, icon(Icon::Trash))
                         .style(theme)
-                        .on_press(ParentMessage::Invite(InviteMessage::DeleteInvitePressed(n)))
+                        .on_press(InviteMessage::DeleteInvitePressed(n))
                         .into(),
                 ]));
             }
@@ -215,7 +216,7 @@ impl Tab for InviteTab {
                     &mut self.invite_name_state,
                     "Enter invite name...",
                     self.invite_name_value.as_str(),
-                    |s| ParentMessage::Invite(InviteMessage::InviteNameChanged(s)),
+                    InviteMessage::InviteNameChanged,
                 )
                 .style(theme)
                 .padding(PADDING / 2)
@@ -224,7 +225,7 @@ impl Tab for InviteTab {
                     &mut self.invite_uses_state,
                     "Enter possible uses...",
                     self.invite_uses_value.as_str(),
-                    |s| ParentMessage::Invite(InviteMessage::InviteUsesChanged(s)),
+                    InviteMessage::InviteUsesChanged,
                 )
                 .width(length!(= 200))
                 .padding(PADDING / 2)
@@ -232,7 +233,7 @@ impl Tab for InviteTab {
                 .into(),
                 Button::new(&mut self.create_invite_but_state, label!("Create"))
                     .style(theme)
-                    .on_press(ParentMessage::Invite(InviteMessage::CreateInvitePressed))
+                    .on_press(InviteMessage::CreateInvitePressed)
                     .into(),
             ])
             .into(),
@@ -242,7 +243,7 @@ impl Tab for InviteTab {
         widgets.push(
             label_button!(&mut self.back_but_state, "Back")
                 .style(theme)
-                .on_press(ParentMessage::Invite(InviteMessage::GoBack))
+                .on_press(InviteMessage::GoBack)
                 .into(),
         );
 

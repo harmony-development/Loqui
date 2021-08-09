@@ -42,7 +42,6 @@ use iced::futures::future::ready;
 use iced_aw::{modal, Modal};
 
 use chan_guild_list::build_guild_list;
-use create_channel::ChannelCreationModal;
 use help::HelpModal;
 use image_viewer::ImageViewerModal;
 use logout::LogoutModal;
@@ -64,10 +63,8 @@ use crate::{
     style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
 };
 
-use self::{edit_channel::UpdateChannelModal, quick_switcher::QuickSwitcherModal};
+use self::quick_switcher::QuickSwitcherModal;
 
-pub mod create_channel;
-pub mod edit_channel;
 pub mod help;
 pub mod image_viewer;
 pub mod logout;
@@ -113,9 +110,7 @@ impl Display for ProfileMenuOption {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GuildMenuOption {
-    NewChannel,
     EditGuild,
-    CopyGuildId,
     LeaveGuild,
     Custom(SmolStr),
 }
@@ -123,9 +118,7 @@ pub enum GuildMenuOption {
 impl Display for GuildMenuOption {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let w = match self {
-            GuildMenuOption::NewChannel => "New Channel",
             GuildMenuOption::EditGuild => "Edit Guild",
-            GuildMenuOption::CopyGuildId => "Copy Guild ID",
             GuildMenuOption::LeaveGuild => "Leave Guild",
             GuildMenuOption::Custom(s) => s.as_str(),
         };
@@ -181,16 +174,10 @@ pub enum Message {
     /// Sent when the permission check for viewing a channel is complete
     ChannelViewPerm(u64, u64, bool),
     /// Modal message passing
-    ChannelCreationMessage(create_channel::Message),
     ImageViewMessage(image_viewer::Message),
     QuickSwitchMsg(quick_switcher::Message),
     ProfileEditMsg(profile_edit::Message),
     HelpModal(help::Message),
-    UpdateChannelMessage(edit_channel::Message),
-    /// Sent when the permission check for channel edits are complete.
-    ShowUpdateChannelModal(u64, u64),
-    /// Sent when the user triggers an ID copy (guild ID, message ID etc.)
-    CopyIdToClipboard(u64),
     /// Sent when the user clicks the `+` button (guild discovery)
     OpenCreateJoinGuild,
     /// Sent when the user picks a new status
@@ -216,19 +203,17 @@ pub struct MainScreen {
     guilds_list_state: scrollable::State,
     guilds_buts_state: Vec<button::State>,
     channels_list_state: scrollable::State,
-    channels_buts_state: Vec<(button::State, button::State, button::State)>,
+    channels_buts_state: Vec<button::State>,
     members_buts_state: Vec<button::State>,
     members_list_state: scrollable::State,
     status_list: pick_list::State<UserStatus>,
 
     // Modal states
     logout_modal: modal::State<LogoutModal>,
-    create_channel_modal: modal::State<ChannelCreationModal>,
     pub image_viewer_modal: modal::State<ImageViewerModal>,
     quick_switcher_modal: modal::State<QuickSwitcherModal>,
     profile_edit_modal: modal::State<ProfileEditModal>,
     help_modal: modal::State<HelpModal>,
-    update_channel_modal: modal::State<UpdateChannelModal>,
 
     /// A map of the last channel we have looked in each guild we are in
     guild_last_channels: IndexMap<u64, u64>,
@@ -389,12 +374,7 @@ impl MainScreen {
             );
 
             // [tag:guild_menu_entry]
-            let channel_menu_entries = vec![
-                GuildMenuOption::NewChannel,
-                GuildMenuOption::EditGuild,
-                GuildMenuOption::CopyGuildId,
-                GuildMenuOption::LeaveGuild,
-            ];
+            let channel_menu_entries = vec![GuildMenuOption::EditGuild, GuildMenuOption::LeaveGuild];
 
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
@@ -414,7 +394,6 @@ impl MainScreen {
             } else {
                 build_channel_list(
                     &guild.channels,
-                    guild_id,
                     self.current_channel_id,
                     &mut self.channels_list_state,
                     &mut self.channels_buts_state,
@@ -658,20 +637,6 @@ impl MainScreen {
         .on_esc(Message::LogoutChoice(false));
 
         let content = if self.current_guild_id.is_some() {
-            // Show CreateChannelModal, if a guild is selected
-            let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
-                state.view(theme).map(Message::ChannelCreationMessage)
-            })
-            .style(theme)
-            .backdrop(Message::ChannelCreationMessage(create_channel::Message::GoBack))
-            .on_esc(Message::ChannelCreationMessage(create_channel::Message::GoBack));
-            // Show UpdateChannelModal, if a guild is selected
-            let content = Modal::new(&mut self.update_channel_modal, content, move |state| {
-                state.view(theme).map(Message::UpdateChannelMessage)
-            })
-            .style(theme)
-            .backdrop(Message::UpdateChannelMessage(edit_channel::Message::GoBack))
-            .on_esc(Message::UpdateChannelMessage(edit_channel::Message::GoBack));
             if self.current_channel_id.is_some() {
                 // Show Image view, if a guild and a channel are selected
                 Modal::new(&mut self.image_viewer_modal, content, move |state| {
@@ -734,7 +699,6 @@ impl MainScreen {
                     super::GuildDiscovery::default().into(),
                 ));
             }
-            Message::CopyIdToClipboard(id) => clip.write(id.to_string()),
             Message::ChannelViewPerm(guild_id, channel_id, ok) => {
                 client.get_channel(guild_id, channel_id).unwrap().user_perms.send_msg = ok;
             }
@@ -907,30 +871,6 @@ impl MainScreen {
                 self.image_viewer_modal.show(!go_back);
                 return cmd;
             }
-            Message::ChannelCreationMessage(msg) => {
-                let (cmd, go_back) = self.create_channel_modal.inner_mut().update(msg, client);
-                self.create_channel_modal.show(!go_back);
-                return cmd;
-            }
-            Message::UpdateChannelMessage(msg) => {
-                let (cmd, go_back) = self.update_channel_modal.inner_mut().update(msg, client);
-                self.update_channel_modal.show(!go_back);
-                return cmd;
-            }
-            Message::ShowUpdateChannelModal(guild_id, channel_id) => {
-                self.update_channel_modal.show(true);
-                self.error_text.clear();
-                let modal_state = self.update_channel_modal.inner_mut();
-                let chan = client
-                    .get_channel(guild_id, channel_id)
-                    .expect("channel not found in client?"); // should never panic, if it does it means client data is corrupted
-                chan.user_perms.manage_channel = true;
-                modal_state.channel_name_field.clear();
-                modal_state.channel_name_field.push_str(&chan.name);
-                modal_state.guild_id = guild_id;
-                modal_state.channel_id = channel_id;
-                return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
-            }
             Message::HelpModal(should_show) => {
                 should_show.and_do(|| self.help_modal.show(false));
             }
@@ -1005,12 +945,6 @@ impl MainScreen {
                 return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
             }
             Message::SelectedGuildMenuOption(option) => match option {
-                GuildMenuOption::NewChannel => {
-                    self.create_channel_modal.inner_mut().guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
-                    self.create_channel_modal.show(true);
-                    self.error_text.clear();
-                    return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);
-                }
                 GuildMenuOption::EditGuild => {
                     let guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
                     return client
@@ -1037,13 +971,6 @@ impl MainScreen {
                     return client.mk_cmd(
                         |inner| async move { guild::leave_guild(&inner, GuildId::new(guild_id)).await },
                         |_| TopLevelMessage::Nothing,
-                    );
-                }
-                GuildMenuOption::CopyGuildId => {
-                    clip.write(
-                        self.current_guild_id
-                            .expect("this menu is only shown if a guild is selected") // [ref:guild_menu_entry]
-                            .to_string(),
                     );
                 }
                 _ => {}
@@ -1522,9 +1449,6 @@ impl MainScreen {
         self.error_text = error.to_string();
         self.logout_modal.show(false);
 
-        Command::batch(vec![
-            self.create_channel_modal.inner_mut().on_error(&error),
-            self.logout_modal.inner_mut().on_error(&error),
-        ])
+        self.logout_modal.inner_mut().on_error(&error)
     }
 }

@@ -52,7 +52,11 @@ use client::{
     tracing::{debug, error, warn},
     OptionExt,
 };
-use iced::{executor, futures::future, Application, Command, Element, Subscription};
+use iced::{
+    executor,
+    futures::future::{self, ready},
+    Application, Command, Element, Subscription,
+};
 use std::{borrow::Cow, convert::identity, future::Future, ops::Not, sync::Arc, time::Duration};
 
 #[derive(Debug, Clone)]
@@ -223,7 +227,7 @@ impl Screen {
             }
             ScreenMessage::GuildSettings(msg) => {
                 if let (Screen::GuildSettings(screen), Some(client)) = (self, client) {
-                    return screen.update(msg, client);
+                    return screen.update(msg, client, clip);
                 }
             }
         }
@@ -760,7 +764,8 @@ impl Application for ScreenManager {
                             .collect::<Vec<_>>()
                     };
 
-                    let mut cmds = Vec::with_capacity(processed.len());
+                    let mut cmds = Vec::with_capacity(processed.len() + 1);
+                    cmds.push(Command::perform(ready(()), map_to_nothing));
 
                     let sources_to_add = processed
                         .iter()

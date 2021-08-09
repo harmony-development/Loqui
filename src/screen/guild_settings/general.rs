@@ -1,6 +1,6 @@
 use super::{
     super::{Message as TopLevelMessage, Screen as TopLevelScreen},
-    GuildMetaData,
+    GuildMetadata,
 };
 use crate::{
     client::Client,
@@ -38,24 +38,18 @@ pub struct GeneralTab {
     name_edit_but_state: button::State,
     icon_edit_but_state: button::State,
     back_but_state: button::State,
+    name_but_state: button::State,
+    id_but_state: button::State,
     loading_text: Option<String>,
-    guild_id: u64,
     pub error_message: String,
 }
 
 impl GeneralTab {
-    pub fn new(guild_id: u64) -> Self {
-        Self {
-            guild_id,
-            ..Default::default()
-        }
-    }
-
     pub fn update(
         &mut self,
         message: GeneralMessage,
         client: &Client,
-        _: &mut GuildMetaData,
+        _: &mut GuildMetadata,
         guild_id: u64,
     ) -> Command<TopLevelMessage> {
         match message {
@@ -64,7 +58,7 @@ impl GeneralTab {
             }
             GeneralMessage::NameButPressed => {
                 //Show loading text via a Option
-                self.loading_text = Some("Updating ...".to_string());
+                self.loading_text = Some("Updating...".to_string());
                 let current_name = self.name_edit_field.clone();
                 return client.mk_cmd(
                     |inner| async move {
@@ -76,7 +70,8 @@ impl GeneralTab {
                 );
             }
             GeneralMessage::NameButSuccess => {
-                self.loading_text = Some("Name updated".to_string());
+                self.name_edit_field.clear();
+                self.loading_text = Some("Name updated!".to_string());
             }
             GeneralMessage::UploadGuildImage => {
                 let content_store = client.content_store_arc();
@@ -96,9 +91,7 @@ impl GeneralTab {
                 );
             }
             GeneralMessage::GoBack => {
-                return TopLevelScreen::push_screen_cmd(TopLevelScreen::Main(Box::new(
-                    super::super::MainScreen::default(),
-                )));
+                return TopLevelScreen::pop_screen_cmd();
             }
         }
         Command::none()
@@ -111,6 +104,8 @@ impl GeneralTab {
 }
 
 impl Tab for GeneralTab {
+    type Message = ParentMessage;
+
     fn title(&self) -> String {
         String::from("General")
     }
@@ -122,30 +117,32 @@ impl Tab for GeneralTab {
     fn content(
         &mut self,
         client: &Client,
-        _: &mut GuildMetaData,
+        guild_id: u64,
+        _: &mut GuildMetadata,
         theme: Theme,
         thumbnail_cache: &ThumbnailCache,
     ) -> Element<'_, ParentMessage> {
         let name_edit_but_state = &mut self.name_edit_but_state;
-        let guild = client.guilds.get(&self.guild_id).unwrap();
-        let back = label_button!(&mut self.back_but_state, "Back")
-            .style(theme)
-            .on_press(ParentMessage::General(GeneralMessage::GoBack));
+        let guild = client.guilds.get(&guild_id).unwrap();
         let ui_text_input_row = row(vec![
-            TextInput::new(
-                &mut self.name_edit_state,
-                guild.name.as_str(),
-                self.name_edit_field.as_str(),
-                |text| ParentMessage::General(GeneralMessage::NameChanged(text)),
-            )
-            .style(theme)
-            .padding(PADDING / 2)
-            .width(length!(= 300))
-            .into(),
-            Button::new(name_edit_but_state, label!["Update"])
-                .on_press(ParentMessage::General(GeneralMessage::NameButPressed))
+            Element::from(
+                TextInput::new(
+                    &mut self.name_edit_state,
+                    "Enter a new name...",
+                    self.name_edit_field.as_str(),
+                    GeneralMessage::NameChanged,
+                )
                 .style(theme)
-                .into(),
+                .padding(PADDING / 2)
+                .width(length!(= 300)),
+            )
+            .map(ParentMessage::General),
+            Element::from(
+                Button::new(name_edit_but_state, label!["Update"])
+                    .on_press(GeneralMessage::NameButPressed)
+                    .style(theme),
+            )
+            .map(ParentMessage::General),
         ])
         .into();
 
@@ -161,23 +158,44 @@ impl Tab for GeneralTab {
                 ),
         );
 
-        let ui_image_but = Button::new(&mut self.icon_edit_but_state, ui_update_guild_icon)
-            .on_press(ParentMessage::General(GeneralMessage::UploadGuildImage))
-            .height(length!(= 128))
-            .width(length!(= 128))
-            .style(theme)
-            .into();
+        let ui_image_but = Element::from(
+            Button::new(&mut self.icon_edit_but_state, ui_update_guild_icon)
+                .on_press(GeneralMessage::UploadGuildImage)
+                .height(length!(= 128))
+                .width(length!(= 128))
+                .style(theme),
+        )
+        .map(ParentMessage::General);
+        let back = Element::from(
+            label_button!(&mut self.back_but_state, "Back")
+                .style(theme)
+                .on_press(GeneralMessage::GoBack),
+        )
+        .map(ParentMessage::General);
 
         let mut content = Vec::with_capacity(5);
         if !self.error_message.is_empty() {
             content.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
         }
-        content.push(ui_image_but);
         if let Some(ldg_text) = &self.loading_text {
             content.push(label!(ldg_text).into());
         }
-        content.push(row(vec![label!("Name").into(), ui_text_input_row]).into());
-        content.push(back.into());
+        content.push(
+            row(vec![
+                label_button!(&mut self.name_but_state, &guild.name)
+                    .on_press(ParentMessage::CopyToClipboard(guild.name.clone()))
+                    .style(theme)
+                    .into(),
+                label_button!(&mut self.id_but_state, format!("ID {}", guild_id))
+                    .on_press(ParentMessage::CopyIdToClipboard(guild_id))
+                    .style(theme)
+                    .into(),
+            ])
+            .into(),
+        );
+        content.push(ui_image_but);
+        content.push(ui_text_input_row);
+        content.push(back);
 
         column(content).into()
     }

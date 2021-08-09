@@ -1,3 +1,6 @@
+mod channel_ordering;
+mod create_channel;
+mod edit_channel;
 mod general;
 mod invite;
 
@@ -6,6 +9,7 @@ use crate::{
     component::*,
     screen::{
         guild_settings::{
+            channel_ordering::{OrderingMessage, OrderingTab},
             general::{GeneralMessage, GeneralTab},
             invite::{InviteMessage, InviteTab},
         },
@@ -16,25 +20,30 @@ use crate::{
 use client::harmony_rust_sdk::client::api::chat::invite::{
     get_guild_invites, get_guild_invites_response::Invite, GetGuildInvitesRequest,
 };
-use iced::{Align, Column, Container, Element, Length};
-use iced_aw::{TabLabel, Tabs, ICON_FONT};
+use iced::Element;
+use iced_aw::{modal, Modal, TabLabel, Tabs, ICON_FONT};
+
+use self::{create_channel::ChannelCreationModal, edit_channel::UpdateChannelModal};
 
 const TAB_PADDING: u16 = 16;
 
-#[derive(Debug, Clone)]
-pub struct GuildMetaData {
+#[derive(Debug, Clone, Default)]
+pub struct GuildMetadata {
     invites: Option<Vec<Invite>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GuildSettings {
     guild_id: u64,
     active_tab: usize,
     general_tab: GeneralTab,
     invite_tab: InviteTab,
+    ordering_tab: OrderingTab,
     current_error: String,
-    meta_data: GuildMetaData,
+    meta_data: GuildMetadata,
     back_button: button::State,
+    update_channel_modal: modal::State<UpdateChannelModal>,
+    create_channel_modal: modal::State<ChannelCreationModal>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,23 +51,48 @@ pub enum Message {
     TabSelected(usize),
     General(GeneralMessage),
     Invite(InviteMessage),
+    Ordering(OrderingMessage),
+    UpdateChannelMessage(edit_channel::Message),
+    ChannelCreationMessage(create_channel::Message),
+    /// Sent when the permission check for channel edits are complete.
+    ShowUpdateChannelModal(u64),
+    /// Sent when the user triggers an ID copy (guild ID, message ID etc.)
+    CopyIdToClipboard(u64),
+    CopyToClipboard(String),
+    NewChannel,
 }
 
 impl GuildSettings {
     pub fn new(guild_id: u64) -> Self {
         GuildSettings {
             guild_id,
-            active_tab: 0,
-            general_tab: GeneralTab::new(guild_id),
-            invite_tab: InviteTab::default(),
-            current_error: String::from(""),
-            meta_data: GuildMetaData { invites: None },
-            back_button: Default::default(),
+            ..Default::default()
         }
     }
 
-    pub fn update(&mut self, message: Message, client: &Client) -> Command<TopLevelMessage> {
+    pub fn update(
+        &mut self,
+        message: Message,
+        client: &Client,
+        clip: &mut iced::Clipboard,
+    ) -> Command<TopLevelMessage> {
         match message {
+            Message::ShowUpdateChannelModal(channel_id) => {
+                self.update_channel_modal.show(true);
+                self.current_error.clear();
+                let modal_state = self.update_channel_modal.inner_mut();
+                let chan = client
+                    .guilds
+                    .get(&self.guild_id)
+                    .and_then(|g| g.channels.get(&channel_id))
+                    .expect("channel not found in client?"); // should never panic, if it does it means client data is corrupted
+                modal_state.channel_name_field.clear();
+                modal_state.channel_name_field.push_str(&chan.name);
+                modal_state.guild_id = self.guild_id;
+                modal_state.channel_id = channel_id;
+            }
+            Message::CopyIdToClipboard(id) => clip.write(id.to_string()),
+            Message::CopyToClipboard(msg) => clip.write(msg),
             Message::TabSelected(selected) => {
                 self.active_tab = selected;
                 match selected {
@@ -83,6 +117,9 @@ impl GuildSettings {
                             |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
                         );
                     }
+                    2 => {
+                        self.ordering_tab.error_message.clear();
+                    }
                     _ => {}
                 };
             }
@@ -96,6 +133,26 @@ impl GuildSettings {
                     .invite_tab
                     .update(message, client, &mut self.meta_data, self.guild_id)
             }
+            Message::Ordering(message) => {
+                return self
+                    .ordering_tab
+                    .update(message, client, &mut self.meta_data, self.guild_id)
+            }
+            Message::UpdateChannelMessage(msg) => {
+                let (cmd, go_back) = self.update_channel_modal.inner_mut().update(msg, client);
+                self.update_channel_modal.show(!go_back);
+                return cmd;
+            }
+            Message::ChannelCreationMessage(msg) => {
+                let (cmd, go_back) = self.create_channel_modal.inner_mut().update(msg, client);
+                self.create_channel_modal.show(!go_back);
+                return cmd;
+            }
+            Message::NewChannel => {
+                self.create_channel_modal.inner_mut().guild_id = self.guild_id;
+                self.create_channel_modal.show(true);
+                self.current_error.clear();
+            }
         }
 
         Command::none()
@@ -103,33 +160,65 @@ impl GuildSettings {
 
     pub fn view(&mut self, theme: Theme, client: &Client, thumbnail_cache: &ThumbnailCache) -> Element<'_, Message> {
         let position = iced_aw::TabBarPosition::Top;
-        Tabs::new(self.active_tab, Message::TabSelected)
+        let content = Tabs::new(self.active_tab, Message::TabSelected)
             .push(
                 self.general_tab.tab_label(),
                 self.general_tab
-                    .view(client, &mut self.meta_data, theme, thumbnail_cache),
+                    .view(client, self.guild_id, &mut self.meta_data, theme, thumbnail_cache),
             )
             .push(
                 self.invite_tab.tab_label(),
                 self.invite_tab
-                    .view(client, &mut self.meta_data, theme, thumbnail_cache),
+                    .view(client, self.guild_id, &mut self.meta_data, theme, thumbnail_cache)
+                    .map(Message::Invite),
+            )
+            .push(
+                self.ordering_tab.tab_label(),
+                self.ordering_tab
+                    .view(client, self.guild_id, &mut self.meta_data, theme, thumbnail_cache),
             )
             .tab_bar_style(theme)
             .icon_font(ICON_FONT)
-            .tab_bar_position(position)
-            .into()
+            .tab_bar_position(position);
+
+        // Show CreateChannelModal, if a guild is selected
+        let content = Modal::new(&mut self.create_channel_modal, content, move |state| {
+            state.view(theme).map(Message::ChannelCreationMessage)
+        })
+        .style(theme)
+        .backdrop(Message::ChannelCreationMessage(create_channel::Message::GoBack))
+        .on_esc(Message::ChannelCreationMessage(create_channel::Message::GoBack));
+
+        // Show UpdateChannelModal, if a guild is selected
+        let content = Modal::new(&mut self.update_channel_modal, content, move |state| {
+            state.view(theme).map(Message::UpdateChannelMessage)
+        })
+        .style(theme)
+        .backdrop(Message::UpdateChannelMessage(edit_channel::Message::GoBack))
+        .on_esc(Message::UpdateChannelMessage(edit_channel::Message::GoBack));
+
+        content.into()
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
+        if self.update_channel_modal.is_shown() {
+            return self.update_channel_modal.inner_mut().on_error(&error);
+        }
+        if self.create_channel_modal.is_shown() {
+            return self.create_channel_modal.inner_mut().on_error(&error);
+        }
         match self.active_tab {
             0 => self.general_tab.on_error(error),
             1 => self.invite_tab.on_error(error),
+            2 => self.ordering_tab.on_error(error),
             _ => Command::none(),
         }
     }
 }
 
 trait Tab {
+    type Message;
+
     fn title(&self) -> String;
 
     fn tab_label(&self) -> TabLabel;
@@ -137,19 +226,12 @@ trait Tab {
     fn view(
         &mut self,
         client: &Client,
-        meta_data: &mut GuildMetaData,
+        guild_id: u64,
+        meta_data: &mut GuildMetadata,
         theme: Theme,
         thumbnail_cache: &ThumbnailCache,
-    ) -> Element<'_, Message> {
-        let column = Column::new()
-            .spacing(20)
-            .push(self.content(client, meta_data, theme, thumbnail_cache));
-
-        Container::new(column)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .align_x(Align::Center)
-            .align_y(Align::Center)
+    ) -> Element<'_, Self::Message> {
+        fill_container(self.content(client, guild_id, meta_data, theme, thumbnail_cache))
             .padding(TAB_PADDING)
             .style(theme)
             .into()
@@ -158,8 +240,9 @@ trait Tab {
     fn content(
         &mut self,
         client: &Client,
-        meta_data: &mut GuildMetaData,
+        guild_id: u64,
+        meta_data: &mut GuildMetadata,
         theme: Theme,
         thumbnail_cache: &ThumbnailCache,
-    ) -> Element<'_, Message>;
+    ) -> Element<'_, Self::Message>;
 }

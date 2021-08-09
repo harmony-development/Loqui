@@ -153,10 +153,12 @@ impl ChannelCreationModal {
                             )
                             .await;
                             result.map(|response| {
-                                TopLevelMessage::main(ParentMessage::ChannelCreationMessage(Message::CreatedChannel {
-                                    guild_id,
-                                    channel_id: response.channel_id,
-                                }))
+                                TopLevelMessage::guild_settings(ParentMessage::ChannelCreationMessage(
+                                    Message::CreatedChannel {
+                                        guild_id,
+                                        channel_id: response.channel_id,
+                                    },
+                                ))
                             })
                         },
                         identity,

@@ -3,10 +3,13 @@ pub mod event_history;
 #[cfg(feature = "markdown")]
 pub mod markdown;
 
-use crate::length;
-pub use crate::{color, label};
+pub use crate::{color, label, space};
+use crate::{
+    length,
+    style::{ALT_COLOR, DEF_SIZE},
+};
 pub use chan_guild_list::build_channel_list;
-use client::{bool_ext::BoolExt, harmony_rust_sdk::api::rest::FileId, IndexMap};
+use client::{bool_ext::BoolExt, channel::Channel, harmony_rust_sdk::api::rest::FileId, IndexMap};
 pub use event_history::build_event_history;
 pub use iced::{
     button, pick_list, scrollable, text_input, Align, Button, Checkbox, Color, Column, Command, Container, Element,
@@ -42,6 +45,22 @@ pub fn fill_container<'a, M>(child: impl Into<Element<'a, M>>) -> Container<'a, 
 
 pub fn icon(icon: Icon) -> Text {
     label!(icon).font(iced_aw::ICON_FONT)
+}
+
+pub fn channel_icon<'a, M: 'a>(channel: &Channel) -> Element<'a, M> {
+    let (channel_name_prefix, channel_prefix_size) = channel
+        .is_category
+        .then(|| (Icon::ListNested, DEF_SIZE - 4))
+        .unwrap_or((Icon::Hash, DEF_SIZE));
+
+    let icon_content = icon(channel_name_prefix).color(ALT_COLOR).size(channel_prefix_size);
+    if channel.is_category {
+        Column::with_children(vec![space!(h = SPACING - (SPACING / 4)).into(), icon_content.into()])
+            .align_items(Align::Center)
+            .into()
+    } else {
+        icon_content.into()
+    }
 }
 
 #[macro_export]

@@ -17,88 +17,52 @@ use iced::{tooltip::Position, Tooltip};
 #[allow(clippy::too_many_arguments)]
 pub fn build_channel_list<'a>(
     channels: &Channels,
-    guild_id: u64,
     current_channel_id: Option<u64>,
     state: &'a mut scrollable::State,
-    buttons_state: &'a mut [(button::State, button::State, button::State)],
+    buttons_state: &'a mut [button::State],
     on_button_press: fn(u64) -> Message,
     theme: Theme,
 ) -> Element<'a, Message> {
-    type Item<'a, 'b> = (
-        (&'b u64, &'b Channel),
-        &'a mut (button::State, button::State, button::State),
-    );
-    let process_item =
-        |mut list: Scrollable<'a, Message>,
-         ((channel_id, channel), (button_state, edit_state, copy_state)): Item<'a, '_>| {
-            let (channel_name_prefix, channel_prefix_size) = channel
-                .is_category
-                .some((Icon::ListNested, DEF_SIZE - 4))
-                .unwrap_or((Icon::Hash, DEF_SIZE));
+    type Item<'a, 'b> = ((&'b u64, &'b Channel), &'a mut button::State);
+    let process_item = |mut list: Scrollable<'a, Message>, ((channel_id, channel), button_state): Item<'a, '_>| {
+        let read_color = channel.has_unread.then(|| Color::WHITE).unwrap_or(ALT_COLOR);
 
-            let read_color = channel.has_unread.then(|| Color::WHITE).unwrap_or(ALT_COLOR);
+        let mut content_widgets = Vec::with_capacity(5);
+        content_widgets.push(channel_icon(channel));
+        channel
+            .is_category
+            .and_do(|| content_widgets.push(space!(w = SPACING).into()));
+        content_widgets.push(
+            label!(truncate_string(
+                &channel.name,
+                channel.user_perms.manage_channel.then(|| 15).unwrap_or(17)
+            ))
+            .color(read_color)
+            .size(DEF_SIZE - 2)
+            .into(),
+        );
 
-            let mut content_widgets = Vec::with_capacity(7);
-            let icon_content = icon(channel_name_prefix).color(read_color).size(channel_prefix_size);
-            let icon_content = if channel.is_category {
-                Column::with_children(vec![space!(h = SPACING - (SPACING / 4)).into(), icon_content.into()])
-                    .align_items(Align::Center)
-                    .into()
-            } else {
-                icon_content.into()
-            };
-            content_widgets.push(icon_content);
-            channel
-                .is_category
-                .and_do(|| content_widgets.push(space!(w = SPACING).into()));
-            content_widgets.push(
-                label!(truncate_string(
-                    &channel.name,
-                    channel.user_perms.manage_channel.then(|| 15).unwrap_or(17)
-                ))
-                .color(read_color)
-                .size(DEF_SIZE - 2)
-                .into(),
-            );
-            content_widgets.push(space!(w+).into());
-            content_widgets.push(
-                Button::new(copy_state, icon(Icon::Clipboard).size(DEF_SIZE - 8))
-                    .style(theme)
-                    .on_press(Message::CopyIdToClipboard(*channel_id))
-                    .into(),
-            );
+        let mut but = Button::new(
+            button_state,
+            Row::with_children(content_widgets).align_items(Align::Center),
+        )
+        .width(length!(+))
+        .style(theme.secondary());
 
-            if channel.user_perms.manage_channel {
-                content_widgets.push(space!(w = SPACING / 2).into());
-                content_widgets.push(
-                    Button::new(edit_state, icon(Icon::Pencil).size(DEF_SIZE - 8))
-                        .style(theme)
-                        .on_press(Message::ShowUpdateChannelModal(guild_id, *channel_id))
-                        .into(),
-                );
-            }
+        if channel.is_category {
+            but = but.style(theme.embed());
+        } else if current_channel_id != Some(*channel_id) {
+            but = but.on_press(on_button_press(*channel_id));
+        }
 
-            let mut but = Button::new(
-                button_state,
-                Row::with_children(content_widgets).align_items(Align::Center),
-            )
-            .width(length!(+))
-            .style(theme.secondary());
+        list = list.push(but);
 
-            if channel.is_category {
-                but = but.style(theme.embed());
-            } else if current_channel_id != Some(*channel_id) {
-                but = but.on_press(on_button_press(*channel_id));
-            }
+        if channel.is_category {
+            list = list.push(Rule::horizontal(SPACING).style(theme.secondary()));
+        }
 
-            list = list.push(but);
-
-            if channel.is_category {
-                list = list.push(Rule::horizontal(SPACING).style(theme.secondary()));
-            }
-
-            list
-        };
+        list
+    };
 
     let list_init = Scrollable::new(state)
         .style(theme)

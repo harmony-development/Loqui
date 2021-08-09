@@ -131,7 +131,7 @@ impl UpdateChannelModal {
                         |inner| async move {
                             channel::delete_channel(&inner, DeleteChannelRequest { guild_id, channel_id }).await
                         },
-                        |_| TopLevelMessage::main(ParentMessage::UpdateChannelMessage(Message::GoBack)),
+                        |_| TopLevelMessage::guild_settings(ParentMessage::UpdateChannelMessage(Message::GoBack)),
                     ),
                     false,
                 );

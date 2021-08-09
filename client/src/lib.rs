@@ -489,7 +489,6 @@ impl Client {
                             init_fetching: false,
                         },
                     );
-                    guild.update_channel_order(previous_id, next_id, channel_id);
                     post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
                 }
             }
