@@ -110,7 +110,7 @@ impl Tab for MembersTab {
                         Button::new(edit_state, icon(Icon::Pencil))
                             .style(theme)
                             .on_press(ParentMessage::ShowManageUserRoles(member_id)),
-                        "Add role to member",
+                        "Edit member roles",
                         iced::tooltip::Position::Top,
                     )
                     .style(theme)

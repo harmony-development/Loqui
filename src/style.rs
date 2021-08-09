@@ -662,7 +662,11 @@ mod dark {
 
         fn hovered(&self) -> button::Style {
             button::Style {
-                background: ACCENT.into(),
+                background: self
+                    .0
+                    .background_color
+                    .map_or(ACCENT, |c| Color { a: c.a * 0.5, ..c })
+                    .into(),
                 ..self.active()
             }
         }
@@ -720,7 +724,11 @@ mod dark {
 
         fn hovered(&self) -> button::Style {
             button::Style {
-                background: ACCENT.into(),
+                background: self
+                    .0
+                    .background_color
+                    .map_or(ACCENT, |c| Color { a: c.a * 0.5, ..c })
+                    .into(),
                 ..self.active()
             }
         }

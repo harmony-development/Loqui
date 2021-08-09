@@ -340,11 +340,13 @@ impl MainScreen {
                     None,
                 ),
                 |(mut list, last_role_id), (state, (user_id, member))| {
+                    const TRUNCATE_LEN: usize = 10;
+
                     let highest_role = guild.highest_role_for_member(**user_id).map(|(id, role)| (id, role));
                     let sender_name_color = highest_role.map_or(Color::WHITE, |(_, role)| {
                         Color::from_rgb8(role.color.0, role.color.1, role.color.2)
                     });
-                    let mut username = label!(truncate_string(&member.username, 10)).color(sender_name_color);
+                    let mut username = label!(truncate_string(&member.username, TRUNCATE_LEN)).color(sender_name_color);
                     // Set text color to a more dimmed one if the user is offline
                     if matches!(member.status, UserStatus::Offline) {
                         username = username.color(Color {
@@ -385,22 +387,25 @@ impl MainScreen {
                         );
                     }
 
-                    list = list.push(
-                        Tooltip::new(
-                            Button::new(
-                                state,
-                                Row::with_children(content)
-                                    .align_items(Align::Center)
-                                    .padding(PADDING / 3),
-                            )
-                            .style(theme.secondary().border_width(2.0))
-                            .on_press(Message::SelectedMember(**user_id))
-                            .width(length!(+)),
-                            member.username.as_str(),
-                            iced::tooltip::Position::Left,
-                        )
-                        .style(theme),
-                    );
+                    let but = Button::new(
+                        state,
+                        Row::with_children(content)
+                            .align_items(Align::Center)
+                            .padding(PADDING / 3),
+                    )
+                    .style(theme.secondary().border_width(2.0))
+                    .on_press(Message::SelectedMember(**user_id))
+                    .width(length!(+));
+
+                    let elem: Element<Message> = if member.username.chars().count() > TRUNCATE_LEN {
+                        Tooltip::new(but, member.username.as_str(), iced::tooltip::Position::Left)
+                            .style(theme)
+                            .into()
+                    } else {
+                        but.into()
+                    };
+
+                    list = list.push(elem);
 
                     (list, highest_role.map(|(id, _)| *id))
                 },
