@@ -31,13 +31,10 @@ impl Guild {
         update_order(&mut self.roles, previous_id, next_id, role_id)
     }
 
-    pub fn highest_role_for_member(&self, user_id: u64) -> Option<&Role> {
-        self.members.get(&user_id).and_then(|role_ids| {
-            self.roles
-                .iter()
-                .find(|(id, _)| role_ids.contains(id))
-                .map(|(_, role)| role)
-        })
+    pub fn highest_role_for_member(&self, user_id: u64) -> Option<(&u64, &Role)> {
+        self.members
+            .get(&user_id)
+            .and_then(|role_ids| self.roles.iter().find(|(id, role)| role.hoist && role_ids.contains(id)))
     }
 }
 

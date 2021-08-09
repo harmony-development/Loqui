@@ -532,7 +532,7 @@ impl Client {
                 }
 
                 if let Some(guild) = self.get_guild(guild_id) {
-                    guild.members.insert(member_id, Vec::new());
+                    guild.members.entry(member_id).or_default();
                 }
 
                 if !self.members.contains_key(&member_id) {
@@ -671,7 +671,7 @@ impl Client {
                 role_ids,
             }) => {
                 self.get_guild(guild_id).and_do(|g| {
-                    g.members.get_mut(&user_id).and_do(|ids| *ids = role_ids);
+                    g.members.insert(user_id, role_ids);
                 });
             }
             x => tracing::warn!("implement {:?}", x),

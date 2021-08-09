@@ -183,9 +183,11 @@ pub fn build_event_history<'a>(
             }
 
             widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING).into());
-            let sender_name_color = guild.highest_role_for_member(id_to_use).map_or(Color::WHITE, |role| {
-                Color::from_rgb8(role.color.0, role.color.1, role.color.2)
-            });
+            let sender_name_color = guild
+                .highest_role_for_member(id_to_use)
+                .map_or(Color::WHITE, |(_, role)| {
+                    Color::from_rgb8(role.color.0, role.color.1, role.color.2)
+                });
             widgets.push(label_container(
                 label!(sender_display_name)
                     .size(MESSAGE_SENDER_SIZE)

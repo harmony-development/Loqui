@@ -61,7 +61,7 @@ use crate::{
     label, label_button, length,
     screen::{map_send_msg, map_to_nothing, truncate_string, ClientExt, ResultExt},
     space,
-    style::{Theme, ALT_COLOR, AVATAR_WIDTH, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
+    style::{Theme, ALT_COLOR, AVATAR_WIDTH, DEF_SIZE, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
 };
 
 use self::quick_switcher::QuickSwitcherModal;
@@ -331,11 +331,15 @@ impl MainScreen {
 
             // Create the member list
             let member_list = self.members_buts_state.iter_mut().zip(sorted_members.iter()).fold(
-                Scrollable::new(&mut self.members_list_state)
-                    .spacing(SPACING)
-                    .padding(PADDING),
-                |mut list, (state, (user_id, member))| {
-                    let sender_name_color = guild.highest_role_for_member(**user_id).map_or(Color::WHITE, |role| {
+                (
+                    Scrollable::new(&mut self.members_list_state)
+                        .spacing(SPACING)
+                        .padding(PADDING),
+                    None,
+                ),
+                |(mut list, last_role_id), (state, (user_id, member))| {
+                    let highest_role = guild.highest_role_for_member(**user_id).map(|(id, role)| (id, role));
+                    let sender_name_color = highest_role.map_or(Color::WHITE, |(_, role)| {
                         Color::from_rgb8(role.color.0, role.color.1, role.color.2)
                     });
                     let mut username = label!(truncate_string(&member.username, 10)).color(sender_name_color);
@@ -369,6 +373,16 @@ impl MainScreen {
                             .into(),
                     ];
 
+                    if highest_role.is_some() && highest_role.map(|(id, _)| *id) != last_role_id {
+                        list = list.push(
+                            Row::with_children(vec![
+                                label!(highest_role.unwrap().1.name.as_str()).size(DEF_SIZE - 4).into(),
+                                Rule::horizontal(SPACING * 2).style(theme.secondary()).into(),
+                            ])
+                            .align_items(Align::Center),
+                        );
+                    }
+
                     list = list.push(
                         Button::new(state, Row::with_children(content).align_items(Align::Center))
                             .style(theme.secondary())
@@ -376,7 +390,7 @@ impl MainScreen {
                             .width(length!(+)),
                     );
 
-                    list
+                    (list, highest_role.map(|(id, _)| *id))
                 },
             );
 
@@ -544,7 +558,7 @@ impl MainScreen {
                 Container::new(
                     Column::with_children(vec![
                         menu.into(),
-                        member_list.into(),
+                        member_list.0.into(),
                         space!(h+).into(),
                         status_menu.into(),
                     ])
