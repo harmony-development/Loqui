@@ -69,7 +69,7 @@ jobs:
 
     - name: Build
       if: ${{ matrix.os != 'macOS-latest' }}
-      run: cargo build --release
+      run: cargo build --release --features markdown
 
     - name: Artifact macOS
       if: ${{ matrix.os == 'macOS-latest' }}
