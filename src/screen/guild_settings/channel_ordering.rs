@@ -6,6 +6,7 @@ use client::{
     },
     Client,
 };
+use iced::Tooltip;
 use iced_aw::TabLabel;
 
 use crate::{
@@ -134,28 +135,51 @@ impl Tab for OrderingTab {
                 let mut content_widgets = Vec::with_capacity(6);
                 content_widgets.push(channel_icon(channel));
                 content_widgets.push(
-                    label_button!(copy_name_state, channel.name.as_str())
-                        .style(theme)
-                        .on_press(ParentMessage::CopyToClipboard(channel.name.to_string()))
-                        .into(),
+                    Tooltip::new(
+                        label_button!(copy_name_state, channel.name.as_str())
+                            .style(theme)
+                            .on_press(ParentMessage::CopyToClipboard(channel.name.to_string())),
+                        "Click to copy",
+                        iced::tooltip::Position::Top,
+                    )
+                    .style(theme)
+                    .into(),
                 );
                 content_widgets.push(
-                    label_button!(copy_state, format!("ID {}", channel_id))
-                        .style(theme)
-                        .on_press(ParentMessage::CopyIdToClipboard(channel_id))
-                        .into(),
+                    Tooltip::new(
+                        label_button!(copy_state, format!("ID {}", channel_id))
+                            .style(theme)
+                            .on_press(ParentMessage::CopyIdToClipboard(channel_id)),
+                        "Click to copy",
+                        iced::tooltip::Position::Top,
+                    )
+                    .style(theme)
+                    .into(),
                 );
                 content_widgets.push(space!(w+).into());
                 if channel.user_perms.manage_channel {
                     content_widgets.push(
-                        Button::new(edit_state, icon(Icon::Pencil))
-                            .style(theme)
-                            .on_press(ParentMessage::ShowUpdateChannelModal(channel_id))
-                            .into(),
+                        Tooltip::new(
+                            Button::new(edit_state, icon(Icon::Pencil))
+                                .style(theme)
+                                .on_press(ParentMessage::ShowUpdateChannelModal(channel_id)),
+                            "Edit channel",
+                            iced::tooltip::Position::Top,
+                        )
+                        .style(theme)
+                        .into(),
                     );
                 }
-                content_widgets.push(up_but.into());
-                content_widgets.push(down_but.into());
+                content_widgets.push(
+                    Tooltip::new(up_but, "Move up", iced::tooltip::Position::Top)
+                        .style(theme)
+                        .into(),
+                );
+                content_widgets.push(
+                    Tooltip::new(down_but, "Move down", iced::tooltip::Position::Top)
+                        .style(theme)
+                        .into(),
+                );
 
                 channels = channels.push(row(content_widgets));
             }

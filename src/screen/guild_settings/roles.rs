@@ -7,6 +7,7 @@ use client::{
     },
     Client,
 };
+use iced::Tooltip;
 use iced_aw::{color_picker, ColorPicker, TabLabel};
 
 use crate::{
@@ -172,44 +173,81 @@ impl Tab for RolesTab {
 
                 let mut content_widgets = Vec::with_capacity(6);
                 if role.hoist {
-                    content_widgets.push(icon(Icon::List).into());
+                    content_widgets.push(
+                        Tooltip::new(icon(Icon::List), "Hoistable", iced::tooltip::Position::Top)
+                            .style(theme)
+                            .into(),
+                    );
                 }
                 if role.pingable {
-                    content_widgets.push(icon(Icon::At).into());
+                    content_widgets.push(
+                        Tooltip::new(icon(Icon::At), "Pingable", iced::tooltip::Position::Top)
+                            .style(theme)
+                            .into(),
+                    );
                 }
                 let role_color = Color::from_rgb8(role.color.0, role.color.1, role.color.2);
                 content_widgets.push(
-                    Button::new(copy_name_state, label!(role.name.as_str()).color(role_color))
-                        .style(theme)
-                        .on_press(ParentMessage::CopyToClipboard(role.name.to_string()))
-                        .into(),
+                    Tooltip::new(
+                        Button::new(copy_name_state, label!(role.name.as_str()).color(role_color))
+                            .style(theme)
+                            .on_press(ParentMessage::CopyToClipboard(role.name.to_string())),
+                        "Click to copy",
+                        iced::tooltip::Position::Top,
+                    )
+                    .style(theme)
+                    .into(),
                 );
                 content_widgets.push(
-                    label_button!(copy_state, format!("ID {}", role_id))
-                        .style(theme)
-                        .on_press(ParentMessage::CopyIdToClipboard(role_id))
-                        .into(),
+                    Tooltip::new(
+                        label_button!(copy_state, format!("ID {}", role_id))
+                            .style(theme)
+                            .on_press(ParentMessage::CopyIdToClipboard(role_id)),
+                        "Click to copy",
+                        iced::tooltip::Position::Top,
+                    )
+                    .style(theme)
+                    .into(),
                 );
                 content_widgets.push(space!(w+).into());
                 content_widgets.push(
                     ColorPicker::new(
                         color_picker_state,
-                        Button::new(color_but_state, icon(Icon::Brush))
-                            .style(theme)
-                            .on_press(ParentMessage::Roles(RolesMessage::ShowColorPicker(role_index, true))),
+                        Tooltip::new(
+                            Button::new(color_but_state, icon(Icon::Brush))
+                                .style(theme)
+                                .on_press(ParentMessage::Roles(RolesMessage::ShowColorPicker(role_index, true))),
+                            "Pick color",
+                            iced::tooltip::Position::Top,
+                        )
+                        .style(theme),
                         ParentMessage::Roles(RolesMessage::ShowColorPicker(role_index, false)),
                         move |color| ParentMessage::Roles(RolesMessage::SetColor { role_id, color }),
                     )
+                    .style(theme)
                     .into(),
                 );
                 content_widgets.push(
-                    Button::new(edit_state, icon(Icon::Pencil))
+                    Tooltip::new(
+                        Button::new(edit_state, icon(Icon::Pencil))
+                            .style(theme)
+                            .on_press(ParentMessage::ShowEditRoleModal(role_id)),
+                        "Edit role",
+                        iced::tooltip::Position::Top,
+                    )
+                    .style(theme)
+                    .into(),
+                );
+                content_widgets.push(
+                    Tooltip::new(up_but, "Move up", iced::tooltip::Position::Top)
                         .style(theme)
-                        .on_press(ParentMessage::ShowEditRoleModal(role_id))
                         .into(),
                 );
-                content_widgets.push(up_but.into());
-                content_widgets.push(down_but.into());
+                content_widgets.push(
+                    Tooltip::new(down_but, "Move down", iced::tooltip::Position::Top)
+                        .style(theme)
+                        .into(),
+                );
                 roles = roles.push(row(content_widgets));
             }
         }

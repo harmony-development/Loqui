@@ -21,7 +21,7 @@ use client::{
         },
     },
 };
-use iced::Element;
+use iced::{Element, Tooltip};
 use iced_aw::{Icon, TabLabel};
 
 #[derive(Debug, Clone)]
@@ -29,11 +29,12 @@ pub enum InviteMessage {
     InviteNameChanged(String),
     InviteUsesChanged(String),
     CreateInvitePressed,
-    InviteCreated((String, i32)),
+    InviteCreated(String, i32),
     InvitesLoaded(Vec<Invite>),
     GoBack,
     DeleteInvitePressed(usize),
     InviteDeleted(usize),
+    CopyToClipboard(String),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -45,7 +46,7 @@ pub struct InviteTab {
     create_invite_but_state: button::State,
     invite_list_state: scrollable::State,
     back_but_state: button::State,
-    delete_invite_but_states: Vec<button::State>,
+    but_states: Vec<(button::State, button::State)>,
     pub error_message: String,
 }
 
@@ -56,6 +57,7 @@ impl InviteTab {
         client: &Client,
         meta_data: &mut GuildMetadata,
         guild_id: u64,
+        clip: &mut iced::Clipboard,
     ) -> Command<TopLevelMessage> {
         match message {
             InviteMessage::InviteNameChanged(s) => {
@@ -80,7 +82,7 @@ impl InviteTab {
                         };
                         let name = create_invite(&inner, request).await?.name;
                         Ok(TopLevelMessage::guild_settings(ParentMessage::Invite(
-                            InviteMessage::InviteCreated((name, uses)),
+                            InviteMessage::InviteCreated(name, uses),
                         )))
                     },
                     identity,
@@ -91,7 +93,7 @@ impl InviteTab {
                 // is selected
                 meta_data.invites = Some(invites);
             }
-            InviteMessage::InviteCreated((name, uses)) => {
+            InviteMessage::InviteCreated(name, uses) => {
                 let new_invite = Invite {
                     invite_id: name,
                     possible_uses: uses,
@@ -124,6 +126,7 @@ impl InviteTab {
             InviteMessage::InviteDeleted(n) => {
                 meta_data.invites.as_mut().unwrap().remove(n);
             }
+            InviteMessage::CopyToClipboard(string) => clip.write(string),
         }
 
         Command::none()
@@ -179,18 +182,26 @@ impl Tab for InviteTab {
                 .as_str(),
             )
             .unwrap();
-            self.delete_invite_but_states
-                .resize_with(invites.len(), Default::default);
+            self.but_states.resize_with(invites.len(), Default::default);
             let mut invites_scrollable = Scrollable::new(&mut self.invite_list_state)
                 .style(theme)
                 .align_items(Align::Center);
             // Create each line of the invite list
-            for (n, (cur_invite, del_but_state)) in
-                invites.iter().zip(self.delete_invite_but_states.iter_mut()).enumerate()
+            for (n, (cur_invite, (del_but_state, copy_url_state))) in
+                invites.iter().zip(self.but_states.iter_mut()).enumerate()
             {
                 url.set_path(&cur_invite.invite_id);
                 invites_scrollable = invites_scrollable.push(row(vec![
-                    label!(url.as_str()).width(length!(% 19)).into(),
+                    Tooltip::new(
+                        label_button!(copy_url_state, url.as_str())
+                            .on_press(InviteMessage::CopyToClipboard(url.to_string()))
+                            .style(theme)
+                            .width(length!(% 19)),
+                        "Click to copy",
+                        iced::tooltip::Position::Top,
+                    )
+                    .style(theme)
+                    .into(),
                     space!(w % 22).into(),
                     label!(cur_invite.possible_uses.to_string()).width(length!(% 3)).into(),
                     space!(w % 3).into(),

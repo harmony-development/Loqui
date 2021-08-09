@@ -20,6 +20,7 @@ use client::{
     error::{ClientError, ClientResult},
     harmony_rust_sdk::client::api::chat::guild::{update_guild_information, UpdateGuildInformation},
 };
+use iced::Tooltip;
 use iced_aw::Icon;
 
 #[derive(Debug, Clone)]
@@ -164,11 +165,16 @@ impl Tab for GeneralTab {
         );
 
         let ui_image_but = Element::from(
-            Button::new(&mut self.icon_edit_but_state, ui_update_guild_icon)
-                .on_press(GeneralMessage::UploadGuildImage)
-                .height(length!(= PROFILE_AVATAR_WIDTH))
-                .width(length!(= PROFILE_AVATAR_WIDTH))
-                .style(theme),
+            Tooltip::new(
+                Button::new(&mut self.icon_edit_but_state, ui_update_guild_icon)
+                    .on_press(GeneralMessage::UploadGuildImage)
+                    .height(length!(= PROFILE_AVATAR_WIDTH))
+                    .width(length!(= PROFILE_AVATAR_WIDTH))
+                    .style(theme),
+                "Click to upload a new image",
+                iced::tooltip::Position::Top,
+            )
+            .style(theme),
         )
         .map(ParentMessage::General);
         let back = Element::from(
@@ -187,14 +193,24 @@ impl Tab for GeneralTab {
         }
         content.push(
             row(vec![
-                label_button!(&mut self.name_but_state, &guild.name)
-                    .on_press(ParentMessage::CopyToClipboard(guild.name.clone()))
-                    .style(theme)
-                    .into(),
-                label_button!(&mut self.id_but_state, format!("ID {}", guild_id))
-                    .on_press(ParentMessage::CopyIdToClipboard(guild_id))
-                    .style(theme)
-                    .into(),
+                Tooltip::new(
+                    label_button!(&mut self.name_but_state, &guild.name)
+                        .on_press(ParentMessage::CopyToClipboard(guild.name.clone()))
+                        .style(theme),
+                    "Click to copy",
+                    iced::tooltip::Position::Top,
+                )
+                .style(theme)
+                .into(),
+                Tooltip::new(
+                    label_button!(&mut self.id_but_state, format!("ID {}", guild_id))
+                        .on_press(ParentMessage::CopyIdToClipboard(guild_id))
+                        .style(theme),
+                    "Click to copy",
+                    iced::tooltip::Position::Top,
+                )
+                .style(theme)
+                .into(),
             ])
             .into(),
         );

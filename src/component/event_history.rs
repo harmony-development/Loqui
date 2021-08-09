@@ -30,7 +30,7 @@ use client::{
     smol_str::SmolStr,
     OptionExt,
 };
-use iced::Font;
+use iced::{Font, Tooltip};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 pub type EventHistoryButsState = [(
@@ -436,14 +436,26 @@ pub fn build_event_history<'a>(
         message_row.push(space!(w+).into());
 
         if let Some(id) = message.id.id() {
-            let but = Button::new(reply_but_state, icon(Icon::Reply).size(MESSAGE_SIZE - 10))
-                .on_press(Message::ReplyToMessage(id))
-                .style(theme.secondary());
+            let but = Tooltip::new(
+                Button::new(reply_but_state, icon(Icon::Reply).size(MESSAGE_SIZE - 10))
+                    .on_press(Message::ReplyToMessage(id))
+                    .style(theme.secondary()),
+                "Reply to message",
+                iced::tooltip::Position::Top,
+            )
+            .size(MESSAGE_SIZE - 2)
+            .style(theme);
             message_row.push(but.into());
             if msg_text.is_some() && current_user_id == message.sender {
-                let but = Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 10))
-                    .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
-                    .style(theme.secondary());
+                let but = Tooltip::new(
+                    Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 10))
+                        .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
+                        .style(theme.secondary()),
+                    "Edit message",
+                    iced::tooltip::Position::Top,
+                )
+                .size(MESSAGE_SIZE - 2)
+                .style(theme);
                 message_row.push(but.into());
             }
         }

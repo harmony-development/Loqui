@@ -147,7 +147,7 @@ impl GuildSettings {
             Message::Invite(message) => {
                 return self
                     .invite_tab
-                    .update(message, client, &mut self.meta_data, self.guild_id)
+                    .update(message, client, &mut self.meta_data, self.guild_id, clip)
             }
             Message::Ordering(message) => {
                 return self

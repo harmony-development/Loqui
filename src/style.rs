@@ -3,7 +3,7 @@ use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::UserStatus}
 use iced::{
     button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color,
 };
-use iced_aw::{number_input, tabs};
+use iced_aw::{number_input, style, tabs};
 
 pub const DEF_SIZE: u16 = 20;
 pub const MESSAGE_TIMESTAMP_SIZE: u16 = 14;
@@ -234,6 +234,12 @@ impl From<Theme> for Box<dyn number_input::StyleSheet> {
     }
 }
 
+impl From<Theme> for Box<dyn style::color_picker::StyleSheet> {
+    fn from(theme: Theme) -> Self {
+        theme.dark.map_or_default(|| dark::ColorPicker.into())
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct OverrideStyle {
     border_color: Option<Color>,
@@ -333,7 +339,7 @@ mod dark {
         Background, Color,
     };
     use iced_aw::tabs::Style;
-    use iced_aw::{card, modal, number_input, tabs};
+    use iced_aw::{card, modal, number_input, style, tabs};
 
     use super::OverrideStyle;
 
@@ -343,6 +349,38 @@ mod dark {
     const ACCENT: Color = color!(0x00, 0x8F, 0xCF); // 00BFFF
     const DISABLED_TEXT: Color = color!(0xDD, 0xDD, 0xDD);
     const TEXT_COLOR: Color = color!(0xEE, 0xEE, 0xEE);
+
+    pub struct ColorPicker;
+
+    impl style::color_picker::StyleSheet for ColorPicker {
+        fn active(&self) -> style::color_picker::Style {
+            style::color_picker::Style {
+                background: DARK_BG.into(),
+                border_radius: 15.0,
+                border_width: 1.0,
+                border_color: ACCENT,
+                bar_border_radius: 5.0,
+                bar_border_width: 1.0,
+                bar_border_color: ACCENT,
+            }
+        }
+
+        fn selected(&self) -> style::color_picker::Style {
+            style::color_picker::Style { ..self.active() }
+        }
+
+        fn hovered(&self) -> style::color_picker::Style {
+            style::color_picker::Style { ..self.active() }
+        }
+
+        fn focused(&self) -> style::color_picker::Style {
+            style::color_picker::Style {
+                border_color: Color::from_rgb(0.5, 0.5, 0.5),
+                bar_border_color: Color::from_rgb(0.5, 0.5, 0.5),
+                ..self.active()
+            }
+        }
+    }
 
     pub struct NumberInput;
 

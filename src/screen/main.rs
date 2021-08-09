@@ -39,7 +39,7 @@ use client::{
     tracing::error,
     IndexMap, OptionExt,
 };
-use iced::futures::future::ready;
+use iced::{futures::future::ready, Tooltip};
 use iced_aw::{modal, Modal};
 
 use chan_guild_list::build_guild_list;
@@ -384,10 +384,15 @@ impl MainScreen {
                     }
 
                     list = list.push(
-                        Button::new(state, Row::with_children(content).align_items(Align::Center))
-                            .style(theme.secondary())
-                            .on_press(Message::SelectedMember(**user_id))
-                            .width(length!(+)),
+                        Tooltip::new(
+                            Button::new(state, Row::with_children(content).align_items(Align::Center))
+                                .style(theme.secondary())
+                                .on_press(Message::SelectedMember(**user_id))
+                                .width(length!(+)),
+                            member.username.as_str(),
+                            iced::tooltip::Position::Left,
+                        )
+                        .style(theme),
                     );
 
                     (list, highest_role.map(|(id, _)| *id))
@@ -490,12 +495,17 @@ impl MainScreen {
                 ])
                 .height(length!(= 14));
 
-                let send_file_button = Button::new(
-                    &mut self.send_file_but_state,
-                    icon(Icon::Upload).size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                let send_file_button = Tooltip::new(
+                    Button::new(
+                        &mut self.send_file_but_state,
+                        icon(Icon::Upload).size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                    )
+                    .style(theme.secondary())
+                    .on_press(Message::SendFiles { guild_id, channel_id }),
+                    "Click to upload a file",
+                    iced::tooltip::Position::Top,
                 )
-                .style(theme.secondary())
-                .on_press(Message::SendFiles { guild_id, channel_id });
+                .style(theme);
 
                 let message_composer = if channel.user_perms.send_msg {
                     match self.mode {
@@ -524,12 +534,17 @@ impl MainScreen {
 
                 if channel.looking_at_message < channel.messages.len().saturating_sub(SHOWN_MSGS_LIMIT) {
                     bottom_area_widgets.push(
-                        Button::new(
-                            &mut self.scroll_to_bottom_but_state,
-                            icon(Icon::ArrowDown).size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                        Tooltip::new(
+                            Button::new(
+                                &mut self.scroll_to_bottom_but_state,
+                                icon(Icon::ArrowDown).size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                            )
+                            .style(theme.secondary())
+                            .on_press(Message::ScrollToBottom(channel_id)),
+                            "Scroll to bottom",
+                            iced::tooltip::Position::Top,
                         )
-                        .style(theme.secondary())
-                        .on_press(Message::ScrollToBottom(channel_id))
+                        .style(theme)
                         .into(),
                     );
                 }
