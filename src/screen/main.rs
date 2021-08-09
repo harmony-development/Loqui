@@ -39,7 +39,7 @@ use client::{
     tracing::error,
     IndexMap, OptionExt,
 };
-use iced::{futures::future::ready, Tooltip};
+use iced::{futures::future::ready, rule::FillMode, Tooltip};
 use iced_aw::{modal, Modal};
 
 use chan_guild_list::build_guild_list;
@@ -287,6 +287,7 @@ impl MainScreen {
             Message::SelectedAppMenuOption,
         )
         .width(length!(+))
+        .padding(PADDING / 2)
         .style(theme);
 
         let status_menu = PickList::new(
@@ -302,6 +303,7 @@ impl MainScreen {
             Message::ChangeUserStatus,
         )
         .width(length!(+))
+        .padding(PADDING / 2)
         .style(theme);
 
         if let Some((guild, guild_id)) = self
@@ -369,7 +371,7 @@ impl MainScreen {
                         fill_container(pfp)
                             .width(len)
                             .height(len)
-                            .style(theme.round().border_color(status_color))
+                            .style(theme.border_width(2.5).border_color(status_color))
                             .into(),
                     ];
 
@@ -385,10 +387,15 @@ impl MainScreen {
 
                     list = list.push(
                         Tooltip::new(
-                            Button::new(state, Row::with_children(content).align_items(Align::Center))
-                                .style(theme.secondary())
-                                .on_press(Message::SelectedMember(**user_id))
-                                .width(length!(+)),
+                            Button::new(
+                                state,
+                                Row::with_children(content)
+                                    .align_items(Align::Center)
+                                    .padding(PADDING / 3),
+                            )
+                            .style(theme.secondary().border_width(2.0))
+                            .on_press(Message::SelectedMember(**user_id))
+                            .width(length!(+)),
                             member.username.as_str(),
                             iced::tooltip::Position::Left,
                         )
@@ -409,6 +416,7 @@ impl MainScreen {
                 Message::SelectedGuildMenuOption,
             )
             .width(length!(+))
+            .padding(PADDING / 2)
             .style(theme);
 
             self.channels_buts_state
@@ -430,7 +438,7 @@ impl MainScreen {
 
             screen_widgets.push(
                 Container::new(Column::with_children(vec![channel_menu.into(), channels_list]))
-                    .width(length!(= 200))
+                    .width(length!(= 220))
                     .height(length!(+))
                     .style(theme)
                     .into(),
@@ -455,46 +463,6 @@ impl MainScreen {
                     theme,
                 );
 
-                let typing_names = sorted_members
-                    .iter()
-                    .flat_map(|(id, member)| {
-                        // Remove own user id from the list (if its there)
-                        if **id == current_user_id {
-                            return None;
-                        }
-
-                        member
-                            .typing_in_channel
-                            .and_then(|(g, c, _)| (g == guild_id && c == channel_id).then(|| member.username.as_str()))
-                    })
-                    .collect::<Vec<_>>();
-                let typing_members_count = typing_names.len();
-                let typing_users_combined =
-                    typing_names
-                        .iter()
-                        .enumerate()
-                        .fold(String::new(), |mut comb, (index, name)| {
-                            comb += name;
-
-                            comb += match typing_members_count {
-                                x if x > index + 1 => ", ",
-                                1 => " is typing...",
-                                _ => " are typing...",
-                            };
-
-                            comb
-                        });
-
-                let typing_users = Column::with_children(vec![
-                    space!(w = 6).into(),
-                    Row::with_children(vec![
-                        space!(w = 9).into(),
-                        label!(typing_users_combined).size(14).into(),
-                    ])
-                    .into(),
-                ])
-                .height(length!(= 14));
-
                 let send_file_button = Tooltip::new(
                     Button::new(
                         &mut self.send_file_but_state,
@@ -517,7 +485,7 @@ impl MainScreen {
                         )
                         .padding((PADDING / 4) * 3)
                         .size(MESSAGE_SIZE)
-                        .style(theme.secondary())
+                        .style(theme.secondary().border_width(2.0))
                         .on_submit(Message::SendMessageComposer { guild_id, channel_id })
                         .width(length!(+))
                         .into(),
@@ -526,7 +494,7 @@ impl MainScreen {
                     fill_container(label!("You don't have permission to send a message here"))
                         .padding((PADDING / 4) * 3)
                         .height(length!(-))
-                        .style(theme)
+                        .style(theme.border_width(0.0))
                         .into()
                 };
 
@@ -549,9 +517,57 @@ impl MainScreen {
                     );
                 }
 
-                let message_area = Column::with_children(vec![
-                    message_history_list,
-                    typing_users.into(),
+                let mut message_area_widgets = Vec::with_capacity(4);
+                message_area_widgets.push(message_history_list);
+                message_area_widgets.push(
+                    Rule::horizontal(0)
+                        .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
+                        .into(),
+                );
+
+                let typing_names = sorted_members
+                    .iter()
+                    .flat_map(|(id, member)| {
+                        // Remove own user id from the list (if its there)
+                        if **id == current_user_id {
+                            return None;
+                        }
+
+                        member
+                            .typing_in_channel
+                            .and_then(|(g, c, _)| (g == guild_id && c == channel_id).then(|| member.username.as_str()))
+                    })
+                    .collect::<Vec<_>>();
+                if !typing_names.is_empty() {
+                    let typing_members_count = typing_names.len();
+                    let typing_users_combined =
+                        typing_names
+                            .iter()
+                            .enumerate()
+                            .fold(String::new(), |mut comb, (index, name)| {
+                                comb += name;
+
+                                comb += match typing_members_count {
+                                    x if x > index + 1 => ", ",
+                                    1 => " is typing...",
+                                    _ => " are typing...",
+                                };
+
+                                comb
+                            });
+
+                    let typing_users = Column::with_children(vec![
+                        space!(w = 6).into(),
+                        Row::with_children(vec![
+                            space!(w = 9).into(),
+                            label!(typing_users_combined).size(14).into(),
+                        ])
+                        .into(),
+                    ])
+                    .height(length!(= 14));
+                    message_area_widgets.push(typing_users.into());
+                }
+                message_area_widgets.push(
                     Container::new(
                         Row::with_children(bottom_area_widgets)
                             .spacing(SPACING * 2)
@@ -560,7 +576,9 @@ impl MainScreen {
                     .width(length!(+))
                     .padding(PADDING / 2)
                     .into(),
-                ]);
+                );
+
+                let message_area = Column::with_children(message_area_widgets);
 
                 screen_widgets.push(fill_container(message_area).style(theme).into());
             } else {
@@ -580,7 +598,7 @@ impl MainScreen {
                     .width(length!(+))
                     .height(length!(+)),
                 )
-                .width(length!(= 200))
+                .width(length!(= 220))
                 .height(length!(+))
                 .style(theme)
                 .into(),
@@ -596,7 +614,7 @@ impl MainScreen {
                         .width(length!(+))
                         .height(length!(+)),
                 )
-                .width(length!(= 200))
+                .width(length!(= 220))
                 .height(length!(+))
                 .style(theme)
                 .into(),
@@ -715,8 +733,8 @@ impl MainScreen {
 
                 if let Some(channel) = client.get_channel(guild_id, channel_id) {
                     if let Some(pos) = channel.messages.iter().position(|(id, _)| message_id.eq(id)) {
-                        channel.looking_at_message = pos.saturating_sub(SHOWN_MSGS_LIMIT);
-                        self.event_history_state.snap_to(1.0);
+                        channel.looking_at_message = pos;
+                        self.event_history_state.snap_to(0.0);
                     }
                 }
             }
@@ -886,6 +904,9 @@ impl MainScreen {
                 if let (Mode::EditingMessage(_), Mode::Normal) = (self.mode, mode) {
                     self.composer_state.unfocus();
                     self.message.clear();
+                }
+                if let (Mode::Normal, Mode::Normal) = (self.mode, mode) {
+                    self.error_text.clear();
                 }
                 self.mode = mode;
             }

@@ -2,6 +2,7 @@ use client::{
     error::ClientError,
     harmony_rust_sdk::client::api::chat::profile::{profile_update, ProfileUpdate},
 };
+use iced::Tooltip;
 use iced_aw::Card;
 
 use crate::{
@@ -66,15 +67,25 @@ impl ProfileEditModal {
             } else {
                 user_profile.username.clone()
             };
-            let user_id = Button::new(
-                &mut self.userid_but_state,
-                label!(format!("ID {}", self.user_id)).size(DEF_SIZE - 4),
+            let user_id = Tooltip::new(
+                Button::new(
+                    &mut self.userid_but_state,
+                    label!(format!("ID {}", self.user_id)).size(DEF_SIZE - 4),
+                )
+                .on_press(Message::CopyId)
+                .style(theme),
+                "Click to copy",
+                iced::tooltip::Position::Bottom,
             )
-            .on_press(Message::CopyId)
             .style(theme);
-            let username = Button::new(&mut self.username_but_state, label!(username_text).size(DEF_SIZE + 12))
-                .on_press(Message::CopyUsername(user_profile.username.to_string()))
-                .style(theme);
+            let username = Tooltip::new(
+                Button::new(&mut self.username_but_state, label!(username_text).size(DEF_SIZE + 12))
+                    .on_press(Message::CopyUsername(user_profile.username.to_string()))
+                    .style(theme),
+                "Click to copy",
+                iced::tooltip::Position::Top,
+            )
+            .style(theme);
             let mut profile_widgets = Vec::with_capacity(4);
             profile_widgets.push(
                 avatar_but

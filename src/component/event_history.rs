@@ -27,14 +27,15 @@ use client::{
     guild::Guild,
     harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
     message::MessageId,
+    render_text,
     smol_str::SmolStr,
     OptionExt,
 };
-use iced::{Font, Tooltip};
+use iced::{rule::FillMode, Font, Tooltip};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 pub type EventHistoryButsState = [(
-    button::State,
+    Vec<button::State>,
     button::State,
     button::State,
     button::State,
@@ -69,8 +70,7 @@ pub fn build_event_history<'a>(
         .height(length!(+))
         .style(theme)
         .align_items(Align::Start)
-        .spacing(SPACING * 2)
-        .padding(PADDING);
+        .spacing(SPACING * 2);
 
     let timeline_range_end = looking_at_message
         .saturating_add(SHOWN_MSGS_LIMIT)
@@ -96,19 +96,28 @@ pub fn build_event_history<'a>(
     let mut message_group = Vec::with_capacity(SHOWN_MSGS_LIMIT);
 
     let push_to_msg_group = |msg_group: &mut Vec<Element<'a, Message>>| {
-        let mut content = Vec::with_capacity(msg_group.len() + 1);
+        let mut content = Vec::with_capacity(msg_group.len());
         content.append(msg_group);
-        content.push(space!(h = PADDING / 4).into());
-
-        Column::with_children(content)
+        let content = Column::with_children(content)
+            .padding(PADDING)
             .spacing(SPACING)
-            .align_items(Align::Start)
+            .align_items(Align::Start);
+
+        Column::with_children(vec![
+            content.into(),
+            space!(h = PADDING / 4).into(),
+            Rule::horizontal(0)
+                .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
+                .into(),
+        ])
+        .spacing(SPACING)
+        .align_items(Align::Start)
     };
 
     for (
         message,
         (
-            media_open_button_state,
+            media_open_button_states,
             h_embed_but,
             f_embed_but,
             edit_but_state,
@@ -157,7 +166,7 @@ pub fn build_event_history<'a>(
             let mut widgets = Vec::with_capacity(7);
             let label_container = |label| {
                 Container::new(label)
-                    .style(theme.secondary().round().border_width(0.0))
+                    .style(theme.secondary())
                     .padding([PADDING / 2, PADDING / 2])
                     .center_x()
                     .center_y()
@@ -178,7 +187,7 @@ pub fn build_event_history<'a>(
 
             {
                 const LEN: Length = length!(= AVATAR_WIDTH);
-                let theme = theme.round().border_color(status_color);
+                let theme = theme.border_width(2.5).border_color(status_color);
                 widgets.push(fill_container(pfp).width(LEN).height(LEN).style(theme).into());
             }
 
@@ -234,12 +243,7 @@ pub fn build_event_history<'a>(
                     .size(DATE_SEPERATOR_SIZE)
                     .color(color!(153, 153, 153)),
             )
-            .height(length!(-))
-            .width(length!(-));
-            let rule = || Rule::horizontal(SPACING).style(theme);
-            let date_time_seperator =
-                Row::with_children(vec![rule().into(), date_time_seperator.into(), rule().into()])
-                    .align_items(Align::Center);
+            .height(length!(-));
 
             event_history = event_history.push(push_to_msg_group(&mut message_group));
             event_history = event_history.push(date_time_seperator);
@@ -368,7 +372,8 @@ pub fn build_event_history<'a>(
         }
 
         if let IcyContent::Files(attachments) = &message.content {
-            if let Some(attachment) = attachments.first() {
+            media_open_button_states.resize_with(attachments.len(), Default::default);
+            for (attachment, media_open_button_state) in attachments.iter().zip(media_open_button_states.iter_mut()) {
                 let is_thumbnail = matches!(attachment.kind.split('/').next(), Some("image"));
                 let does_content_exist = content_store.content_exists(&attachment.id);
 
@@ -474,7 +479,8 @@ pub fn build_event_history<'a>(
 
             let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
             let content = label!(match &reply_message.content {
-                IcyContent::Text(text) => truncate_string(&text.replace('\n', " "), 40).to_string(),
+                IcyContent::Text(text) =>
+                    truncate_string(&render_text(&text.replace('\n', " "), members), 40).to_string(),
                 IcyContent::Files(files) => {
                     let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
                         names.push_str(", ");

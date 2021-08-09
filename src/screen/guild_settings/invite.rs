@@ -200,6 +200,7 @@ impl Tab for InviteTab {
                         "Click to copy",
                         iced::tooltip::Position::Top,
                     )
+                    .gap(PADDING / 3)
                     .style(theme)
                     .into(),
                     space!(w % 22).into(),

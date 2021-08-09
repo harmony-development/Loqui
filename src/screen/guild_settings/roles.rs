@@ -190,7 +190,7 @@ impl Tab for RolesTab {
                 content_widgets.push(
                     Tooltip::new(
                         Button::new(copy_name_state, label!(role.name.as_str()).color(role_color))
-                            .style(theme)
+                            .style(theme.background_color(Color { a: 0.2, ..role_color }))
                             .on_press(ParentMessage::CopyToClipboard(role.name.to_string())),
                         "Click to copy",
                         iced::tooltip::Position::Top,

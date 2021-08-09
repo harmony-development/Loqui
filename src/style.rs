@@ -16,7 +16,7 @@ pub const SPACING: u16 = 4;
 
 pub const ERROR_COLOR: Color = color!(. 1.0, 0.0, 0.0);
 pub const SUCCESS_COLOR: Color = color!(. 0.0, 1.0, 0.0);
-pub const ALT_COLOR: Color = color!(. 0.5, 0.5, 0.5);
+pub const ALT_COLOR: Color = color!(. 0.65, 0.65, 0.65);
 
 pub const AVATAR_WIDTH: u16 = 44;
 pub const PROFILE_AVATAR_WIDTH: u16 = 96;
@@ -90,6 +90,11 @@ impl Theme {
         self.overrides.background_color = Some(color);
         self
     }
+
+    pub fn padded(mut self, pad: rule::FillMode) -> Self {
+        self.overrides.padded = Some(pad);
+        self
+    }
 }
 
 impl Default for Theme {
@@ -156,11 +161,11 @@ impl From<Theme> for Box<dyn button::StyleSheet> {
     fn from(theme: Theme) -> Self {
         if theme.dark {
             if theme.secondary {
-                dark::DarkButton.into()
+                dark::DarkButton(theme.overrides).into()
             } else if theme.embed {
-                dark::EmbedButton.into()
+                dark::EmbedButton(theme.overrides).into()
             } else {
-                dark::Button.into()
+                dark::Button(theme.overrides).into()
             }
         } else {
             light::Button.into()
@@ -202,9 +207,9 @@ impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
         theme.dark.map_or_default(|| {
             if theme.secondary {
-                dark::RuleBright.into()
+                dark::RuleBright(theme.overrides).into()
             } else {
-                dark::Rule.into()
+                dark::Rule(theme.overrides).into()
             }
         })
     }
@@ -241,11 +246,12 @@ impl From<Theme> for Box<dyn style::color_picker::StyleSheet> {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct OverrideStyle {
+pub struct OverrideStyle {
     border_color: Option<Color>,
     border_radius: Option<f32>,
     border_width: Option<f32>,
     background_color: Option<Color>,
+    padded: Option<rule::FillMode>,
 }
 
 impl OverrideStyle {
@@ -343,12 +349,13 @@ mod dark {
 
     use super::OverrideStyle;
 
-    const DARK_BG: Color = color!(0x0A, 0x0D, 0x13);
-    const BRIGHT_BG: Color = color!(0x16, 0x19, 0x1F);
-    const DISABLED: Color = color!(0x26, 0x29, 0x2F);
-    const ACCENT: Color = color!(0x00, 0x8F, 0xCF); // 00BFFF
-    const DISABLED_TEXT: Color = color!(0xDD, 0xDD, 0xDD);
-    const TEXT_COLOR: Color = color!(0xEE, 0xEE, 0xEE);
+    const DARKER: Color = color!(0x14, 0x14, 0x11);
+    const DARK_BG: Color = color!(0x1b, 0x1b, 0x18);
+    const BRIGHT_BG: Color = color!(0x26, 0x26, 0x22);
+    const DISABLED: Color = color!(0x67, 0x30, 0x28);
+    const ACCENT: Color = color!(0xaa, 0x50, 0x42);
+    const DISABLED_TEXT: Color = color!(0xe2, 0xc9, 0x9f);
+    const TEXT_COLOR: Color = color!(0xf2, 0xee, 0xd3);
 
     pub struct ColorPicker;
 
@@ -358,10 +365,10 @@ mod dark {
                 background: DARK_BG.into(),
                 border_radius: 15.0,
                 border_width: 1.0,
-                border_color: ACCENT,
+                border_color: DARKER,
                 bar_border_radius: 5.0,
                 bar_border_width: 1.0,
-                bar_border_color: ACCENT,
+                bar_border_color: DARKER,
             }
         }
 
@@ -465,14 +472,14 @@ mod dark {
             card::Style {
                 background: DARK_BG.into(),
                 head_background: BRIGHT_BG.into(),
-                border_color: BRIGHT_BG,
+                border_color: DARKER,
                 foot_background: DARK_BG.into(),
                 body_text_color: TEXT_COLOR,
                 foot_text_color: TEXT_COLOR,
                 head_text_color: TEXT_COLOR,
                 close_color: TEXT_COLOR,
-                border_width: 0.0,
-                border_radius: 6.0,
+                border_width: 2.0,
+                border_radius: 0.0,
                 ..Default::default()
             }
         }
@@ -495,7 +502,9 @@ mod dark {
             self.0.container(container::Style {
                 background: DARK_BG.into(),
                 text_color: Some(TEXT_COLOR),
-                ..container::Style::default()
+                border_color: DARKER,
+                border_width: 1.5,
+                border_radius: 0.0,
             })
         }
     }
@@ -505,7 +514,7 @@ mod dark {
     impl container::StyleSheet for RoundContainer {
         fn style(&self) -> container::Style {
             self.0.container(container::Style {
-                border_color: DARK_BG,
+                border_color: DARKER,
                 border_radius: 8.0,
                 border_width: 2.0,
                 ..Container(self.0).style()
@@ -602,9 +611,9 @@ mod dark {
         fn active(&self) -> text_input::Style {
             text_input::Style {
                 background: BRIGHT_BG.into(),
-                border_radius: 8.0,
-                border_width: 0.0,
-                border_color: ACCENT,
+                border_radius: 0.0,
+                border_width: 1.0,
+                border_color: DARKER,
             }
         }
 
@@ -637,13 +646,15 @@ mod dark {
         }
     }
 
-    pub struct DarkButton;
+    pub struct DarkButton(pub OverrideStyle);
 
     impl button::StyleSheet for DarkButton {
         fn active(&self) -> button::Style {
             button::Style {
-                background: DARK_BG.into(),
-                border_radius: 8.0,
+                background: self.0.background_color.unwrap_or(DARK_BG).into(),
+                border_color: self.0.border_color.unwrap_or(DARKER),
+                border_radius: self.0.border_radius.unwrap_or(0.0),
+                border_width: self.0.border_width.unwrap_or(1.0),
                 text_color: TEXT_COLOR,
                 ..button::Style::default()
             }
@@ -673,33 +684,35 @@ mod dark {
         }
     }
 
-    pub struct EmbedButton;
+    pub struct EmbedButton(pub OverrideStyle);
 
     impl button::StyleSheet for EmbedButton {
         fn active(&self) -> button::Style {
-            DarkButton.active()
+            DarkButton(self.0).active()
         }
 
         fn hovered(&self) -> button::Style {
-            DarkButton.hovered()
+            DarkButton(self.0).hovered()
         }
 
         fn pressed(&self) -> button::Style {
-            DarkButton.pressed()
+            DarkButton(self.0).pressed()
         }
 
         fn disabled(&self) -> button::Style {
-            DarkButton.active()
+            DarkButton(self.0).active()
         }
     }
 
-    pub struct Button;
+    pub struct Button(pub OverrideStyle);
 
     impl button::StyleSheet for Button {
         fn active(&self) -> button::Style {
             button::Style {
-                background: BRIGHT_BG.into(),
-                border_radius: 8.0,
+                background: self.0.background_color.unwrap_or(BRIGHT_BG).into(),
+                border_color: self.0.border_color.unwrap_or(DARKER),
+                border_radius: self.0.border_radius.unwrap_or(0.0),
+                border_width: self.0.border_width.unwrap_or(1.0),
                 text_color: TEXT_COLOR,
                 ..button::Style::default()
             }
@@ -868,9 +881,9 @@ mod dark {
             pick_list::Style {
                 background: DARK_BG.into(),
                 text_color: TEXT_COLOR,
-                border_width: 8.0,
-                border_radius: 8.0,
-                border_color: DARK_BG,
+                border_width: 1.5,
+                border_radius: 0.0,
+                border_color: DARKER,
                 ..pick_list::Style::default()
             }
         }
@@ -884,26 +897,26 @@ mod dark {
         }
     }
 
-    pub struct Rule;
+    pub struct Rule(pub OverrideStyle);
 
     impl rule::StyleSheet for Rule {
         fn style(&self) -> rule::Style {
             rule::Style {
-                color: DARK_BG,
-                width: 3,
-                radius: 8.0,
-                fill_mode: rule::FillMode::Padded(10),
+                color: self.0.background_color.unwrap_or(DARKER),
+                width: self.0.border_width.unwrap_or(3.0) as u16,
+                radius: self.0.border_radius.unwrap_or(8.0),
+                fill_mode: self.0.padded.unwrap_or(rule::FillMode::Padded(10)),
             }
         }
     }
 
-    pub struct RuleBright;
+    pub struct RuleBright(pub OverrideStyle);
 
     impl rule::StyleSheet for RuleBright {
         fn style(&self) -> rule::Style {
             rule::Style {
-                color: BRIGHT_BG,
-                ..Rule.style()
+                color: self.0.background_color.unwrap_or(BRIGHT_BG),
+                ..Rule(self.0).style()
             }
         }
     }

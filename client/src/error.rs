@@ -71,7 +71,12 @@ impl Display for ClientError {
                 {
                     match Error::decode(raw_error.clone()) {
                         Ok(err) => {
-                            write!(fmt, "API error: {} | {}", err.identifier, err.human_message)
+                            write!(
+                                fmt,
+                                "API error: {} | {}",
+                                err.identifier.replace('\n', " "),
+                                err.human_message.replace('\n', " ")
+                            )
                         }
                         Err(_) => {
                             write!(

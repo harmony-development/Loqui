@@ -50,7 +50,7 @@ pub fn build_channel_list<'a>(
         .style(theme.secondary());
 
         if channel.is_category {
-            but = but.style(theme.embed());
+            but = but.style(theme.embed().border_width(0.0));
         } else if current_channel_id != Some(*channel_id) {
             but = but.on_press(on_button_press(*channel_id));
         }
@@ -94,15 +94,15 @@ pub fn build_guild_list<'a>(
     let process_item = |mut list: Scrollable<'a, Message>, ((guild_id, guild), (index, button_state)): Item<'a, '_>| {
         let mk_but = |state: &'a mut button::State, content: Element<'a, Message>| {
             let theme = if guild.channels.values().any(|c| c.has_unread) {
-                theme.round().border_color(Color::WHITE)
+                theme.border_color(Color::WHITE)
             } else {
                 theme
             };
 
-            Button::new(state, fill_container(content).style(theme))
+            Button::new(state, fill_container(content).style(theme.border_width(0.0)))
                 .width(length!(+))
                 .height(length!(= 52))
-                .style(theme.secondary())
+                .style(theme.secondary().border_width(2.0))
         };
 
         let but = if index >= buttons_state_len - 1 {
@@ -143,7 +143,7 @@ pub fn build_guild_list<'a>(
 
         list = list.push(
             Tooltip::new(but, &guild.name, Position::Bottom)
-                .gap(8)
+                .gap(PADDING / 2)
                 .style(theme.secondary()),
         );
 

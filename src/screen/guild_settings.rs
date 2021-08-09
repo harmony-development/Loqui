@@ -4,6 +4,7 @@ mod create_edit_role;
 mod edit_channel;
 mod general;
 mod invite;
+mod members;
 mod roles;
 
 use crate::{
@@ -29,6 +30,7 @@ use self::{
     create_channel::ChannelCreationModal,
     create_edit_role::RoleModal,
     edit_channel::UpdateChannelModal,
+    members::{MembersMessage, MembersTab},
     roles::{RolesMessage, RolesTab},
 };
 
@@ -47,6 +49,7 @@ pub struct GuildSettings {
     invite_tab: InviteTab,
     ordering_tab: OrderingTab,
     roles_tab: RolesTab,
+    members_tab: MembersTab,
     current_error: String,
     meta_data: GuildMetadata,
     back_button: button::State,
@@ -62,6 +65,7 @@ pub enum Message {
     Invite(InviteMessage),
     Ordering(OrderingMessage),
     Roles(RolesMessage),
+    Members(MembersMessage),
     UpdateChannelMessage(edit_channel::Message),
     ChannelCreationMessage(create_channel::Message),
     RoleMessage(create_edit_role::Message),
@@ -136,6 +140,9 @@ impl GuildSettings {
                     3 => {
                         self.roles_tab.error_message.clear();
                     }
+                    4 => {
+                        self.members_tab.error_message.clear();
+                    }
                     _ => {}
                 };
             }
@@ -157,6 +164,11 @@ impl GuildSettings {
             Message::Roles(message) => {
                 return self
                     .roles_tab
+                    .update(message, client, &mut self.meta_data, self.guild_id)
+            }
+            Message::Members(message) => {
+                return self
+                    .members_tab
                     .update(message, client, &mut self.meta_data, self.guild_id)
             }
             Message::UpdateChannelMessage(msg) => {
@@ -234,6 +246,11 @@ impl GuildSettings {
                 self.roles_tab
                     .view(client, self.guild_id, &mut self.meta_data, theme, thumbnail_cache),
             )
+            .push(
+                self.members_tab.tab_label(),
+                self.members_tab
+                    .view(client, self.guild_id, &mut self.meta_data, theme, thumbnail_cache),
+            )
             .tab_bar_style(theme)
             .icon_font(ICON_FONT)
             .tab_bar_position(position);
@@ -280,6 +297,7 @@ impl GuildSettings {
             1 => self.invite_tab.on_error(error),
             2 => self.ordering_tab.on_error(error),
             3 => self.roles_tab.on_error(error),
+            4 => self.members_tab.on_error(error),
             _ => Command::none(),
         }
     }
