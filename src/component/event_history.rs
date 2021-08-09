@@ -268,7 +268,7 @@ pub fn build_event_history<'a>(
         msg_text.and_do(|textt| {
             let text = client::render_text(textt, members);
             #[cfg(feature = "markdown")]
-            let message_text = super::markdown::markdown_svg(text);
+            let message_text = super::markdown::markdown_svg(&text);
             #[cfg(not(feature = "markdown"))]
             let mut message_text = label!(text).size(MESSAGE_SIZE);
 
