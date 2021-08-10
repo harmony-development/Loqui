@@ -61,7 +61,14 @@ use iced::{
     futures::future::{self, ready},
     Application, Command, Element, Subscription,
 };
-use std::{borrow::Cow, convert::identity, future::Future, ops::Not, sync::Arc, time::Duration};
+use std::{
+    borrow::Cow,
+    convert::identity,
+    future::Future,
+    ops::Not,
+    sync::{mpsc::Receiver, Arc},
+    time::Duration,
+};
 
 #[derive(Debug, Clone)]
 pub enum ScreenMessage {
@@ -317,17 +324,31 @@ pub struct ScreenManager {
     socket_reset: bool,
     should_exit: bool,
     is_window_focused: bool,
+    theme_rx: Receiver<()>,
 }
 
 impl ScreenManager {
     pub fn new(content_store: Arc<ContentStore>) -> Self {
-        let colorscheme = std::fs::read(content_store.theme_file())
-            .ok()
-            .and_then(|data| toml::from_slice::<ColorschemeRaw>(&data).ok())
-            .map_or_else(Default::default, Colorscheme::from);
+        let (ev_tx, ev_rx) = std::sync::mpsc::channel();
 
-        Self {
-            theme: Theme::with_colorscheme(colorscheme),
+        let cstore = content_store.clone();
+        std::thread::spawn(move || {
+            use notify::{recommended_watcher, Event, RecursiveMode, Result, Watcher};
+
+            let mut watcher = recommended_watcher(move |ev: Result<Event>| {
+                if ev.is_ok() {
+                    let _ = ev_tx.send(());
+                }
+            })
+            .unwrap();
+
+            watcher.watch(cstore.theme_file(), RecursiveMode::NonRecursive).unwrap();
+
+            std::thread::park();
+        });
+
+        let mut this = Self {
+            theme: Theme::default(),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new().into())),
             client: None,
             content_store,
@@ -336,7 +357,21 @@ impl ScreenManager {
             socket_reset: false,
             should_exit: false,
             is_window_focused: true,
-        }
+            theme_rx: ev_rx,
+        };
+
+        this.reload_colorscheme();
+
+        this
+    }
+
+    fn reload_colorscheme(&mut self) {
+        let colorscheme = std::fs::read(self.content_store.theme_file())
+            .ok()
+            .and_then(|data| toml::from_slice::<ColorschemeRaw>(&data).ok())
+            .map_or_else(Default::default, Colorscheme::from);
+
+        self.theme.colorscheme = colorscheme;
     }
 
     fn process_post_event(&mut self, post: PostProcessEvent, clip: &mut iced::Clipboard) -> Command<Message> {
@@ -556,6 +591,10 @@ impl Application for ScreenManager {
                 .values_mut()
                 .for_each(|m| m.typing_in_channel = m.typing_in_channel.filter(|d| d.2.elapsed().as_secs() < 5))
         });
+
+        if self.theme_rx.try_recv().is_ok() {
+            self.reload_colorscheme();
+        }
 
         match msg {
             Message::ChildMessage(msg) => {

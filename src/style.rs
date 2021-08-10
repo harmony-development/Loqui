@@ -38,7 +38,7 @@ pub struct Theme {
     round: bool,
     embed: bool,
     overrides: OverrideStyle,
-    colorscheme: Colorscheme,
+    pub colorscheme: Colorscheme,
 }
 
 impl Theme {
@@ -52,13 +52,6 @@ impl Theme {
         color!(9, 229, 56),
         color!(209, 50, 113),
     ];
-
-    pub fn with_colorscheme(colorscheme: Colorscheme) -> Self {
-        Self {
-            colorscheme,
-            ..Default::default()
-        }
-    }
 
     pub const fn calculate_sender_color(&self, name_len: usize) -> Color {
         Theme::SENDER_COLORS[name_len % Theme::SENDER_COLORS.len()]
