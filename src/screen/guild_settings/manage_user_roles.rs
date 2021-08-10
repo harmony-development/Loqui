@@ -1,5 +1,6 @@
 use super::super::Message as TopLevelMessage;
 use client::harmony_rust_sdk::client::api::chat::permissions::{self, ManageUserRoles, ManageUserRolesSelfBuilder};
+use iced::{tooltip::Position, Tooltip};
 use iced_aw::Card;
 
 use crate::{
@@ -7,7 +8,7 @@ use crate::{
     component::*,
     label, length,
     screen::{map_to_nothing, ClientExt},
-    style::{Theme, PADDING, SPACING},
+    style::{Theme, DEF_SIZE, PADDING, SPACING},
 };
 
 #[derive(Debug, Clone)]
@@ -48,46 +49,55 @@ impl ManageUserRolesModal {
             if let Some(user_roles) = guild.members.get(&self.user_id) {
                 self.but_states.resize_with(guild.roles.len(), Default::default);
                 for ((role_id, role), but_state) in guild.roles.iter().zip(self.but_states.iter_mut()) {
+                    let is_given = user_roles.contains(role_id);
+                    let (tooltip, tooltip_position) = is_given
+                        .then(|| ("Remove role from user", Position::Right))
+                        .unwrap_or(("Give role to user", Position::Left));
                     let role_color = Color::from_rgb8(role.color.0, role.color.1, role.color.2);
-                    if user_roles.contains(role_id) {
-                        given_roles = given_roles.push(
-                            Button::new(but_state, label!(role.name.as_str()).color(role_color))
-                                .on_press(Message::RoleChange {
-                                    guild_id,
-                                    role_id: *role_id,
-                                    user_id: self.user_id,
-                                    give_or_take: false,
-                                })
-                                .style(theme.background_color(Color { a: 0.2, ..role_color })),
-                        );
+                    let role_but = Tooltip::new(
+                        Button::new(but_state, label!(role.name.as_str()).color(role_color))
+                            .on_press(Message::RoleChange {
+                                guild_id,
+                                role_id: *role_id,
+                                user_id: self.user_id,
+                                give_or_take: !is_given,
+                            })
+                            .style(theme.background_color(Color { a: 0.2, ..role_color })),
+                        tooltip,
+                        tooltip_position,
+                    )
+                    .style(theme)
+                    .size(DEF_SIZE - 2)
+                    .gap(SPACING * 2);
+                    if is_given {
+                        given_roles = given_roles.push(role_but);
                     } else {
-                        taken_roles = taken_roles.push(
-                            Button::new(but_state, label!(role.name.as_str()).color(role_color))
-                                .on_press(Message::RoleChange {
-                                    guild_id,
-                                    role_id: *role_id,
-                                    user_id: self.user_id,
-                                    give_or_take: true,
-                                })
-                                .style(theme.background_color(Color { a: 0.2, ..role_color })),
-                        );
+                        taken_roles = taken_roles.push(role_but);
                     }
                 }
             }
         }
 
         widgets.push(
-            Column::with_children(vec![label!("Given").into(), space!(h+).into(), given_roles.into()])
-                .width(length!(+))
-                .align_items(Align::Center)
-                .into(),
+            Column::with_children(vec![
+                label!("Given").into(),
+                given_roles.height(length!(+)).width(length!(+)).into(),
+            ])
+            .width(length!(+))
+            .height(length!(+))
+            .align_items(Align::Center)
+            .into(),
         );
         widgets.push(Rule::vertical(SPACING * 2).style(theme).into());
         widgets.push(
-            Column::with_children(vec![label!("Others").into(), space!(h+).into(), taken_roles.into()])
-                .width(length!(+))
-                .align_items(Align::Center)
-                .into(),
+            Column::with_children(vec![
+                label!("Others").into(),
+                taken_roles.height(length!(+)).width(length!(+)).into(),
+            ])
+            .width(length!(+))
+            .height(length!(+))
+            .align_items(Align::Center)
+            .into(),
         );
 
         Container::new(
