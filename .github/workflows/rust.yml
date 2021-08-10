@@ -48,7 +48,8 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt update -yy
-        sudo apt install -yy --no-install-recommends clang libgtk-3-0 libgtk-3-dev protobuf-compiler libpango1.0-0 libpango1.0-dev libglib2.0-0 libglib2.0-dev python3 pkg-config cmake openssl libx11-dev libxcb1-dev libfreetype6 libfreetype6-dev fontconfig libfontconfig-dev expat libcairo2-dev libcairo2 libatk1.0-0 libatk1.0-dev libgdk-pixbuf2.0-0 libgdk-pixbuf2.0-dev clang lld
+        sudo apt install -yy --no-install-recommends clang libgtk-3-0 libgtk-3-dev protobuf-compiler libpango1.0-0 libpango1.0-dev libglib2.0-0 libglib2.0-dev python3 pkg-config cmake openssl libx11-dev libxcb1-dev libfreetype6 libfreetype6-dev fontconfig libfontconfig-dev expat libcairo2-dev libcairo2 libatk1.0-0 libatk1.0-dev libgdk-pixbuf2.0-0 libgdk-pixbuf2.0-dev clang lld unzip
+        unzip .github/upx.zip && chmod +x upx
   
     - name: Install rust
       uses: actions-rs/toolchain@v1.0.7
@@ -68,8 +69,10 @@ jobs:
         name: 'clippy (${{ matrix.os }})'
 
     - name: Build
-      if: ${{ matrix.os != 'macOS-latest' }}
-      run: cargo build --release
+      run: | 
+          cargo build --release
+          ./upx target/release/crust || echo "not on linux / macos"
+          ./upx target/release/crust.exe || echo "not on windows"
 
     - name: Artifact macOS
       if: ${{ matrix.os == 'macOS-latest' }}
