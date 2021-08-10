@@ -1,0 +1,7 @@
+border = "#0A0D13"
+primary_bg = "#0A0D13"
+secondary_bg = "#16191F"
+disabled_bg = "#26292F"
+accent = "#008FCF"
+text = "#EEEEEE"
+disabled_text = "#DDDDDD"
