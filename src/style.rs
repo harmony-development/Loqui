@@ -1,9 +1,14 @@
 use crate::color;
-use client::{bool_ext::BoolExt, harmony_rust_sdk::api::harmonytypes::UserStatus};
+use client::{content::ColorschemeRaw, harmony_rust_sdk::api::harmonytypes::UserStatus};
+use hex_color::HexColor;
 use iced::{
     button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color,
 };
-use iced_aw::{number_input, style, tabs};
+use iced_aw::{
+    number_input,
+    style::{self},
+    tabs,
+};
 
 pub const DEF_SIZE: u16 = 20;
 pub const MESSAGE_TIMESTAMP_SIZE: u16 = 14;
@@ -14,20 +19,26 @@ pub const DATE_SEPERATOR_SIZE: u16 = 24;
 pub const PADDING: u16 = 16;
 pub const SPACING: u16 = 4;
 
-pub const ERROR_COLOR: Color = color!(. 1.0, 0.0, 0.0);
-pub const SUCCESS_COLOR: Color = color!(. 0.0, 1.0, 0.0);
-pub const ALT_COLOR: Color = color!(. 0.65, 0.65, 0.65);
-
 pub const AVATAR_WIDTH: u16 = 44;
 pub const PROFILE_AVATAR_WIDTH: u16 = 96;
 
-#[derive(Debug, Clone, Copy)]
+pub const ERROR_COLOR: Color = color!(. 1.0, 0.0, 0.0);
+pub const SUCCESS_COLOR: Color = color!(. 0.0, 1.0, 0.0);
+pub const ALT_COLOR: Color = color!(. 0.65, 0.65, 0.65);
+pub const DARKER: Color = color!(0x14, 0x14, 0x11);
+pub const DARK_BG: Color = color!(0x1b, 0x1b, 0x18);
+pub const BRIGHT_BG: Color = color!(0x26, 0x26, 0x22);
+pub const DISABLED: Color = color!(0x67, 0x30, 0x28);
+pub const ACCENT: Color = color!(0xaa, 0x50, 0x42);
+pub const DISABLED_TEXT: Color = color!(0xe2, 0xc9, 0x9f);
+pub const TEXT_COLOR: Color = color!(0xf2, 0xee, 0xd3);
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Theme {
-    dark: bool,
     secondary: bool,
     round: bool,
     embed: bool,
     overrides: OverrideStyle,
+    colorscheme: Colorscheme,
 }
 
 impl Theme {
@@ -41,6 +52,13 @@ impl Theme {
         color!(9, 229, 56),
         color!(209, 50, 113),
     ];
+
+    pub fn with_colorscheme(colorscheme: Colorscheme) -> Self {
+        Self {
+            colorscheme,
+            ..Default::default()
+        }
+    }
 
     pub const fn calculate_sender_color(&self, name_len: usize) -> Color {
         Theme::SENDER_COLORS[name_len % Theme::SENDER_COLORS.len()]
@@ -97,151 +115,211 @@ impl Theme {
     }
 }
 
-impl Default for Theme {
+#[derive(Debug, Clone, Copy)]
+pub struct Colorscheme {
+    pub error: Color,
+    pub success: Color,
+    pub border: Color,
+    pub primary_bg: Color,
+    pub secondary_bg: Color,
+    pub disabled_bg: Color,
+    pub text: Color,
+    pub disabled_text: Color,
+    pub accent: Color,
+}
+
+impl Default for Colorscheme {
     fn default() -> Self {
         Self {
-            dark: true,
-            secondary: false,
-            round: false,
-            embed: false,
-            overrides: Default::default(),
+            error: ERROR_COLOR,
+            success: SUCCESS_COLOR,
+            border: DARKER,
+            primary_bg: DARK_BG,
+            secondary_bg: BRIGHT_BG,
+            disabled_bg: DISABLED,
+            text: TEXT_COLOR,
+            disabled_text: DISABLED_TEXT,
+            accent: ACCENT,
         }
     }
 }
 
-pub struct TabBar;
+impl From<ColorschemeRaw> for Colorscheme {
+    fn from(value: ColorschemeRaw) -> Self {
+        Self {
+            error: value
+                .error
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().error),
+            success: value
+                .success
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().success),
+            border: value
+                .border
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().border),
+            primary_bg: value
+                .primary_bg
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().primary_bg),
+            secondary_bg: value
+                .secondary_bg
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().secondary_bg),
+            disabled_bg: value
+                .disabled_bg
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().disabled_bg),
+            text: value
+                .text
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().text),
+            disabled_text: value
+                .disabled_text
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().disabled_text),
+            accent: value
+                .accent
+                .parse_to_color()
+                .unwrap_or_else(|| Colorscheme::default().accent),
+        }
+    }
+}
+
+trait ParseToColor {
+    fn parse_to_color(&self) -> Option<Color>;
+}
+
+impl ParseToColor for String {
+    fn parse_to_color(&self) -> Option<Color> {
+        self.parse::<HexColor>()
+            .ok()
+            .map(|color| Color::from_rgb8(color.r, color.g, color.b))
+    }
+}
+
+pub fn tuple_to_iced_color(color: (u8, u8, u8)) -> Color {
+    Color::from_rgb8(color.0, color.1, color.2)
+}
 
 impl From<Theme> for Box<dyn tabs::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            dark::TabBar.into()
-        } else {
-            light::TabBar.into()
-        }
+        styles::TabBar(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn container::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| {
-            if theme.secondary {
-                if theme.round {
-                    dark::BrightRoundContainer(theme.overrides).into()
-                } else {
-                    dark::BrightContainer(theme.overrides).into()
-                }
-            } else if theme.round {
-                dark::RoundContainer(theme.overrides).into()
+        if theme.secondary {
+            if theme.round {
+                styles::BrightRoundContainer(theme.overrides, theme.colorscheme).into()
             } else {
-                dark::Container(theme.overrides).into()
+                styles::BrightContainer(theme.overrides, theme.colorscheme).into()
             }
-        })
+        } else if theme.round {
+            styles::RoundContainer(theme.overrides, theme.colorscheme).into()
+        } else {
+            styles::Container(theme.overrides, theme.colorscheme).into()
+        }
     }
 }
 
 impl From<Theme> for Box<dyn radio::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::Radio.into())
+        styles::Radio(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn text_input::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| {
-            if theme.secondary {
-                dark::DarkTextInput.into()
-            } else {
-                dark::TextInput.into()
-            }
-        })
+        if theme.secondary {
+            styles::DarkTextInput(theme.colorscheme).into()
+        } else {
+            styles::TextInput(theme.colorscheme).into()
+        }
     }
 }
 
 impl From<Theme> for Box<dyn button::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        if theme.dark {
-            if theme.secondary {
-                dark::DarkButton(theme.overrides).into()
-            } else if theme.embed {
-                dark::EmbedButton(theme.overrides).into()
-            } else {
-                dark::Button(theme.overrides).into()
-            }
+        if theme.secondary {
+            styles::DarkButton(theme.overrides, theme.colorscheme).into()
+        } else if theme.embed {
+            styles::EmbedButton(theme.overrides, theme.colorscheme).into()
         } else {
-            light::Button.into()
+            styles::Button(theme.overrides, theme.colorscheme).into()
         }
     }
 }
 
 impl From<Theme> for Box<dyn scrollable::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::Scrollable.into())
+        styles::Scrollable(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn slider::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::Slider.into())
+        styles::Slider(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn progress_bar::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::ProgressBar.into())
+        styles::ProgressBar(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn checkbox::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::Checkbox.into())
+        styles::Checkbox(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn pick_list::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::PickList.into())
+        styles::PickList(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| {
-            if theme.secondary {
-                dark::RuleBright(theme.overrides).into()
-            } else {
-                dark::Rule(theme.overrides).into()
-            }
-        })
+        if theme.secondary {
+            styles::RuleBright(theme.overrides, theme.colorscheme).into()
+        } else {
+            styles::Rule(theme.overrides, theme.colorscheme).into()
+        }
     }
 }
 
 impl From<Theme> for Box<dyn iced_aw::modal::StyleSheet> {
-    fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::Modal.into())
+    fn from(_: Theme) -> Self {
+        styles::Modal.into()
     }
 }
 
 impl From<Theme> for Box<dyn iced_aw::card::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::Card.into())
+        styles::Card(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn toggler::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::Toggler.into())
+        styles::Toggler(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn number_input::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::NumberInput.into())
+        styles::NumberInput(theme.colorscheme).into()
     }
 }
 
 impl From<Theme> for Box<dyn style::color_picker::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        theme.dark.map_or_default(|| dark::ColorPicker.into())
+        styles::ColorPicker(theme.colorscheme).into()
     }
 }
 
@@ -270,114 +348,74 @@ impl OverrideStyle {
         }
         style
     }
-}
 
-mod light {
-    use crate::color;
-    use iced::{button, Background, Color, Vector};
-    use iced_aw::style::tab_bar::Style;
-    use iced_aw::tabs;
-
-    pub struct TabBar;
-
-    impl tabs::StyleSheet for TabBar {
-        fn active(&self, is_selected: bool) -> tabs::Style {
-            let tab_label_background = if is_selected {
-                Background::Color(Color::BLACK)
-            } else {
-                Background::Color(Color::WHITE)
-            };
-
-            let text_color = if is_selected { Color::WHITE } else { Color::BLACK };
-
-            Style {
-                background: None,
-                border_color: None,
-                border_width: 0.0,
-                tab_label_background,
-                tab_label_border_color: Color::TRANSPARENT,
-                tab_label_border_width: 0.0,
-                icon_color: text_color,
-                text_color,
-            }
+    fn button(self, mut style: button::Style) -> button::Style {
+        if let Some(color) = self.border_color {
+            style.border_color = color;
         }
-
-        fn hovered(&self, is_selected: bool) -> tabs::Style {
-            let tab_label_background = Background::Color(Color::BLACK);
-            let text_color = Color::WHITE;
-
-            Style {
-                tab_label_background,
-                icon_color: text_color,
-                text_color,
-                ..self.active(is_selected)
-            }
+        if let Some(radius) = self.border_radius {
+            style.border_radius = radius;
         }
+        if let Some(width) = self.border_width {
+            style.border_width = width;
+        }
+        if let Some(color) = self.background_color {
+            style.background = Some(color.into());
+        }
+        style
     }
 
-    pub struct Button;
-
-    impl button::StyleSheet for Button {
-        fn active(&self) -> button::Style {
-            button::Style {
-                background: color!(28, 108, 223).into(),
-                border_radius: 12.0,
-                shadow_offset: Vector::new(1.0, 1.0),
-                text_color: color!(238, 238, 238),
-                ..button::Style::default()
-            }
+    fn rule(self, mut style: rule::Style) -> rule::Style {
+        if let Some(color) = self.border_color {
+            style.color = color;
         }
-
-        fn hovered(&self) -> button::Style {
-            button::Style {
-                text_color: Color::WHITE,
-                shadow_offset: Vector::new(1.0, 2.0),
-                ..self.active()
-            }
+        if let Some(radius) = self.border_radius {
+            style.radius = radius;
         }
+        if let Some(width) = self.border_width {
+            style.width = width as u16;
+        }
+        if let Some(mode) = self.padded {
+            style.fill_mode = mode;
+        }
+        style
     }
 }
 
-mod dark {
+mod styles {
+    use super::{Colorscheme, OverrideStyle};
     use crate::color;
     use iced::{
         button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler,
         Background, Color,
     };
-    use iced_aw::tabs::Style;
-    use iced_aw::{card, modal, number_input, style, tabs};
+    use iced_aw::{
+        number_input,
+        style::{self, card, modal},
+        tabs,
+    };
 
-    use super::OverrideStyle;
-
-    const DARKER: Color = color!(0x14, 0x14, 0x11);
-    const DARK_BG: Color = color!(0x1b, 0x1b, 0x18);
-    const BRIGHT_BG: Color = color!(0x26, 0x26, 0x22);
-    const DISABLED: Color = color!(0x67, 0x30, 0x28);
-    const ACCENT: Color = color!(0xaa, 0x50, 0x42);
-    const DISABLED_TEXT: Color = color!(0xe2, 0xc9, 0x9f);
-    const TEXT_COLOR: Color = color!(0xf2, 0xee, 0xd3);
-
-    pub struct ColorPicker;
+    pub struct ColorPicker(pub Colorscheme);
 
     impl style::color_picker::StyleSheet for ColorPicker {
         fn active(&self) -> style::color_picker::Style {
             style::color_picker::Style {
-                background: DARK_BG.into(),
+                background: self.0.primary_bg.into(),
                 border_radius: 15.0,
                 border_width: 1.0,
-                border_color: DARKER,
+                border_color: self.0.border,
                 bar_border_radius: 5.0,
                 bar_border_width: 1.0,
-                bar_border_color: DARKER,
+                bar_border_color: self.0.border,
             }
         }
 
         fn selected(&self) -> style::color_picker::Style {
-            style::color_picker::Style { ..self.active() }
+            self.active()
         }
 
         fn hovered(&self) -> style::color_picker::Style {
-            style::color_picker::Style { ..self.active() }
+            self.active()
         }
 
         fn focused(&self) -> style::color_picker::Style {
@@ -389,30 +427,30 @@ mod dark {
         }
     }
 
-    pub struct NumberInput;
+    pub struct NumberInput(pub Colorscheme);
 
     impl number_input::StyleSheet for NumberInput {
         fn active(&self) -> number_input::Style {
             number_input::Style {
-                button_background: Some(DARK_BG.into()),
-                icon_color: TEXT_COLOR,
+                button_background: Some(self.0.primary_bg.into()),
+                icon_color: self.0.text,
             }
         }
     }
 
-    pub struct Toggler;
+    pub struct Toggler(pub Colorscheme);
 
     impl toggler::StyleSheet for Toggler {
         fn active(&self, is_active: bool) -> toggler::Style {
             let mut style = toggler::Style {
-                background: DARK_BG,
-                foreground: ACCENT,
-                background_border: Some(BRIGHT_BG),
+                background: self.0.primary_bg,
+                foreground: self.0.accent,
+                background_border: Some(self.0.secondary_bg),
                 foreground_border: None,
             };
 
             if !is_active {
-                style.foreground = DISABLED;
+                style.foreground = self.0.disabled_bg;
             }
 
             style
@@ -420,27 +458,27 @@ mod dark {
 
         fn hovered(&self, _is_active: bool) -> toggler::Style {
             toggler::Style {
-                background: DARK_BG,
-                foreground: ACCENT,
-                background_border: Some(BRIGHT_BG),
-                foreground_border: Some(BRIGHT_BG),
+                background: self.0.primary_bg,
+                foreground: self.0.accent,
+                background_border: Some(self.0.secondary_bg),
+                foreground_border: Some(self.0.secondary_bg),
             }
         }
     }
 
-    pub struct TabBar;
+    pub struct TabBar(pub Colorscheme);
 
     impl tabs::StyleSheet for TabBar {
         fn active(&self, is_selected: bool) -> tabs::Style {
             let tab_label_background = if is_selected {
-                Background::Color(BRIGHT_BG)
+                Background::Color(self.0.secondary_bg)
             } else {
-                Background::Color(DARK_BG)
+                Background::Color(self.0.primary_bg)
             };
 
-            let text_color = if is_selected { ACCENT } else { Color::WHITE };
+            let text_color = if is_selected { self.0.accent } else { self.0.text };
 
-            Style {
+            tabs::Style {
                 background: None,
                 border_color: None,
                 border_width: 0.0,
@@ -453,10 +491,10 @@ mod dark {
         }
 
         fn hovered(&self, is_selected: bool) -> tabs::Style {
-            let tab_label_background = Background::Color(BRIGHT_BG);
-            let text_color = ACCENT;
+            let tab_label_background = Background::Color(self.0.secondary_bg);
+            let text_color = self.0.accent;
 
-            Style {
+            tabs::Style {
                 tab_label_background,
                 icon_color: text_color,
                 text_color,
@@ -465,19 +503,19 @@ mod dark {
         }
     }
 
-    pub struct Card;
+    pub struct Card(pub Colorscheme);
 
     impl card::StyleSheet for Card {
         fn active(&self) -> card::Style {
             card::Style {
-                background: DARK_BG.into(),
-                head_background: BRIGHT_BG.into(),
-                border_color: DARKER,
-                foot_background: DARK_BG.into(),
-                body_text_color: TEXT_COLOR,
-                foot_text_color: TEXT_COLOR,
-                head_text_color: TEXT_COLOR,
-                close_color: TEXT_COLOR,
+                background: self.0.primary_bg.into(),
+                head_background: self.0.secondary_bg.into(),
+                border_color: self.0.border,
+                foot_background: self.0.primary_bg.into(),
+                body_text_color: self.0.text,
+                foot_text_color: self.0.text,
+                head_text_color: self.0.text,
+                close_color: self.0.text,
                 border_width: 2.0,
                 border_radius: 0.0,
                 ..Default::default()
@@ -495,91 +533,95 @@ mod dark {
         }
     }
 
-    pub struct Container(pub(super) OverrideStyle);
+    pub struct Container(pub OverrideStyle, pub Colorscheme);
 
     impl container::StyleSheet for Container {
         fn style(&self) -> container::Style {
             self.0.container(container::Style {
-                background: DARK_BG.into(),
-                text_color: Some(TEXT_COLOR),
-                border_color: DARKER,
+                background: self.1.primary_bg.into(),
+                text_color: Some(self.1.text),
+                border_color: self.1.border,
                 border_width: 1.5,
                 border_radius: 0.0,
             })
         }
     }
 
-    pub struct RoundContainer(pub(super) OverrideStyle);
+    pub struct RoundContainer(pub OverrideStyle, pub Colorscheme);
 
     impl container::StyleSheet for RoundContainer {
         fn style(&self) -> container::Style {
             self.0.container(container::Style {
-                border_color: DARKER,
+                border_color: self.1.border,
                 border_radius: 8.0,
                 border_width: 2.0,
-                ..Container(self.0).style()
+                ..Container(self.0, self.1).style()
             })
         }
     }
 
-    pub struct BrightRoundContainer(pub(super) OverrideStyle);
+    pub struct BrightRoundContainer(pub OverrideStyle, pub Colorscheme);
 
     impl container::StyleSheet for BrightRoundContainer {
         fn style(&self) -> container::Style {
             self.0.container(container::Style {
-                border_color: BRIGHT_BG,
+                border_color: self.1.secondary_bg,
                 border_radius: 8.0,
                 border_width: 2.0,
-                ..BrightContainer(self.0).style()
+                ..BrightContainer(self.0, self.1).style()
             })
         }
     }
 
-    pub struct BrightContainer(pub(super) OverrideStyle);
+    pub struct BrightContainer(pub OverrideStyle, pub Colorscheme);
 
     impl container::StyleSheet for BrightContainer {
         fn style(&self) -> container::Style {
             self.0.container(container::Style {
-                background: BRIGHT_BG.into(),
-                ..Container(self.0).style()
+                background: self.1.secondary_bg.into(),
+                ..Container(self.0, self.1).style()
             })
         }
     }
 
-    pub struct Radio;
+    pub struct Radio(pub Colorscheme);
 
     impl radio::StyleSheet for Radio {
         fn active(&self) -> radio::Style {
             radio::Style {
-                background: BRIGHT_BG.into(),
-                dot_color: ACCENT,
+                background: self.0.secondary_bg.into(),
+                dot_color: self.0.accent,
                 border_width: 1.0,
-                border_color: ACCENT,
+                border_color: self.0.accent,
             }
         }
 
         fn hovered(&self) -> radio::Style {
             radio::Style {
-                background: Color { a: 0.5, ..BRIGHT_BG }.into(),
+                background: Color {
+                    a: 0.5,
+                    ..self.0.secondary_bg
+                }
+                .into(),
                 ..self.active()
             }
         }
     }
 
-    pub struct DarkTextInput;
+    pub struct DarkTextInput(pub Colorscheme);
 
     impl text_input::StyleSheet for DarkTextInput {
         fn active(&self) -> text_input::Style {
             text_input::Style {
-                background: DARK_BG.into(),
-                ..TextInput.active()
+                background: self.0.primary_bg.into(),
+                ..TextInput(self.0).active()
             }
         }
 
         fn focused(&self) -> text_input::Style {
             text_input::Style {
                 border_width: 3.0,
-                border_color: ACCENT,
+                border_color: self.0.accent,
                 ..self.active()
             }
         }
@@ -589,38 +631,41 @@ mod dark {
         }
 
         fn value_color(&self) -> Color {
-            TextInput.value_color()
+            TextInput(self.0).value_color()
         }
 
         fn selection_color(&self) -> Color {
-            TextInput.selection_color()
+            TextInput(self.0).selection_color()
         }
 
         fn hovered(&self) -> text_input::Style {
             text_input::Style {
                 border_width: 2.0,
-                border_color: Color { a: 0.5, ..ACCENT },
+                border_color: Color {
+                    a: 0.5,
+                    ..self.0.accent
+                },
                 ..self.focused()
             }
         }
     }
 
-    pub struct TextInput;
+    pub struct TextInput(pub Colorscheme);
 
     impl text_input::StyleSheet for TextInput {
         fn active(&self) -> text_input::Style {
             text_input::Style {
-                background: BRIGHT_BG.into(),
+                background: self.0.secondary_bg.into(),
                 border_radius: 0.0,
                 border_width: 1.0,
-                border_color: DARKER,
+                border_color: self.0.border,
             }
         }
 
         fn focused(&self) -> text_input::Style {
             text_input::Style {
                 border_width: 3.0,
-                border_color: ACCENT,
+                border_color: self.0.accent,
                 ..self.active()
             }
         }
@@ -630,34 +675,37 @@ mod dark {
         }
 
         fn value_color(&self) -> Color {
-            TEXT_COLOR
+            self.0.text
         }
 
         fn selection_color(&self) -> Color {
-            ACCENT
+            self.0.accent
         }
 
         fn hovered(&self) -> text_input::Style {
             text_input::Style {
                 border_width: 2.0,
-                border_color: Color { a: 0.5, ..ACCENT },
+                border_color: Color {
+                    a: 0.5,
+                    ..self.0.accent
+                },
                 ..self.focused()
             }
         }
     }
 
-    pub struct DarkButton(pub OverrideStyle);
+    pub struct DarkButton(pub OverrideStyle, pub Colorscheme);
 
     impl button::StyleSheet for DarkButton {
         fn active(&self) -> button::Style {
-            button::Style {
-                background: self.0.background_color.unwrap_or(DARK_BG).into(),
-                border_color: self.0.border_color.unwrap_or(DARKER),
-                border_radius: self.0.border_radius.unwrap_or(0.0),
-                border_width: self.0.border_width.unwrap_or(1.0),
-                text_color: TEXT_COLOR,
+            self.0.button(button::Style {
+                background: self.1.primary_bg.into(),
+                border_color: self.1.border,
+                border_radius: 0.0,
+                border_width: 1.0,
+                text_color: self.1.text,
                 ..button::Style::default()
-            }
+            })
         }
 
         fn hovered(&self) -> button::Style {
@@ -665,7 +713,7 @@ mod dark {
                 background: self
                     .0
                     .background_color
-                    .map_or(ACCENT, |c| Color { a: c.a * 0.5, ..c })
+                    .map_or(self.1.accent, |c| Color { a: c.a * 0.5, ..c })
                     .into(),
                 ..self.active()
             }
@@ -681,45 +729,45 @@ mod dark {
 
         fn disabled(&self) -> button::Style {
             button::Style {
-                background: DISABLED.into(),
-                text_color: DISABLED_TEXT,
+                background: self.1.disabled_bg.into(),
+                text_color: self.1.disabled_text,
                 ..self.active()
             }
         }
     }
 
-    pub struct EmbedButton(pub OverrideStyle);
+    pub struct EmbedButton(pub OverrideStyle, pub Colorscheme);
 
     impl button::StyleSheet for EmbedButton {
         fn active(&self) -> button::Style {
-            DarkButton(self.0).active()
+            DarkButton(self.0, self.1).active()
         }
 
         fn hovered(&self) -> button::Style {
-            DarkButton(self.0).hovered()
+            DarkButton(self.0, self.1).hovered()
         }
 
         fn pressed(&self) -> button::Style {
-            DarkButton(self.0).pressed()
+            DarkButton(self.0, self.1).pressed()
         }
 
         fn disabled(&self) -> button::Style {
-            DarkButton(self.0).active()
+            DarkButton(self.0, self.1).active()
         }
     }
 
-    pub struct Button(pub OverrideStyle);
+    pub struct Button(pub OverrideStyle, pub Colorscheme);
 
     impl button::StyleSheet for Button {
         fn active(&self) -> button::Style {
-            button::Style {
-                background: self.0.background_color.unwrap_or(BRIGHT_BG).into(),
-                border_color: self.0.border_color.unwrap_or(DARKER),
-                border_radius: self.0.border_radius.unwrap_or(0.0),
-                border_width: self.0.border_width.unwrap_or(1.0),
-                text_color: TEXT_COLOR,
+            self.0.button(button::Style {
+                background: self.1.secondary_bg.into(),
+                border_color: self.1.border,
+                border_radius: 0.0,
+                border_width: 1.0,
+                text_color: self.1.text,
                 ..button::Style::default()
-            }
+            })
         }
 
         fn hovered(&self) -> button::Style {
@@ -727,7 +775,7 @@ mod dark {
                 background: self
                     .0
                     .background_color
-                    .map_or(ACCENT, |c| Color { a: c.a * 0.5, ..c })
+                    .map_or(self.1.accent, |c| Color { a: c.a * 0.5, ..c })
                     .into(),
                 ..self.active()
             }
@@ -743,14 +791,14 @@ mod dark {
 
         fn disabled(&self) -> button::Style {
             button::Style {
-                background: DISABLED.into(),
-                text_color: DISABLED_TEXT,
+                background: self.1.disabled_bg.into(),
+                text_color: self.1.disabled_text,
                 ..self.active()
             }
         }
     }
 
-    pub struct Scrollable;
+    pub struct Scrollable(pub Colorscheme);
 
     impl scrollable::StyleSheet for Scrollable {
         fn active(&self) -> scrollable::Scrollbar {
@@ -772,9 +820,13 @@ mod dark {
             let active = self.active();
 
             scrollable::Scrollbar {
-                background: Color { a: 0.5, ..BRIGHT_BG }.into(),
+                background: Color {
+                    a: 0.5,
+                    ..self.0.secondary_bg
+                }
+                .into(),
                 scroller: scrollable::Scroller {
-                    color: ACCENT,
+                    color: self.0.accent,
                     ..active.scroller
                 },
                 ..active
@@ -794,15 +846,21 @@ mod dark {
         }
     }
 
-    pub struct Slider;
+    pub struct Slider(pub Colorscheme);
 
     impl slider::StyleSheet for Slider {
         fn active(&self) -> slider::Style {
             slider::Style {
-                rail_colors: (ACCENT, Color { a: 0.1, ..ACCENT }),
+                rail_colors: (
+                    self.0.accent,
+                    Color {
+                        a: 0.1,
+                        ..self.0.accent
+                    },
+                ),
                 handle: slider::Handle {
                     shape: slider::HandleShape::Circle { radius: 9.0 },
-                    color: ACCENT,
+                    color: self.0.accent,
                     border_width: 0.0,
                     border_color: Color::TRANSPARENT,
                 },
@@ -814,7 +872,7 @@ mod dark {
 
             slider::Style {
                 handle: slider::Handle {
-                    color: ACCENT,
+                    color: self.0.accent,
                     ..active.handle
                 },
                 ..active
@@ -834,28 +892,28 @@ mod dark {
         }
     }
 
-    pub struct ProgressBar;
+    pub struct ProgressBar(pub Colorscheme);
 
     impl progress_bar::StyleSheet for ProgressBar {
         fn style(&self) -> progress_bar::Style {
             progress_bar::Style {
-                background: BRIGHT_BG.into(),
-                bar: ACCENT.into(),
+                background: self.0.secondary_bg.into(),
+                bar: self.0.accent.into(),
                 border_radius: 10.0,
             }
         }
     }
 
-    pub struct Checkbox;
+    pub struct Checkbox(pub Colorscheme);
 
     impl checkbox::StyleSheet for Checkbox {
         fn active(&self, is_checked: bool) -> checkbox::Style {
             checkbox::Style {
-                background: if is_checked { ACCENT } else { BRIGHT_BG }.into(),
+                background: if is_checked { self.0.accent } else { self.0.secondary_bg }.into(),
                 checkmark_color: Color::WHITE,
                 border_radius: 2.0,
                 border_width: 1.0,
-                border_color: ACCENT,
+                border_color: self.0.accent,
             }
         }
 
@@ -863,7 +921,7 @@ mod dark {
             checkbox::Style {
                 background: Color {
                     a: 0.8,
-                    ..if is_checked { ACCENT } else { BRIGHT_BG }
+                    ..if is_checked { self.0.accent } else { self.0.secondary_bg }
                 }
                 .into(),
                 ..self.active(is_checked)
@@ -871,15 +929,15 @@ mod dark {
         }
     }
 
-    pub struct PickList;
+    pub struct PickList(pub Colorscheme);
 
     impl pick_list::StyleSheet for PickList {
         fn menu(&self) -> pick_list::Menu {
             pick_list::Menu {
-                background: BRIGHT_BG.into(),
-                text_color: TEXT_COLOR,
-                selected_background: ACCENT.into(),
-                selected_text_color: TEXT_COLOR,
+                background: self.0.secondary_bg.into(),
+                text_color: self.0.text,
+                selected_background: self.0.accent.into(),
+                selected_text_color: self.0.text,
                 border_width: 3.0,
                 border_color: Color::TRANSPARENT,
             }
@@ -887,45 +945,45 @@ mod dark {
 
         fn active(&self) -> pick_list::Style {
             pick_list::Style {
-                background: DARK_BG.into(),
-                text_color: TEXT_COLOR,
+                background: self.0.primary_bg.into(),
+                text_color: self.0.text,
                 border_width: 1.5,
                 border_radius: 0.0,
-                border_color: DARKER,
+                border_color: self.0.border,
                 ..pick_list::Style::default()
             }
         }
 
         fn hovered(&self) -> pick_list::Style {
             pick_list::Style {
-                background: ACCENT.into(),
-                border_color: ACCENT,
+                background: self.0.accent.into(),
+                border_color: self.0.accent,
                 ..self.active()
             }
         }
     }
 
-    pub struct Rule(pub OverrideStyle);
+    pub struct Rule(pub OverrideStyle, pub Colorscheme);
 
     impl rule::StyleSheet for Rule {
         fn style(&self) -> rule::Style {
-            rule::Style {
-                color: self.0.background_color.unwrap_or(DARKER),
-                width: self.0.border_width.unwrap_or(3.0) as u16,
-                radius: self.0.border_radius.unwrap_or(8.0),
-                fill_mode: self.0.padded.unwrap_or(rule::FillMode::Padded(10)),
-            }
+            self.0.rule(rule::Style {
+                color: self.1.border,
+                width: 3,
+                radius: 8.0,
+                fill_mode: rule::FillMode::Padded(10),
+            })
         }
     }
 
-    pub struct RuleBright(pub OverrideStyle);
+    pub struct RuleBright(pub OverrideStyle, pub Colorscheme);
 
     impl rule::StyleSheet for RuleBright {
         fn style(&self) -> rule::Style {
-            rule::Style {
-                color: self.0.background_color.unwrap_or(BRIGHT_BG),
-                ..Rule(self.0).style()
-            }
+            self.0.rule(rule::Style {
+                color: self.1.secondary_bg,
+                ..Rule(self.0, self.1).style()
+            })
         }
     }
 }

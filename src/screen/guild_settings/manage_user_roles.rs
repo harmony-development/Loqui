@@ -8,7 +8,7 @@ use crate::{
     component::*,
     label, length,
     screen::{map_to_nothing, ClientExt},
-    style::{Theme, DEF_SIZE, PADDING, SPACING},
+    style::{tuple_to_iced_color, Theme, DEF_SIZE, PADDING, SPACING},
 };
 
 #[derive(Debug, Clone)]
@@ -53,7 +53,7 @@ impl ManageUserRolesModal {
                     let (tooltip, tooltip_position) = is_given
                         .then(|| ("Remove role from user", Position::Right))
                         .unwrap_or(("Give role to user", Position::Left));
-                    let role_color = Color::from_rgb8(role.color.0, role.color.1, role.color.2);
+                    let role_color = tuple_to_iced_color(role.color);
                     let role_but = Tooltip::new(
                         Button::new(but_state, label!(role.name.as_str()).color(role_color))
                             .on_press(Message::RoleChange {

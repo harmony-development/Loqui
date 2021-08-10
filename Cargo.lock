@@ -688,6 +688,7 @@ dependencies = [
  "chrono",
  "client",
  "fuzzy-matcher",
+ "hex_color",
  "iced",
  "iced_aw",
  "iced_native",
@@ -1738,6 +1739,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "hex_color"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cee0f56b7ac7d28f8f3357c2d4ce55401b2066414369d64976ccf740b949a05b"
+dependencies = [
+ "lazy_static",
+ "regex",
 ]
 
 [[package]]

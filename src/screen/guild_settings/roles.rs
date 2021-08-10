@@ -18,7 +18,7 @@ use crate::{
         Screen as TopLevelScreen,
     },
     space,
-    style::{Theme, ERROR_COLOR, PADDING, SPACING},
+    style::{tuple_to_iced_color, Theme, ERROR_COLOR, PADDING, SPACING},
 };
 
 use super::{GuildMetadata, Tab};
@@ -186,7 +186,7 @@ impl Tab for RolesTab {
                             .into(),
                     );
                 }
-                let role_color = Color::from_rgb8(role.color.0, role.color.1, role.color.2);
+                let role_color = tuple_to_iced_color(role.color);
                 content_widgets.push(
                     Tooltip::new(
                         Button::new(copy_name_state, label!(role.name.as_str()).color(role_color))

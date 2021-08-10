@@ -61,7 +61,9 @@ use crate::{
     label, label_button, length,
     screen::{map_send_msg, map_to_nothing, truncate_string, ClientExt, ResultExt},
     space,
-    style::{Theme, ALT_COLOR, AVATAR_WIDTH, DEF_SIZE, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING},
+    style::{
+        tuple_to_iced_color, Theme, ALT_COLOR, AVATAR_WIDTH, DEF_SIZE, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING,
+    },
 };
 
 use self::quick_switcher::QuickSwitcherModal;
@@ -343,9 +345,8 @@ impl MainScreen {
                     const TRUNCATE_LEN: usize = 10;
 
                     let highest_role = guild.highest_role_for_member(**user_id).map(|(id, role)| (id, role));
-                    let sender_name_color = highest_role.map_or(Color::WHITE, |(_, role)| {
-                        Color::from_rgb8(role.color.0, role.color.1, role.color.2)
-                    });
+                    let sender_name_color =
+                        highest_role.map_or(Color::WHITE, |(_, role)| tuple_to_iced_color(role.color));
                     let mut username = label!(truncate_string(&member.username, TRUNCATE_LEN)).color(sender_name_color);
                     // Set text color to a more dimmed one if the user is offline
                     if matches!(member.status, UserStatus::Offline) {

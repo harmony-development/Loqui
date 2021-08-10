@@ -54,6 +54,7 @@ iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", branch = "crust", d
     "number_input",
     "color_picker",
 ] }
+hex_color = "1"
 
 open = "2.0.0"
 rfd = "0.4"

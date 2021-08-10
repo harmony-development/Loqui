@@ -17,11 +17,12 @@ use crate::{
         Client, PostProcessEvent, Session,
     },
     component::*,
-    style::{Theme, AVATAR_WIDTH, PROFILE_AVATAR_WIDTH},
+    style::{Colorscheme, Theme, AVATAR_WIDTH, PROFILE_AVATAR_WIDTH},
 };
 
 use client::{
     bool_ext::BoolExt,
+    content::ColorschemeRaw,
     harmony_rust_sdk::{
         self,
         api::{
@@ -320,8 +321,13 @@ pub struct ScreenManager {
 
 impl ScreenManager {
     pub fn new(content_store: Arc<ContentStore>) -> Self {
+        let colorscheme = std::fs::read(content_store.theme_file())
+            .ok()
+            .and_then(|data| toml::from_slice::<ColorschemeRaw>(&data).ok())
+            .map_or_else(Default::default, Colorscheme::from);
+
         Self {
-            theme: Theme::default(),
+            theme: Theme::with_colorscheme(colorscheme),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new().into())),
             client: None,
             content_store,

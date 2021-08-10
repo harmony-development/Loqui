@@ -16,8 +16,8 @@ use crate::{
     },
     space,
     style::{
-        Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
-        MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
+        tuple_to_iced_color, Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR,
+        MESSAGE_SENDER_SIZE, MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
     },
     IOSEVKA,
 };
@@ -194,9 +194,7 @@ pub fn build_event_history<'a>(
             widgets.push(space!(w = LEFT_TIMESTAMP_PADDING + SPACING).into());
             let sender_name_color = guild
                 .highest_role_for_member(id_to_use)
-                .map_or(Color::WHITE, |(_, role)| {
-                    Color::from_rgb8(role.color.0, role.color.1, role.color.2)
-                });
+                .map_or(Color::WHITE, |(_, role)| tuple_to_iced_color(role.color));
             widgets.push(label_container(
                 label!(sender_display_name)
                     .size(MESSAGE_SENDER_SIZE)
@@ -346,7 +344,7 @@ pub fn build_event_history<'a>(
                             .spacing(SPACING / 4)
                             .align_items(Align::Start),
                     )
-                    .style(theme.round())
+                    .style(theme)
                     .into(),
                 );
             }
@@ -362,11 +360,7 @@ pub fn build_event_history<'a>(
                         .spacing(SPACING / 2)
                         .align_items(Align::Start),
                 )
-                .style(theme.round().secondary().border_color(Color::from_rgb8(
-                    embeds.color.0,
-                    embeds.color.1,
-                    embeds.color.2,
-                )))
+                .style(theme.secondary().border_color(tuple_to_iced_color(embeds.color)))
                 .into(),
             );
         }
