@@ -390,6 +390,7 @@ impl ScreenManager {
                         let _ = notify_rust::Notification::new()
                             .summary(&title)
                             .body(&truncate_string(&content, 50))
+                            .auto_icon()
                             .show();
                     }
                     Command::none()
