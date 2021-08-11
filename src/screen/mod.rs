@@ -180,7 +180,7 @@ impl Screen {
             Screen::Main(screen) => screen.subscription(),
             Screen::GuildSettings(screen) => screen.subscription(),
             Screen::GuildDiscovery(screen) => screen.subscription(),
-            _ => Subscription::none(),
+            Screen::Login(screen) => screen.subscription(),
         }
     }
 

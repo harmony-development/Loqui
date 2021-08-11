@@ -5,7 +5,7 @@ use crate::{
     label, label_button, length,
     screen::{try_convert_err_to_login_err, ClientExt, ResultExt},
     space,
-    style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING},
+    style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING, SPACING},
 };
 use client::{
     error::ClientResult,
@@ -23,8 +23,9 @@ use client::{
         },
     },
     smol_str::SmolStr,
-    AHashMap, IndexMap,
+    AHashMap, IndexMap, OptionExt,
 };
+use iced::rule;
 use std::{ops::Not, sync::Arc};
 
 #[allow(dead_code)]
@@ -47,6 +48,12 @@ impl Default for AuthPart {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FocusDirection {
+    Before,
+    After,
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     FieldChanged(SmolStr, String),
@@ -55,11 +62,15 @@ pub enum Message {
     GoBack,
     AuthStep(Option<AuthStep>),
     UseSession(Session),
+    Focus(FocusDirection),
 }
+
+type Fields = IndexMap<SmolStr, (text_input::State, String, String)>;
 
 #[derive(Debug, Default, Clone)]
 pub struct LoginScreen {
-    fields: IndexMap<SmolStr, (text_input::State, String, String)>,
+    title: SmolStr,
+    fields: Fields,
     choices: AHashMap<SmolStr, button::State>,
     proceed: button::State,
     back: button::State,
@@ -93,6 +104,7 @@ impl LoginScreen {
                 "text".to_string(),
             ),
         );
+        self.title = SmolStr::new_inline("choose homeserver");
     }
 
     pub fn view(&mut self, theme: Theme, content_store: &Arc<ContentStore>) -> Element<Message> {
@@ -102,7 +114,16 @@ impl LoginScreen {
                 .into();
         }
 
-        let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 1);
+        let mut widgets = Vec::with_capacity(self.fields.len() + self.choices.len() + 3);
+
+        if self.title.is_empty().not() {
+            widgets.push(label!(self.title.as_str()).into());
+            widgets.push(
+                Rule::horizontal(SPACING)
+                    .style(theme.border_radius(0.0).padded(rule::FillMode::Full))
+                    .into(),
+            );
+        }
 
         if self.current_error.is_empty().not() {
             let error_text = label!(&self.current_error).color(ERROR_COLOR).size(DEF_SIZE - 2);
@@ -138,7 +159,8 @@ impl LoginScreen {
             widgets.push(session_list.into());
         }
 
-        for (name, (state, value, r#type)) in self.fields.iter_mut() {
+        let fields_len = self.fields.len();
+        for (index, (name, (state, value, r#type))) in self.fields.iter_mut().enumerate() {
             let namee = name.clone();
             let mut input = TextInput::new(state, name, value, move |new| Message::FieldChanged(namee.clone(), new))
                 .padding(PADDING / 2)
@@ -147,6 +169,11 @@ impl LoginScreen {
                 "password" | "new-password" => input.password(),
                 _ => input,
             };
+            if index == fields_len - 1 {
+                input = input.on_submit(Message::Proceed);
+            } else {
+                input = input.on_submit(Message::Focus(FocusDirection::After));
+            }
             widgets.push(input.into());
         }
 
@@ -185,10 +212,14 @@ impl LoginScreen {
 
         fill_container(Row::with_children(vec![
             space!(w % 3).into(),
-            field_panel.width(length!(% 5)).into(),
+            fill_container(field_panel)
+                .height(length!(-))
+                .width(length!(% 5))
+                .style(theme.border_width(2.0))
+                .into(),
             space!(w % 3).into(),
         ]))
-        .style(theme)
+        .style(theme.border_width(0.0))
         .into()
     }
 
@@ -207,6 +238,36 @@ impl LoginScreen {
         }
 
         match msg {
+            Message::Focus(direction) => {
+                let find_focused = || self.fields.iter().position(|(_, (state, _, _))| state.is_focused());
+                let unfocus_pos = |pos, fields: &mut Fields| {
+                    fields.get_index_mut(pos).and_do(|(_, (state, _, _))| state.unfocus());
+                };
+                match direction {
+                    FocusDirection::Before => {
+                        if let Some(pos) = find_focused() {
+                            unfocus_pos(pos, &mut self.fields);
+                            let maybe_state = if pos == 0 {
+                                self.fields.get_index_mut(self.fields.len().saturating_sub(1))
+                            } else {
+                                self.fields.get_index_mut(pos - 1)
+                            };
+                            maybe_state.and_do(|(_, (state, _, _))| state.focus());
+                        }
+                    }
+                    FocusDirection::After => {
+                        if let Some(pos) = find_focused() {
+                            unfocus_pos(pos, &mut self.fields);
+                            let maybe_state = if pos == self.fields.len().saturating_sub(1) {
+                                self.fields.get_index_mut(0)
+                            } else {
+                                self.fields.get_index_mut(pos + 1)
+                            };
+                            maybe_state.and_do(|(_, (state, _, _))| state.focus());
+                        }
+                    }
+                }
+            }
             Message::FieldChanged(field, value) => {
                 if let Some((_, val, _)) = self.fields.get_mut(&field) {
                     *val = value;
@@ -313,11 +374,13 @@ impl LoginScreen {
                         if let Some(step) = step.step {
                             match step {
                                 Step::Choice(choice) => {
+                                    self.title = choice.title.into();
                                     self.choices
                                         .extend(choice.options.into_iter().map(|opt| (opt.into(), Default::default())));
                                     self.current_step = AuthPart::Step(AuthType::Choice);
                                 }
                                 Step::Form(form) => {
+                                    self.title = form.title.into();
                                     self.fields.extend(form.fields.into_iter().map(|field| {
                                         (
                                             field.name.into(),
@@ -325,6 +388,7 @@ impl LoginScreen {
                                         )
                                     }));
                                     self.current_step = AuthPart::Step(AuthType::Form);
+                                    self.fields.first_mut().and_do(|(_, (state, _, _))| state.focus());
                                 }
                                 _ => todo!("Implement waiting"),
                             }
@@ -386,6 +450,28 @@ impl LoginScreen {
             }
         }
         Command::none()
+    }
+
+    pub fn subscription(&self) -> Subscription<TopLevelMessage> {
+        iced_native::subscription::events_with(|ev, _| {
+            use iced_native::{
+                event::Event,
+                keyboard::{Event as Ke, KeyCode},
+            };
+
+            match ev {
+                Event::Keyboard(Ke::KeyPressed {
+                    key_code: KeyCode::Tab,
+                    modifiers,
+                }) => Some(
+                    modifiers
+                        .shift()
+                        .then(|| TopLevelMessage::login(Message::Focus(FocusDirection::Before)))
+                        .unwrap_or_else(|| TopLevelMessage::login(Message::Focus(FocusDirection::After))),
+                ),
+                _ => None,
+            }
+        })
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
