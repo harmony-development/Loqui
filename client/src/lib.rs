@@ -373,6 +373,8 @@ impl Client {
                                 }));
                             }
 
+                            post_emotes(&message, &mut post);
+
                             /*if let Some(message_id) = message.reply_to {
                                 post.push(PostProcessEvent::FetchMessage {
                                     guild_id,
@@ -451,6 +453,7 @@ impl Client {
                 if let Some(channel) = self.get_channel(guild_id, channel_id) {
                     if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_updated.message_id)) {
                         msg.content = Content::Text(message_updated.content);
+                        post_emotes(msg, &mut post);
                     }
                 }
             }
@@ -716,17 +719,22 @@ impl Client {
 
         for message in messages.values() {
             message.post_process(&mut post);
+            post_emotes(message, &mut post);
         }
 
-        for overrides in messages.values().flat_map(|msg| msg.overrides.as_ref()) {
-            if let Some(id) = overrides.avatar_url.clone() {
-                post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                    kind: "image".into(),
-                    name: "avatar".into(),
-                    ..Attachment::new_unknown(id)
-                }));
-            }
-        }
+        post.extend(
+            messages
+                .values()
+                .flat_map(|msg| msg.overrides.as_ref())
+                .filter_map(|ov| ov.avatar_url.clone())
+                .map(|id| {
+                    PostProcessEvent::FetchThumbnail(Attachment {
+                        kind: "image".into(),
+                        name: "avatar".into(),
+                        ..Attachment::new_unknown(id)
+                    })
+                }),
+        );
 
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             messages.extend(channel.messages.drain(..));
@@ -828,20 +836,34 @@ pub mod byte_writer {
     }
 }
 
+use regex::Regex;
+
+lazy_static::lazy_static! {
+    pub static ref MENTION: Regex = Regex::new("<@(?P<id>[0-9]*)>").unwrap();
+    pub static ref EMOTE: Regex = Regex::new("<:(?P<id>.*):>").unwrap();
+}
+
+pub fn post_emotes(message: &Message, post: &mut Vec<PostProcessEvent>) {
+    if let Content::Text(text) = &message.content {
+        post.extend(EMOTE.captures_iter(text).filter_map(|c| c.name("id")).map(|m| {
+            tracing::info!("fetching emote {}", m.as_str());
+            PostProcessEvent::FetchThumbnail(Attachment {
+                kind: "image".into(),
+                name: "emote".into(),
+                ..Attachment::new_unknown(FileId::Id(m.as_str().to_string()))
+            })
+        }));
+    }
+}
+
 pub fn render_text(textt: &str, members: &Members) -> String {
     use byte_writer::Writer;
-    use regex::Regex;
     use std::fmt::Write;
-
-    lazy_static::lazy_static! {
-        static ref MENTION: Regex = Regex::new("<@(?P<id>[0-9]*)>").unwrap();
-        static ref EMOTE: Regex = Regex::new("<:(.*):>").unwrap();
-    }
 
     // TODO: this is horribly inefficient
     let mut text = textt.to_string();
-    for capture in MENTION.captures_iter(textt) {
-        let user_id = capture.name("id").unwrap().as_str();
+    for m in MENTION.captures_iter(textt).filter_map(|c| c.name("id")) {
+        let user_id = m.as_str();
         if let Ok(parsed_user_id) = user_id.parse::<u64>() {
             let member_name = members
                 .get(&parsed_user_id)

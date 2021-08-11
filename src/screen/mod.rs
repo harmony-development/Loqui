@@ -91,6 +91,7 @@ pub enum Message {
         data: Attachment,
         thumbnail: Option<ImageHandle>,
         avatar: Option<(ImageHandle, ImageHandle)>,
+        emote: Option<ImageHandle>,
         open: bool,
     },
     TryEventsReceived(Vec<ClientResult<Event>>),
@@ -814,9 +815,13 @@ impl Application for ScreenManager {
                 data,
                 thumbnail,
                 avatar,
+                emote,
                 open,
             } => {
                 let path = self.content_store.content_path(&data.id);
+                emote.and_do(|emote| {
+                    self.thumbnail_cache.put_emote_thumbnail(data.id.clone(), emote);
+                });
                 avatar.and_do(|(profile_avatar, avatar)| {
                     self.thumbnail_cache.put_avatar_thumbnail(data.id.clone(), avatar);
                     self.thumbnail_cache
@@ -1093,6 +1098,7 @@ fn map_send_msg(data: (u64, u64, u64, IcyMessage, Duration, Option<u64>)) -> Mes
 
 fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &ThumbnailCache) -> Command<Message> {
     let is_thumbnailable = data.name == "avatar" || data.name == "guild";
+    let is_emote = data.name == "emote";
     thumbnail_cache
         .thumbnails
         .contains_key(&data.id)
@@ -1102,10 +1108,11 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
 
             let inner = client.inner_arc();
             let process_image = move |data: &[u8]| {
+                const FILTER: FilterType = FilterType::Lanczos3;
+
                 let image = image::load_from_memory(data).unwrap();
                 let avatar = is_thumbnailable.then(|| {
                     const RES_LEN: u32 = AVATAR_WIDTH as u32 - 4;
-                    const FILTER: FilterType = FilterType::Lanczos3;
                     const PRES_LEN: u32 = PROFILE_AVATAR_WIDTH as u32;
 
                     let bgra = image.resize(RES_LEN, RES_LEN, FILTER).into_bgra8();
@@ -1116,16 +1123,24 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
 
                     (profile_avatar, avatar)
                 });
+                let emote = is_emote.then(|| {
+                    const RES_LEN: u32 = 48;
+
+                    let bgra = image.resize(RES_LEN, RES_LEN, FILTER).into_bgra8();
+                    let emote = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
+
+                    emote
+                });
                 let content = is_thumbnailable.not().then(|| {
                     let bgra = image.into_bgra8();
                     ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec())
                 });
-                (content, avatar)
+                (content, avatar, emote)
             };
 
             Command::perform(
                 async move {
-                    let (thumbnail, avatar) = match tokio::fs::read(&content_path).await {
+                    let (thumbnail, avatar, emote) = match tokio::fs::read(&content_path).await {
                         Ok(raw) => process_image(&raw),
                         Err(err) => {
                             warn!("couldn't read thumbnail for ID {} from disk: {}", data.id, err);
@@ -1140,6 +1155,7 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
                         data,
                         avatar,
                         thumbnail,
+                        emote,
                         open: false,
                     })
                 },

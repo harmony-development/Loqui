@@ -1114,6 +1114,7 @@ impl MainScreen {
                                 TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
                                     avatar: None,
+                                    emote: None,
                                     thumbnail: Some(ImageHandle::from_pixels(
                                         bgra.width(),
                                         bgra.height(),
@@ -1146,6 +1147,7 @@ impl MainScreen {
                                 TopLevelMessage::DownloadedThumbnail {
                                     data: attachment,
                                     avatar: None,
+                                    emote: None,
                                     thumbnail: Some(ImageHandle::from_pixels(
                                         bgra.width(),
                                         bgra.height(),

@@ -167,6 +167,7 @@ enum Cache {
     Thumb,
     Avatar,
     ProfileAvat,
+    Emote,
 }
 
 #[derive(Debug)]
@@ -174,6 +175,7 @@ pub struct ThumbnailCache {
     pub thumbnails: IndexMap<FileId, ImageHandle>,
     pub avatars: IndexMap<FileId, ImageHandle>,
     pub profile_avatars: IndexMap<FileId, ImageHandle>,
+    pub emotes: IndexMap<FileId, ImageHandle>,
     max_size: usize,
 }
 
@@ -190,6 +192,7 @@ impl ThumbnailCache {
             thumbnails: IndexMap::default(),
             avatars: IndexMap::default(),
             profile_avatars: IndexMap::default(),
+            emotes: IndexMap::default(),
             max_size,
         }
     }
@@ -209,11 +212,17 @@ impl ThumbnailCache {
         self.internal_put_thumbnail(Cache::ProfileAvat, thumbnail_id, thumbnail)
     }
 
+    #[inline(always)]
+    pub fn put_emote_thumbnail(&mut self, thumbnail_id: FileId, thumbnail: ImageHandle) {
+        self.internal_put_thumbnail(Cache::Emote, thumbnail_id, thumbnail)
+    }
+
     fn internal_put_thumbnail(&mut self, cache: Cache, thumbnail_id: FileId, thumbnail: ImageHandle) {
         let map = match cache {
             Cache::Avatar => &mut self.avatars,
             Cache::ProfileAvat => &mut self.profile_avatars,
             Cache::Thumb => &mut self.thumbnails,
+            Cache::Emote => &mut self.emotes,
         };
 
         let thumbnail_size = get_image_size_from_handle(&thumbnail);
