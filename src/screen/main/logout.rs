@@ -49,7 +49,7 @@ impl LogoutModal {
                 .spacing(12);
 
                 Container::new(logout_confirm_panel)
-                    .style(theme.round().border_width(0.0))
+                    .style(theme)
                     .center_x()
                     .center_y()
                     .into()

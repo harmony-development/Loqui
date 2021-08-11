@@ -132,6 +132,7 @@ impl Display for GuildMenuOption {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    FocusComposer(char),
     EditLastMessage,
     QuickSwitch,
     ChangeMode(Mode),
@@ -907,12 +908,15 @@ impl MainScreen {
                         self.message.clear();
                     }
                 }
-                if let (Mode::EditingMessage(_), Mode::Normal) = (self.mode, mode) {
-                    self.composer_state.unfocus();
-                    self.message.clear();
-                }
-                if let (Mode::Normal, Mode::Normal) = (self.mode, mode) {
-                    self.error_text.clear();
+                if self.current_guild_id.is_some() && self.current_channel_id.is_some() {
+                    if let (Mode::EditingMessage(_), Mode::Normal) = (self.mode, mode) {
+                        self.composer_state.unfocus();
+                        self.message.clear();
+                    }
+                    if let (Mode::Normal, Mode::Normal) = (self.mode, mode) {
+                        self.composer_state.unfocus();
+                        self.error_text.clear();
+                    }
                 }
                 self.mode = mode;
             }
@@ -1464,27 +1468,37 @@ impl MainScreen {
                     );
                 }
             }
+            Message::FocusComposer(c) => {
+                if self.current_guild_id.is_some()
+                    && self.current_channel_id.is_some()
+                    && !self.composer_state.is_focused()
+                {
+                    self.composer_state.focus();
+                    self.message.push(c);
+                    self.composer_state.move_cursor_to_end();
+                }
+            }
         }
 
         Command::none()
     }
 
     pub fn subscription(&self) -> Subscription<TopLevelMessage> {
-        use iced_native::{keyboard, Event};
+        use iced_native::{event::Status, keyboard, Event};
 
-        fn filter_events(ev: Event, _status: iced_native::event::Status) -> Option<TopLevelMessage> {
+        fn filter_events(ev: Event, status: Status) -> Option<TopLevelMessage> {
             type Ke = keyboard::Event;
             type Kc = keyboard::KeyCode;
 
             match ev {
-                Event::Keyboard(Ke::KeyReleased {
+                Event::Keyboard(Ke::KeyPressed {
                     key_code: Kc::Escape, ..
                 }) => Some(TopLevelMessage::main(Message::ChangeMode(Mode::Normal))),
-                Event::Keyboard(Ke::KeyReleased {
+                Event::Keyboard(Ke::KeyPressed {
                     key_code: Kc::K,
                     modifiers,
                 }) => modifiers.control().then(|| TopLevelMessage::main(Message::QuickSwitch)),
-                Event::Keyboard(Ke::KeyReleased {
+                Event::Keyboard(Ke::KeyPressed {
                     key_code: Kc::Up,
                     modifiers,
                 }) => {
@@ -1501,7 +1515,7 @@ impl MainScreen {
                     };
                     Some(msg)
                 }
-                Event::Keyboard(Ke::KeyReleased {
+                Event::Keyboard(Ke::KeyPressed {
                     key_code: Kc::Down,
                     modifiers,
                 }) => {
@@ -1518,6 +1532,8 @@ impl MainScreen {
                     };
                     Some(msg)
                 }
+                Event::Keyboard(Ke::CharacterReceived(c)) => (matches!(status, Status::Ignored) && c != '')
+                    .then(|| TopLevelMessage::main(Message::FocusComposer(c))),
                 _ => None,
             }
         }
