@@ -1261,7 +1261,7 @@ pub fn sub_escape_pop_screen() -> Subscription<Message> {
         };
 
         match ev {
-            Event::Keyboard(Ke::KeyReleased {
+            Event::Keyboard(Ke::KeyPressed {
                 key_code: KeyCode::Escape,
                 ..
             }) => Some(Message::PopScreen),

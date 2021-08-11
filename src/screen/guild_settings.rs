@@ -9,6 +9,8 @@ mod manage_user_roles;
 mod members;
 mod roles;
 
+use std::ops::Not;
+
 use crate::{
     client::{error::ClientError, Client},
     component::*,
@@ -402,7 +404,14 @@ impl GuildSettings {
     }
 
     pub fn subscription(&self) -> Subscription<TopLevelMessage> {
-        sub_escape_pop_screen()
+        (self.role_modal.is_shown()
+            || self.create_channel_modal.is_shown()
+            || self.update_channel_modal.is_shown()
+            || self.manage_user_roles_modal.is_shown()
+            || self.manage_role_permissions_modal.is_shown())
+        .not()
+        .then(sub_escape_pop_screen)
+        .unwrap_or_else(Subscription::none)
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
