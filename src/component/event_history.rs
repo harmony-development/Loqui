@@ -417,7 +417,7 @@ pub fn build_event_history<'a>(
                             attachment: attachment.clone(),
                             is_thumbnail,
                         })
-                        .style(theme.secondary())
+                        .style(theme.secondary().border_width(2.0))
                         .into(),
                 );
             }

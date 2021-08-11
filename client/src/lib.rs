@@ -856,7 +856,6 @@ lazy_static::lazy_static! {
 pub fn post_emotes(message: &Message, post: &mut Vec<PostProcessEvent>) {
     if let Content::Text(text) = &message.content {
         post.extend(EMOTE.captures_iter(text).filter_map(|c| c.name("id")).map(|m| {
-            tracing::info!("fetching emote {}", m.as_str());
             PostProcessEvent::FetchThumbnail(Attachment {
                 kind: "image".into(),
                 name: "emote".into(),
