@@ -1671,9 +1671,9 @@ dependencies = [
 
 [[package]]
 name = "guillotiere"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9253eedea82720b2bc91fe831c9ce3a31299955ed5eb19b9ed600a625b686212"
+checksum = "b62d5865c036cb1393e23c50693df631d3f5d7bcca4c04fe4cc0fd592e74a782"
 dependencies = [
  "euclid",
  "svg_fmt",
@@ -1701,7 +1701,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#8b2fb9b367c2e5d0696f90e0529c5bb9d2ea83d2"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#30c066b210b06d142d7e14e9ecafd404a4795dd5"
 dependencies = [
  "proc-macro2",
  "quote 1.0.9",
@@ -1711,7 +1711,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#8b2fb9b367c2e5d0696f90e0529c5bb9d2ea83d2"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#30c066b210b06d142d7e14e9ecafd404a4795dd5"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -2205,9 +2205,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.98"
+version = "0.2.99"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "320cfe77175da3a483efed4bc0adc1968ca050b098ce4f2f1c13a56626128790"
+checksum = "a7f823d141fe0a24df1e23b4af4e3c7ba9e5966ec514ea068c93024aa7deb765"
 
 [[package]]
 name = "libloading"

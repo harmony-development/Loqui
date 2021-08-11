@@ -28,7 +28,7 @@ use client::{
         api::{
             chat::{
                 event::{Event, GuildAddedToList, GuildUpdated, MessageSent, PermissionUpdated, ProfileUpdated},
-                GetGuildListRequest, GetMessageRequest, GetUserResponse,
+                BatchQueryPermissionsRequest, GetGuildListRequest, GetMessageRequest, GetUserResponse,
             },
             harmonytypes::UserStatus,
             rest::FileId,
@@ -39,7 +39,7 @@ use client::{
                 chat::{
                     guild::{get_guild, get_guild_list},
                     message::get_message,
-                    permissions::{query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder},
+                    permissions::{batch_query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder},
                     profile::{self, get_user, get_user_bulk, ProfileUpdate},
                     EventSource, GuildId, UserId,
                 },
@@ -54,13 +54,11 @@ use client::{
 };
 use iced::{
     executor,
-    futures::{
-        future::{self, ready},
-        FutureExt,
-    },
+    futures::future::{self, ready},
     Application, Command, Element, Subscription,
 };
 use std::{
+    array::IntoIter,
     borrow::Cow,
     convert::identity,
     future::Future,
@@ -399,27 +397,28 @@ impl ScreenManager {
                     |inner| async move {
                         let perm_queries = ["channels.manage.change-information", "messages.send"];
                         let mut events = Vec::with_capacity(perm_queries.len());
-                        for query in perm_queries {
-                            let query = query.to_string();
-                            events.push(
-                                query_has_permission(
-                                    &inner,
-                                    QueryPermissions::new(guild_id, query.clone()).channel_id(channel_id),
-                                )
-                                .map(|res| {
-                                    res.map(|perm| {
-                                        Event::PermissionUpdated(PermissionUpdated {
-                                            guild_id,
-                                            channel_id,
-                                            ok: perm.ok,
-                                            query,
-                                        })
-                                    })
-                                    .map_err(ClientError::from)
+                        let batch_query = BatchQueryPermissionsRequest {
+                            requests: IntoIter::new(perm_queries)
+                                .map(|query| {
+                                    QueryPermissions::new(guild_id, query.to_string())
+                                        .channel_id(channel_id)
+                                        .into()
                                 })
-                                .await?,
-                            );
-                        }
+                                .collect(),
+                        };
+                        events.extend(batch_query_has_permission(&inner, batch_query).await.map(|resp| {
+                            resp.responses
+                                .into_iter()
+                                .zip(IntoIter::new(perm_queries))
+                                .map(|(perm, query)| {
+                                    Event::PermissionUpdated(PermissionUpdated {
+                                        guild_id,
+                                        channel_id,
+                                        ok: perm.ok,
+                                        query: query.to_string(),
+                                    })
+                                })
+                        })?);
                         ClientResult::Ok(events)
                     },
                     Message::EventsReceived,
@@ -490,23 +489,27 @@ impl ScreenManager {
                             "permissions.manage.get",
                         ];
                         events.reserve(perm_queries.len());
-                        for query in perm_queries {
-                            let query = query.to_string();
-                            events.push(
-                                query_has_permission(&inner, QueryPermissions::new(guild_id, query.clone()))
-                                    .map(|res| {
-                                        res.map(|perm| {
-                                            Event::PermissionUpdated(PermissionUpdated {
-                                                guild_id,
-                                                channel_id: 0,
-                                                ok: perm.ok,
-                                                query,
-                                            })
-                                        })
-                                        .map_err(Into::into)
-                                    })
-                                    .await,
-                            );
+                        let batch_query = BatchQueryPermissionsRequest {
+                            requests: IntoIter::new(perm_queries)
+                                .map(|query| QueryPermissions::new(guild_id, query.to_string()).into())
+                                .collect(),
+                        };
+                        let batch_resp = batch_query_has_permission(&inner, batch_query).await.map(|resp| {
+                            resp.responses
+                                .into_iter()
+                                .zip(IntoIter::new(perm_queries))
+                                .map(|(perm, query)| {
+                                    Ok(Event::PermissionUpdated(PermissionUpdated {
+                                        guild_id,
+                                        channel_id: 0,
+                                        ok: perm.ok,
+                                        query: query.to_string(),
+                                    }))
+                                })
+                        });
+                        match batch_resp {
+                            Ok(perms) => events.extend(perms),
+                            Err(err) => events.push(Err(err.into())),
                         }
                         ClientResult::Ok(events)
                     },
