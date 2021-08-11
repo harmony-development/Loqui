@@ -178,6 +178,8 @@ impl Screen {
     fn subscription(&self) -> Subscription<Message> {
         match self {
             Screen::Main(screen) => screen.subscription(),
+            Screen::GuildSettings(screen) => screen.subscription(),
+            Screen::GuildDiscovery(screen) => screen.subscription(),
             _ => Subscription::none(),
         }
     }
@@ -1138,9 +1140,7 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
                     const RES_LEN: u32 = 48;
 
                     let bgra = image.resize(RES_LEN, RES_LEN, FILTER).into_bgra8();
-                    let emote = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
-
-                    emote
+                    ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec())
                 });
                 let content = is_thumbnailable.not().then(|| {
                     let bgra = image.into_bgra8();
@@ -1251,4 +1251,21 @@ pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(value)
     }
+}
+
+pub fn sub_escape_pop_screen() -> Subscription<Message> {
+    iced_native::subscription::events_with(|ev, _| {
+        use iced_native::{
+            event::Event,
+            keyboard::{Event as Ke, KeyCode},
+        };
+
+        match ev {
+            Event::Keyboard(Ke::KeyReleased {
+                key_code: KeyCode::Escape,
+                ..
+            }) => Some(Message::PopScreen),
+            _ => None,
+        }
+    })
 }

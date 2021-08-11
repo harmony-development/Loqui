@@ -7,7 +7,7 @@ use client::{
     OptionExt,
 };
 
-use super::{ClientExt, Message as TopLevelMessage, Screen as TopLevelScreen};
+use super::{sub_escape_pop_screen, ClientExt, Message as TopLevelMessage, Screen as TopLevelScreen};
 
 use crate::{
     client::{error::ClientError, Client},
@@ -205,6 +205,10 @@ impl GuildDiscovery {
         }
 
         Command::none()
+    }
+
+    pub fn subscription(&self) -> Subscription<TopLevelMessage> {
+        sub_escape_pop_screen()
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {

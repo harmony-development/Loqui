@@ -42,7 +42,7 @@ use self::{
     roles::{RolesMessage, RolesTab},
 };
 
-use super::ClientExt;
+use super::{sub_escape_pop_screen, ClientExt};
 
 const TAB_PADDING: u16 = 16;
 
@@ -399,6 +399,10 @@ impl GuildSettings {
         ));
 
         content.into()
+    }
+
+    pub fn subscription(&self) -> Subscription<TopLevelMessage> {
+        sub_escape_pop_screen()
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
