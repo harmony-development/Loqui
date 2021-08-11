@@ -72,11 +72,11 @@ jobs:
 
     - name: UPX windows
       if: ${{ matrix.os == 'windows-latest' }}
-      run: upx.exe target/release/crust.exe
+      run: .github/upx.exe target/release/crust.exe
 
     - name: UPX unix
       if: ${{ matrix.os != 'windows-latest' }}
-      run: ./upx target/release/crust
+      run: .github/upx target/release/crust
 
     - name: Artifact macOS
       if: ${{ matrix.os == 'macOS-latest' }}
