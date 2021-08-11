@@ -379,7 +379,7 @@ impl Client {
                             g.user_perms.get_user_roles = ok;
                         }
                         "roles.user.manage" => g.user_perms.manage_user_roles = ok,
-                        "roles.user.get" => g.user_perms.get_roles = ok,
+                        "roles.user.get" => g.user_perms.get_user_roles = ok,
                         "invites.*" | "invites.manage.*" => {
                             g.user_perms.delete_invite = ok;
                             g.user_perms.create_invite = ok;
