@@ -27,9 +27,7 @@ use client::{
         self,
         api::{
             chat::{
-                event::{
-                    Event, GuildAddedToList, GuildUpdated, MessageSent, PermissionUpdated, ProfileUpdated, RoleCreated,
-                },
+                event::{Event, GuildAddedToList, GuildUpdated, MessageSent, PermissionUpdated, ProfileUpdated},
                 GetGuildListRequest, GetMessageRequest, GetUserResponse,
             },
             harmonytypes::UserStatus,
@@ -41,9 +39,7 @@ use client::{
                 chat::{
                     guild::{get_guild, get_guild_list},
                     message::get_message,
-                    permissions::{
-                        self, get_guild_roles, query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder,
-                    },
+                    permissions::{query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder},
                     profile::{self, get_user, get_user_bulk, ProfileUpdate},
                     EventSource, GuildId, UserId,
                 },
@@ -401,28 +397,30 @@ impl ScreenManager {
                 }
                 PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => client.mk_cmd(
                     |inner| async move {
-                        let query = |check_for: &str| {
-                            permissions::query_has_permission(
-                                &inner,
-                                QueryPermissions::new(guild_id, check_for.to_string()).channel_id(channel_id),
-                            )
-                        };
-                        let manage_channel = query("channels.manage.change-information").await?.ok;
-                        let send_msg = query("messages.send").await?.ok;
-                        ClientResult::Ok(vec![
-                            Event::PermissionUpdated(PermissionUpdated {
-                                guild_id,
-                                channel_id,
-                                ok: manage_channel,
-                                query: "channels.manage.change-information".to_string(),
-                            }),
-                            Event::PermissionUpdated(PermissionUpdated {
-                                guild_id,
-                                channel_id,
-                                ok: send_msg,
-                                query: "messages.send".to_string(),
-                            }),
-                        ])
+                        let perm_queries = ["channels.manage.change-information", "messages.send"];
+                        let mut events = Vec::with_capacity(perm_queries.len());
+                        for query in perm_queries {
+                            let query = query.to_string();
+                            events.push(
+                                query_has_permission(
+                                    &inner,
+                                    QueryPermissions::new(guild_id, query.clone()).channel_id(channel_id),
+                                )
+                                .map(|res| {
+                                    res.map(|perm| {
+                                        Event::PermissionUpdated(PermissionUpdated {
+                                            guild_id,
+                                            channel_id,
+                                            ok: perm.ok,
+                                            query,
+                                        })
+                                    })
+                                    .map_err(ClientError::from)
+                                })
+                                .await?,
+                            );
+                        }
+                        ClientResult::Ok(events)
                     },
                     Message::EventsReceived,
                 ),
@@ -473,39 +471,41 @@ impl ScreenManager {
                                 })
                             },
                         )?));
-                        let mk_perm_query = |query: String| {
-                            query_has_permission(&inner, QueryPermissions::new(guild_id, query.clone())).map(|res| {
-                                res.map(|perm| {
-                                    Event::PermissionUpdated(PermissionUpdated {
-                                        guild_id,
-                                        channel_id: 0,
-                                        ok: perm.ok,
-                                        query,
+                        let perm_queries = [
+                            "guild.manage.change-information",
+                            "user.manage.kick",
+                            "user.manage.ban",
+                            "user.manage.unban",
+                            "invites.manage.create",
+                            "invites.manage.delete",
+                            "invites.view",
+                            "channels.manage.move",
+                            "channels.manage.create",
+                            "channels.manage.delete",
+                            "roles.manage",
+                            "roles.get",
+                            "roles.user.manage",
+                            "roles.user.get",
+                        ];
+                        events.reserve(perm_queries.len());
+                        for query in perm_queries {
+                            let query = query.to_string();
+                            events.push(
+                                query_has_permission(&inner, QueryPermissions::new(guild_id, query.clone()))
+                                    .map(|res| {
+                                        res.map(|perm| {
+                                            Event::PermissionUpdated(PermissionUpdated {
+                                                guild_id,
+                                                channel_id: 0,
+                                                ok: perm.ok,
+                                                query,
+                                            })
+                                        })
+                                        .map_err(Into::into)
                                     })
-                                })
-                                .map_err(Into::into)
-                            })
-                        };
-                        events.push(mk_perm_query("guild.manage.change-information".to_string()).await);
-                        events.push(mk_perm_query("user.manage.kick".to_string()).await);
-                        events.push(mk_perm_query("user.manage.ban".to_string()).await);
-                        events.push(mk_perm_query("user.manage.unban".to_string()).await);
-                        events.extend(get_guild_roles(&inner, GuildId::new(guild_id)).await.map_or_else(
-                            |err| vec![Err(err.into())],
-                            |roles| {
-                                roles
-                                    .roles
-                                    .into_iter()
-                                    .map(|role| {
-                                        Ok(Event::RoleCreated(RoleCreated {
-                                            guild_id,
-                                            role_id: role.role_id,
-                                            role: Some(role),
-                                        }))
-                                    })
-                                    .collect::<Vec<_>>()
-                            },
-                        ));
+                                    .await,
+                            );
+                        }
                         ClientResult::Ok(events)
                     },
                     Message::TryEventsReceived,

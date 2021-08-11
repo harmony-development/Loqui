@@ -16,7 +16,7 @@ use client::{
     harmony_rust_sdk::{
         api::{
             chat::{
-                event::{ChannelCreated, Event, MemberJoined, MessageSent, UserRolesUpdated},
+                event::{ChannelCreated, Event, MemberJoined, MessageSent, RoleCreated, UserRolesUpdated},
                 GetChannelMessagesResponse, GetUserRolesRequest,
             },
             harmonytypes::UserStatus,
@@ -26,7 +26,7 @@ use client::{
                 self,
                 channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
                 guild::{self, get_guild_members},
-                permissions::get_user_roles,
+                permissions::{get_guild_roles, get_user_roles},
                 profile::{self, ProfileUpdate},
                 GuildId,
             },
@@ -1014,24 +1014,14 @@ impl MainScreen {
             Message::SelectedGuildMenuOption(option) => match option {
                 GuildMenuOption::EditGuild => {
                     let guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
-                    return client
-                        .guilds
-                        .get(&guild_id)
-                        .map(|g| {
-                            g.user_perms.change_info.map_or_else(
-                                || {
-                                    TopLevelMessage::Error(Box::new(ClientError::Custom(
-                                        "Not permitted to edit guild information".to_string(),
-                                    )))
-                                },
-                                || {
-                                    TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
-                                        super::GuildSettings::new(guild_id).into(),
-                                    )))
-                                },
-                            )
-                        })
-                        .map_or_else(Command::none, |msg| Command::perform(ready(msg), identity));
+                    return client.guilds.get(&guild_id).map_or_else(Command::none, |_| {
+                        Command::perform(
+                            ready(TopLevelMessage::PushScreen(Box::new(TopLevelScreen::GuildSettings(
+                                super::GuildSettings::new(guild_id).into(),
+                            )))),
+                            identity,
+                        )
+                    });
                 }
                 GuildMenuOption::LeaveGuild => {
                     let guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
@@ -1274,6 +1264,7 @@ impl MainScreen {
                 if let Some(guild) = client.get_guild(guild_id) {
                     if guild.channels.is_empty() && !guild.init_fetching {
                         guild.init_fetching = true;
+                        let user_perms = guild.user_perms.clone();
                         let inner = client.inner_arc();
                         return Command::perform(
                             async move {
@@ -1291,21 +1282,42 @@ impl MainScreen {
                                     }))
                                 }));
 
+                                if user_perms.get_roles {
+                                    events.extend(get_guild_roles(&inner, GuildId::new(guild_id)).await.map_or_else(
+                                        |err| vec![Err(err.into())],
+                                        |roles| {
+                                            roles
+                                                .roles
+                                                .into_iter()
+                                                .map(|role| {
+                                                    Ok(Event::RoleCreated(RoleCreated {
+                                                        guild_id,
+                                                        role_id: role.role_id,
+                                                        role: Some(role),
+                                                    }))
+                                                })
+                                                .collect::<Vec<_>>()
+                                        },
+                                    ));
+                                }
+
                                 let members = get_guild_members(&inner, guildid).await?.members;
                                 events.reserve(members.len() * 2);
-                                for id in &members {
-                                    events.push(
-                                        get_user_roles(&inner, GetUserRolesRequest { guild_id, user_id: *id })
-                                            .await
-                                            .map(|resp| {
-                                                Event::UserRolesUpdated(UserRolesUpdated {
-                                                    guild_id,
-                                                    user_id: *id,
-                                                    role_ids: resp.roles,
+                                if user_perms.get_user_roles {
+                                    for id in &members {
+                                        events.push(
+                                            get_user_roles(&inner, GetUserRolesRequest { guild_id, user_id: *id })
+                                                .await
+                                                .map(|resp| {
+                                                    Event::UserRolesUpdated(UserRolesUpdated {
+                                                        guild_id,
+                                                        user_id: *id,
+                                                        role_ids: resp.roles,
+                                                    })
                                                 })
-                                            })
-                                            .map_err(Into::into),
-                                    );
+                                                .map_err(Into::into),
+                                        );
+                                    }
                                 }
                                 let member_events = members
                                     .into_iter()

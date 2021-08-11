@@ -125,27 +125,6 @@ impl Tab for GeneralTab {
     ) -> Element<'_, ParentMessage> {
         let name_edit_but_state = &mut self.name_edit_but_state;
         let guild = client.guilds.get(&guild_id).unwrap();
-        let ui_text_input_row = row(vec![
-            Element::from(
-                TextInput::new(
-                    &mut self.name_edit_state,
-                    "Enter a new name...",
-                    self.name_edit_field.as_str(),
-                    GeneralMessage::NameChanged,
-                )
-                .style(theme)
-                .padding(PADDING / 2)
-                .width(length!(= 300)),
-            )
-            .map(ParentMessage::General),
-            Element::from(
-                Button::new(name_edit_but_state, label!["Update"])
-                    .on_press(GeneralMessage::NameButPressed)
-                    .style(theme),
-            )
-            .map(ParentMessage::General),
-        ])
-        .into();
 
         let ui_update_guild_icon = fill_container(
             guild
@@ -163,20 +142,23 @@ impl Tab for GeneralTab {
                     |handle| Element::from(Image::new(handle.clone())),
                 ),
         );
-
+        let mut ui_image_but = Button::new(&mut self.icon_edit_but_state, ui_update_guild_icon)
+            .height(length!(= PROFILE_AVATAR_WIDTH))
+            .width(length!(= PROFILE_AVATAR_WIDTH))
+            .style(theme);
+        if guild.user_perms.change_info {
+            ui_image_but = ui_image_but.on_press(GeneralMessage::UploadGuildImage);
+        }
         let ui_image_but = Element::from(
             Tooltip::new(
-                Button::new(&mut self.icon_edit_but_state, ui_update_guild_icon)
-                    .on_press(GeneralMessage::UploadGuildImage)
-                    .height(length!(= PROFILE_AVATAR_WIDTH))
-                    .width(length!(= PROFILE_AVATAR_WIDTH))
-                    .style(theme),
+                ui_image_but,
                 "Click to upload a new image",
                 iced::tooltip::Position::Top,
             )
             .style(theme),
         )
         .map(ParentMessage::General);
+
         let back = Element::from(
             label_button!(&mut self.back_but_state, "Back")
                 .style(theme)
@@ -215,7 +197,31 @@ impl Tab for GeneralTab {
             .into(),
         );
         content.push(ui_image_but);
-        content.push(ui_text_input_row);
+        if guild.user_perms.change_info {
+            content.push(
+                row(vec![
+                    Element::from(
+                        TextInput::new(
+                            &mut self.name_edit_state,
+                            "Enter a new name...",
+                            self.name_edit_field.as_str(),
+                            GeneralMessage::NameChanged,
+                        )
+                        .style(theme)
+                        .padding(PADDING / 2)
+                        .width(length!(= 300)),
+                    )
+                    .map(ParentMessage::General),
+                    Element::from(
+                        label_button!(name_edit_but_state, "Update")
+                            .on_press(GeneralMessage::NameButPressed)
+                            .style(theme),
+                    )
+                    .map(ParentMessage::General),
+                ])
+                .into(),
+            );
+        }
         content.push(back);
 
         column(content).into()

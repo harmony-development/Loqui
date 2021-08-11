@@ -137,18 +137,25 @@ impl GuildSettings {
                         // Invite tab
                         // Is Triggered when the invite tab is clicked
                         // Triggers the fetch of the invites, receiving is handled in invite.rs
-                        let guild_id = self.guild_id;
-                        let inner_client = client.inner().clone();
-                        return Command::perform(
-                            async move {
-                                let request = GetGuildInvitesRequest { guild_id };
-                                let invites = get_guild_invites(&inner_client, request).await?.invites;
-                                Ok(TopLevelMessage::ChildMessage(TopLevelScreenMessage::GuildSettings(
-                                    Message::Invite(InviteMessage::InvitesLoaded(invites)),
-                                )))
-                            },
-                            |result| result.unwrap_or_else(|err| TopLevelMessage::Error(Box::new(err))),
-                        );
+                        if client
+                            .guilds
+                            .get(&self.guild_id)
+                            .map_or(false, |g| g.user_perms.view_invites)
+                        {
+                            let guild_id = self.guild_id;
+                            return client.mk_cmd(
+                                |inner| async move {
+                                    get_guild_invites(&inner, GetGuildInvitesRequest { guild_id })
+                                        .await
+                                        .map(|resp| resp.invites)
+                                },
+                                |invites| {
+                                    TopLevelMessage::ChildMessage(TopLevelScreenMessage::GuildSettings(
+                                        Message::Invite(InviteMessage::InvitesLoaded(invites)),
+                                    ))
+                                },
+                            );
+                        }
                     }
                     2 => {
                         self.ordering_tab.error_message.clear();

@@ -100,37 +100,7 @@ impl Tab for OrderingTab {
             for ((channel_id, channel), (up_state, down_state, edit_state, copy_state, copy_name_state)) in
                 guild.channels.iter().zip(&mut self.button_states)
             {
-                let channel_index = guild.channels.get_index_of(channel_id).unwrap();
                 let channel_id = *channel_id;
-
-                let up_place = guild
-                    .channels
-                    .get_index(channel_index.wrapping_sub(2))
-                    .map(|(id, _)| *id);
-                let down_place = guild.channels.get_index(channel_index + 2).map(|(id, _)| *id);
-
-                let mk_place = |id, id_after| match (id, id_after) {
-                    (Some(before), Some(after)) => (before != after).then(|| Place::between(before, after)),
-                    (Some(before), None) => {
-                        (channel_index != guild.channels.len().saturating_sub(1)).then(|| Place::top(before))
-                    }
-                    (None, Some(after)) => (channel_index != 0).then(|| Place::bottom(after)),
-                    (None, None) => None,
-                };
-                let mut up_but = Button::new(up_state, icon(Icon::ArrowUp)).style(theme);
-                if let Some(new_place) = mk_place(up_place, Some(channel_id)) {
-                    up_but = up_but.on_press(ParentMessage::Ordering(OrderingMessage::MoveChannel {
-                        id: channel_id,
-                        new_place,
-                    }));
-                }
-                let mut down_but = Button::new(down_state, icon(Icon::ArrowDown)).style(theme);
-                if let Some(new_place) = mk_place(Some(channel_id), down_place) {
-                    down_but = down_but.on_press(ParentMessage::Ordering(OrderingMessage::MoveChannel {
-                        id: channel_id,
-                        new_place,
-                    }));
-                }
 
                 let mut content_widgets = Vec::with_capacity(6);
                 content_widgets.push(channel_icon(channel));
@@ -170,28 +140,63 @@ impl Tab for OrderingTab {
                         .into(),
                     );
                 }
-                content_widgets.push(
-                    Tooltip::new(up_but, "Move up", iced::tooltip::Position::Top)
-                        .style(theme)
-                        .into(),
-                );
-                content_widgets.push(
-                    Tooltip::new(down_but, "Move down", iced::tooltip::Position::Top)
-                        .style(theme)
-                        .into(),
-                );
+                if guild.user_perms.update_channel_order {
+                    let channel_index = guild.channels.get_index_of(&channel_id).unwrap();
+
+                    let up_place = guild
+                        .channels
+                        .get_index(channel_index.wrapping_sub(2))
+                        .map(|(id, _)| *id);
+                    let down_place = guild.channels.get_index(channel_index + 2).map(|(id, _)| *id);
+
+                    let mk_place = |id, id_after| match (id, id_after) {
+                        (Some(before), Some(after)) => (before != after).then(|| Place::between(before, after)),
+                        (Some(before), None) => {
+                            (channel_index != guild.channels.len().saturating_sub(1)).then(|| Place::top(before))
+                        }
+                        (None, Some(after)) => (channel_index != 0).then(|| Place::bottom(after)),
+                        (None, None) => None,
+                    };
+                    let mut up_but = Button::new(up_state, icon(Icon::ArrowUp)).style(theme);
+                    if let Some(new_place) = mk_place(up_place, Some(channel_id)) {
+                        up_but = up_but.on_press(ParentMessage::Ordering(OrderingMessage::MoveChannel {
+                            id: channel_id,
+                            new_place,
+                        }));
+                    }
+                    let mut down_but = Button::new(down_state, icon(Icon::ArrowDown)).style(theme);
+                    if let Some(new_place) = mk_place(Some(channel_id), down_place) {
+                        down_but = down_but.on_press(ParentMessage::Ordering(OrderingMessage::MoveChannel {
+                            id: channel_id,
+                            new_place,
+                        }));
+                    }
+
+                    content_widgets.push(
+                        Tooltip::new(up_but, "Move up", iced::tooltip::Position::Top)
+                            .style(theme)
+                            .into(),
+                    );
+                    content_widgets.push(
+                        Tooltip::new(down_but, "Move down", iced::tooltip::Position::Top)
+                            .style(theme)
+                            .into(),
+                    );
+                }
 
                 channels = channels.push(Container::new(row(content_widgets)).style(theme));
             }
+            if guild.user_perms.create_channel {
+                channels = channels.push(
+                    fill_container(
+                        label_button!(&mut self.create_channel_state, "Create Channel")
+                            .on_press(ParentMessage::NewChannel)
+                            .style(theme),
+                    )
+                    .height(length!(-)),
+                );
+            }
         }
-        channels = channels.push(
-            fill_container(
-                label_button!(&mut self.create_channel_state, "Create Channel")
-                    .on_press(ParentMessage::NewChannel)
-                    .style(theme),
-            )
-            .height(length!(-)),
-        );
 
         let mut content = Vec::with_capacity(3);
 

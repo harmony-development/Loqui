@@ -245,69 +245,73 @@ impl Tab for RolesTab {
                     .into(),
                 );
                 content_widgets.push(space!(w+).into());
-                content_widgets.push(
-                    ColorPicker::new(
-                        color_picker_state,
+                if guild.user_perms.manage_roles {
+                    content_widgets.push(
+                        ColorPicker::new(
+                            color_picker_state,
+                            Tooltip::new(
+                                Button::new(color_but_state, icon(Icon::Brush))
+                                    .style(theme)
+                                    .on_press(ParentMessage::Roles(RolesMessage::ShowColorPicker(role_index, true))),
+                                "Pick color",
+                                iced::tooltip::Position::Top,
+                            )
+                            .style(theme),
+                            ParentMessage::Roles(RolesMessage::ShowColorPicker(role_index, false)),
+                            move |color| ParentMessage::Roles(RolesMessage::SetColor { role_id, color }),
+                        )
+                        .style(theme)
+                        .into(),
+                    );
+                    content_widgets.push(
                         Tooltip::new(
-                            Button::new(color_but_state, icon(Icon::Brush))
+                            Button::new(edit_state, icon(Icon::Pencil))
                                 .style(theme)
-                                .on_press(ParentMessage::Roles(RolesMessage::ShowColorPicker(role_index, true))),
-                            "Pick color",
+                                .on_press(ParentMessage::ShowEditRoleModal(role_id)),
+                            "Edit role",
                             iced::tooltip::Position::Top,
                         )
-                        .style(theme),
-                        ParentMessage::Roles(RolesMessage::ShowColorPicker(role_index, false)),
-                        move |color| ParentMessage::Roles(RolesMessage::SetColor { role_id, color }),
-                    )
-                    .style(theme)
-                    .into(),
-                );
-                content_widgets.push(
-                    Tooltip::new(
-                        Button::new(edit_state, icon(Icon::Pencil))
-                            .style(theme)
-                            .on_press(ParentMessage::ShowEditRoleModal(role_id)),
-                        "Edit role",
-                        iced::tooltip::Position::Top,
-                    )
-                    .style(theme)
-                    .into(),
-                );
-                content_widgets.push(
-                    Tooltip::new(
-                        Button::new(manage_perms_state, icon(Icon::ListCheck))
-                            .style(theme)
-                            .on_press(ParentMessage::ShowManagePermsModal(
-                                role_id,
-                                self.manage_perms_on_channel.0.as_ref().map(|(id, _)| *id),
-                            )),
-                        "Manage permissions",
-                        iced::tooltip::Position::Top,
-                    )
-                    .style(theme)
-                    .into(),
-                );
-                content_widgets.push(
-                    Tooltip::new(up_but, "Move up", iced::tooltip::Position::Top)
                         .style(theme)
                         .into(),
-                );
-                content_widgets.push(
-                    Tooltip::new(down_but, "Move down", iced::tooltip::Position::Top)
+                    );
+                    content_widgets.push(
+                        Tooltip::new(
+                            Button::new(manage_perms_state, icon(Icon::ListCheck))
+                                .style(theme)
+                                .on_press(ParentMessage::ShowManagePermsModal(
+                                    role_id,
+                                    self.manage_perms_on_channel.0.as_ref().map(|(id, _)| *id),
+                                )),
+                            "Manage permissions",
+                            iced::tooltip::Position::Top,
+                        )
                         .style(theme)
                         .into(),
-                );
+                    );
+                    content_widgets.push(
+                        Tooltip::new(up_but, "Move up", iced::tooltip::Position::Top)
+                            .style(theme)
+                            .into(),
+                    );
+                    content_widgets.push(
+                        Tooltip::new(down_but, "Move down", iced::tooltip::Position::Top)
+                            .style(theme)
+                            .into(),
+                    );
+                }
                 roles = roles.push(Container::new(row(content_widgets)).style(theme));
             }
+            if guild.user_perms.manage_roles {
+                roles = roles.push(
+                    fill_container(
+                        label_button!(&mut self.create_role_state, "Create Role")
+                            .on_press(ParentMessage::NewRole)
+                            .style(theme),
+                    )
+                    .height(length!(-)),
+                );
+            }
         }
-        roles = roles.push(
-            fill_container(
-                label_button!(&mut self.create_role_state, "Create Role")
-                    .on_press(ParentMessage::NewRole)
-                    .style(theme),
-            )
-            .height(length!(-)),
-        );
 
         let mut content = Vec::with_capacity(4);
 
@@ -323,23 +327,25 @@ impl Tab for RolesTab {
                     .iter()
                     .map(|(id, channel)| ChannelSelection(Some((*id, channel.name.clone())))),
             );
+            if guild.user_perms.manage_roles {
+                content.push(
+                    Row::with_children(vec![
+                        label!("Manage roles on:").into(),
+                        PickList::new(
+                            &mut self.channel_select_state,
+                            options,
+                            Some(self.manage_perms_on_channel.clone()),
+                            |selected| ParentMessage::Roles(RolesMessage::SelectedChannel(selected)),
+                        )
+                        .style(theme)
+                        .into(),
+                    ])
+                    .align_items(Align::Center)
+                    .spacing(SPACING)
+                    .into(),
+                );
+            }
         }
-        content.push(
-            Row::with_children(vec![
-                label!("Manage roles on:").into(),
-                PickList::new(
-                    &mut self.channel_select_state,
-                    options,
-                    Some(self.manage_perms_on_channel.clone()),
-                    |selected| ParentMessage::Roles(RolesMessage::SelectedChannel(selected)),
-                )
-                .style(theme)
-                .into(),
-            ])
-            .align_items(Align::Center)
-            .spacing(SPACING)
-            .into(),
-        );
         content.push(fill_container(roles).style(theme).into());
         content.push(
             label_button!(&mut self.back_but_state, "Back")

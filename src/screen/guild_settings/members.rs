@@ -147,17 +147,19 @@ impl Tab for MembersTab {
                             .into(),
                     );
                 }
-                content_widgets.push(
-                    Tooltip::new(
-                        Button::new(edit_state, icon(Icon::Pencil))
-                            .style(theme)
-                            .on_press(ParentMessage::ShowManageUserRoles(member_id)),
-                        "Edit member roles",
-                        iced::tooltip::Position::Top,
-                    )
-                    .style(theme)
-                    .into(),
-                );
+                if guild.user_perms.manage_user_roles {
+                    content_widgets.push(
+                        Tooltip::new(
+                            Button::new(edit_state, icon(Icon::Pencil))
+                                .style(theme)
+                                .on_press(ParentMessage::ShowManageUserRoles(member_id)),
+                            "Edit member roles",
+                            iced::tooltip::Position::Top,
+                        )
+                        .style(theme)
+                        .into(),
+                    );
+                }
 
                 members = members.push(Container::new(row(content_widgets)).style(theme));
             }

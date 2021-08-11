@@ -336,7 +336,18 @@ impl Client {
 
                 if let Some(g) = self.get_guild(guild_id) {
                     match query.as_str() {
-                        "channels.manage.change-information" | "channel.manage.*" | "channel.*" => {
+                        "channel.manage.*" | "channel.*" => {
+                            g.user_perms.create_channel = ok;
+                            g.user_perms.delete_channel = ok;
+                            g.user_perms.update_channel_order = ok;
+                            g.channels
+                                .get_mut(&channel_id)
+                                .and_do(|c| c.user_perms.manage_channel = ok);
+                        }
+                        "channels.manage.move" => g.user_perms.update_channel_order = ok,
+                        "channels.manage.create" => g.user_perms.create_channel = ok,
+                        "channels.manage.delete" => g.user_perms.delete_channel = ok,
+                        "channels.manage.change-information" => {
                             g.channels
                                 .get_mut(&channel_id)
                                 .and_do(|c| c.user_perms.manage_channel = ok);
@@ -355,6 +366,26 @@ impl Client {
                         "user.manage.ban" => g.user_perms.ban_user = ok,
                         "user.manage.kick" => g.user_perms.kick_user = ok,
                         "user.manage.unban" => g.user_perms.unban_user = ok,
+                        "roles.*" => {
+                            g.user_perms.manage_roles = ok;
+                            g.user_perms.get_roles = ok;
+                            g.user_perms.manage_user_roles = ok;
+                            g.user_perms.get_user_roles = ok;
+                        }
+                        "roles.manage" => g.user_perms.manage_roles = ok,
+                        "roles.get" => g.user_perms.get_roles = ok,
+                        "roles.user.*" => {
+                            g.user_perms.manage_user_roles = ok;
+                            g.user_perms.get_user_roles = ok;
+                        }
+                        "roles.user.manage" => g.user_perms.manage_user_roles = ok,
+                        "roles.user.get" => g.user_perms.get_roles = ok,
+                        "invites.*" | "invites.manage.*" => {
+                            g.user_perms.delete_invite = ok;
+                            g.user_perms.create_invite = ok;
+                        }
+                        "invites.manage.delete" => g.user_perms.delete_invite = ok,
+                        "invites.manage.create" => g.user_perms.create_invite = ok,
                         _ => {}
                     }
                 }

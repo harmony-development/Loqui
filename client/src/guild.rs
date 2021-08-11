@@ -64,8 +64,18 @@ fn update_order<V>(map: &mut IndexMap<u64, V>, previous_id: u64, next_id: u64, i
 
 #[derive(Debug, Default, Clone)]
 pub struct GuildPerms {
-    pub change_info: bool,
-    pub ban_user: bool,
-    pub kick_user: bool,
-    pub unban_user: bool,
+    pub change_info: bool,          // guild.manage.change-information
+    pub ban_user: bool,             // user.manage.ban
+    pub kick_user: bool,            // user.manage.kick
+    pub unban_user: bool,           // user.manage.unban
+    pub get_user_roles: bool,       // roles.user.get
+    pub manage_user_roles: bool,    // roles.user.manage
+    pub manage_roles: bool,         // roles.manage
+    pub get_roles: bool,            // roles.get
+    pub update_channel_order: bool, // channels.manage.move
+    pub create_channel: bool,       // channels.manage.create
+    pub delete_channel: bool,       // channels.manage.delete
+    pub create_invite: bool,        // invites.manage.create
+    pub delete_invite: bool,        // invites.manage.delete
+    pub view_invites: bool,         // invites.view
 }

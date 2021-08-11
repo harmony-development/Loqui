@@ -152,47 +152,51 @@ impl Tab for InviteTab {
     fn content(
         &mut self,
         client: &Client,
-        _: u64,
+        guild_id: u64,
         meta_data: &mut GuildMetadata,
         theme: Theme,
         _: &ThumbnailCache,
     ) -> Element<'_, InviteMessage> {
+        let user_perms = client
+            .guilds
+            .get(&guild_id)
+            .map_or_else(Default::default, |g| g.user_perms.clone());
         let mut widgets = Vec::with_capacity(10);
         if !self.error_message.is_empty() {
             widgets.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
         }
         // If there are any invites, create invite list
-        if let Some(invites) = &meta_data.invites {
-            // Create header for invite list
-            let invites_table = row(vec![
-                label!("Invite Id").width(length!(% 19)).into(),
-                space!(w % 20).into(),
-                label!("Possible uses").width(length!(% 4)).into(),
-                space!(w % 3).into(),
-                label!("Uses").width(length!(% 3)).into(),
-                space!(w % 3).into(),
-            ]);
-            let homeserver_url = client.inner().homeserver_url();
-            let mut url = Url::parse(
-                format!(
-                    "harmony://{}:{}/",
-                    homeserver_url.host().unwrap(),
-                    homeserver_url.port().unwrap_or(2289)
+        if user_perms.view_invites {
+            if let Some(invites) = &meta_data.invites {
+                // Create header for invite list
+                let invites_table = row(vec![
+                    label!("Invite Id").width(length!(% 19)).into(),
+                    space!(w % 20).into(),
+                    label!("Possible uses").width(length!(% 4)).into(),
+                    space!(w % 3).into(),
+                    label!("Uses").width(length!(% 3)).into(),
+                    space!(w % 3).into(),
+                ]);
+                let homeserver_url = client.inner().homeserver_url();
+                let mut url = Url::parse(
+                    format!(
+                        "harmony://{}:{}/",
+                        homeserver_url.host().unwrap(),
+                        homeserver_url.port().unwrap_or(2289)
+                    )
+                    .as_str(),
                 )
-                .as_str(),
-            )
-            .unwrap();
-            self.but_states.resize_with(invites.len(), Default::default);
-            let mut invites_scrollable = Scrollable::new(&mut self.invite_list_state)
-                .style(theme)
-                .align_items(Align::Center);
-            // Create each line of the invite list
-            for (n, (cur_invite, (del_but_state, copy_url_state))) in
-                invites.iter().zip(self.but_states.iter_mut()).enumerate()
-            {
-                url.set_path(&cur_invite.invite_id);
-                invites_scrollable = invites_scrollable.push(
-                    Container::new(row(vec![
+                .unwrap();
+                self.but_states.resize_with(invites.len(), Default::default);
+                let mut invites_scrollable = Scrollable::new(&mut self.invite_list_state)
+                    .style(theme)
+                    .align_items(Align::Center);
+                // Create each line of the invite list
+                for (n, (cur_invite, (del_but_state, copy_url_state))) in
+                    invites.iter().zip(self.but_states.iter_mut()).enumerate()
+                {
+                    url.set_path(&cur_invite.invite_id);
+                    let mut row_widgets = vec![
                         Tooltip::new(
                             label_button!(copy_url_state, url.as_str())
                                 .on_press(InviteMessage::CopyToClipboard(url.to_string()))
@@ -209,50 +213,62 @@ impl Tab for InviteTab {
                         space!(w % 3).into(),
                         label!(cur_invite.use_count.to_string()).width(length!(% 3)).into(),
                         space!(w % 1).into(),
-                        Button::new(del_but_state, icon(Icon::Trash))
-                            .style(theme)
-                            .on_press(InviteMessage::DeleteInvitePressed(n))
-                            .into(),
-                    ]))
-                    .style(theme),
-                );
+                    ];
+                    if user_perms.delete_invite {
+                        row_widgets.push(
+                            Button::new(del_but_state, icon(Icon::Trash))
+                                .style(theme)
+                                .on_press(InviteMessage::DeleteInvitePressed(n))
+                                .into(),
+                        );
+                    }
+                    invites_scrollable = invites_scrollable.push(Container::new(row(row_widgets)).style(theme));
+                }
+                widgets.push(invites_table.into());
+                widgets.push(fill_container(invites_scrollable).style(theme).into());
+            // If there aren't any invites
+            } else {
+                widgets.push(label!("Fetching invites").into());
             }
-            widgets.push(invites_table.into());
-            widgets.push(fill_container(invites_scrollable).style(theme).into());
-        // If there aren't any invites
         } else {
-            widgets.push(label!("Fetching invites").into());
+            widgets.push(
+                label!("You don't have permission to view invites")
+                    .color(theme.colorscheme.error)
+                    .into(),
+            );
         }
         widgets.push(space!(h = 20).into());
         // Invite Creation fields
-        widgets.push(
-            row(vec![
-                TextInput::new(
-                    &mut self.invite_name_state,
-                    "Enter invite name...",
-                    self.invite_name_value.as_str(),
-                    InviteMessage::InviteNameChanged,
-                )
-                .style(theme)
-                .padding(PADDING / 2)
-                .into(),
-                TextInput::new(
-                    &mut self.invite_uses_state,
-                    "Enter possible uses...",
-                    self.invite_uses_value.as_str(),
-                    InviteMessage::InviteUsesChanged,
-                )
-                .width(length!(= 200))
-                .padding(PADDING / 2)
-                .style(theme)
-                .into(),
-                Button::new(&mut self.create_invite_but_state, label!("Create"))
+        if user_perms.create_invite {
+            widgets.push(
+                row(vec![
+                    TextInput::new(
+                        &mut self.invite_name_state,
+                        "Enter invite name...",
+                        self.invite_name_value.as_str(),
+                        InviteMessage::InviteNameChanged,
+                    )
                     .style(theme)
-                    .on_press(InviteMessage::CreateInvitePressed)
+                    .padding(PADDING / 2)
                     .into(),
-            ])
-            .into(),
-        );
+                    TextInput::new(
+                        &mut self.invite_uses_state,
+                        "Enter possible uses...",
+                        self.invite_uses_value.as_str(),
+                        InviteMessage::InviteUsesChanged,
+                    )
+                    .width(length!(= 200))
+                    .padding(PADDING / 2)
+                    .style(theme)
+                    .into(),
+                    Button::new(&mut self.create_invite_but_state, label!("Create"))
+                        .style(theme)
+                        .on_press(InviteMessage::CreateInvitePressed)
+                        .into(),
+                ])
+                .into(),
+            );
+        }
         widgets.push(space!(h = 20).into());
         //Back button
         widgets.push(
