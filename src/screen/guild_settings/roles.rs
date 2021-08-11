@@ -245,6 +245,22 @@ impl Tab for RolesTab {
                     .into(),
                 );
                 content_widgets.push(space!(w+).into());
+                if guild.user_perms.set_permission {
+                    content_widgets.push(
+                        Tooltip::new(
+                            Button::new(manage_perms_state, icon(Icon::ListCheck))
+                                .style(theme)
+                                .on_press(ParentMessage::ShowManagePermsModal(
+                                    role_id,
+                                    self.manage_perms_on_channel.0.as_ref().map(|(id, _)| *id),
+                                )),
+                            "Manage permissions",
+                            iced::tooltip::Position::Top,
+                        )
+                        .style(theme)
+                        .into(),
+                    );
+                }
                 if guild.user_perms.manage_roles {
                     content_widgets.push(
                         ColorPicker::new(
@@ -269,20 +285,6 @@ impl Tab for RolesTab {
                                 .style(theme)
                                 .on_press(ParentMessage::ShowEditRoleModal(role_id)),
                             "Edit role",
-                            iced::tooltip::Position::Top,
-                        )
-                        .style(theme)
-                        .into(),
-                    );
-                    content_widgets.push(
-                        Tooltip::new(
-                            Button::new(manage_perms_state, icon(Icon::ListCheck))
-                                .style(theme)
-                                .on_press(ParentMessage::ShowManagePermsModal(
-                                    role_id,
-                                    self.manage_perms_on_channel.0.as_ref().map(|(id, _)| *id),
-                                )),
-                            "Manage permissions",
                             iced::tooltip::Position::Top,
                         )
                         .style(theme)

@@ -78,4 +78,6 @@ pub struct GuildPerms {
     pub create_invite: bool,        // invites.manage.create
     pub delete_invite: bool,        // invites.manage.delete
     pub view_invites: bool,         // invites.view
+    pub set_permission: bool,       // permissions.set
+    pub get_permission: bool,       // permissions.get
 }

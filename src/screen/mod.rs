@@ -486,6 +486,8 @@ impl ScreenManager {
                             "roles.get",
                             "roles.user.manage",
                             "roles.user.get",
+                            "permissions.manage.set",
+                            "permissions.manage.get",
                         ];
                         events.reserve(perm_queries.len());
                         for query in perm_queries {

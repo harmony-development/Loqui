@@ -243,12 +243,16 @@ impl GuildSettings {
                 self.manage_role_permissions_modal.show(true);
                 self.current_error.clear();
                 if let Some(guild) = client.guilds.get(&self.guild_id) {
-                    let guild_id = self.guild_id;
-                    let mut cmds = Vec::with_capacity(guild.channels.len() + 1);
-                    let mk_cmd = |channel_id| {
-                        client.mk_cmd(
-                            |inner| async move {
-                                get_permissions(&inner, GetPermissions::new(guild_id, role_id).channel_id(channel_id))
+                    if guild.user_perms.get_permission {
+                        let guild_id = self.guild_id;
+                        let mut cmds = Vec::with_capacity(guild.channels.len() + 1);
+                        let mk_cmd = |channel_id| {
+                            client.mk_cmd(
+                                |inner| async move {
+                                    get_permissions(
+                                        &inner,
+                                        GetPermissions::new(guild_id, role_id).channel_id(channel_id),
+                                    )
                                     .await
                                     .map(|p| {
                                         vec![Event::RolePermsUpdated(RolePermissionsUpdated {
@@ -258,22 +262,23 @@ impl GuildSettings {
                                             role_id,
                                         })]
                                     })
-                            },
-                            TopLevelMessage::EventsReceived,
-                        )
-                    };
+                                },
+                                TopLevelMessage::EventsReceived,
+                            )
+                        };
 
-                    if guild.role_perms.iter().filter(|(id, _)| role_id.eq(*id)).count() == 0 {
-                        cmds.push(mk_cmd(0));
-                    }
-
-                    for (channel_id, channel) in &guild.channels {
-                        if channel.role_perms.iter().filter(|(id, _)| role_id.eq(*id)).count() == 0 {
-                            cmds.push(mk_cmd(*channel_id));
+                        if guild.role_perms.iter().filter(|(id, _)| role_id.eq(*id)).count() == 0 {
+                            cmds.push(mk_cmd(0));
                         }
-                    }
 
-                    return Command::batch(cmds);
+                        for (channel_id, channel) in &guild.channels {
+                            if channel.role_perms.iter().filter(|(id, _)| role_id.eq(*id)).count() == 0 {
+                                cmds.push(mk_cmd(*channel_id));
+                            }
+                        }
+
+                        return Command::batch(cmds);
+                    }
                 }
             }
             Message::NewRole => {

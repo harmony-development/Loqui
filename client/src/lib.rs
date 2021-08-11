@@ -386,6 +386,12 @@ impl Client {
                         }
                         "invites.manage.delete" => g.user_perms.delete_invite = ok,
                         "invites.manage.create" => g.user_perms.create_invite = ok,
+                        "permissions.*" | "permissions.manage.*" => {
+                            g.user_perms.get_permission = ok;
+                            g.user_perms.set_permission = ok;
+                        }
+                        "permissions.manage.set" => g.user_perms.set_permission = ok,
+                        "permissions.manage.get" => g.user_perms.get_permission = ok,
                         _ => {}
                     }
                 }
