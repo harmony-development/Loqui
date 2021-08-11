@@ -73,7 +73,8 @@ impl ManageRolePermissionsModal {
                             .on_press(Message::SetPerm(perm, true))
                             .into(),
                     ])
-                    .align_items(Align::Center),
+                    .align_items(Align::Center)
+                    .spacing(SPACING),
                 )
                 .padding(PADDING / 2)
                 .style(theme)
@@ -88,6 +89,7 @@ impl ManageRolePermissionsModal {
             );
 
             if let Some(permissions) = permissions {
+                self.delete_but_states.resize_with(permissions.len(), Default::default);
                 for (perm, delete_state) in permissions.iter().zip(self.delete_but_states.iter_mut()) {
                     perms = perms.push(mk_perm_card(perm, delete_state));
                 }
