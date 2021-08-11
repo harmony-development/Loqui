@@ -115,7 +115,7 @@ impl ProfileEditModal {
                             .map(|(_, role)| {
                                 let color = tuple_to_iced_color(role.color);
                                 Container::new(label!(role.name.as_str()).size(DEF_SIZE - 4).color(color))
-                                    .padding(SPACING / 2)
+                                    .padding(PADDING / 4)
                                     .style(theme.background_color(Color { a: 0.2, ..color }))
                                     .into()
                             })

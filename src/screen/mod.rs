@@ -342,7 +342,15 @@ impl ScreenManager {
             })
             .unwrap();
 
-            watcher.watch(cstore.theme_file(), RecursiveMode::NonRecursive).unwrap();
+            watcher
+                .watch(
+                    cstore
+                        .theme_file()
+                        .parent()
+                        .unwrap_or_else(|| std::path::Path::new(".")),
+                    RecursiveMode::NonRecursive,
+                )
+                .unwrap();
 
             std::thread::park();
         });

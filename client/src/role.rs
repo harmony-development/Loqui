@@ -1,9 +1,11 @@
-use harmony_rust_sdk::api::chat::Role as HarmonyRole;
+use ahash::AHashMap;
+use harmony_rust_sdk::api::chat::{Permission, Role as HarmonyRole};
 use smol_str::SmolStr;
 
 use crate::{color, IndexMap};
 
 pub type Roles = IndexMap<u64, Role>;
+pub type RolePerms = AHashMap<u64, Vec<Permission>>;
 
 #[derive(Debug, Default, Clone)]
 pub struct Role {

@@ -191,31 +191,34 @@ impl Tab for InviteTab {
                 invites.iter().zip(self.but_states.iter_mut()).enumerate()
             {
                 url.set_path(&cur_invite.invite_id);
-                invites_scrollable = invites_scrollable.push(row(vec![
-                    Tooltip::new(
-                        label_button!(copy_url_state, url.as_str())
-                            .on_press(InviteMessage::CopyToClipboard(url.to_string()))
-                            .style(theme)
-                            .width(length!(% 19)),
-                        "Click to copy",
-                        iced::tooltip::Position::Top,
-                    )
-                    .gap(PADDING / 3)
-                    .style(theme)
-                    .into(),
-                    space!(w % 22).into(),
-                    label!(cur_invite.possible_uses.to_string()).width(length!(% 3)).into(),
-                    space!(w % 3).into(),
-                    label!(cur_invite.use_count.to_string()).width(length!(% 3)).into(),
-                    space!(w % 1).into(),
-                    Button::new(del_but_state, icon(Icon::Trash))
+                invites_scrollable = invites_scrollable.push(
+                    Container::new(row(vec![
+                        Tooltip::new(
+                            label_button!(copy_url_state, url.as_str())
+                                .on_press(InviteMessage::CopyToClipboard(url.to_string()))
+                                .style(theme)
+                                .width(length!(% 19)),
+                            "Click to copy",
+                            iced::tooltip::Position::Top,
+                        )
+                        .gap(PADDING / 3)
                         .style(theme)
-                        .on_press(InviteMessage::DeleteInvitePressed(n))
                         .into(),
-                ]));
+                        space!(w % 22).into(),
+                        label!(cur_invite.possible_uses.to_string()).width(length!(% 3)).into(),
+                        space!(w % 3).into(),
+                        label!(cur_invite.use_count.to_string()).width(length!(% 3)).into(),
+                        space!(w % 1).into(),
+                        Button::new(del_but_state, icon(Icon::Trash))
+                            .style(theme)
+                            .on_press(InviteMessage::DeleteInvitePressed(n))
+                            .into(),
+                    ]))
+                    .style(theme),
+                );
             }
             widgets.push(invites_table.into());
-            widgets.push(invites_scrollable.into());
+            widgets.push(fill_container(invites_scrollable).style(theme).into());
         // If there aren't any invites
         } else {
             widgets.push(label!("Fetching invites").into());

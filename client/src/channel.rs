@@ -1,3 +1,5 @@
+use crate::role::RolePerms;
+
 use super::message::Messages;
 use ahash::RandomState;
 use indexmap::IndexMap;
@@ -14,6 +16,7 @@ pub struct Channel {
     pub loading_messages_history: bool,
     pub reached_top: bool,
     pub user_perms: ChanPerms,
+    pub role_perms: RolePerms,
     pub has_unread: bool,
     pub looking_at_channel: bool,
     pub init_fetching: bool,

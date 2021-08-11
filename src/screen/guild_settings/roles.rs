@@ -5,11 +5,13 @@ use client::{
         api::chat::{Place, Role},
         client::api::chat::permissions::{self, ModifyGuildRole, ModifyGuildRoleSelfBuilder, MoveRole},
     },
+    smol_str::SmolStr,
     Client,
 };
 use iced::Tooltip;
 use iced_aw::{color_picker, ColorPicker, TabLabel};
 
+use super::{GuildMetadata, Tab};
 use crate::{
     component::*,
     label_button, length,
@@ -21,7 +23,19 @@ use crate::{
     style::{tuple_to_iced_color, Theme, ERROR_COLOR, PADDING, SPACING},
 };
 
-use super::{GuildMetadata, Tab};
+use std::fmt::{self, Display, Formatter};
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChannelSelection(Option<(u64, SmolStr)>);
+
+impl Display for ChannelSelection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.0.as_ref() {
+            Some((_, name)) => write!(f, "#{}", name),
+            None => write!(f, "Guild"),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum RolesMessage {
@@ -29,10 +43,12 @@ pub enum RolesMessage {
     GoBack,
     ShowColorPicker(usize, bool),
     SetColor { role_id: u64, color: Color },
+    SelectedChannel(ChannelSelection),
 }
 
 #[derive(Debug, Default)]
 pub struct RolesTab {
+    #[allow(clippy::type_complexity)]
     button_states: Vec<(
         button::State,
         button::State,
@@ -41,10 +57,13 @@ pub struct RolesTab {
         button::State,
         button::State,
         color_picker::State,
+        button::State,
     )>,
     role_list_state: scrollable::State,
     back_but_state: button::State,
     create_role_state: button::State,
+    channel_select_state: pick_list::State<ChannelSelection>,
+    manage_perms_on_channel: ChannelSelection,
     pub error_message: String,
 }
 
@@ -59,6 +78,8 @@ impl Clone for RolesTab {
             role_list_state: self.role_list_state,
             back_but_state: self.back_but_state,
             create_role_state: self.create_role_state,
+            channel_select_state: self.channel_select_state.clone(),
+            manage_perms_on_channel: self.manage_perms_on_channel.clone(),
             error_message: self.error_message.clone(),
         }
     }
@@ -104,6 +125,10 @@ impl RolesTab {
                 },
                 map_to_nothing,
             ),
+            RolesMessage::SelectedChannel(selected) => {
+                self.manage_perms_on_channel = selected;
+                Command::none()
+            }
         }
     }
 
@@ -140,11 +165,21 @@ impl Tab for RolesTab {
             .spacing(SPACING)
             .style(theme);
 
-        if let Some(guild) = client.guilds.get(&guild_id) {
+        let guild = client.guilds.get(&guild_id);
+        if let Some(guild) = guild {
             self.button_states.resize_with(guild.roles.len(), Default::default);
             for (
                 (role_id, role),
-                (up_state, down_state, edit_state, copy_state, copy_name_state, color_but_state, color_picker_state),
+                (
+                    up_state,
+                    down_state,
+                    edit_state,
+                    copy_state,
+                    copy_name_state,
+                    color_but_state,
+                    color_picker_state,
+                    manage_perms_state,
+                ),
             ) in guild.roles.iter().zip(&mut self.button_states)
             {
                 let role_index = guild.roles.get_index_of(role_id).unwrap();
@@ -239,6 +274,20 @@ impl Tab for RolesTab {
                     .into(),
                 );
                 content_widgets.push(
+                    Tooltip::new(
+                        Button::new(manage_perms_state, icon(Icon::ListCheck))
+                            .style(theme)
+                            .on_press(ParentMessage::ShowManagePermsModal(
+                                role_id,
+                                self.manage_perms_on_channel.0.as_ref().map(|(id, _)| *id),
+                            )),
+                        "Manage permissions",
+                        iced::tooltip::Position::Top,
+                    )
+                    .style(theme)
+                    .into(),
+                );
+                content_widgets.push(
                     Tooltip::new(up_but, "Move up", iced::tooltip::Position::Top)
                         .style(theme)
                         .into(),
@@ -248,7 +297,7 @@ impl Tab for RolesTab {
                         .style(theme)
                         .into(),
                 );
-                roles = roles.push(row(content_widgets));
+                roles = roles.push(Container::new(row(content_widgets)).style(theme));
             }
         }
         roles = roles.push(
@@ -260,12 +309,38 @@ impl Tab for RolesTab {
             .height(length!(-)),
         );
 
-        let mut content = Vec::with_capacity(3);
+        let mut content = Vec::with_capacity(4);
 
         if !self.error_message.is_empty() {
             content.push(label!(self.error_message.as_str()).color(ERROR_COLOR).into())
         }
-        content.push(roles.into());
+        let mut options = Vec::with_capacity(guild.map_or(0, |g| g.channels.len()) + 1);
+        options.push(ChannelSelection(None));
+        if let Some(guild) = guild {
+            options.extend(
+                guild
+                    .channels
+                    .iter()
+                    .map(|(id, channel)| ChannelSelection(Some((*id, channel.name.clone())))),
+            );
+        }
+        content.push(
+            Row::with_children(vec![
+                label!("Manage roles on:").into(),
+                PickList::new(
+                    &mut self.channel_select_state,
+                    options,
+                    Some(self.manage_perms_on_channel.clone()),
+                    |selected| ParentMessage::Roles(RolesMessage::SelectedChannel(selected)),
+                )
+                .style(theme)
+                .into(),
+            ])
+            .align_items(Align::Center)
+            .spacing(SPACING)
+            .into(),
+        );
+        content.push(fill_container(roles).style(theme).into());
         content.push(
             label_button!(&mut self.back_but_state, "Back")
                 .on_press(ParentMessage::Roles(RolesMessage::GoBack))
@@ -273,6 +348,8 @@ impl Tab for RolesTab {
                 .into(),
         );
 
-        Container::new(column(content)).padding(PADDING * 10).into()
+        Container::new(column(content).align_items(Align::Center))
+            .padding(PADDING * 8)
+            .into()
     }
 }

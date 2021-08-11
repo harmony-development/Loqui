@@ -2,7 +2,7 @@ use ahash::AHashMap;
 use harmony_rust_sdk::client::api::rest::FileId;
 
 use crate::{
-    role::{Role, Roles},
+    role::{Role, RolePerms, Roles},
     IndexMap,
 };
 
@@ -16,6 +16,7 @@ pub struct Guild {
     pub picture: Option<FileId>,
     pub channels: Channels,
     pub roles: Roles,
+    pub role_perms: RolePerms,
     pub members: AHashMap<u64, Vec<u64>>,
     pub homeserver: String,
     pub user_perms: GuildPerms,

@@ -117,7 +117,7 @@ impl Tab for MembersTab {
                     .into(),
                 );
 
-                members = members.push(row(content_widgets));
+                members = members.push(Container::new(row(content_widgets)).style(theme));
             }
         }
 
@@ -126,7 +126,7 @@ impl Tab for MembersTab {
         if !self.error_message.is_empty() {
             content.push(label!(self.error_message.as_str()).color(ERROR_COLOR).into())
         }
-        content.push(members.into());
+        content.push(fill_container(members).style(theme).into());
         content.push(
             label_button!(&mut self.back_but_state, "Back")
                 .on_press(ParentMessage::Members(MembersMessage::GoBack))

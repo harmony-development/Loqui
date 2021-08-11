@@ -14,12 +14,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum Message {
     GoBack,
-    RoleChange {
-        guild_id: u64,
-        role_id: u64,
-        user_id: u64,
-        give_or_take: bool,
-    },
+    RoleChange { role_id: u64, give_or_take: bool },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -57,9 +52,7 @@ impl ManageUserRolesModal {
                     let role_but = Tooltip::new(
                         Button::new(but_state, label!(role.name.as_str()).color(role_color))
                             .on_press(Message::RoleChange {
-                                guild_id,
                                 role_id: *role_id,
-                                user_id: self.user_id,
                                 give_or_take: !is_given,
                             })
                             .style(theme.background_color(Color { a: 0.2, ..role_color })),
@@ -91,7 +84,7 @@ impl ManageUserRolesModal {
         widgets.push(Rule::vertical(SPACING * 2).style(theme).into());
         widgets.push(
             Column::with_children(vec![
-                label!("Others").into(),
+                label!("Not given").into(),
                 taken_roles.height(length!(+)).width(length!(+)).into(),
             ])
             .width(length!(+))
@@ -102,7 +95,7 @@ impl ManageUserRolesModal {
 
         Container::new(
             Card::new(
-                label!("Manage user roles").width(length!(= 600 - PADDING - SPACING * 2)),
+                label!("Manage user roles").width(length!(= 600 - PADDING - SPACING)),
                 row(widgets).width(length!(= 600)).height(length!(= 600)),
             )
             .style(theme.round())
@@ -114,27 +107,25 @@ impl ManageUserRolesModal {
         .into()
     }
 
-    pub fn update(&mut self, message: Message, client: &Client) -> (Command<TopLevelMessage>, bool) {
+    pub fn update(&mut self, message: Message, client: &Client, guild_id: u64) -> (Command<TopLevelMessage>, bool) {
         (
             match message {
                 Message::GoBack => return (Command::none(), true),
-                Message::RoleChange {
-                    guild_id,
-                    role_id,
-                    user_id,
-                    give_or_take,
-                } => client.mk_cmd(
-                    |inner| async move {
-                        let mut request = ManageUserRoles::new(guild_id, user_id);
-                        if give_or_take {
-                            request = request.give_role_ids(vec![role_id]);
-                        } else {
-                            request = request.take_role_ids(vec![role_id]);
-                        }
-                        permissions::manage_user_roles(&inner, request).await
-                    },
-                    map_to_nothing,
-                ),
+                Message::RoleChange { role_id, give_or_take } => {
+                    let user_id = self.user_id;
+                    client.mk_cmd(
+                        |inner| async move {
+                            let mut request = ManageUserRoles::new(guild_id, user_id);
+                            if give_or_take {
+                                request = request.give_role_ids(vec![role_id]);
+                            } else {
+                                request = request.take_role_ids(vec![role_id]);
+                            }
+                            permissions::manage_user_roles(&inner, request).await
+                        },
+                        map_to_nothing,
+                    )
+                }
             },
             false,
         )

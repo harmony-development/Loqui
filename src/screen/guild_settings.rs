@@ -4,6 +4,7 @@ mod create_edit_role;
 mod edit_channel;
 mod general;
 mod invite;
+mod manage_role_permissions;
 mod manage_user_roles;
 mod members;
 mod roles;
@@ -21,8 +22,12 @@ use crate::{
     },
     style::*,
 };
-use client::harmony_rust_sdk::client::api::chat::invite::{
-    get_guild_invites, get_guild_invites_response::Invite, GetGuildInvitesRequest,
+use client::harmony_rust_sdk::{
+    api::chat::event::{Event, RolePermissionsUpdated},
+    client::api::chat::{
+        invite::{get_guild_invites, get_guild_invites_response::Invite, GetGuildInvitesRequest},
+        permissions::{get_permissions, GetPermissions, GetPermissionsSelfBuilder},
+    },
 };
 use iced::Element;
 use iced_aw::{modal, Modal, TabLabel, Tabs, ICON_FONT};
@@ -31,10 +36,13 @@ use self::{
     create_channel::ChannelCreationModal,
     create_edit_role::RoleModal,
     edit_channel::UpdateChannelModal,
+    manage_role_permissions::ManageRolePermissionsModal,
     manage_user_roles::ManageUserRolesModal,
     members::{MembersMessage, MembersTab},
     roles::{RolesMessage, RolesTab},
 };
+
+use super::ClientExt;
 
 const TAB_PADDING: u16 = 16;
 
@@ -59,6 +67,7 @@ pub struct GuildSettings {
     create_channel_modal: modal::State<ChannelCreationModal>,
     role_modal: modal::State<RoleModal>,
     manage_user_roles_modal: modal::State<ManageUserRolesModal>,
+    manage_role_permissions_modal: modal::State<ManageRolePermissionsModal>,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +82,7 @@ pub enum Message {
     ChannelCreationMessage(create_channel::Message),
     RoleMessage(create_edit_role::Message),
     ManageUserRolesMessage(manage_user_roles::Message),
+    ManageRolePermissionsMessage(manage_role_permissions::Message),
     /// Sent when the permission check for channel edits are complete.
     ShowUpdateChannelModal(u64),
     /// Sent when the user triggers an ID copy (guild ID, message ID etc.)
@@ -82,6 +92,7 @@ pub enum Message {
     ShowEditRoleModal(u64),
     ShowManageUserRoles(u64),
     NewRole,
+    ShowManagePermsModal(u64, Option<u64>),
 }
 
 impl GuildSettings {
@@ -218,6 +229,46 @@ impl GuildSettings {
                 self.manage_user_roles_modal.show(true);
                 self.current_error.clear();
             }
+            Message::ShowManagePermsModal(role_id, channel_id) => {
+                let mut modal_state = self.manage_role_permissions_modal.inner_mut();
+                modal_state.role_id = role_id;
+                modal_state.channel_id = channel_id;
+                self.manage_role_permissions_modal.show(true);
+                self.current_error.clear();
+                if let Some(guild) = client.guilds.get(&self.guild_id) {
+                    let guild_id = self.guild_id;
+                    let mut cmds = Vec::with_capacity(guild.channels.len() + 1);
+                    let mk_cmd = |channel_id| {
+                        client.mk_cmd(
+                            |inner| async move {
+                                get_permissions(&inner, GetPermissions::new(guild_id, role_id).channel_id(channel_id))
+                                    .await
+                                    .map(|p| {
+                                        vec![Event::RolePermsUpdated(RolePermissionsUpdated {
+                                            guild_id,
+                                            channel_id,
+                                            perms: p.perms,
+                                            role_id,
+                                        })]
+                                    })
+                            },
+                            TopLevelMessage::EventsReceived,
+                        )
+                    };
+
+                    if guild.role_perms.iter().filter(|(id, _)| role_id.eq(*id)).count() == 0 {
+                        cmds.push(mk_cmd(0));
+                    }
+
+                    for (channel_id, channel) in &guild.channels {
+                        if channel.role_perms.iter().filter(|(id, _)| role_id.eq(*id)).count() == 0 {
+                            cmds.push(mk_cmd(*channel_id));
+                        }
+                    }
+
+                    return Command::batch(cmds);
+                }
+            }
             Message::NewRole => {
                 let mut modal_state = self.role_modal.inner_mut();
                 modal_state.guild_id = self.guild_id;
@@ -229,8 +280,19 @@ impl GuildSettings {
                 self.current_error.clear();
             }
             Message::ManageUserRolesMessage(message) => {
-                let (cmd, go_back) = self.manage_user_roles_modal.inner_mut().update(message, client);
+                let (cmd, go_back) = self
+                    .manage_user_roles_modal
+                    .inner_mut()
+                    .update(message, client, self.guild_id);
                 self.manage_user_roles_modal.show(!go_back);
+                return cmd;
+            }
+            Message::ManageRolePermissionsMessage(message) => {
+                let (cmd, go_back) =
+                    self.manage_role_permissions_modal
+                        .inner_mut()
+                        .update(message, client, self.guild_id);
+                self.manage_role_permissions_modal.show(!go_back);
                 return cmd;
             }
         }
@@ -308,6 +370,21 @@ impl GuildSettings {
         .style(theme)
         .backdrop(Message::ManageUserRolesMessage(manage_user_roles::Message::GoBack))
         .on_esc(Message::ManageUserRolesMessage(manage_user_roles::Message::GoBack));
+
+        // Show RoleModal
+        let guild_id = self.guild_id;
+        let content = Modal::new(&mut self.manage_role_permissions_modal, content, move |state| {
+            state
+                .view(theme, client, guild_id)
+                .map(Message::ManageRolePermissionsMessage)
+        })
+        .style(theme)
+        .backdrop(Message::ManageRolePermissionsMessage(
+            manage_role_permissions::Message::GoBack,
+        ))
+        .on_esc(Message::ManageRolePermissionsMessage(
+            manage_role_permissions::Message::GoBack,
+        ));
 
         content.into()
     }

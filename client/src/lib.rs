@@ -509,6 +509,7 @@ impl Client {
                                 send_msg: false,
                             },
                             init_fetching: false,
+                            role_perms: AHashMap::new(),
                         },
                     );
                     if previous_id != 0 || next_id != 0 {
@@ -564,7 +565,7 @@ impl Client {
                     member.username = new_username.into();
                 }
                 if update_status {
-                    member.status = UserStatus::from_i32(new_status).unwrap();
+                    member.status = UserStatus::from_i32(new_status).unwrap_or(UserStatus::Offline);
                 }
                 if update_avatar {
                     let parsed = FileId::from_str(&new_avatar).ok();
@@ -673,6 +674,24 @@ impl Client {
                 self.get_guild(guild_id).and_do(|g| {
                     g.members.insert(user_id, role_ids);
                 });
+            }
+            Event::RolePermsUpdated(RolePermissionsUpdated {
+                guild_id,
+                channel_id,
+                role_id,
+                perms,
+            }) => {
+                if let Some(perms) = perms {
+                    self.get_guild(guild_id).and_do(|g| {
+                        if channel_id != 0 {
+                            g.channels.get_mut(&channel_id).and_do(|c| {
+                                c.role_perms.insert(role_id, perms.permissions);
+                            });
+                        } else {
+                            g.role_perms.insert(role_id, perms.permissions);
+                        }
+                    });
+                }
             }
             x => tracing::warn!("implement {:?}", x),
         }
