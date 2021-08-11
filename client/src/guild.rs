@@ -65,4 +65,7 @@ fn update_order<V>(map: &mut IndexMap<u64, V>, previous_id: u64, next_id: u64, i
 #[derive(Debug, Default, Clone)]
 pub struct GuildPerms {
     pub change_info: bool,
+    pub ban_user: bool,
+    pub kick_user: bool,
+    pub unban_user: bool,
 }

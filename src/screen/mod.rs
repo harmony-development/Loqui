@@ -58,7 +58,10 @@ use client::{
 };
 use iced::{
     executor,
-    futures::future::{self, ready},
+    futures::{
+        future::{self, ready},
+        FutureExt,
+    },
     Application, Command, Element, Subscription,
 };
 use std::{
@@ -470,11 +473,9 @@ impl ScreenManager {
                                 })
                             },
                         )?));
-                        let query = "guild.manage.change-information".to_string();
-                        events.push(
-                            query_has_permission(&inner, QueryPermissions::new(guild_id, query.clone()))
-                                .await
-                                .map(|perm| {
+                        let mk_perm_query = |query: String| {
+                            query_has_permission(&inner, QueryPermissions::new(guild_id, query.clone())).map(|res| {
+                                res.map(|perm| {
                                     Event::PermissionUpdated(PermissionUpdated {
                                         guild_id,
                                         channel_id: 0,
@@ -482,8 +483,13 @@ impl ScreenManager {
                                         query,
                                     })
                                 })
-                                .map_err(Into::into),
-                        );
+                                .map_err(Into::into)
+                            })
+                        };
+                        events.push(mk_perm_query("guild.manage.change-information".to_string()).await);
+                        events.push(mk_perm_query("user.manage.kick".to_string()).await);
+                        events.push(mk_perm_query("user.manage.ban".to_string()).await);
+                        events.push(mk_perm_query("user.manage.unban".to_string()).await);
                         events.extend(get_guild_roles(&inner, GuildId::new(guild_id)).await.map_or_else(
                             |err| vec![Err(err.into())],
                             |roles| {

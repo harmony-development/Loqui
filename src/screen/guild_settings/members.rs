@@ -1,11 +1,21 @@
-use client::{error::ClientError, Client};
+use client::{
+    error::ClientError,
+    harmony_rust_sdk::{
+        api::chat::{BanUserRequest, KickUserRequest},
+        client::api::chat::guild::{ban_user, kick_user},
+    },
+    Client,
+};
 use iced::Tooltip;
 use iced_aw::TabLabel;
 
 use crate::{
     component::*,
     label_button, length,
-    screen::{guild_settings::Message as ParentMessage, Message as TopLevelMessage, Screen as TopLevelScreen},
+    screen::{
+        guild_settings::Message as ParentMessage, map_to_nothing, ClientExt, Message as TopLevelMessage,
+        Screen as TopLevelScreen,
+    },
     style::{Theme, ERROR_COLOR, PADDING, SPACING},
 };
 
@@ -14,11 +24,19 @@ use super::{GuildMetadata, Tab};
 #[derive(Debug, Clone)]
 pub enum MembersMessage {
     GoBack,
+    BanMember(u64),
+    KickMember(u64),
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct MembersTab {
-    button_states: Vec<(button::State, button::State, button::State)>,
+    button_states: Vec<(
+        button::State,
+        button::State,
+        button::State,
+        button::State,
+        button::State,
+    )>,
     member_list_state: scrollable::State,
     back_but_state: button::State,
     pub error_message: String,
@@ -28,12 +46,20 @@ impl MembersTab {
     pub fn update(
         &mut self,
         message: MembersMessage,
-        _: &Client,
+        client: &Client,
         _: &mut GuildMetadata,
-        _: u64,
+        guild_id: u64,
     ) -> Command<TopLevelMessage> {
         match message {
             MembersMessage::GoBack => TopLevelScreen::pop_screen_cmd(),
+            MembersMessage::BanMember(user_id) => client.mk_cmd(
+                |inner| async move { ban_user(&inner, BanUserRequest { guild_id, user_id }).await },
+                map_to_nothing,
+            ),
+            MembersMessage::KickMember(user_id) => client.mk_cmd(
+                |inner| async move { kick_user(&inner, KickUserRequest { guild_id, user_id }).await },
+                map_to_nothing,
+            ),
         }
     }
 
@@ -72,7 +98,7 @@ impl Tab for MembersTab {
 
         if let Some(guild) = client.guilds.get(&guild_id) {
             self.button_states.resize_with(guild.members.len(), Default::default);
-            for ((member_id, _), (copy_state, copy_name_state, edit_state)) in
+            for ((member_id, _), (copy_state, copy_name_state, edit_state, ban_state, kick_state)) in
                 guild.members.iter().zip(&mut self.button_states)
             {
                 let member = match client.members.get(member_id) {
@@ -105,6 +131,22 @@ impl Tab for MembersTab {
                     .into(),
                 );
                 content_widgets.push(space!(w+).into());
+                if guild.user_perms.kick_user {
+                    content_widgets.push(
+                        label_button!(kick_state, "Kick")
+                            .style(theme)
+                            .on_press(ParentMessage::Members(MembersMessage::KickMember(member_id)))
+                            .into(),
+                    );
+                }
+                if guild.user_perms.ban_user {
+                    content_widgets.push(
+                        label_button!(ban_state, "Ban")
+                            .style(theme)
+                            .on_press(ParentMessage::Members(MembersMessage::BanMember(member_id)))
+                            .into(),
+                    );
+                }
                 content_widgets.push(
                     Tooltip::new(
                         Button::new(edit_state, icon(Icon::Pencil))

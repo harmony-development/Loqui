@@ -334,19 +334,29 @@ impl Client {
                     ok,
                 } = perm;
 
-                match query.as_str() {
-                    "channels.manage.change-information" | "channel.manage.*" => {
-                        self.get_channel(guild_id, channel_id)
-                            .and_do(|c| c.user_perms.manage_channel = ok);
+                if let Some(g) = self.get_guild(guild_id) {
+                    match query.as_str() {
+                        "channels.manage.change-information" | "channel.manage.*" | "channel.*" => {
+                            g.channels
+                                .get_mut(&channel_id)
+                                .and_do(|c| c.user_perms.manage_channel = ok);
+                        }
+                        "messages.send" | "messages.*" => {
+                            g.channels.get_mut(&channel_id).and_do(|c| c.user_perms.send_msg = ok);
+                        }
+                        "guild.manage.change-information" | "guild.manage.*" | "guild.*" => {
+                            g.user_perms.change_info = ok;
+                        }
+                        "user.*" | "user.manage.*" => {
+                            g.user_perms.kick_user = ok;
+                            g.user_perms.ban_user = ok;
+                            g.user_perms.unban_user = ok;
+                        }
+                        "user.manage.ban" => g.user_perms.ban_user = ok,
+                        "user.manage.kick" => g.user_perms.kick_user = ok,
+                        "user.manage.unban" => g.user_perms.unban_user = ok,
+                        _ => {}
                     }
-                    "messages.send" | "messages.*" => {
-                        self.get_channel(guild_id, channel_id)
-                            .and_do(|c| c.user_perms.send_msg = ok);
-                    }
-                    "guild.manage.change-information" | "guild.manage.*" => {
-                        self.get_guild(guild_id).and_do(|g| g.user_perms.change_info = ok);
-                    }
-                    _ => {}
                 }
             }
             Event::SentMessage(message_sent) => {
