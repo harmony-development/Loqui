@@ -266,14 +266,14 @@ pub fn build_event_history<'a>(
         msg_text.and_do(|textt| {
             if let Some((handle, m)) = client::EMOTE
                 .captures_iter(textt)
-                .filter_map(|c| c.name("id"))
+                .flatten()
+                .flat_map(|c| Some((c.name("id")?, c.name("all")?)))
                 .next()
-                .and_then(|m| {
-                    let mtext = m.as_str();
-                    (textt == format!("<:{}:>", mtext))
-                        .then(|| thumbnail_cache.emotes.get(&FileId::Id(mtext.to_string())))
+                .and_then(|(id, all)| {
+                    (textt == all.as_str())
+                        .then(|| thumbnail_cache.emotes.get(&FileId::Id(id.as_str().to_string())))
                         .flatten()
-                        .map(|h| (h, mtext))
+                        .map(|h| (h, id.as_str()))
                 })
             {
                 message_body_widgets.push(
@@ -288,16 +288,42 @@ pub fn build_event_history<'a>(
                 );
             } else {
                 let text = client::render_text(textt, members);
+
+                #[cfg(not(feature = "markdown"))]
+                let code = client::CODE
+                    .captures_iter(textt)
+                    .flatten()
+                    .flat_map(|c| Some((c.name("content")?, c.name("all")?)))
+                    .next()
+                    .and_then(|(code, all)| (textt == all.as_str()).then(|| code.as_str()));
+                #[cfg(not(feature = "markdown"))]
+                let text = code.unwrap_or(&text);
+
                 #[cfg(feature = "markdown")]
                 let message_text = super::markdown::markdown_svg(&text);
                 #[cfg(not(feature = "markdown"))]
                 let mut message_text = label!(text).size(MESSAGE_SIZE);
 
                 #[cfg(not(feature = "markdown"))]
+                if code.is_some() {
+                    message_text = message_text.font(IOSEVKA);
+                }
+
+                #[cfg(not(feature = "markdown"))]
                 if !message.id.is_ack() || message.being_edited.is_some() {
                     message_text = message_text.color(color!(200, 200, 200));
                 } else if mode == message.id.id().map_or(Mode::Normal, Mode::EditingMessage) {
                     message_text = message_text.color(ERROR_COLOR);
+                }
+
+                #[cfg(not(feature = "markdown"))]
+                if code.is_some() {
+                    message_body_widgets.push(
+                        Container::new(message_text)
+                            .style(theme.border_width(0.0).background_color(theme.colorscheme.secondary_bg))
+                            .into(),
+                    );
+                    return;
                 }
 
                 message_body_widgets.push(message_text.into());

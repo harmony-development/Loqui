@@ -24,5 +24,5 @@ chrono = "0.4.19"
 tracing = "0.1"
 bool_ext = "0.5"
 smol_str = { version = "0.1.18", features = ["serde"] }
-regex = "1"
+fancy-regex = "0.7"
 lazy_static = "1"

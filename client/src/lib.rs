@@ -889,43 +889,43 @@ pub mod byte_writer {
     }
 }
 
-use regex::Regex;
+use fancy_regex::Regex;
 
 lazy_static::lazy_static! {
-    pub static ref MENTION: Regex = Regex::new("<@(?P<id>[0-9]*)>").unwrap();
-    pub static ref EMOTE: Regex = Regex::new("<:(?P<id>.*):>").unwrap();
+    pub static ref MENTION: Regex = Regex::new("(?P<all><@(?P<id>[0-9]*)>)").unwrap();
+    pub static ref EMOTE: Regex = Regex::new("(?P<all><:(?P<id>.*):>)").unwrap();
+    pub static ref CODE: Regex = Regex::new("(?P<all>(?P<ticks>`{1,3})\n?(?P<content>(?!`)[\\S\\s]*)\n?\\k<ticks>)").unwrap();
 }
 
 pub fn post_emotes(message: &Message, post: &mut Vec<PostProcessEvent>) {
     if let Content::Text(text) = &message.content {
-        post.extend(EMOTE.captures_iter(text).filter_map(|c| c.name("id")).map(|m| {
-            PostProcessEvent::FetchThumbnail(Attachment {
-                kind: "image".into(),
-                name: "emote".into(),
-                ..Attachment::new_unknown(FileId::Id(m.as_str().to_string()))
-            })
-        }));
+        post.extend(
+            EMOTE
+                .captures_iter(text)
+                .flatten()
+                .filter_map(|c| c.name("id"))
+                .map(|m| {
+                    PostProcessEvent::FetchThumbnail(Attachment {
+                        kind: "image".into(),
+                        name: "emote".into(),
+                        ..Attachment::new_unknown(FileId::Id(m.as_str().to_string()))
+                    })
+                }),
+        );
     }
 }
 
 pub fn render_text(textt: &str, members: &Members) -> String {
-    use byte_writer::Writer;
-    use std::fmt::Write;
-
     // TODO: this is horribly inefficient
     let mut text = textt.to_string();
-    for m in MENTION.captures_iter(textt).filter_map(|c| c.name("id")) {
-        let user_id = m.as_str();
-        if let Ok(parsed_user_id) = user_id.parse::<u64>() {
-            let member_name = members
-                .get(&parsed_user_id)
-                .map_or_else(|| "unknown user", |m| m.username.as_str());
-            let mut pattern_arr = [b'0'; 23];
-            write!(Writer(&mut pattern_arr), "<@{}>", user_id).unwrap();
-            text = text.replace(
-                (unsafe { std::str::from_utf8_unchecked(&pattern_arr) }).trim_end_matches(|c| c != '>'),
-                &format!("@{}", member_name),
-            );
+    for caps in MENTION.captures_iter(textt).flatten() {
+        if let (Some(id), Some(all)) = (caps.name("id"), caps.name("all")) {
+            if let Ok(parsed_user_id) = id.as_str().parse::<u64>() {
+                let member_name = members
+                    .get(&parsed_user_id)
+                    .map_or_else(|| "unknown user", |m| m.username.as_str());
+                text = text.replace(all.as_str(), &format!("@{}", member_name));
+            }
         }
     }
     text
