@@ -941,6 +941,7 @@ pub fn post_emotes(message: &Message, post: &mut Vec<PostProcessEvent>) {
             text.split_whitespace()
                 .map(Url::parse)
                 .flatten()
+                .filter(|url| ["https", "http"].contains(&url.scheme()))
                 .map(PostProcessEvent::FetchLinkMetadata),
         );
         post.extend(

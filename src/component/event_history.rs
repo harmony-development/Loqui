@@ -704,12 +704,13 @@ pub fn build_event_history<'a>(
             },
         );
         message_row.push(maybe_timestamp);
-        message_row.push(msg_body.into());
-        message_row.push(space!(w+).into());
+        message_row.push(msg_body.width(length!(%98)).into());
 
         if let Some(id) = message.id.id() {
             let but = Tooltip::new(
-                Button::new(reply_but_state, icon(Icon::Reply).size(MESSAGE_SIZE - 10))
+                Button::new(reply_but_state, icon(Icon::Reply).size(MESSAGE_SIZE - 6))
+                    .padding(PADDING / 8)
+                    .width(length!(%1))
                     .on_press(Message::ReplyToMessage(id))
                     .style(theme.secondary()),
                 "Reply to message",
@@ -720,7 +721,9 @@ pub fn build_event_history<'a>(
             message_row.push(but.into());
             if msg_text.is_some() && current_user_id == message.sender {
                 let but = Tooltip::new(
-                    Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 10))
+                    Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 6))
+                        .padding(PADDING / 8)
+                        .width(length!(%1))
                         .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
                         .style(theme.secondary()),
                     "Edit message",
