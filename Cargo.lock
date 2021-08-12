@@ -1661,7 +1661,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#30c066b210b06d142d7e14e9ecafd404a4795dd5"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#49db1380da6cdeb5985dee5d354d71bea6175f14"
 dependencies = [
  "proc-macro2",
  "quote 1.0.9",
@@ -1671,7 +1671,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#30c066b210b06d142d7e14e9ecafd404a4795dd5"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#49db1380da6cdeb5985dee5d354d71bea6175f14"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -2296,9 +2296,9 @@ dependencies = [
 
 [[package]]
 name = "matches"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
+checksum = "a3e378b66a060d48947b590737b30a1be76706c8dd7b8ba0f2fe3989c68a853f"
 
 [[package]]
 name = "maybe-uninit"
@@ -3861,9 +3861,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b7b349f11a7047e6d1276853e612d152f5e8a352c61917887cc2169e2366b4c"
+checksum = "01cf844b23c6131f624accf65ce0e4e9956a8bb329400ea5bcc26ae3a5c20b0b"
 dependencies = [
  "autocfg",
  "bytes",

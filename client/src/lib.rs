@@ -52,7 +52,7 @@ use std::{
 };
 use tokio::task::JoinError;
 
-use crate::channel::ChanPerms;
+use crate::{channel::ChanPerms, emotes::EmotePack};
 
 use self::{
     guild::Guilds,
@@ -124,6 +124,7 @@ pub enum PostProcessEvent {
         content: String,
     },
     FetchLinkMetadata(Url),
+    FetchEmotes(u64),
 }
 
 #[derive(Clone)]
@@ -231,6 +232,14 @@ impl Client {
     #[inline(always)]
     pub fn get_member(&mut self, user_id: u64) -> Option<&mut Member> {
         self.members.get_mut(&user_id)
+    }
+
+    pub fn get_emote_name(&self, image_id: &str) -> Option<&str> {
+        self.emote_packs
+            .values()
+            .flat_map(|pack| pack.emotes.get(image_id))
+            .map(String::as_str)
+            .next()
     }
 
     pub fn send_msg_cmd(
@@ -469,7 +478,11 @@ impl Client {
                                             unread_message: false,
                                             mention: true,
                                             title: format!("{} | #{}", guild.name, channel.name),
-                                            content: format!("@{}: {}", member_name, render_text(text, &self.members)),
+                                            content: format!(
+                                                "@{}: {}",
+                                                member_name,
+                                                render_text(text, &self.members, &self.emote_packs)
+                                            ),
                                         });
                                     }
                                 }
@@ -758,6 +771,46 @@ impl Client {
                     });
                 }
             }
+            Event::EmotePackUpdated(EmotePackUpdated {
+                pack_id,
+                pack_name,
+                update_pack_name,
+            }) => {
+                if let Some(pack) = self.emote_packs.get_mut(&pack_id) {
+                    if update_pack_name {
+                        pack.pack_name = pack_name;
+                    }
+                }
+            }
+            Event::EmotePackEmotesUpdated(EmotePackEmotesUpdated {
+                pack_id,
+                added_emotes,
+                deleted_emotes,
+            }) => {
+                if let Some(pack) = self.emote_packs.get_mut(&pack_id) {
+                    pack.emotes
+                        .extend(added_emotes.into_iter().map(|emote| (emote.image_id, emote.name)));
+                    for image_id in deleted_emotes {
+                        pack.emotes.remove(&image_id);
+                    }
+                }
+            }
+            Event::EmotePackDeleted(EmotePackDeleted { pack_id }) => {
+                self.emote_packs.remove(&pack_id);
+            }
+            Event::EmotePackAdded(EmotePackAdded { pack }) => {
+                if let Some(pack) = pack {
+                    post.push(PostProcessEvent::FetchEmotes(pack.pack_id));
+                    self.emote_packs.insert(
+                        pack.pack_id,
+                        EmotePack {
+                            pack_name: pack.pack_name,
+                            pack_owner: pack.pack_owner,
+                            emotes: Default::default(),
+                        },
+                    );
+                }
+            }
             x => tracing::warn!("implement {:?}", x),
         }
 
@@ -816,6 +869,27 @@ impl Client {
         subs.push(EventSource::Homeserver);
         subs
     }
+}
+
+pub fn render_text(textt: &str, members: &Members, emote_packs: &EmotePacks) -> String {
+    // TODO: this is horribly inefficient
+    let mut text = textt.to_string();
+    for tok in textt.parse_md_custom(HarmonyToken::parse) {
+        if let Token::Custom(HarmonyToken::Mention(id)) = tok {
+            let member_name = members.get(&id).map_or_else(|| "unknown user", |m| m.username.as_str());
+            text = text.replace(&format!("<@{}>", id), &format!("@{}", member_name));
+        } else if let Token::Custom(HarmonyToken::Emote(image_id)) = tok {
+            if let Some(name) = emote_packs
+                .values()
+                .flat_map(|pack| pack.emotes.get(image_id))
+                .map(String::as_str)
+                .next()
+            {
+                text = text.replace(&format!("<:{}:>", image_id), &format!(":{}:", name));
+            }
+        }
+    }
+    text
 }
 
 fn post_heading(post: &mut Vec<PostProcessEvent>, embed: &Embed) {
@@ -965,18 +1039,6 @@ pub fn post_emotes(message: &Message, post: &mut Vec<PostProcessEvent>) {
                 }),
         );
     }
-}
-
-pub fn render_text(textt: &str, members: &Members) -> String {
-    // TODO: this is horribly inefficient
-    let mut text = textt.to_string();
-    for tok in textt.parse_md_custom(HarmonyToken::parse) {
-        if let Token::Custom(HarmonyToken::Mention(id)) = tok {
-            let member_name = members.get(&id).map_or_else(|| "unknown user", |m| m.username.as_str());
-            text = text.replace(&format!("<@{}>", id), &format!("@{}", member_name));
-        }
-    }
-    text
 }
 
 pub mod color {

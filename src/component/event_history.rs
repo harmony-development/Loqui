@@ -316,11 +316,12 @@ pub fn build_event_history<'a>(
                     Token::Custom(tok) => match tok {
                         HarmonyToken::Emote(id) => match thumbnail_cache.emotes.get(&FileId::Id(id.to_string())) {
                             Some(handle) => {
+                                let tooltip = client.get_emote_name(id).unwrap_or(id);
                                 if only_emotes {
                                     line_widgets.push(
                                         Tooltip::new(
                                             Image::new(handle.clone()).width(length!(= 48)).height(length!( = 48)),
-                                            id,
+                                            tooltip,
                                             iced::tooltip::Position::Top,
                                         )
                                         .size(MESSAGE_SIZE)
@@ -334,7 +335,7 @@ pub fn build_event_history<'a>(
                                             Image::new(handle.clone())
                                                 .width(length!(= MESSAGE_SIZE + 4))
                                                 .height(length!( = MESSAGE_SIZE + 4)),
-                                            id,
+                                            tooltip,
                                             iced::tooltip::Position::Top,
                                         )
                                         .size(MESSAGE_SIZE)
@@ -762,7 +763,8 @@ pub fn build_event_history<'a>(
             let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
             let content = label!(match &reply_message.content {
                 IcyContent::Text(text) =>
-                    truncate_string(&render_text(&text.replace('\n', " "), members), 40).to_string(),
+                    truncate_string(&render_text(&text.replace('\n', " "), members, &client.emote_packs), 40)
+                        .to_string(),
                 IcyContent::Files(files) => {
                     let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
                         names.push_str(", ");

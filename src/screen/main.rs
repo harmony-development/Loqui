@@ -902,7 +902,8 @@ impl MainScreen {
                             if let IcyContent::Text(text) = &msg.content {
                                 client::tracing::debug!("editing message: {} / \"{}\"", mid, text);
                                 self.message.clear();
-                                self.message.push_str(&render_text(text, &client.members));
+                                self.message
+                                    .push_str(&render_text(text, &client.members, &client.emote_packs));
                             }
                         }
                     } else {
@@ -1167,7 +1168,7 @@ impl MainScreen {
                 };
             }
             Message::SendMessageComposer { guild_id, channel_id } => {
-                let replace_mentions = |text: &str| {
+                let replace_stuff = |text: &str| {
                     let mut text = text.to_string();
                     if let Some(guild) = client.guilds.get(&self.current_guild_id.unwrap()) {
                         for (id, member) in client.members.iter().filter(|(id, _)| guild.members.contains_key(id)) {
@@ -1182,13 +1183,18 @@ impl MainScreen {
                             );
                         }
                     }
+                    for pack in client.emote_packs.values() {
+                        for (image_id, name) in &pack.emotes {
+                            text = text.replace(&format!(":{}:", name), &format!("<:{}:>", image_id));
+                        }
+                    }
                     text
                 };
 
                 if !self.message.trim().is_empty() {
                     match self.mode {
                         Mode::EditingMessage(message_id) => {
-                            let new_content = replace_mentions(self.message.trim());
+                            let new_content = replace_stuff(self.message.trim());
                             self.message.clear();
                             if let Some(msg) = client
                                 .get_channel(guild_id, channel_id)
@@ -1209,7 +1215,7 @@ impl MainScreen {
                         }
                         Mode::Normal => {
                             let message = IcyMessage {
-                                content: IcyContent::Text(replace_mentions(self.message.trim())),
+                                content: IcyContent::Text(replace_stuff(self.message.trim())),
                                 sender: client.user_id.unwrap(),
                                 reply_to: self.reply_to.take(),
                                 ..Default::default()

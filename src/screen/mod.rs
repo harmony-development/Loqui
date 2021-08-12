@@ -27,8 +27,12 @@ use client::{
         self,
         api::{
             chat::{
-                event::{Event, GuildAddedToList, GuildUpdated, MessageSent, PermissionUpdated, ProfileUpdated},
-                BatchQueryPermissionsRequest, GetGuildListRequest, GetMessageRequest, GetUserResponse,
+                event::{
+                    EmotePackAdded, EmotePackEmotesUpdated, Event, GuildAddedToList, GuildUpdated, MessageSent,
+                    PermissionUpdated, ProfileUpdated,
+                },
+                BatchQueryPermissionsRequest, GetEmotePackEmotesRequest, GetEmotePacksRequest, GetGuildListRequest,
+                GetMessageRequest, GetUserResponse,
             },
             harmonytypes::UserStatus,
             mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -38,6 +42,7 @@ use client::{
             api::{
                 auth::AuthStepResponse,
                 chat::{
+                    emote::{get_emote_pack_emotes, get_emote_packs},
                     guild::{get_guild, get_guild_list},
                     message::get_message,
                     permissions::{batch_query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder},
@@ -561,6 +566,20 @@ impl ScreenManager {
                     },
                     |(data, url)| data.map_or(Message::Nothing, |data| Message::FetchLinkDataReceived(data, url)),
                 ),
+                PostProcessEvent::FetchEmotes(pack_id) => client.mk_cmd(
+                    |inner| async move {
+                        get_emote_pack_emotes(&inner, GetEmotePackEmotesRequest { pack_id })
+                            .await
+                            .map(|resp| {
+                                vec![Event::EmotePackEmotesUpdated(EmotePackEmotesUpdated {
+                                    pack_id,
+                                    added_emotes: resp.emotes,
+                                    deleted_emotes: Vec::new(),
+                                })]
+                            })
+                    },
+                    Message::EventsReceived,
+                ),
             }
         } else {
             Command::none()
@@ -777,6 +796,11 @@ impl Application for ScreenManager {
                             new_username: self_profile.user_name,
                             user_id: self_id,
                         }));
+                        events.extend(get_emote_packs(&inner, GetEmotePacksRequest {}).await.map(|resp| {
+                            resp.packs
+                                .into_iter()
+                                .map(|pack| Event::EmotePackAdded(EmotePackAdded { pack: Some(pack) }))
+                        })?);
                         profile::profile_update(
                             &inner,
                             ProfileUpdate::default().new_status(UserStatus::OnlineUnspecified),
