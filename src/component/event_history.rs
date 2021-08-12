@@ -26,12 +26,16 @@ use client::{
     bool_ext::BoolExt,
     guild::Guild,
     harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
+    linemd::{
+        parser::{Text, Token},
+        Parser,
+    },
     message::MessageId,
     render_text,
     smol_str::SmolStr,
-    OptionExt,
+    HarmonyToken, OptionExt,
 };
-use iced::{rule::FillMode, Font, Tooltip};
+use iced::{rule::FillMode, Tooltip};
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 pub type EventHistoryButsState = [(
@@ -42,6 +46,7 @@ pub type EventHistoryButsState = [(
     button::State,
     button::State,
     button::State,
+    Vec<button::State>,
 ); SHOWN_MSGS_LIMIT];
 
 const MSG_LR_PADDING: u16 = AVATAR_WIDTH / 4;
@@ -124,6 +129,7 @@ pub fn build_event_history<'a>(
             avatar_but_state,
             reply_but_state,
             goto_reply_state,
+            message_buts_state,
         ),
     ) in (std::iter::once(first_message).chain(displayable_events)).zip(buts_sate.iter_mut())
     {
@@ -263,72 +269,168 @@ pub fn build_event_history<'a>(
             }
         });
 
-        msg_text.and_do(|textt| {
-            if let Some((handle, m)) = client::EMOTE
-                .captures_iter(textt)
-                .flatten()
-                .flat_map(|c| Some((c.name("id")?, c.name("all")?)))
-                .next()
-                .and_then(|(id, all)| {
-                    (textt == all.as_str())
-                        .then(|| thumbnail_cache.emotes.get(&FileId::Id(id.as_str().to_string())))
-                        .flatten()
-                        .map(|h| (h, id.as_str()))
-                })
-            {
-                message_body_widgets.push(
-                    Tooltip::new(
-                        Image::new(handle.clone()).width(length!(= 48)).height(length!( = 48)),
-                        m,
-                        iced::tooltip::Position::Right,
-                    )
-                    .gap(PADDING / 2)
-                    .style(theme)
-                    .into(),
-                );
-            } else {
-                let text = client::render_text(textt, members);
+        if let Some(textt) = msg_text {
+            let tokens = textt.parse_md_custom(HarmonyToken::parse);
+            let mut widgets = Vec::with_capacity(tokens.len());
+            let color = (Mode::EditingMessage(id_to_use) == mode)
+                .then(|| ERROR_COLOR)
+                .unwrap_or(theme.colorscheme.text);
 
-                #[cfg(not(feature = "markdown"))]
-                let code = client::CODE
-                    .captures_iter(textt)
-                    .flatten()
-                    .flat_map(|c| Some((c.name("content")?, c.name("all")?)))
-                    .next()
-                    .and_then(|(code, all)| (textt == all.as_str()).then(|| code.as_str()));
-                #[cfg(not(feature = "markdown"))]
-                let text = code.unwrap_or(&text);
-
-                #[cfg(feature = "markdown")]
-                let message_text = super::markdown::markdown_svg(&text);
-                #[cfg(not(feature = "markdown"))]
-                let mut message_text = label!(text).size(MESSAGE_SIZE);
-
-                #[cfg(not(feature = "markdown"))]
-                if code.is_some() {
-                    message_text = message_text.font(IOSEVKA);
+            let is_emotes_until_line_break = |at: usize| {
+                tokens
+                    .iter()
+                    .skip(at)
+                    .take_while(|tok| !matches!(tok, Token::LineBreak))
+                    .all(|tok| matches!(tok, Token::Custom(HarmonyToken::Emote(_))))
+            };
+            let mut only_emotes = is_emotes_until_line_break(0);
+            let mut line_widgets = Vec::with_capacity(5);
+            let mk_text_elem = |text: &Text| -> Element<Message> {
+                let Text { value, code, .. } = text;
+                let mut text = label!(value.trim()).color(color).size(MESSAGE_SIZE);
+                if *code {
+                    text = text.font(IOSEVKA);
+                    let mut bg_color = theme.colorscheme.primary_bg;
+                    bg_color.r *= 1.25;
+                    bg_color.g *= 1.25;
+                    bg_color.b *= 1.25;
+                    Container::new(text)
+                        .style(theme.border_width(0.0).background_color(bg_color))
+                        .into()
+                } else {
+                    text.into()
                 }
+            };
 
-                #[cfg(not(feature = "markdown"))]
-                if !message.id.is_ack() || message.being_edited.is_some() {
-                    message_text = message_text.color(color!(200, 200, 200));
-                } else if mode == message.id.id().map_or(Mode::Normal, Mode::EditingMessage) {
-                    message_text = message_text.color(ERROR_COLOR);
-                }
+            message_buts_state.resize_with(tokens.len(), Default::default);
+            for ((at, token), but_state) in tokens.iter().enumerate().zip(message_buts_state.iter_mut()) {
+                match token {
+                    Token::Custom(tok) => match tok {
+                        HarmonyToken::Emote(id) => match thumbnail_cache.emotes.get(&FileId::Id(id.to_string())) {
+                            Some(handle) => {
+                                if only_emotes {
+                                    line_widgets.push(
+                                        Tooltip::new(
+                                            Image::new(handle.clone()).width(length!(= 48)).height(length!( = 48)),
+                                            id,
+                                            iced::tooltip::Position::Right,
+                                        )
+                                        .size(MESSAGE_SIZE)
+                                        .gap(PADDING / 2)
+                                        .style(theme)
+                                        .into(),
+                                    );
+                                } else {
+                                    line_widgets.push(
+                                        Tooltip::new(
+                                            Image::new(handle.clone())
+                                                .width(length!(= MESSAGE_SIZE + 4))
+                                                .height(length!( = MESSAGE_SIZE + 4)),
+                                            id,
+                                            iced::tooltip::Position::Right,
+                                        )
+                                        .size(MESSAGE_SIZE)
+                                        .gap(PADDING / 2)
+                                        .style(theme)
+                                        .into(),
+                                    );
+                                    line_widgets.push(label!(" ").into());
+                                }
+                            }
+                            None => {
+                                line_widgets
+                                    .push(label!(format!("<:{}:> ", id)).size(MESSAGE_SIZE).color(color).into());
+                            }
+                        },
+                        HarmonyToken::Mention(id) => {
+                            let member_name = members.get(id).map_or_else(|| "unknown user", |m| m.username.as_str());
+                            let role_color = guild
+                                .highest_role_for_member(*id)
+                                .map_or(theme.colorscheme.text, |(_, role)| tuple_to_iced_color(role.color));
 
-                #[cfg(not(feature = "markdown"))]
-                if code.is_some() {
-                    message_body_widgets.push(
-                        Container::new(message_text)
-                            .style(theme.border_width(0.0).background_color(theme.colorscheme.secondary_bg))
+                            line_widgets.push(
+                                Button::new(
+                                    but_state,
+                                    label!(format!("@{}", member_name))
+                                        .size(MESSAGE_SIZE - 6)
+                                        .color(role_color),
+                                )
+                                .height(length!(= MESSAGE_SIZE + 4))
+                                .style(theme.background_color(Color { a: 0.1, ..role_color }))
+                                .on_press(Message::SelectedMember(*id))
+                                .into(),
+                            );
+                            line_widgets.push(label!(" ").into());
+                        }
+                    },
+                    Token::Text(text) => {
+                        line_widgets.push(mk_text_elem(text));
+                        line_widgets.push(label!(" ").into());
+                    }
+                    Token::Url { name, url, .. } => {
+                        let url = *url;
+                        let color = theme.colorscheme.accent;
+                        let label = label!(name.as_ref().map_or(url, |text| text.value))
+                            .color(color)
+                            .size(MESSAGE_SIZE - 6);
+                        line_widgets.push(
+                            Button::new(but_state, label)
+                                .style(theme.background_color(Color { a: 0.1, ..color }))
+                                .on_press(Message::OpenUrl(url.into()))
+                                .height(length!(= MESSAGE_SIZE + 4))
+                                .into(),
+                        );
+                        line_widgets.push(label!(" ").into());
+                    }
+                    Token::Header(depth) => {
+                        line_widgets.push(
+                            label!((0..*depth + 1)
+                                .enumerate()
+                                .map(|(at, _)| if at == *depth { ' ' } else { '#' })
+                                .collect::<String>())
+                            .color(color)
+                            .size(MESSAGE_SIZE)
                             .into(),
-                    );
-                    return;
+                        );
+                    }
+                    Token::ListItem(number) => {
+                        let prefix = match number {
+                            Some(num) => label!(format!("{}. ", num)),
+                            None => label!(". "),
+                        };
+                        line_widgets.push(prefix.size(MESSAGE_SIZE).color(color).into());
+                    }
+                    Token::CodeFence { code, .. } => {
+                        only_emotes = is_emotes_until_line_break(at);
+                        widgets.push(
+                            Row::with_children(line_widgets.drain(..).collect())
+                                .align_items(Align::Center)
+                                .into(),
+                        );
+                        line_widgets.push(mk_text_elem(&Text {
+                            value: code,
+                            code: true,
+                            ..Default::default()
+                        }));
+                    }
+                    Token::LineBreak => {
+                        only_emotes = is_emotes_until_line_break(at);
+                        widgets.push(
+                            Row::with_children(line_widgets.drain(..).collect())
+                                .align_items(Align::Center)
+                                .into(),
+                        );
+                    }
                 }
-
-                message_body_widgets.push(message_text.into());
             }
-        });
+
+            widgets.push(
+                Row::with_children(line_widgets.drain(..).collect())
+                    .align_items(Align::Center)
+                    .into(),
+            );
+            message_body_widgets.push(Column::with_children(widgets).align_items(Align::Start).into());
+        }
 
         if let IcyContent::Embeds(embeds) = &message.content {
             let put_heading =
