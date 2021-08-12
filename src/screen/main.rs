@@ -190,6 +190,7 @@ pub enum Message {
     GotoReply(MessageId),
     NextBeforeGuild(bool),
     NextBeforeChannel(bool),
+    DeleteMessage(u64),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1477,6 +1478,14 @@ impl MainScreen {
                     self.composer_state.focus();
                     self.message.push(c);
                     self.composer_state.move_cursor_to_end();
+                }
+            }
+            Message::DeleteMessage(message_id) => {
+                if let (Some(guild_id), Some(channel_id)) = (self.current_guild_id, self.current_channel_id) {
+                    return Command::perform(
+                        client.delete_msg_cmd(guild_id, channel_id, message_id),
+                        ResultExt::map_to_nothing,
+                    );
                 }
             }
         }

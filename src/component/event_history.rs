@@ -49,6 +49,7 @@ pub type EventHistoryButsState = [(
     button::State,
     button::State,
     button::State,
+    button::State,
     Vec<button::State>,
     Vec<button::State>,
 ); SHOWN_MSGS_LIMIT];
@@ -132,6 +133,7 @@ pub fn build_event_history<'a>(
             f_embed_but,
             edit_but_state,
             avatar_but_state,
+            delete_but_state,
             reply_but_state,
             goto_reply_state,
             message_buts_state,
@@ -704,33 +706,43 @@ pub fn build_event_history<'a>(
             },
         );
         message_row.push(maybe_timestamp);
-        message_row.push(msg_body.width(length!(%98)).into());
+        message_row.push(msg_body.width(length!(%96)).into());
 
         if let Some(id) = message.id.id() {
-            let but = Tooltip::new(
-                Button::new(reply_but_state, icon(Icon::Reply).size(MESSAGE_SIZE - 6))
-                    .padding(PADDING / 8)
-                    .width(length!(%1))
-                    .on_press(Message::ReplyToMessage(id))
-                    .style(theme.secondary()),
-                "Reply to message",
-                iced::tooltip::Position::Top,
-            )
-            .size(MESSAGE_SIZE - 2)
-            .style(theme);
-            message_row.push(but.into());
-            if msg_text.is_some() && current_user_id == message.sender {
-                let but = Tooltip::new(
-                    Button::new(edit_but_state, icon(Icon::Pencil).size(MESSAGE_SIZE - 6))
+            let mk_but = |tooltip, state, ico, message| {
+                Tooltip::new(
+                    Button::new(state, icon(ico).size(MESSAGE_SIZE - 6))
                         .padding(PADDING / 8)
                         .width(length!(%1))
-                        .on_press(Message::ChangeMode(Mode::EditingMessage(id)))
+                        .on_press(message)
                         .style(theme.secondary()),
-                    "Edit message",
+                    tooltip,
                     iced::tooltip::Position::Top,
                 )
                 .size(MESSAGE_SIZE - 2)
-                .style(theme);
+                .style(theme)
+            };
+            let but = mk_but(
+                "Reply to message",
+                reply_but_state,
+                Icon::Reply,
+                Message::ReplyToMessage(id),
+            );
+            message_row.push(but.into());
+            if msg_text.is_some() && current_user_id == message.sender {
+                let but = mk_but(
+                    "Edit message",
+                    edit_but_state,
+                    Icon::Pencil,
+                    Message::ChangeMode(Mode::EditingMessage(id)),
+                );
+                message_row.push(but.into());
+                let but = mk_but(
+                    "Delete message",
+                    delete_but_state,
+                    Icon::Trash,
+                    Message::DeleteMessage(id),
+                );
                 message_row.push(but.into());
             }
         }
