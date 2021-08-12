@@ -291,9 +291,9 @@ pub fn build_event_history<'a>(
                 if *code {
                     text = text.font(IOSEVKA);
                     let mut bg_color = theme.colorscheme.primary_bg;
-                    bg_color.r *= 1.25;
-                    bg_color.g *= 1.25;
-                    bg_color.b *= 1.25;
+                    bg_color.r *= 1.6;
+                    bg_color.g *= 1.6;
+                    bg_color.b *= 1.6;
                     Container::new(text)
                         .style(theme.border_width(0.0).background_color(bg_color))
                         .into()
@@ -313,7 +313,7 @@ pub fn build_event_history<'a>(
                                         Tooltip::new(
                                             Image::new(handle.clone()).width(length!(= 48)).height(length!( = 48)),
                                             id,
-                                            iced::tooltip::Position::Right,
+                                            iced::tooltip::Position::Top,
                                         )
                                         .size(MESSAGE_SIZE)
                                         .gap(PADDING / 2)
@@ -327,7 +327,7 @@ pub fn build_event_history<'a>(
                                                 .width(length!(= MESSAGE_SIZE + 4))
                                                 .height(length!( = MESSAGE_SIZE + 4)),
                                             id,
-                                            iced::tooltip::Position::Right,
+                                            iced::tooltip::Position::Top,
                                         )
                                         .size(MESSAGE_SIZE)
                                         .gap(PADDING / 2)
@@ -374,11 +374,18 @@ pub fn build_event_history<'a>(
                             .color(color)
                             .size(MESSAGE_SIZE - 6);
                         line_widgets.push(
-                            Button::new(but_state, label)
-                                .style(theme.background_color(Color { a: 0.1, ..color }))
-                                .on_press(Message::OpenUrl(url.into()))
-                                .height(length!(= MESSAGE_SIZE + 4))
-                                .into(),
+                            Tooltip::new(
+                                Button::new(but_state, label)
+                                    .style(theme.background_color(Color { a: 0.1, ..color }))
+                                    .on_press(Message::OpenUrl(url.into()))
+                                    .height(length!(= MESSAGE_SIZE + 4)),
+                                format!("Go to {}", url),
+                                iced::tooltip::Position::Top,
+                            )
+                            .size(MESSAGE_SIZE)
+                            .style(theme)
+                            .gap(PADDING / 2)
+                            .into(),
                         );
                         line_widgets.push(label!(" ").into());
                     }
