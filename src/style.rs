@@ -706,7 +706,7 @@ mod styles {
                 background: self
                     .0
                     .background_color
-                    .map_or(self.1.accent, |c| Color { a: c.a * 0.5, ..c })
+                    .map_or(self.1.accent, |c| Color { a: c.a * 0.3, ..c })
                     .into(),
                 ..self.active()
             }
@@ -768,7 +768,7 @@ mod styles {
                 background: self
                     .0
                     .background_color
-                    .map_or(self.1.accent, |c| Color { a: c.a * 0.5, ..c })
+                    .map_or(self.1.accent, |c| Color { a: c.a * 0.3, ..c })
                     .into(),
                 ..self.active()
             }

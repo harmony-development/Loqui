@@ -30,10 +30,10 @@ use client::{
         parser::{Text, Token},
         Parser,
     },
-    message::MessageId,
+    message::{Attachment, MessageId},
     render_text,
     smol_str::SmolStr,
-    HarmonyToken, OptionExt,
+    HarmonyToken, OptionExt, Url,
 };
 use iced::{rule::FillMode, Tooltip};
 
@@ -46,6 +46,7 @@ pub type EventHistoryButsState = [(
     button::State,
     button::State,
     button::State,
+    Vec<button::State>,
     Vec<button::State>,
 ); SHOWN_MSGS_LIMIT];
 
@@ -130,6 +131,7 @@ pub fn build_event_history<'a>(
             reply_but_state,
             goto_reply_state,
             message_buts_state,
+            external_url_states,
         ),
     ) in (std::iter::once(first_message).chain(displayable_events)).zip(buts_sate.iter_mut())
     {
@@ -437,6 +439,50 @@ pub fn build_event_history<'a>(
                     .into(),
             );
             message_body_widgets.push(Column::with_children(widgets).align_items(Align::Start).into());
+
+            let ids = textt
+                .split_whitespace()
+                .map(Url::parse)
+                .flatten()
+                .map(FileId::External)
+                .collect::<Vec<_>>();
+            external_url_states.resize_with(ids.len(), Default::default);
+            for (id, media_open_button_state) in ids.into_iter().zip(external_url_states.iter_mut()) {
+                let is_thumbnail = ["png", "jpg", "gif"].contains(&&id.as_str()[id.as_str().len().saturating_sub(3)..]);
+                if is_thumbnail {
+                    let does_content_exist = content_store.content_exists(&id);
+
+                    let content: Element<Message> = thumbnail_cache.thumbnails.get(&id).map_or_else(
+                        || {
+                            let text = does_content_exist.some("Open").unwrap_or("Download");
+                            label!("{} {}", text, id.as_str()).into()
+                        },
+                        |handle| {
+                            // TODO: Don't hardcode this length, calculate it using the size of the window
+                            let image = Image::new(handle.clone()).width(length!(= 320));
+                            let text = does_content_exist
+                                .map_or_else(|| label!("Download {}", id.as_str()), || label!(id.as_str()));
+
+                            Column::with_children(vec![text.size(DEF_SIZE - 4).into(), image.into()])
+                                .spacing(SPACING)
+                                .into()
+                        },
+                    );
+                    message_body_widgets.push(
+                        Button::new(media_open_button_state, content)
+                            .on_press(Message::OpenContent {
+                                attachment: Attachment {
+                                    kind: "image".to_string(),
+                                    name: id.as_str().to_string(),
+                                    ..Attachment::new_unknown(id)
+                                },
+                                is_thumbnail,
+                            })
+                            .style(theme.secondary().border_width(2.0))
+                            .into(),
+                    );
+                }
+            }
         }
 
         if let IcyContent::Embeds(embeds) = &message.content {
