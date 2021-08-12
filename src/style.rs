@@ -12,7 +12,7 @@ use iced_aw::{
 
 pub const DEF_SIZE: u16 = 20;
 pub const MESSAGE_TIMESTAMP_SIZE: u16 = 14;
-pub const MESSAGE_SIZE: u16 = 20;
+pub const MESSAGE_SIZE: u16 = 18;
 pub const MESSAGE_SENDER_SIZE: u16 = 21;
 pub const DATE_SEPERATOR_SIZE: u16 = 24;
 

@@ -351,10 +351,9 @@ pub fn build_event_history<'a>(
                             line_widgets.push(
                                 Button::new(
                                     but_state,
-                                    label!(format!("@{}", member_name))
-                                        .size(MESSAGE_SIZE - 6)
-                                        .color(role_color),
+                                    label!(format!("@{}", member_name)).size(MESSAGE_SIZE).color(role_color),
                                 )
+                                .padding([2, 3])
                                 .height(length!(= MESSAGE_SIZE + 4))
                                 .style(theme.background_color(Color { a: 0.1, ..role_color }))
                                 .on_press(Message::SelectedMember(*id))
@@ -372,10 +371,11 @@ pub fn build_event_history<'a>(
                         let color = theme.colorscheme.accent;
                         let label = label!(name.as_ref().map_or(url, |text| text.value))
                             .color(color)
-                            .size(MESSAGE_SIZE - 6);
+                            .size(MESSAGE_SIZE);
                         line_widgets.push(
                             Tooltip::new(
                                 Button::new(but_state, label)
+                                    .padding([2, 3])
                                     .style(theme.background_color(Color { a: 0.1, ..color }))
                                     .on_press(Message::OpenUrl(url.into()))
                                     .height(length!(= MESSAGE_SIZE + 4)),
