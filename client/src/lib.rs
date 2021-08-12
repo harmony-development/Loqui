@@ -2,6 +2,7 @@
 
 pub mod channel;
 pub mod content;
+pub mod emotes;
 pub mod error;
 pub mod guild;
 pub mod member;
@@ -10,6 +11,7 @@ pub mod role;
 
 use bool_ext::BoolExt;
 use channel::Channel;
+use emotes::EmotePacks;
 use guild::Guild;
 pub use harmony_rust_sdk::{
     self,
@@ -131,6 +133,7 @@ pub struct Client {
     pub members: Members,
     pub user_id: Option<u64>,
     pub link_datas: AHashMap<Url, FetchLinkData>,
+    pub emote_packs: EmotePacks,
     content_store: Arc<ContentStore>,
 }
 
@@ -159,6 +162,7 @@ impl Client {
             content_store,
             inner: InnerClient::new(homeserver_url, session).await?,
             link_datas: AHashMap::new(),
+            emote_packs: EmotePacks::default(),
         })
     }
 
