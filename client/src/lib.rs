@@ -20,6 +20,7 @@ use harmony_rust_sdk::{
     api::{
         chat::{event::*, DeleteMessageRequest},
         harmonytypes::{Message as HarmonyMessage, UserStatus},
+        mediaproxy::fetch_link_metadata_response::Data as FetchLinkData,
     },
     client::api::{
         chat::{
@@ -120,6 +121,7 @@ pub enum PostProcessEvent {
         title: String,
         content: String,
     },
+    FetchLinkMetadata(Url),
 }
 
 #[derive(Clone)]
@@ -128,6 +130,7 @@ pub struct Client {
     pub guilds: Guilds,
     pub members: Members,
     pub user_id: Option<u64>,
+    pub link_datas: AHashMap<Url, FetchLinkData>,
     content_store: Arc<ContentStore>,
 }
 
@@ -155,6 +158,7 @@ impl Client {
             user_id: session.as_ref().map(|s| s.user_id),
             content_store,
             inner: InnerClient::new(homeserver_url, session).await?,
+            link_datas: AHashMap::new(),
         })
     }
 
@@ -933,6 +937,12 @@ impl<'a> HarmonyToken<'a> {
 
 pub fn post_emotes(message: &Message, post: &mut Vec<PostProcessEvent>) {
     if let Content::Text(text) = &message.content {
+        post.extend(
+            text.split_whitespace()
+                .map(Url::parse)
+                .flatten()
+                .map(PostProcessEvent::FetchLinkMetadata),
+        );
         post.extend(
             text.as_str()
                 .parse_md_custom(HarmonyToken::parse)

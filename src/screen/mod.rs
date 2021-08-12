@@ -31,6 +31,7 @@ use client::{
                 BatchQueryPermissionsRequest, GetGuildListRequest, GetMessageRequest, GetUserResponse,
             },
             harmonytypes::UserStatus,
+            mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
             rest::FileId,
         },
         client::{
@@ -44,13 +45,15 @@ use client::{
                     EventSource, GuildId, UserId,
                 },
                 harmonytypes::Message as HarmonyMessage,
+                mediaproxy::fetch_link_metadata,
+                rest::download_extract_file,
             },
             error::{ClientError as InnerClientError, InternalClientError as HrpcClientError},
             Client as InnerClient, EventsSocket,
         },
     },
     tracing::{debug, error, warn},
-    OptionExt,
+    OptionExt, Url,
 };
 use iced::{
     executor,
@@ -131,6 +134,7 @@ pub enum Message {
     Exit,
     ExitReady,
     WindowFocusChanged(bool),
+    FetchLinkDataReceived(FetchLinkData, Url),
 }
 
 impl Message {
@@ -543,6 +547,19 @@ impl ScreenManager {
                         })
                     },
                     Message::EventsReceived,
+                ),
+                PostProcessEvent::FetchLinkMetadata(url) => client.mk_cmd(
+                    |inner| async move {
+                        fetch_link_metadata(
+                            &inner,
+                            FetchLinkMetadataRequest {
+                                url: url.clone().into(),
+                            },
+                        )
+                        .await
+                        .map(|resp| (resp.data, url))
+                    },
+                    |(data, url)| data.map_or(Message::Nothing, |data| Message::FetchLinkDataReceived(data, url)),
                 ),
             }
         } else {
@@ -1000,6 +1017,49 @@ impl Application for ScreenManager {
                 }
                 cmds.push(self.update(Message::EventsReceived(events), clip));
                 return Command::batch(cmds);
+            }
+            Message::FetchLinkDataReceived(data, url) => {
+                let mut cmd = None;
+                if let Some(client) = self.client.as_mut() {
+                    if let FetchLinkData::IsSite(site) = &data {
+                        if let Ok(url) = site.image.parse::<Url>() {
+                            let id = FileId::External(url);
+                            cmd = Some(client.mk_cmd(
+                                |inner| async move {
+                                    download_extract_file(&inner, id.clone()).await.map(|file| {
+                                        Message::DownloadedThumbnail {
+                                            open: false,
+                                            data: Attachment {
+                                                size: file.data().len() as u32,
+                                                name: file.name().into(),
+                                                kind: file.mimetype().into(),
+                                                ..Attachment::new_unknown(id)
+                                            },
+                                            thumbnail: image::load_from_memory(file.data())
+                                                .ok()
+                                                .map(|image| image.into_bgra8())
+                                                .map(|bgra| {
+                                                    ImageHandle::from_pixels(
+                                                        bgra.width(),
+                                                        bgra.height(),
+                                                        bgra.into_vec(),
+                                                    )
+                                                }),
+                                            avatar: None,
+                                            emote: None,
+                                        }
+                                    })
+                                },
+                                identity,
+                            ));
+                        }
+                    }
+                    client.link_datas.insert(url, data);
+                }
+
+                if let Some(cmd) = cmd {
+                    return cmd;
+                }
             }
         }
         Command::none()

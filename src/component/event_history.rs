@@ -25,7 +25,10 @@ use chrono::{Datelike, TimeZone, Timelike};
 use client::{
     bool_ext::BoolExt,
     guild::Guild,
-    harmony_rust_sdk::api::harmonytypes::{r#override::Reason, UserStatus},
+    harmony_rust_sdk::api::{
+        harmonytypes::{r#override::Reason, UserStatus},
+        mediaproxy::fetch_link_metadata_response::Data as FetchLinkData,
+    },
     linemd::{
         parser::{Text, Token},
         Parser,
@@ -33,7 +36,7 @@ use client::{
     message::{Attachment, MessageId},
     render_text,
     smol_str::SmolStr,
-    HarmonyToken, OptionExt, Url,
+    Client, HarmonyToken, OptionExt, Url,
 };
 use iced::{rule::FillMode, Tooltip};
 
@@ -60,6 +63,7 @@ const TIMESTAMP_WIDTH: u16 = DEF_SIZE * 2 + RIGHT_TIMESTAMP_PADDING + LEFT_TIMES
 pub fn build_event_history<'a>(
     content_store: &ContentStore,
     thumbnail_cache: &ThumbnailCache,
+    client: &Client,
     guild: &Guild,
     channel: &Channel,
     members: &Members,
@@ -440,47 +444,111 @@ pub fn build_event_history<'a>(
             );
             message_body_widgets.push(Column::with_children(widgets).align_items(Align::Start).into());
 
-            let ids = textt
-                .split_whitespace()
-                .map(Url::parse)
-                .flatten()
-                .map(FileId::External)
-                .collect::<Vec<_>>();
-            external_url_states.resize_with(ids.len(), Default::default);
-            for (id, media_open_button_state) in ids.into_iter().zip(external_url_states.iter_mut()) {
-                let is_thumbnail = ["png", "jpg", "gif"].contains(&&id.as_str()[id.as_str().len().saturating_sub(3)..]);
-                if is_thumbnail {
-                    let does_content_exist = content_store.content_exists(&id);
-
-                    let content: Element<Message> = thumbnail_cache.thumbnails.get(&id).map_or_else(
-                        || {
-                            let text = does_content_exist.some("Open").unwrap_or("Download");
-                            label!("{} {}", text, id.as_str()).into()
-                        },
-                        |handle| {
-                            // TODO: Don't hardcode this length, calculate it using the size of the window
-                            let image = Image::new(handle.clone()).width(length!(= 320));
-                            let text = does_content_exist
-                                .map_or_else(|| label!("Download {}", id.as_str()), || label!(id.as_str()));
-
-                            Column::with_children(vec![text.size(DEF_SIZE - 4).into(), image.into()])
+            let urls = textt.split_whitespace().map(Url::parse).flatten().collect::<Vec<_>>();
+            external_url_states.resize_with(urls.len(), Default::default);
+            for (url, media_open_button_state) in urls.into_iter().zip(external_url_states.iter_mut()) {
+                if let Some(data) = client.link_datas.get(&url) {
+                    match data {
+                        FetchLinkData::IsSite(site) => {
+                            let desc_words = site
+                                .description
+                                .split_whitespace()
+                                .fold(
+                                    (String::with_capacity(site.description.len() + 6), 0),
+                                    |(mut total, mut len), item| {
+                                        total.push_str(item);
+                                        len += item.len();
+                                        total.push(' ');
+                                        if len >= 50 {
+                                            len = 0;
+                                            total.push('\n');
+                                        }
+                                        (total, len)
+                                    },
+                                )
+                                .0;
+                            let mut widgets = vec![
+                                Row::with_children(vec![
+                                    space!(w = PADDING / 2).into(),
+                                    label!(truncate_string(&site.page_title, 50)).size(DEF_SIZE - 2).into(),
+                                ])
+                                .align_items(Align::Center)
+                                .into(),
+                                Rule::horizontal(SPACING)
+                                    .style(theme.border_radius(0.0).padded(FillMode::Full))
+                                    .into(),
+                                Row::with_children(vec![
+                                    space!(w = PADDING / 2).into(),
+                                    label!(desc_words).size(DEF_SIZE - 5).into(),
+                                ])
+                                .align_items(Align::Center)
+                                .into(),
+                            ];
+                            if let Some(handle) = site
+                                .image
+                                .parse()
+                                .ok()
+                                .and_then(|url| thumbnail_cache.thumbnails.get(&FileId::External(url)))
+                            {
+                                widgets.push(
+                                    Rule::horizontal(SPACING)
+                                        .style(theme.border_radius(0.0).padded(FillMode::Full))
+                                        .into(),
+                                );
+                                widgets.push(Image::new(handle.clone()).width(length!(+)).height(length!(-)).into());
+                            }
+                            let content = Column::with_children(widgets)
+                                .width(length!(= (DEF_SIZE - 2) * 24))
                                 .spacing(SPACING)
-                                .into()
-                        },
-                    );
-                    message_body_widgets.push(
-                        Button::new(media_open_button_state, content)
-                            .on_press(Message::OpenContent {
-                                attachment: Attachment {
-                                    kind: "image".to_string(),
-                                    name: id.as_str().to_string(),
-                                    ..Attachment::new_unknown(id)
+                                .align_items(Align::Start);
+
+                            let url: String = url.into();
+                            message_body_widgets.push(
+                                Button::new(media_open_button_state, content)
+                                    .padding([PADDING / 2, 0])
+                                    .on_press(Message::OpenUrl(url.into()))
+                                    .style(theme.secondary().border_width(2.0))
+                                    .into(),
+                            );
+                        }
+                        FetchLinkData::IsMedia(media) => {
+                            let id = FileId::External(url);
+                            let is_thumbnail = media.mimetype.starts_with("image");
+                            let does_content_exist = content_store.content_exists(&id);
+
+                            let content: Element<Message> = thumbnail_cache.thumbnails.get(&id).map_or_else(
+                                || {
+                                    let text = does_content_exist.some("Open").unwrap_or("Download");
+                                    label!("{} {}", text, media.filename).into()
                                 },
-                                is_thumbnail,
-                            })
-                            .style(theme.secondary().border_width(2.0))
-                            .into(),
-                    );
+                                |handle| {
+                                    // TODO: Don't hardcode this length, calculate it using the size of the window
+                                    let image = Image::new(handle.clone()).width(length!(= 320));
+                                    let text = does_content_exist.map_or_else(
+                                        || label!("Download {}", media.filename),
+                                        || label!(&media.filename),
+                                    );
+
+                                    Column::with_children(vec![text.size(DEF_SIZE - 4).into(), image.into()])
+                                        .spacing(SPACING)
+                                        .into()
+                                },
+                            );
+                            message_body_widgets.push(
+                                Button::new(media_open_button_state, content)
+                                    .on_press(Message::OpenContent {
+                                        attachment: Attachment {
+                                            kind: media.mimetype.clone(),
+                                            name: media.filename.clone(),
+                                            ..Attachment::new_unknown(id)
+                                        },
+                                        is_thumbnail,
+                                    })
+                                    .style(theme.secondary().border_width(2.0))
+                                    .into(),
+                            );
+                        }
+                    }
                 }
             }
         }

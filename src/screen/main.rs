@@ -459,6 +459,7 @@ impl MainScreen {
                 let message_history_list = build_event_history(
                     client.content_store(),
                     thumbnail_cache,
+                    client,
                     guild,
                     channel,
                     &client.members,
