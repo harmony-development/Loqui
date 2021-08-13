@@ -89,6 +89,7 @@ impl Default for Mode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProfileMenuOption {
     EditProfile,
+    ManageEmotes,
     Help,
     Logout,
     SwitchAccount,
@@ -100,6 +101,7 @@ impl Display for ProfileMenuOption {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let w = match self {
             ProfileMenuOption::EditProfile => "Edit Profile",
+            ProfileMenuOption::ManageEmotes => "Manage Emotes",
             ProfileMenuOption::Help => "Help",
             ProfileMenuOption::Logout => "Logout",
             ProfileMenuOption::SwitchAccount => "Switch Account",
@@ -282,6 +284,7 @@ impl MainScreen {
             &mut self.menu_state,
             vec![
                 ProfileMenuOption::EditProfile,
+                ProfileMenuOption::ManageEmotes,
                 ProfileMenuOption::Help,
                 ProfileMenuOption::SwitchAccount,
                 ProfileMenuOption::Logout,
@@ -1040,6 +1043,11 @@ impl MainScreen {
                 _ => {}
             },
             Message::SelectedAppMenuOption(option) => match option {
+                ProfileMenuOption::ManageEmotes => {
+                    return TopLevelScreen::push_screen_cmd(TopLevelScreen::EmoteManagement(Box::new(
+                        Default::default(),
+                    )));
+                }
                 ProfileMenuOption::Logout => {
                     self.logout_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache, clip);

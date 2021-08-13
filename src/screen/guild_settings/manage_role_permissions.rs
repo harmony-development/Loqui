@@ -154,10 +154,10 @@ impl ManageRolePermissionsModal {
                 column(widgets).width(length!(= 600)).height(length!(= 600)),
             )
             .close_size((DEF_SIZE + (PADDING / 2)) as f32)
-            .style(theme.round())
+            .style(theme)
             .on_close(Message::GoBack),
         )
-        .style(theme.round().border_width(0.0))
+        .style(theme.border_width(0.0))
         .center_x()
         .center_y()
         .into()

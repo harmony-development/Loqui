@@ -788,6 +788,13 @@ impl Client {
                 deleted_emotes,
             }) => {
                 if let Some(pack) = self.emote_packs.get_mut(&pack_id) {
+                    post.extend(added_emotes.iter().map(|emote| {
+                        PostProcessEvent::FetchThumbnail(Attachment {
+                            kind: "image".to_string(),
+                            name: "emote".to_string(),
+                            ..Attachment::new_unknown(FileId::Id(emote.image_id.clone()))
+                        })
+                    }));
                     pack.emotes
                         .extend(added_emotes.into_iter().map(|emote| (emote.image_id, emote.name)));
                     for image_id in deleted_emotes {

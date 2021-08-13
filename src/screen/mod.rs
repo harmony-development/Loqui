@@ -1,3 +1,4 @@
+pub mod emote_management;
 pub mod guild_discovery;
 pub mod guild_settings;
 pub mod login;
@@ -75,12 +76,15 @@ use std::{
     time::Duration,
 };
 
+use self::emote_management::ManageEmotesScreen;
+
 #[derive(Debug, Clone)]
 pub enum ScreenMessage {
     LoginScreen(login::Message),
     MainScreen(main::Message),
     GuildDiscovery(guild_discovery::Message),
     GuildSettings(guild_settings::Message),
+    EmoteManagement(emote_management::Message),
 }
 
 #[derive(Debug, Clone)]
@@ -162,6 +166,11 @@ impl Message {
     pub const fn guild_settings(msg: guild_settings::Message) -> Self {
         Self::ChildMessage(ScreenMessage::GuildSettings(msg))
     }
+
+    #[inline(always)]
+    pub const fn emote_management(msg: emote_management::Message) -> Self {
+        Self::ChildMessage(ScreenMessage::EmoteManagement(msg))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -170,6 +179,7 @@ pub enum Screen {
     Main(Box<MainScreen>),
     GuildDiscovery(Box<GuildDiscovery>),
     GuildSettings(Box<GuildSettings>),
+    EmoteManagement(Box<ManageEmotesScreen>),
 }
 
 impl Screen {
@@ -180,6 +190,7 @@ impl Screen {
             Screen::GuildDiscovery(screen) => screen.on_error(error),
             Screen::Main(screen) => screen.on_error(error),
             Screen::GuildSettings(screen) => screen.on_error(error),
+            Screen::EmoteManagement(screen) => screen.on_error(error),
         }
     }
 
@@ -190,6 +201,7 @@ impl Screen {
             Screen::GuildSettings(screen) => screen.subscription(),
             Screen::GuildDiscovery(screen) => screen.subscription(),
             Screen::Login(screen) => screen.subscription(),
+            Screen::EmoteManagement(screen) => screen.subscription(),
         }
     }
 
@@ -216,6 +228,9 @@ impl Screen {
             Screen::GuildSettings(screen) => screen
                 .view(theme, client.unwrap(), thumbnail_cache) // This will not panic cause [ref:client_set_before_main_view]
                 .map(ScreenMessage::GuildSettings),
+            Screen::EmoteManagement(screen) => screen
+                .view(theme, client.unwrap(), thumbnail_cache) // This will not panic cause [ref:client_set_before_main_view]
+                .map(ScreenMessage::EmoteManagement),
         }
         .map(Message::ChildMessage)
     }
@@ -247,6 +262,11 @@ impl Screen {
             }
             ScreenMessage::GuildSettings(msg) => {
                 if let (Screen::GuildSettings(screen), Some(client)) = (self, client) {
+                    return screen.update(msg, client, clip);
+                }
+            }
+            ScreenMessage::EmoteManagement(msg) => {
+                if let (Screen::EmoteManagement(screen), Some(client)) = (self, client) {
                     return screen.update(msg, client, clip);
                 }
             }
