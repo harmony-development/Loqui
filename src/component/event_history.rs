@@ -489,6 +489,7 @@ pub fn build_event_history<'a>(
                                 .align_items(Align::Center)
                                 .into(),
                             ];
+                            let content_width = (DEF_SIZE - 2) * 24;
                             if let Some(handle) = site
                                 .image
                                 .parse()
@@ -500,10 +501,20 @@ pub fn build_event_history<'a>(
                                         .style(theme.border_radius(0.0).padded(FillMode::Full))
                                         .into(),
                                 );
-                                widgets.push(Image::new(handle.clone()).width(length!(+)).height(length!(-)).into());
+                                widgets.push(
+                                    Row::with_children(vec![
+                                        space!(w = PADDING / 2).into(),
+                                        Image::new(handle.clone())
+                                            .width(length!(= content_width - PADDING))
+                                            .height(length!(-))
+                                            .into(),
+                                    ])
+                                    .align_items(Align::Center)
+                                    .into(),
+                                );
                             }
                             let content = Column::with_children(widgets)
-                                .width(length!(= (DEF_SIZE - 2) * 24))
+                                .width(length!(= content_width))
                                 .spacing(SPACING)
                                 .align_items(Align::Start);
 
