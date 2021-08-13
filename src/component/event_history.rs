@@ -316,33 +316,35 @@ pub fn build_event_history<'a>(
                     Token::Custom(tok) => match tok {
                         HarmonyToken::Emote(id) => match thumbnail_cache.emotes.get(&FileId::Id(id.to_string())) {
                             Some(handle) => {
-                                let tooltip = client.get_emote_name(id).unwrap_or(id);
+                                let tooltip = |content, state| {
+                                    Tooltip::new(
+                                        Button::new(state, content)
+                                            .style(theme)
+                                            .padding(0)
+                                            .on_press(Message::CopyToClipboard(id.to_string())),
+                                        format!(
+                                            "Click to copy ID of {}",
+                                            truncate_string(client.get_emote_name(id).unwrap_or(id), 10)
+                                        ),
+                                        iced::tooltip::Position::Top,
+                                    )
+                                    .size(MESSAGE_SIZE)
+                                    .gap(PADDING / 2)
+                                    .style(theme)
+                                    .into()
+                                };
                                 if only_emotes {
-                                    line_widgets.push(
-                                        Tooltip::new(
-                                            Image::new(handle.clone()).width(length!(= 48)).height(length!( = 48)),
-                                            tooltip,
-                                            iced::tooltip::Position::Top,
-                                        )
-                                        .size(MESSAGE_SIZE)
-                                        .gap(PADDING / 2)
-                                        .style(theme)
-                                        .into(),
-                                    );
+                                    line_widgets.push(tooltip(
+                                        Image::new(handle.clone()).width(length!(= 48)).height(length!( = 48)),
+                                        but_state,
+                                    ));
                                 } else {
-                                    line_widgets.push(
-                                        Tooltip::new(
-                                            Image::new(handle.clone())
-                                                .width(length!(= MESSAGE_SIZE + 4))
-                                                .height(length!( = MESSAGE_SIZE + 4)),
-                                            tooltip,
-                                            iced::tooltip::Position::Top,
-                                        )
-                                        .size(MESSAGE_SIZE)
-                                        .gap(PADDING / 2)
-                                        .style(theme)
-                                        .into(),
-                                    );
+                                    line_widgets.push(tooltip(
+                                        Image::new(handle.clone())
+                                            .width(length!(= MESSAGE_SIZE + 4))
+                                            .height(length!( = MESSAGE_SIZE + 4)),
+                                        but_state,
+                                    ));
                                     line_widgets.push(label!(" ").into());
                                 }
                             }

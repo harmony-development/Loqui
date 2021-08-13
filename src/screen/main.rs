@@ -193,6 +193,7 @@ pub enum Message {
     NextBeforeGuild(bool),
     NextBeforeChannel(bool),
     DeleteMessage(u64),
+    CopyToClipboard(String),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1502,6 +1503,7 @@ impl MainScreen {
                     );
                 }
             }
+            Message::CopyToClipboard(value) => clip.write(value),
         }
 
         Command::none()
