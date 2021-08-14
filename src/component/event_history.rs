@@ -34,7 +34,6 @@ use client::{
         Parser,
     },
     message::{Attachment, MessageId},
-    render_text,
     smol_str::SmolStr,
     Client, HarmonyToken, OptionExt, Url,
 };
@@ -749,52 +748,15 @@ pub fn build_event_history<'a>(
         let mut message_col = Vec::with_capacity(2);
 
         if let Some(reply_message) = maybe_reply_message {
-            let name_to_use = members
-                .get(&reply_message.sender)
-                .map_or_else(SmolStr::default, |member| member.username.clone());
-            let author_name = reply_message
-                .overrides
-                .as_ref()
-                .map_or(name_to_use, |ov| ov.name.as_str().into());
-            let color = color!(200, 200, 200);
-
-            let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
-            let content = label!(match &reply_message.content {
-                IcyContent::Text(text) =>
-                    truncate_string(&render_text(&text.replace('\n', " "), members, &client.emote_packs), 40)
-                        .to_string(),
-                IcyContent::Files(files) => {
-                    let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
-                        names.push_str(", ");
-                        names.push_str(name);
-                        names
-                    });
-                    format!("sent file(s): {}", file_names)
-                }
-                IcyContent::Embeds(_) => "sent an embed".to_string(),
-            })
-            .size(MESSAGE_SIZE - 4)
-            .color(color);
+            let widget = make_reply_message(reply_message, client, theme, Message::GotoReply, goto_reply_state);
 
             message_col.push(
                 Row::with_children(vec![
                     space!(w = TIMESTAMP_WIDTH / 5).into(),
-                    Row::with_children(vec![
-                        icon(Icon::Reply).size(MESSAGE_SIZE).into(),
-                        Button::new(
-                            goto_reply_state,
-                            Row::with_children(vec![author.into(), content.into()])
-                                .align_items(Align::Center)
-                                .spacing(SPACING / 2)
-                                .padding(PADDING / 5),
-                        )
-                        .on_press(Message::GotoReply(reply_message.id))
-                        .style(theme.round())
+                    Row::with_children(vec![icon(Icon::Reply).size(MESSAGE_SIZE).into(), widget.into()])
+                        .spacing(SPACING)
+                        .align_items(Align::Center)
                         .into(),
-                    ])
-                    .spacing(SPACING)
-                    .align_items(Align::Center)
-                    .into(),
                 ])
                 .align_items(Align::Center)
                 .into(),

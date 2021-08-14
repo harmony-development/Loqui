@@ -4,10 +4,20 @@ pub mod event_history;
 pub use crate::{color, label, space};
 use crate::{
     length,
-    style::{ALT_COLOR, DEF_SIZE},
+    screen::truncate_string,
+    style::{Theme, ALT_COLOR, DEF_SIZE, MESSAGE_SIZE},
 };
 pub use chan_guild_list::build_channel_list;
-use client::{bool_ext::BoolExt, channel::Channel, harmony_rust_sdk::api::rest::FileId, IndexMap};
+use client::{
+    bool_ext::BoolExt,
+    channel::Channel,
+    harmony_rust_sdk::api::rest::FileId,
+    message::Content as IcyContent,
+    message::{Message, MessageId},
+    render_text,
+    smol_str::SmolStr,
+    Client, IndexMap,
+};
 pub use event_history::build_event_history;
 pub use iced::{
     button, pick_list, scrollable, text_input, Align, Button, Checkbox, Color, Column, Command, Container, Element,
@@ -17,6 +27,54 @@ pub use iced_aw::Icon;
 pub use iced_native::Padding;
 
 use super::style::{PADDING, SPACING};
+
+pub fn make_reply_message<'a, M: Clone + 'a>(
+    reply_message: &Message,
+    client: &Client,
+    theme: Theme,
+    message: fn(MessageId) -> M,
+    but_state: &'a mut button::State,
+) -> Button<'a, M> {
+    let name_to_use = client
+        .members
+        .get(&reply_message.sender)
+        .map_or_else(SmolStr::default, |member| member.username.clone());
+    let author_name = reply_message
+        .overrides
+        .as_ref()
+        .map_or(name_to_use, |ov| ov.name.as_str().into());
+    let color = color!(200, 200, 200);
+
+    let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
+    let content = label!(match &reply_message.content {
+        IcyContent::Text(text) => truncate_string(
+            &render_text(&text.replace('\n', " "), &client.members, &client.emote_packs),
+            40
+        )
+        .to_string(),
+        IcyContent::Files(files) => {
+            let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
+                names.push_str(", ");
+                names.push_str(name);
+                names
+            });
+            format!("sent file(s): {}", file_names)
+        }
+        IcyContent::Embeds(_) => "sent an embed".to_string(),
+    })
+    .size(MESSAGE_SIZE - 4)
+    .color(color);
+
+    Button::new(
+        but_state,
+        Row::with_children(vec![author.into(), content.into()])
+            .align_items(Align::Center)
+            .spacing(SPACING / 2)
+            .padding(PADDING / 5),
+    )
+    .on_press(message(reply_message.id))
+    .style(theme)
+}
 
 pub fn column<M>(children: Vec<Element<M>>) -> Column<M> {
     Column::with_children(children)

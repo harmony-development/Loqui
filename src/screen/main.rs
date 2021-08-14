@@ -189,6 +189,7 @@ pub enum Message {
     /// Sent when the user picks a new status
     ChangeUserStatus(UserStatus),
     GotoReply(MessageId),
+    ClearReply,
     NextBeforeGuild(bool),
     NextBeforeChannel(bool),
     CopyToClipboard(String),
@@ -202,6 +203,8 @@ pub struct MainScreen {
     history_buts_sate: EventHistoryButsState,
     send_file_but_state: button::State,
     composer_state: text_input::State,
+    goto_reply_state: button::State,
+    clear_reply_state: button::State,
     scroll_to_bottom_but_state: button::State,
 
     // Room area state
@@ -475,13 +478,12 @@ impl MainScreen {
                     theme,
                 );
 
+                let icon_size = (PADDING / 4) * 3 + MESSAGE_SIZE;
                 let send_file_button = Tooltip::new(
-                    Button::new(
-                        &mut self.send_file_but_state,
-                        icon(Icon::Upload).size((PADDING / 4) * 3 + MESSAGE_SIZE),
-                    )
-                    .style(theme.secondary())
-                    .on_press(Message::SendFiles { guild_id, channel_id }),
+                    Button::new(&mut self.send_file_but_state, icon(Icon::Upload).size(icon_size))
+                        .style(theme.secondary())
+                        .padding(PADDING / 4)
+                        .on_press(Message::SendFiles { guild_id, channel_id }),
                     "Click to upload a file",
                     iced::tooltip::Position::Top,
                 )
@@ -517,8 +519,9 @@ impl MainScreen {
                         Tooltip::new(
                             Button::new(
                                 &mut self.scroll_to_bottom_but_state,
-                                icon(Icon::ArrowDown).size((PADDING / 4) * 3 + MESSAGE_SIZE),
+                                icon(Icon::ArrowDown).size(icon_size),
                             )
+                            .padding(PADDING / 4)
                             .style(theme.secondary())
                             .on_press(Message::ScrollToBottom(channel_id)),
                             "Scroll to bottom",
@@ -529,13 +532,47 @@ impl MainScreen {
                     );
                 }
 
-                let mut message_area_widgets = Vec::with_capacity(4);
+                let mut message_area_widgets = Vec::with_capacity(5);
                 message_area_widgets.push(message_history_list);
                 message_area_widgets.push(
                     Rule::horizontal(0)
                         .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
                         .into(),
                 );
+                if let Some(reply_message) = self.reply_to.and_then(|id| channel.messages.get(&MessageId::Ack(id))) {
+                    let widget = make_reply_message(
+                        reply_message,
+                        client,
+                        theme,
+                        Message::GotoReply,
+                        &mut self.goto_reply_state,
+                    );
+                    let clear_reply_but = Button::new(&mut self.clear_reply_state, icon(Icon::X))
+                        .style(theme)
+                        .padding(PADDING / 4)
+                        .on_press(Message::ClearReply);
+                    message_area_widgets.push(
+                        Container::new(
+                            Row::with_children(vec![
+                                label!("Replying to").size(MESSAGE_SIZE).into(),
+                                widget.into(),
+                                space!(w+).into(),
+                                clear_reply_but.into(),
+                            ])
+                            .spacing(SPACING)
+                            .align_items(Align::Center),
+                        )
+                        .center_x()
+                        .center_y()
+                        .padding(PADDING / 2)
+                        .into(),
+                    );
+                    message_area_widgets.push(
+                        Rule::horizontal(0)
+                            .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
+                            .into(),
+                    );
+                }
 
                 let typing_names = sorted_members
                     .iter()
@@ -1507,9 +1544,7 @@ impl MainScreen {
                             });
                     }
                 }
-                MessageMenuOption::Reply(id) => {
-                    self.reply_to = Some(id);
-                }
+                MessageMenuOption::Reply(id) => self.reply_to = Some(id),
                 MessageMenuOption::Edit(id) => {
                     return self.update(
                         Message::ChangeMode(Mode::EditingMessage(id)),
@@ -1527,6 +1562,7 @@ impl MainScreen {
                     }
                 }
             },
+            Message::ClearReply => self.reply_to = None,
         }
 
         Command::none()
