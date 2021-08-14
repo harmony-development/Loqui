@@ -94,7 +94,6 @@ pub enum ProfileMenuOption {
     Logout,
     SwitchAccount,
     Exit,
-    Custom(SmolStr),
 }
 
 impl Display for ProfileMenuOption {
@@ -106,7 +105,6 @@ impl Display for ProfileMenuOption {
             ProfileMenuOption::Logout => "Logout",
             ProfileMenuOption::SwitchAccount => "Switch Account",
             ProfileMenuOption::Exit => "Exit",
-            ProfileMenuOption::Custom(s) => s.as_str(),
         };
 
         f.write_str(w)
@@ -117,7 +115,6 @@ impl Display for ProfileMenuOption {
 pub enum GuildMenuOption {
     EditGuild,
     LeaveGuild,
-    Custom(SmolStr),
 }
 
 impl Display for GuildMenuOption {
@@ -125,7 +122,6 @@ impl Display for GuildMenuOption {
         let w = match self {
             GuildMenuOption::EditGuild => "Edit Guild",
             GuildMenuOption::LeaveGuild => "Leave Guild",
-            GuildMenuOption::Custom(s) => s.as_str(),
         };
 
         f.write_str(w)
@@ -293,9 +289,10 @@ impl MainScreen {
                 ProfileMenuOption::Logout,
                 ProfileMenuOption::Exit,
             ],
-            Some(ProfileMenuOption::Custom(current_username)),
+            None,
             Message::SelectedAppMenuOption,
         )
+        .placeholder(current_username)
         .width(length!(+))
         .padding(PADDING / 2)
         .style(theme);
@@ -426,9 +423,10 @@ impl MainScreen {
             let channel_menu = PickList::new(
                 &mut self.channel_menu_state,
                 channel_menu_entries,
-                Some(GuildMenuOption::Custom(truncate_string(&guild.name, 16).into())),
+                None,
                 Message::SelectedGuildMenuOption,
             )
+            .placeholder(truncate_string(&guild.name, 16))
             .width(length!(+))
             .padding(PADDING / 2)
             .style(theme);
@@ -1074,7 +1072,6 @@ impl MainScreen {
                         |_| TopLevelMessage::Nothing,
                     );
                 }
-                _ => {}
             },
             Message::SelectedAppMenuOption(option) => match option {
                 ProfileMenuOption::ManageEmotes => {
@@ -1108,7 +1105,6 @@ impl MainScreen {
                 ProfileMenuOption::Exit => {
                     return Command::perform(async { TopLevelMessage::Exit }, identity);
                 }
-                _ => {}
             },
             Message::ComposerMessageChanged(new_msg) => {
                 self.message = new_msg;
