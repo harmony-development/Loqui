@@ -116,6 +116,11 @@ impl Theme {
         self.overrides.text_color = Some(text_color);
         self
     }
+
+    pub fn placeholder_color(mut self, placeholder_color: Color) -> Self {
+        self.overrides.placeholder_color = Some(placeholder_color);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -335,6 +340,7 @@ pub struct OverrideStyle {
     padded: Option<rule::FillMode>,
     icon_size: Option<f32>,
     text_color: Option<Color>,
+    placeholder_color: Option<Color>,
 }
 
 impl OverrideStyle {
@@ -410,6 +416,9 @@ impl OverrideStyle {
         }
         if let Some(color) = self.text_color {
             style.text_color = color;
+        }
+        if let Some(color) = self.placeholder_color {
+            style.placeholder_color = color;
         }
         style
     }

@@ -295,7 +295,7 @@ impl MainScreen {
         .placeholder(current_username)
         .width(length!(+))
         .padding(PADDING / 2)
-        .style(theme);
+        .style(theme.placeholder_color(theme.colorscheme.text));
 
         let status_menu = PickList::new(
             &mut self.status_list,
@@ -429,7 +429,7 @@ impl MainScreen {
             .placeholder(truncate_string(&guild.name, 16))
             .width(length!(+))
             .padding(PADDING / 2)
-            .style(theme);
+            .style(theme.placeholder_color(theme.colorscheme.text));
 
             self.channels_buts_state
                 .resize_with(guild.channels.len(), Default::default);

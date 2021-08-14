@@ -734,7 +734,12 @@ pub fn build_event_history<'a>(
                 .text_size(MESSAGE_TIMESTAMP_SIZE)
                 .menu_text_size(MESSAGE_SIZE)
                 .padding(0)
-                .style(theme.text_color(color!(160, 160, 160)).border_width(0.0).icon_size(0.0))
+                .style(
+                    theme
+                        .placeholder_color(color!(160, 160, 160))
+                        .border_width(0.0)
+                        .icon_size(0.0),
+                )
                 .font(IOSEVKA)
                 .menu_font(Font::Default),
         )
