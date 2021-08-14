@@ -12,6 +12,7 @@ use channel::{get_channel_messages, GetChannelMessages};
 use chat::Typing;
 use client::{
     bool_ext::BoolExt,
+    content,
     error::ClientResult,
     harmony_rust_sdk::{
         api::{
@@ -63,7 +64,7 @@ use crate::{
         *,
     },
     label, label_button, length,
-    screen::{map_send_msg, map_to_nothing, truncate_string, ClientExt, ResultExt},
+    screen::{map_send_msg, map_to_nothing, select_files, truncate_string, ClientExt, ResultExt},
     space,
     style::{
         tuple_to_iced_color, Theme, ALT_COLOR, AVATAR_WIDTH, DEF_SIZE, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING,
@@ -145,9 +146,16 @@ pub enum Message {
         channel_id: u64,
     },
     /// Sent when the user wants to send a file.
-    SendFiles {
+    SelectFilesToSend,
+    UploadFiles {
         guild_id: u64,
         channel_id: u64,
+        files: Vec<PathBuf>,
+    },
+    UploadResult {
+        guild_id: u64,
+        channel_id: u64,
+        result: Box<ClientResult<Vec<Attachment>>>,
     },
     /// Sent when user makes a change to the message they are composing.
     ComposerMessageChanged(String),
@@ -481,15 +489,15 @@ impl MainScreen {
                 );
 
                 let icon_size = (PADDING / 4) * 3 + MESSAGE_SIZE;
-                let send_file_button = Tooltip::new(
+                let mut send_file_button =
                     Button::new(&mut self.send_file_but_state, icon(Icon::Upload).size(icon_size))
                         .style(theme.secondary())
-                        .padding(PADDING / 4)
-                        .on_press(Message::SendFiles { guild_id, channel_id }),
-                    "Click to upload a file",
-                    iced::tooltip::Position::Top,
-                )
-                .style(theme);
+                        .padding(PADDING / 4);
+                if channel.uploading_files.is_empty() {
+                    send_file_button = send_file_button.on_press(Message::SelectFilesToSend);
+                }
+                let send_file_button =
+                    Tooltip::new(send_file_button, "Click to upload a file", iced::tooltip::Position::Top).style(theme);
 
                 let message_composer = if channel.user_perms.send_msg {
                     match self.mode {
@@ -541,6 +549,24 @@ impl MainScreen {
                         .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
                         .into(),
                 );
+                if !channel.uploading_files.is_empty() {
+                    let widgets = std::iter::once("Uploading files: ")
+                        .chain(channel.uploading_files.iter().map(String::as_str))
+                        .map(|label| label!(label).size(MESSAGE_SIZE).into())
+                        .collect();
+                    message_area_widgets.push(
+                        Container::new(Row::with_children(widgets).align_items(Align::Center).spacing(SPACING))
+                            .center_y()
+                            .center_x()
+                            .padding(PADDING / 2)
+                            .into(),
+                    );
+                    message_area_widgets.push(
+                        Rule::horizontal(0)
+                            .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
+                            .into(),
+                    );
+                }
                 if let Some(reply_message) = self.reply_to.and_then(|id| channel.messages.get(&MessageId::Ack(id))) {
                     let widget = make_reply_message(
                         reply_message,
@@ -1280,36 +1306,80 @@ impl MainScreen {
                     );
                 }
             }
-            Message::SendFiles { guild_id, channel_id } => {
-                let inner = client.inner_arc();
-                let content_store = client.content_store_arc();
-                let sender = client.user_id.unwrap();
-
-                return Command::perform(
-                    async move {
-                        let ids = super::select_upload_files(&inner, content_store, false).await?;
-                        Ok(TopLevelMessage::SendMessage {
-                            message: IcyMessage {
-                                content: IcyContent::Files(ids),
-                                sender,
-                                ..Default::default()
+            Message::SelectFilesToSend => {
+                if let (Some(guild_id), Some(channel_id)) = (self.current_guild_id, self.current_channel_id) {
+                    return Command::perform(select_files(false), move |result| {
+                        result.map_or_else(
+                            |err| {
+                                if matches!(err, ClientError::Custom(_)) {
+                                    error!("{}", err);
+                                    TopLevelMessage::Nothing
+                                } else {
+                                    TopLevelMessage::Error(Box::new(err))
+                                }
                             },
-                            retry_after: Duration::from_secs(0),
-                            guild_id,
-                            channel_id,
-                        })
-                    },
-                    |result| {
-                        result.unwrap_or_else(|err| {
-                            if matches!(err, ClientError::Custom(_)) {
-                                error!("{}", err);
-                                TopLevelMessage::Nothing
-                            } else {
-                                TopLevelMessage::Error(Box::new(err))
-                            }
-                        })
-                    },
-                );
+                            |files| {
+                                TopLevelMessage::main(Message::UploadFiles {
+                                    guild_id,
+                                    channel_id,
+                                    files,
+                                })
+                            },
+                        )
+                    });
+                }
+            }
+            Message::UploadFiles {
+                guild_id,
+                channel_id,
+                files,
+            } => {
+                if let Some(channel) = client.get_channel(guild_id, channel_id) {
+                    channel.uploading_files = files.iter().map(content::get_filename).collect();
+
+                    let inner = client.inner_arc();
+                    let content_store = client.content_store_arc();
+                    return Command::perform(
+                        async move { super::upload_files(&inner, content_store, files).await },
+                        move |result| {
+                            TopLevelMessage::main(Message::UploadResult {
+                                guild_id,
+                                channel_id,
+                                result: Box::new(result),
+                            })
+                        },
+                    );
+                }
+            }
+            Message::UploadResult {
+                guild_id,
+                channel_id,
+                result,
+            } => {
+                if let Some(channel) = client.get_channel(guild_id, channel_id) {
+                    channel.uploading_files.clear();
+                    match *result {
+                        Ok(attachments) => {
+                            let sender = client.user_id.unwrap();
+                            return Command::perform(
+                                ready(TopLevelMessage::SendMessage {
+                                    message: IcyMessage {
+                                        content: IcyContent::Files(attachments),
+                                        sender,
+                                        ..Default::default()
+                                    },
+                                    retry_after: Duration::from_secs(0),
+                                    guild_id,
+                                    channel_id,
+                                }),
+                                identity,
+                            );
+                        }
+                        Err(err) => {
+                            return Command::perform(ready(TopLevelMessage::Error(Box::new(err))), identity);
+                        }
+                    }
+                }
             }
             Message::GuildChanged(guild_id) => {
                 self.mode = Mode::Normal;

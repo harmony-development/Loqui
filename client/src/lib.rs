@@ -588,6 +588,7 @@ impl Client {
                             },
                             init_fetching: false,
                             role_perms: AHashMap::new(),
+                            uploading_files: Vec::new(),
                         },
                     );
                     if previous_id != 0 || next_id != 0 {

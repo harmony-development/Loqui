@@ -72,6 +72,7 @@ use std::{
     convert::identity,
     future::Future,
     ops::Not,
+    path::PathBuf,
     sync::{mpsc::Receiver, Arc},
     time::Duration,
 };
@@ -1279,38 +1280,50 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
         })
 }
 
-async fn select_upload_files(
-    inner: &InnerClient,
-    content_store: Arc<ContentStore>,
-    one: bool,
-) -> ClientResult<Vec<Attachment>> {
-    use crate::client::content;
-    use harmony_rust_sdk::client::api::rest::upload_extract_id;
-
+async fn select_files(one: bool) -> ClientResult<Vec<PathBuf>> {
     let file_dialog = rfd::AsyncFileDialog::new();
 
-    let handles = if one {
+    if one {
         file_dialog.pick_file().await.map(|f| vec![f])
     } else {
         file_dialog.pick_files().await
     }
-    .ok_or_else(|| ClientError::Custom("File selection error (no file selected?)".to_string()))?;
+    .ok_or_else(|| ClientError::Custom("File selection error (no file selected?)".to_string()))
+    .map(|files| files.into_iter().map(|a| a.path().to_path_buf()).collect())
+}
+
+async fn upload_files(
+    inner: &InnerClient,
+    content_store: Arc<ContentStore>,
+    handles: Vec<PathBuf>,
+) -> ClientResult<Vec<Attachment>> {
+    use crate::client::content;
+    use harmony_rust_sdk::client::api::rest::upload_extract_id;
+
     let mut ids = Vec::with_capacity(handles.len());
 
     for handle in handles {
         // TODO: don't load the files into memory
         // needs API for this in harmony_rust_sdk
-        match tokio::fs::read(handle.path()).await {
+        match tokio::fs::read(&handle).await {
             Ok(data) => {
                 let file_mimetype = content::infer_type_from_bytes(&data);
-                let filename = content::get_filename(handle.path()).to_string();
+                let filename = content::get_filename(&handle).to_string();
                 let filesize = data.len();
 
                 let send_result = upload_extract_id(inner, filename.clone(), file_mimetype.clone(), data).await;
 
                 match send_result.map(FileId::Id) {
                     Ok(id) => {
-                        if let Err(err) = tokio::fs::hard_link(handle.path(), content_store.content_path(&id)).await {
+                        let path = content_store.content_path(&id);
+                        // Remove hard link if it exists
+                        if path.exists() {
+                            if let Err(err) = tokio::fs::remove_file(&path).await {
+                                warn!("Couldn't remove file: {}", err);
+                            }
+                        }
+                        // Hard link to file to save space
+                        if let Err(err) = tokio::fs::hard_link(&handle, path).await {
                             warn!("An IO error occured while hard linking a file you tried to upload (this may result in a duplication of the file): {}", err);
                         }
                         ids.push(Attachment {
@@ -1332,6 +1345,14 @@ async fn select_upload_files(
     }
 
     Ok(ids)
+}
+
+async fn select_upload_files(
+    inner: &InnerClient,
+    content_store: Arc<ContentStore>,
+    one: bool,
+) -> ClientResult<Vec<Attachment>> {
+    upload_files(inner, content_store, select_files(one).await?).await
 }
 
 fn try_convert_err_to_login_err(err: &ClientError, session: &Session) -> Option<ClientError> {

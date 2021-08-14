@@ -20,6 +20,7 @@ pub struct Channel {
     pub has_unread: bool,
     pub looking_at_channel: bool,
     pub init_fetching: bool,
+    pub uploading_files: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
