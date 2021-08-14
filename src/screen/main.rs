@@ -21,16 +21,20 @@ use client::{
             },
             harmonytypes::UserStatus,
         },
-        client::api::{
-            chat::{
-                self,
-                channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
-                guild::{self, get_guild_members},
-                permissions::{get_guild_roles, get_user_roles},
-                profile::{self, ProfileUpdate},
-                GuildId,
+        client::{
+            api::{
+                chat::{
+                    self,
+                    channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
+                    guild::{self, get_guild_members},
+                    permissions::{get_guild_roles, get_user_roles},
+                    profile::{self, ProfileUpdate},
+                    GuildId,
+                },
+                rest::download_extract_file,
             },
-            rest::download_extract_file,
+            error::ClientError as InnerClientError,
+            exports::reqwest::StatusCode,
         },
     },
     message::MessageId,
@@ -1623,9 +1627,13 @@ impl MainScreen {
     }
 
     pub fn on_error(&mut self, error: ClientError) -> Command<TopLevelMessage> {
+        if let ClientError::Internal(InnerClientError::Reqwest(error)) = &error {
+            if error.status() == Some(StatusCode::NOT_FOUND) {
+                return Command::none();
+            }
+        }
         self.error_text = error.to_string();
         self.logout_modal.show(false);
-
-        self.logout_modal.inner_mut().on_error(&error)
+        Command::none()
     }
 }

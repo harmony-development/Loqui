@@ -49,7 +49,7 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
     let content = label!(match &reply_message.content {
         IcyContent::Text(text) => truncate_string(
             &render_text(&text.replace('\n', " "), &client.members, &client.emote_packs),
-            40
+            75
         )
         .to_string(),
         IcyContent::Files(files) => {
