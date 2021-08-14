@@ -106,6 +106,16 @@ impl Theme {
         self.overrides.padded = Some(pad);
         self
     }
+
+    pub fn icon_size(mut self, icon_size: f32) -> Self {
+        self.overrides.icon_size = Some(icon_size);
+        self
+    }
+
+    pub fn text_color(mut self, text_color: Color) -> Self {
+        self.overrides.text_color = Some(text_color);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -272,7 +282,7 @@ impl From<Theme> for Box<dyn checkbox::StyleSheet> {
 
 impl From<Theme> for Box<dyn pick_list::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::PickList(theme.colorscheme).into()
+        styles::PickList(theme.colorscheme, theme.overrides).into()
     }
 }
 
@@ -323,6 +333,8 @@ pub struct OverrideStyle {
     border_width: Option<f32>,
     background_color: Option<Color>,
     padded: Option<rule::FillMode>,
+    icon_size: Option<f32>,
+    text_color: Option<Color>,
 }
 
 impl OverrideStyle {
@@ -338,6 +350,9 @@ impl OverrideStyle {
         }
         if let Some(color) = self.background_color {
             style.background = Some(color.into());
+        }
+        if let Some(color) = self.text_color {
+            style.text_color = Some(color);
         }
         style
     }
@@ -355,6 +370,9 @@ impl OverrideStyle {
         if let Some(color) = self.background_color {
             style.background = Some(color.into());
         }
+        if let Some(color) = self.text_color {
+            style.text_color = color;
+        }
         style
     }
 
@@ -370,6 +388,35 @@ impl OverrideStyle {
         }
         if let Some(mode) = self.padded {
             style.fill_mode = mode;
+        }
+        style
+    }
+
+    fn pick_list(self, mut style: pick_list::Style) -> pick_list::Style {
+        if let Some(color) = self.border_color {
+            style.border_color = color;
+        }
+        if let Some(radius) = self.border_radius {
+            style.border_radius = radius;
+        }
+        if let Some(width) = self.border_width {
+            style.border_width = width;
+        }
+        if let Some(color) = self.background_color {
+            style.background = color.into();
+        }
+        if let Some(icon_size) = self.icon_size {
+            style.icon_size = icon_size;
+        }
+        if let Some(color) = self.text_color {
+            style.text_color = color;
+        }
+        style
+    }
+
+    fn menu(self, mut style: pick_list::Menu) -> pick_list::Menu {
+        if let Some(width) = self.border_width {
+            style.border_width = width;
         }
         style
     }
@@ -922,29 +969,29 @@ mod styles {
         }
     }
 
-    pub struct PickList(pub Colorscheme);
+    pub struct PickList(pub Colorscheme, pub OverrideStyle);
 
     impl pick_list::StyleSheet for PickList {
         fn menu(&self) -> pick_list::Menu {
-            pick_list::Menu {
+            self.1.menu(pick_list::Menu {
                 background: self.0.secondary_bg.into(),
                 text_color: self.0.text,
                 selected_background: self.0.accent.into(),
                 selected_text_color: self.0.text,
                 border_width: 3.0,
                 border_color: Color::TRANSPARENT,
-            }
+            })
         }
 
         fn active(&self) -> pick_list::Style {
-            pick_list::Style {
+            self.1.pick_list(pick_list::Style {
                 background: self.0.primary_bg.into(),
                 text_color: self.0.text,
                 border_width: 1.5,
                 border_radius: 0.0,
                 border_color: self.0.border,
                 ..pick_list::Style::default()
-            }
+            })
         }
 
         fn hovered(&self) -> pick_list::Style {

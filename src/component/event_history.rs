@@ -1,4 +1,4 @@
-use std::ops::Not;
+use std::{fmt::Display, ops::Not};
 
 use crate::{
     client::{
@@ -21,7 +21,7 @@ use crate::{
     },
     IOSEVKA,
 };
-use chrono::{Datelike, TimeZone, Timelike};
+use chrono::{Datelike, TimeZone};
 use client::{
     bool_ext::BoolExt,
     guild::Guild,
@@ -38,7 +38,27 @@ use client::{
     smol_str::SmolStr,
     Client, HarmonyToken, OptionExt, Url,
 };
-use iced::{rule::FillMode, Tooltip};
+use iced::{rule::FillMode, Font, Tooltip};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MessageMenuOption {
+    Copy(MessageId),
+    Reply(u64),
+    Edit(u64),
+    Delete(u64),
+}
+
+impl Display for MessageMenuOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let text = match self {
+            MessageMenuOption::Copy(_) => "copy",
+            MessageMenuOption::Reply(_) => "reply",
+            MessageMenuOption::Edit(_) => "edit",
+            MessageMenuOption::Delete(_) => "delete",
+        };
+        f.write_str(text)
+    }
+}
 
 pub const SHOWN_MSGS_LIMIT: usize = 32;
 pub type EventHistoryButsState = [(
@@ -47,11 +67,9 @@ pub type EventHistoryButsState = [(
     button::State,
     button::State,
     button::State,
-    button::State,
-    button::State,
-    button::State,
     Vec<button::State>,
     Vec<button::State>,
+    pick_list::State<MessageMenuOption>,
 ); SHOWN_MSGS_LIMIT];
 
 const MSG_LR_PADDING: u16 = AVATAR_WIDTH / 4;
@@ -131,13 +149,11 @@ pub fn build_event_history<'a>(
             media_open_button_states,
             h_embed_but,
             f_embed_but,
-            edit_but_state,
             avatar_but_state,
-            delete_but_state,
-            reply_but_state,
             goto_reply_state,
             message_buts_state,
             external_url_states,
+            menu_list_state,
         ),
     ) in (std::iter::once(first_message).chain(displayable_events)).zip(buts_sate.iter_mut())
     {
@@ -259,6 +275,9 @@ pub fn build_event_history<'a>(
 
             event_history = event_history.push(push_to_msg_group(&mut message_group));
             event_history = event_history.push(date_time_seperator);
+            event_history = event_history.push(
+                Rule::horizontal(SPACING).style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full)),
+            );
             message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
         } else if message_group.is_empty().not()
             && last_timestamp.signed_duration_since(message_timestamp) > chrono::Duration::minutes(5)
@@ -691,75 +710,41 @@ pub fn build_event_history<'a>(
         let msg_body = Column::with_children(message_body_widgets)
             .align_items(Align::Start)
             .spacing(MSG_LR_PADDING);
-        let mut message_row = Vec::with_capacity(5);
+        let mut message_row = Vec::with_capacity(3);
 
         let maybe_reply_message = message
             .reply_to
             .and_then(|id| channel.messages.get(&MessageId::Ack(id)));
 
-        let maybe_timestamp = (maybe_reply_message.is_some()
-            || is_sender_different
-            || last_timestamp.minute() != message_timestamp.minute())
-        .map_or_else(
-            || space!(w = TIMESTAMP_WIDTH).into(),
-            || {
-                let message_timestamp = message_timestamp.format("%H:%M").to_string();
-
-                Container::new(
-                    label!(message_timestamp)
-                        .size(MESSAGE_TIMESTAMP_SIZE)
-                        .color(color!(160, 160, 160))
-                        .font(IOSEVKA)
-                        .width(length!(+)),
-                )
-                .padding([PADDING / 8, RIGHT_TIMESTAMP_PADDING, 0, LEFT_TIMESTAMP_PADDING])
-                .width(length!(= TIMESTAMP_WIDTH))
-                .center_x()
-                .center_y()
-                .into()
-            },
-        );
-        message_row.push(maybe_timestamp);
-        message_row.push(msg_body.width(length!(%96)).into());
-
+        let mut options = Vec::with_capacity(4);
+        if matches!(message.content, IcyContent::Text(_)) {
+            options.push(MessageMenuOption::Copy(message.id));
+        }
         if let Some(id) = message.id.id() {
-            let mk_but = |tooltip, state, ico, message| {
-                Tooltip::new(
-                    Button::new(state, icon(ico).size(MESSAGE_SIZE - 6))
-                        .padding(PADDING / 8)
-                        .width(length!(%1))
-                        .on_press(message)
-                        .style(theme.secondary()),
-                    tooltip,
-                    iced::tooltip::Position::Top,
-                )
-                .size(MESSAGE_SIZE - 2)
-                .style(theme)
-            };
-            let but = mk_but(
-                "Reply to message",
-                reply_but_state,
-                Icon::Reply,
-                Message::ReplyToMessage(id),
-            );
-            message_row.push(but.into());
+            options.push(MessageMenuOption::Reply(id));
             if msg_text.is_some() && current_user_id == message.sender {
-                let but = mk_but(
-                    "Edit message",
-                    edit_but_state,
-                    Icon::Pencil,
-                    Message::ChangeMode(Mode::EditingMessage(id)),
-                );
-                message_row.push(but.into());
-                let but = mk_but(
-                    "Delete message",
-                    delete_but_state,
-                    Icon::Trash,
-                    Message::DeleteMessage(id),
-                );
-                message_row.push(but.into());
+                options.push(MessageMenuOption::Edit(id));
+                options.push(MessageMenuOption::Delete(id));
             }
         }
+
+        let timestamp_formatted = message_timestamp.format("%H:%M").to_string();
+        let timestamp = Container::new(
+            PickList::new(menu_list_state, options, None, Message::MessageMenuSelected)
+                .placeholder(timestamp_formatted)
+                .text_size(MESSAGE_TIMESTAMP_SIZE)
+                .menu_text_size(MESSAGE_SIZE)
+                .padding(0)
+                .style(theme.text_color(color!(160, 160, 160)).border_width(0.0).icon_size(0.0))
+                .font(IOSEVKA)
+                .menu_font(Font::Default),
+        )
+        .padding([PADDING / 8, RIGHT_TIMESTAMP_PADDING, 0, LEFT_TIMESTAMP_PADDING])
+        .width(length!(= TIMESTAMP_WIDTH))
+        .center_x()
+        .center_y();
+        message_row.push(timestamp.into());
+        message_row.push(msg_body.into());
 
         let mut message_col = Vec::with_capacity(2);
 

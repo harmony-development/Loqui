@@ -55,7 +55,7 @@ use crate::{
         Client,
     },
     component::{
-        event_history::{EventHistoryButsState, SHOWN_MSGS_LIMIT},
+        event_history::{EventHistoryButsState, MessageMenuOption, SHOWN_MSGS_LIMIT},
         *,
     },
     label, label_button, length,
@@ -188,12 +188,11 @@ pub enum Message {
     OpenCreateJoinGuild,
     /// Sent when the user picks a new status
     ChangeUserStatus(UserStatus),
-    ReplyToMessage(u64),
     GotoReply(MessageId),
     NextBeforeGuild(bool),
     NextBeforeChannel(bool),
-    DeleteMessage(u64),
     CopyToClipboard(String),
+    MessageMenuSelected(MessageMenuOption),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -750,9 +749,6 @@ impl MainScreen {
                         self.event_history_state.snap_to(0.0);
                     }
                 }
-            }
-            Message::ReplyToMessage(message_id) => {
-                self.reply_to = Some(message_id);
             }
             Message::ChangeUserStatus(new_status) => {
                 return client.mk_cmd(
@@ -1495,15 +1491,42 @@ impl MainScreen {
                     self.composer_state.move_cursor_to_end();
                 }
             }
-            Message::DeleteMessage(message_id) => {
-                if let (Some(guild_id), Some(channel_id)) = (self.current_guild_id, self.current_channel_id) {
-                    return Command::perform(
-                        client.delete_msg_cmd(guild_id, channel_id, message_id),
-                        ResultExt::map_to_nothing,
+            Message::CopyToClipboard(value) => clip.write(value),
+            Message::MessageMenuSelected(option) => match option {
+                MessageMenuOption::Copy(id) => {
+                    if let (Some(guild_id), Some(channel_id)) = (self.current_guild_id, self.current_channel_id) {
+                        client
+                            .guilds
+                            .get(&guild_id)
+                            .and_then(|g| g.channels.get(&channel_id))
+                            .and_then(|c| c.messages.get(&id))
+                            .and_do(|m| {
+                                if let IcyContent::Text(text) = &m.content {
+                                    clip.write(text.clone());
+                                }
+                            });
+                    }
+                }
+                MessageMenuOption::Reply(id) => {
+                    self.reply_to = Some(id);
+                }
+                MessageMenuOption::Edit(id) => {
+                    return self.update(
+                        Message::ChangeMode(Mode::EditingMessage(id)),
+                        client,
+                        thumbnail_cache,
+                        clip,
                     );
                 }
-            }
-            Message::CopyToClipboard(value) => clip.write(value),
+                MessageMenuOption::Delete(message_id) => {
+                    if let (Some(guild_id), Some(channel_id)) = (self.current_guild_id, self.current_channel_id) {
+                        return Command::perform(
+                            client.delete_msg_cmd(guild_id, channel_id, message_id),
+                            ResultExt::map_to_nothing,
+                        );
+                    }
+                }
+            },
         }
 
         Command::none()
