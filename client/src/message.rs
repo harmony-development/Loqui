@@ -204,6 +204,9 @@ impl From<content::Content> for Content {
             content::Content::EmbedMessage(embeds) => {
                 Self::Embeds(Box::new((*embeds.embeds.unwrap_or_default()).into()))
             }
+            content::Content::PhotosMessage(photos) => {
+                todo!()
+            }
         }
     }
 }
