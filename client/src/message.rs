@@ -204,9 +204,20 @@ impl From<content::Content> for Content {
             content::Content::EmbedMessage(embeds) => {
                 Self::Embeds(Box::new((*embeds.embeds.unwrap_or_default()).into()))
             }
-            content::Content::PhotosMessage(photos) => {
-                todo!()
-            }
+            content::Content::PhotosMessage(photos) => Self::Files(
+                photos
+                    .photos
+                    .into_iter()
+                    .flat_map(|photo| {
+                        Some(Attachment {
+                            id: photo.hmc.parse().ok()?,
+                            kind: "image/jpeg".to_string(),
+                            name: photo.name,
+                            size: photo.file_size,
+                        })
+                    })
+                    .collect(),
+            ),
         }
     }
 }
