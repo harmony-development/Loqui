@@ -1631,6 +1631,7 @@ impl MainScreen {
                         );
                     }
                 }
+                MessageMenuOption::CopyMessageId(id) => clip.write(id.to_string()),
             },
             Message::ClearReply => self.reply_to = None,
         }

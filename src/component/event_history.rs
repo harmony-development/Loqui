@@ -42,6 +42,7 @@ use iced::{rule::FillMode, Font, Tooltip};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MessageMenuOption {
     Copy(MessageId),
+    CopyMessageId(u64),
     Reply(u64),
     Edit(u64),
     Delete(u64),
@@ -50,6 +51,7 @@ pub enum MessageMenuOption {
 impl Display for MessageMenuOption {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let text = match self {
+            MessageMenuOption::CopyMessageId(_) => "copy id",
             MessageMenuOption::Copy(_) => "copy",
             MessageMenuOption::Reply(_) => "reply",
             MessageMenuOption::Edit(_) => "edit",
@@ -721,6 +723,7 @@ pub fn build_event_history<'a>(
         }
         if let Some(id) = message.id.id() {
             options.push(MessageMenuOption::Reply(id));
+            options.push(MessageMenuOption::CopyMessageId(id));
             if msg_text.is_some() && current_user_id == message.sender {
                 options.push(MessageMenuOption::Edit(id));
                 options.push(MessageMenuOption::Delete(id));
