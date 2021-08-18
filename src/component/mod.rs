@@ -45,7 +45,7 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
                 .as_ref()
                 .map_or(name_to_use, |ov| ov.name.as_str());
 
-            let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE);
+            let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 3);
             let content_label = match &reply_message.content {
                 IcyContent::Text(text) => render_text(&text.replace('\n', " "), &client.members, &client.emote_packs),
                 IcyContent::Files(files) => files.iter().map(|f| &f.name).enumerate().fold(
