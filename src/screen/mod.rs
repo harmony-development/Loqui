@@ -90,12 +90,12 @@ pub enum ScreenMessage {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    ChildMessage(ScreenMessage),
+    ChildMessage(Box<ScreenMessage>),
     PopScreen,
     PushScreen(Box<Screen>),
     Logout(Box<Screen>),
-    LoginComplete(Option<Client>, Option<GetUserResponse>),
-    ClientCreated(Client),
+    LoginComplete(Box<(Option<Client>, Option<GetUserResponse>)>),
+    ClientCreated(Box<Client>),
     Nothing,
     DownloadedThumbnail {
         data: Attachment,
@@ -149,28 +149,28 @@ pub enum Message {
 
 impl Message {
     #[inline(always)]
-    pub const fn main(msg: main::Message) -> Self {
-        Self::ChildMessage(ScreenMessage::MainScreen(msg))
+    pub fn main(msg: main::Message) -> Self {
+        Self::ChildMessage(ScreenMessage::MainScreen(msg).into())
     }
 
     #[inline(always)]
-    pub const fn login(msg: login::Message) -> Self {
-        Self::ChildMessage(ScreenMessage::LoginScreen(msg))
+    pub fn login(msg: login::Message) -> Self {
+        Self::ChildMessage(ScreenMessage::LoginScreen(msg).into())
     }
 
     #[inline(always)]
-    pub const fn guild_discovery(msg: guild_discovery::Message) -> Self {
-        Self::ChildMessage(ScreenMessage::GuildDiscovery(msg))
+    pub fn guild_discovery(msg: guild_discovery::Message) -> Self {
+        Self::ChildMessage(ScreenMessage::GuildDiscovery(msg).into())
     }
 
     #[inline(always)]
-    pub const fn guild_settings(msg: guild_settings::Message) -> Self {
-        Self::ChildMessage(ScreenMessage::GuildSettings(msg))
+    pub fn guild_settings(msg: guild_settings::Message) -> Self {
+        Self::ChildMessage(ScreenMessage::GuildSettings(msg).into())
     }
 
     #[inline(always)]
-    pub const fn emote_management(msg: emote_management::Message) -> Self {
-        Self::ChildMessage(ScreenMessage::EmoteManagement(msg))
+    pub fn emote_management(msg: emote_management::Message) -> Self {
+        Self::ChildMessage(ScreenMessage::EmoteManagement(msg).into())
     }
 }
 
@@ -233,7 +233,7 @@ impl Screen {
                 .view(theme, client.unwrap(), thumbnail_cache) // This will not panic cause [ref:client_set_before_main_view]
                 .map(ScreenMessage::EmoteManagement),
         }
-        .map(Message::ChildMessage)
+        .map(|msg| Message::ChildMessage(msg.into()))
     }
 
     #[inline(always)]
@@ -347,7 +347,7 @@ impl ScreenStack {
 pub struct ScreenManager {
     theme: Theme,
     screens: ScreenStack,
-    client: Option<Client>,
+    client: Option<Box<Client>>,
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
     cur_socket: Option<Box<EventsSocket>>,
@@ -639,7 +639,9 @@ impl Application for ScreenManager {
                         })
                 },
                 |result: ClientResult<_>| {
-                    result.map_to_msg_def(|(client, profile)| Message::LoginComplete(Some(client), Some(profile)))
+                    result.map_to_msg_def(|(client, profile)| {
+                        Message::LoginComplete((Some(client), Some(profile)).into())
+                    })
                 },
             )
         } else {
@@ -679,8 +681,8 @@ impl Application for ScreenManager {
         match msg {
             Message::ChildMessage(msg) => {
                 return self.screens.current_mut().update(
-                    msg,
-                    self.client.as_mut(),
+                    *msg,
+                    self.client.as_mut().map(Box::as_mut),
                     &self.content_store,
                     &self.thumbnail_cache,
                     clip,
@@ -713,7 +715,7 @@ impl Application for ScreenManager {
                         inner.begin_auth().await?;
                         inner.next_auth_step(AuthStepResponse::Initial).await
                     },
-                    |step| Message::ChildMessage(ScreenMessage::LoginScreen(login::Message::AuthStep(step))),
+                    |step| Message::login(login::Message::AuthStep(step)),
                 );
                 self.client = Some(client);
                 return cmd;
@@ -770,9 +772,10 @@ impl Application for ScreenManager {
                     Command::perform(socket.close(), |_| Message::Nothing)
                 };
             }
-            Message::LoginComplete(maybe_client, maybe_profile) => {
+            Message::LoginComplete(res) => {
+                let (maybe_client, maybe_profile) = *res;
                 if let Some(client) = maybe_client {
-                    self.client = Some(client); // This is the only place we set a main screen [tag:client_set_before_main_view]
+                    self.client = Some(client.into()); // This is the only place we set a main screen [tag:client_set_before_main_view]
                 }
                 if let Screen::Login(screen) = self.screens.current_mut() {
                     screen.waiting = false;
@@ -1130,7 +1133,7 @@ impl Application for ScreenManager {
     fn view(&mut self) -> Element<Self::Message> {
         self.screens.current_mut().view(
             self.theme,
-            self.client.as_ref(),
+            self.client.as_ref().map(Box::as_ref),
             &self.content_store,
             &self.thumbnail_cache,
         )

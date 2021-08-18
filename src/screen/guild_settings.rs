@@ -20,7 +20,7 @@ use crate::{
             general::{GeneralMessage, GeneralTab},
             invite::{InviteMessage, InviteTab},
         },
-        Message as TopLevelMessage, ScreenMessage as TopLevelScreenMessage,
+        Message as TopLevelMessage,
     },
     style::*,
 };
@@ -152,9 +152,9 @@ impl GuildSettings {
                                         .map(|resp| resp.invites)
                                 },
                                 |invites| {
-                                    TopLevelMessage::ChildMessage(TopLevelScreenMessage::GuildSettings(
-                                        Message::Invite(InviteMessage::InvitesLoaded(invites)),
-                                    ))
+                                    TopLevelMessage::guild_settings(Message::Invite(InviteMessage::InvitesLoaded(
+                                        invites,
+                                    )))
                                 },
                             );
                         }

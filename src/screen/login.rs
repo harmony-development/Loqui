@@ -324,7 +324,7 @@ impl LoginScreen {
                     },
                     |result: ClientResult<_>| {
                         result.map_to_msg_def(|(client, profile)| {
-                            TopLevelMessage::LoginComplete(Some(client), Some(profile))
+                            TopLevelMessage::LoginComplete((Some(client), Some(profile)).into())
                         })
                     },
                 );
@@ -354,7 +354,7 @@ impl LoginScreen {
                                 let content_store = content_store.clone();
                                 self.waiting = true;
                                 Command::perform(Client::new(uri, None, content_store), |result| {
-                                    result.map_to_msg_def(TopLevelMessage::ClientCreated)
+                                    result.map_to_msg_def(|c| TopLevelMessage::ClientCreated(c.into()))
                                 })
                             }
                             Err(err) => self.on_error(ClientError::UrlParse(homeserver.clone(), err)),
@@ -442,7 +442,7 @@ impl LoginScreen {
                                 }
                             },
                             |result: ClientResult<_>| {
-                                result.map_to_msg_def(|profile| TopLevelMessage::LoginComplete(None, profile))
+                                result.map_to_msg_def(|profile| TopLevelMessage::LoginComplete((None, profile).into()))
                             },
                         );
                     }

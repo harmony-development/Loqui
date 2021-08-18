@@ -1044,7 +1044,7 @@ impl MainScreen {
                                     channel::get_channel_messages(
                                         &inner,
                                         GetChannelMessages::new(guild_id, channel_id)
-                                            .before_message(oldest_msg_id.unwrap_or_default()),
+                                            .message_id(oldest_msg_id.unwrap_or_default()),
                                     )
                                     .await
                                     .map(|response| {
