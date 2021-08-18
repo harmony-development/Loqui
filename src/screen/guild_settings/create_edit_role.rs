@@ -10,7 +10,7 @@ use client::{
         },
     },
 };
-use iced_aw::{number_input, Card};
+use iced_aw::Card;
 
 use crate::{
     client::{error::ClientError, Client},
@@ -58,9 +58,6 @@ pub struct RoleModal {
     role_delete_but_state: button::State,
     role_creation_state: RoleState,
     color_but_state: button::State,
-    r_color_state: number_input::State,
-    g_color_state: number_input::State,
-    b_color_state: number_input::State,
     pub role_name_field: String,
     error_text: String,
     pub is_hoist: bool,

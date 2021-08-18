@@ -1861,7 +1861,6 @@ dependencies = [
  "iced_native",
  "iced_style",
  "iced_web",
- "num-traits",
  "wasm-bindgen",
  "web-sys",
 ]

@@ -5,7 +5,6 @@ use iced::{
     button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color,
 };
 use iced_aw::{
-    number_input,
     style::{self},
     tabs,
 };
@@ -319,11 +318,11 @@ impl From<Theme> for Box<dyn toggler::StyleSheet> {
     }
 }
 
-impl From<Theme> for Box<dyn number_input::StyleSheet> {
+/*impl From<Theme> for Box<dyn number_input::StyleSheet> {
     fn from(theme: Theme) -> Self {
         styles::NumberInput(theme.colorscheme).into()
     }
-}
+}*/
 
 impl From<Theme> for Box<dyn style::color_picker::StyleSheet> {
     fn from(theme: Theme) -> Self {
@@ -439,7 +438,6 @@ mod styles {
         Background, Color,
     };
     use iced_aw::{
-        number_input,
         style::{self, card, modal},
         tabs,
     };
@@ -476,7 +474,7 @@ mod styles {
         }
     }
 
-    pub struct NumberInput(pub Colorscheme);
+    /*pub struct NumberInput(pub Colorscheme);
 
     impl number_input::StyleSheet for NumberInput {
         fn active(&self) -> number_input::Style {
@@ -485,7 +483,7 @@ mod styles {
                 icon_color: self.0.text,
             }
         }
-    }
+    }*/
 
     pub struct Toggler(pub Colorscheme);
 
