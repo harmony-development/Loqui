@@ -34,7 +34,6 @@ use client::{
         Parser,
     },
     message::{Attachment, MessageId},
-    smol_str::SmolStr,
     Client, HarmonyToken, OptionExt, Url,
 };
 use iced::{rule::FillMode, Font, Tooltip};
@@ -173,7 +172,7 @@ pub fn build_event_history<'a>(
 
         let message_timestamp = timezone.from_utc_datetime(&message.timestamp);
         let member = members.get(&id_to_use);
-        let name_to_use = member.map_or_else(SmolStr::default, |member| member.username.clone());
+        let name_to_use = member.map_or("unknown member", |member| member.username.as_str());
         let sender_status = member.map_or(UserStatus::Offline, |m| m.status);
         let is_sender_bot = member.map_or(false, |m| m.is_bot);
         let override_reason_raw = message
@@ -191,15 +190,12 @@ pub fn build_event_history<'a>(
             }
             Reason::SystemPlurality(_) => "plurality".to_string(),
         });
-        let sender_display_name = message
-            .overrides
-            .as_ref()
-            .map_or(name_to_use, |ov| ov.name.as_str().into());
+        let sender_display_name = message.overrides.as_ref().map_or(name_to_use, |ov| ov.name.as_str());
         let sender_avatar_url = message.overrides.as_ref().map_or_else(
             || member.and_then(|m| m.avatar_url.as_ref()),
             |ov| ov.avatar_url.as_ref(),
         );
-        let sender_body_creator = |sender_display_name: &str, avatar_but_state: &'a mut button::State| {
+        let sender_body_creator = |avatar_but_state: &'a mut button::State| {
             let mut widgets = Vec::with_capacity(7);
             let label_container = |label| {
                 Container::new(label)
@@ -265,13 +261,13 @@ pub fn build_event_history<'a>(
         };
 
         let is_sender_different =
-            last_sender_id.as_ref() != Some(&id_to_use) || last_sender_name.as_ref() != Some(&sender_display_name);
+            last_sender_id.as_ref() != Some(&id_to_use) || last_sender_name != Some(sender_display_name);
 
         if is_sender_different {
             if message_group.is_empty().not() {
                 event_history = event_history.push(push_to_msg_group(&mut message_group));
             }
-            message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
+            message_group.push(sender_body_creator(avatar_but_state));
         } else if message_timestamp.day() != last_timestamp.day() {
             let date_time_seperator = fill_container(
                 label!(message_timestamp.format("[%d %B %Y]").to_string())
@@ -285,12 +281,12 @@ pub fn build_event_history<'a>(
             event_history = event_history.push(
                 Rule::horizontal(SPACING).style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full)),
             );
-            message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
+            message_group.push(sender_body_creator(avatar_but_state));
         } else if message_group.is_empty().not()
             && last_timestamp.signed_duration_since(message_timestamp) > chrono::Duration::minutes(5)
         {
             event_history = event_history.push(push_to_msg_group(&mut message_group));
-            message_group.push(sender_body_creator(&sender_display_name, avatar_but_state));
+            message_group.push(sender_body_creator(avatar_but_state));
         }
 
         let mut message_body_widgets = Vec::with_capacity(2);

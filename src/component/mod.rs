@@ -14,9 +14,7 @@ use client::{
     harmony_rust_sdk::api::rest::FileId,
     message::Content as IcyContent,
     message::{Message, MessageId},
-    render_text,
-    smol_str::SmolStr,
-    Client, IndexMap,
+    render_text, Client, IndexMap,
 };
 pub use event_history::build_event_history;
 pub use iced::{
@@ -41,13 +39,13 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
             let name_to_use = client
                 .members
                 .get(&reply_message.sender)
-                .map_or_else(SmolStr::default, |member| member.username.clone());
+                .map_or("unknown user", |member| member.username.as_str());
             let author_name = reply_message
                 .overrides
                 .as_ref()
-                .map_or(name_to_use, |ov| ov.name.as_str().into());
+                .map_or(name_to_use, |ov| ov.name.as_str());
 
-            let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
+            let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE);
             let content_label = match &reply_message.content {
                 IcyContent::Text(text) => render_text(&text.replace('\n', " "), &client.members, &client.emote_packs),
                 IcyContent::Files(files) => files.iter().map(|f| &f.name).enumerate().fold(
@@ -82,6 +80,7 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
             .spacing(SPACING / 2)
             .padding(PADDING / 5),
     )
+    .padding(PADDING / 6)
     .style(theme);
 
     if let Some(id) = reply_message.map(|m| m.id) {
