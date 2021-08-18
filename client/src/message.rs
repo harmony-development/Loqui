@@ -4,13 +4,14 @@ use harmony_rust_sdk::{
     api::harmonytypes::{
         self, content, r#override::Reason, ContentEmbed, ContentFiles, ContentText, Message as HarmonyMessage,
     },
-    client::api::rest::FileId,
+    client::{api::rest::FileId, exports::reqwest::Url},
 };
+use linemd::{parser::Token, Parser};
 use rand::Rng;
 use smol_str::SmolStr;
 use std::{str::FromStr, time::UNIX_EPOCH};
 
-use crate::{color, IndexMap};
+use crate::{color, HarmonyToken, IndexMap};
 
 use super::{content::MAX_THUMB_SIZE, post_heading, PostProcessEvent};
 
@@ -240,7 +241,21 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn post_process(&self, post: &mut Vec<PostProcessEvent>) {
+    pub fn post_process(&self, post: &mut Vec<PostProcessEvent>, guild_id: u64, channel_id: u64) {
+        if let Some(message_id) = self.reply_to {
+            post.push(PostProcessEvent::FetchMessage {
+                guild_id,
+                channel_id,
+                message_id,
+            });
+        }
+        if let Some(id) = self.overrides.as_ref().and_then(|ov| ov.avatar_url.clone()) {
+            post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                kind: "image".into(),
+                name: "avatar".into(),
+                ..Attachment::new_unknown(id)
+            }));
+        }
         match &self.content {
             Content::Files(attachments) => {
                 for attachment in attachments {
@@ -252,7 +267,31 @@ impl Message {
             Content::Embeds(embeds) => {
                 post_heading(post, embeds);
             }
-            _ => {}
+            Content::Text(text) => {
+                post.extend(
+                    text.split_whitespace()
+                        .map(Url::parse)
+                        .flatten()
+                        .filter(|url| ["https", "http"].contains(&url.scheme()))
+                        .map(PostProcessEvent::FetchLinkMetadata),
+                );
+                post.extend(
+                    text.as_str()
+                        .parse_md_custom(HarmonyToken::parse)
+                        .into_iter()
+                        .flat_map(|tok| {
+                            if let Token::Custom(HarmonyToken::Emote(id)) = tok {
+                                Some(PostProcessEvent::FetchThumbnail(Attachment {
+                                    kind: "image".into(),
+                                    name: "emote".into(),
+                                    ..Attachment::new_unknown(FileId::Id(id.to_string()))
+                                }))
+                            } else {
+                                None
+                            }
+                        }),
+                );
+            }
         }
     }
 }
@@ -272,12 +311,6 @@ impl Default for Message {
             reply_to: None,
         }
     }
-}
-
-pub(crate) fn harmony_messages_to_ui_messages(
-    messages: IndexMap<MessageId, HarmonyMessage>,
-) -> IndexMap<MessageId, Message> {
-    messages.into_iter().map(|(id, msg)| (id, msg.into())).rev().collect()
 }
 
 impl From<harmonytypes::Override> for Override {

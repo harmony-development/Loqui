@@ -20,7 +20,7 @@ pub use harmony_rust_sdk::{
 };
 use harmony_rust_sdk::{
     api::{
-        chat::{event::*, DeleteMessageRequest},
+        chat::{event::*, get_channel_messages_request::Direction, DeleteMessageRequest},
         harmonytypes::{Message as HarmonyMessage, UserStatus},
         mediaproxy::fetch_link_metadata_response::Data as FetchLinkData,
     },
@@ -40,7 +40,7 @@ use harmony_rust_sdk::{
 use content::ContentStore;
 use error::{ClientError, ClientResult};
 use member::{Member, Members};
-use message::{harmony_messages_to_ui_messages, Attachment, Content, Embed, MessageId};
+use message::{Attachment, Content, Embed, MessageId};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::{
@@ -432,29 +432,7 @@ impl Client {
                         if let Some(channel) = guild.channels.get_mut(&channel_id) {
                             let message = Message::from(message);
 
-                            if let Some(id) = message
-                                .overrides
-                                .as_ref()
-                                .and_then(|overrides| overrides.avatar_url.clone())
-                            {
-                                post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                                    kind: "image".into(),
-                                    name: "avatar".into(),
-                                    ..Attachment::new_unknown(id)
-                                }));
-                            }
-
-                            post_emotes(&message, &mut post);
-
-                            /*if let Some(message_id) = message.reply_to {
-                                post.push(PostProcessEvent::FetchMessage {
-                                    guild_id,
-                                    channel_id,
-                                    message_id,
-                                });
-                            }*/
-
-                            message.post_process(&mut post);
+                            message.post_process(&mut post, guild_id, channel_id);
 
                             if let Content::Text(text) = &message.content {
                                 if !channel.looking_at_channel {
@@ -528,7 +506,7 @@ impl Client {
                 if let Some(channel) = self.get_channel(guild_id, channel_id) {
                     if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_updated.message_id)) {
                         msg.content = Content::Text(message_updated.content);
-                        post_emotes(msg, &mut post);
+                        msg.post_process(&mut post, guild_id, channel_id);
                     }
                 }
             }
@@ -579,6 +557,7 @@ impl Client {
                             loading_messages_history: false,
                             looking_at_message: 0,
                             messages: Default::default(),
+                            last_known_message_id: 0,
                             reached_top: false,
                             has_unread: false,
                             looking_at_channel: false,
@@ -825,43 +804,133 @@ impl Client {
         post
     }
 
+    pub fn process_reply_message(
+        &mut self,
+        guild_id: u64,
+        channel_id: u64,
+        message: HarmonyMessage,
+    ) -> Vec<PostProcessEvent> {
+        let mut post = Vec::new();
+
+        if let Some(channel) = self.get_channel(guild_id, channel_id) {
+            let message: Message = message.into();
+            message.post_process(&mut post, guild_id, channel_id);
+            if channel.messages.contains_key(&message.id) {
+                channel.messages.insert(message.id, message);
+            } else {
+                channel.messages.reverse();
+                channel.messages.insert(message.id, message);
+                channel.messages.reverse();
+            }
+        }
+
+        post
+    }
+
     pub fn process_get_message_history_response(
         &mut self,
         guild_id: u64,
         channel_id: u64,
+        message_id: u64,
         messages: Vec<HarmonyMessage>,
         reached_top: bool,
+        direction: Direction,
     ) -> Vec<PostProcessEvent> {
         let mut post = Vec::new();
-        let mut messages = harmony_messages_to_ui_messages(
-            messages
-                .into_iter()
-                .map(|msg| (MessageId::Ack(msg.message_id), msg))
-                .collect(),
-        );
-
-        for message in messages.values() {
-            message.post_process(&mut post);
-            post_emotes(message, &mut post);
-        }
-
-        post.extend(
-            messages
-                .values()
-                .flat_map(|msg| msg.overrides.as_ref())
-                .filter_map(|ov| ov.avatar_url.clone())
-                .map(|id| {
-                    PostProcessEvent::FetchThumbnail(Attachment {
-                        kind: "image".into(),
-                        name: "avatar".into(),
-                        ..Attachment::new_unknown(id)
-                    })
-                }),
-        );
 
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
-            messages.extend(channel.messages.drain(..));
-            channel.messages = messages;
+            let mut messages: IndexMap<_, _> = messages
+                .into_iter()
+                .map(|msg| (MessageId::Ack(msg.message_id), Message::from(msg)))
+                .collect();
+
+            messages.values().for_each(|m| {
+                m.post_process(&mut post, guild_id, channel_id);
+            });
+
+            let msg_pos = channel.messages.get_index_of(&MessageId::Ack(message_id));
+            let process_before = |mut pos: usize,
+                                  messages: IndexMap<MessageId, Message>,
+                                  chan_messages: &mut Vec<(MessageId, Message)>| {
+                for message in messages {
+                    if chan_messages.get(pos).map_or(true, |(id, _)| message.0.eq(id)) {
+                        continue;
+                    }
+                    if let Some(at) = chan_messages.iter().position(|(id, _)| message.0.eq(id)) {
+                        if at < pos {
+                            pos -= 1;
+                        }
+                        chan_messages.remove(at);
+                    }
+                    chan_messages.insert(pos, message);
+                }
+            };
+            let process_after = |mut pos: usize,
+                                 messages: IndexMap<MessageId, Message>,
+                                 chan_messages: &mut Vec<(MessageId, Message)>| {
+                pos += 1;
+                for message in messages {
+                    if chan_messages.get(pos).map_or(true, |(id, _)| message.0.eq(id)) {
+                        pos += 1;
+                        continue;
+                    }
+                    if let Some(at) = chan_messages.iter().position(|(id, _)| message.0.eq(id)) {
+                        if at < pos {
+                            pos -= 1;
+                        }
+                        chan_messages.remove(at);
+                    }
+                    chan_messages.insert(pos, message);
+                    pos += 1;
+                }
+            };
+
+            match direction {
+                Direction::Before => {
+                    let last_message_id = messages.keys().last().copied();
+                    match msg_pos.or_else(|| {
+                        channel
+                            .messages
+                            .get_index_of(&MessageId::Ack(channel.last_known_message_id))
+                    }) {
+                        Some(pos) => {
+                            let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
+                            process_before(pos, messages, &mut chan_messages);
+                            channel.messages = chan_messages.into_iter().collect();
+                        }
+                        None => {
+                            messages.reverse();
+                            channel.messages.extend(messages);
+                        }
+                    }
+                    if let Some(MessageId::Ack(id)) = last_message_id {
+                        channel.last_known_message_id = id;
+                    }
+                }
+                Direction::After => match msg_pos {
+                    Some(pos) => {
+                        let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
+                        process_after(pos, messages, &mut chan_messages);
+                        channel.messages = chan_messages.into_iter().collect();
+                    }
+                    None => {
+                        channel.messages.extend(messages);
+                    }
+                },
+                Direction::Around => match msg_pos {
+                    Some(pos) => {
+                        let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
+                        let message_pos = messages.get_index_of(&MessageId::Ack(message_id)).unwrap();
+                        process_after(pos, messages.drain(message_pos + 1..).collect(), &mut chan_messages);
+                        process_before(pos, messages.drain(..message_pos).collect(), &mut chan_messages);
+                        channel.messages = chan_messages.into_iter().collect();
+                    }
+                    None => {
+                        messages.extend(channel.messages.drain(..));
+                        channel.messages = messages;
+                    }
+                },
+            }
             channel.reached_top = reached_top;
         }
 
@@ -1018,34 +1087,6 @@ impl<'a> HarmonyToken<'a> {
         } else {
             None
         }
-    }
-}
-
-pub fn post_emotes(message: &Message, post: &mut Vec<PostProcessEvent>) {
-    if let Content::Text(text) = &message.content {
-        post.extend(
-            text.split_whitespace()
-                .map(Url::parse)
-                .flatten()
-                .filter(|url| ["https", "http"].contains(&url.scheme()))
-                .map(PostProcessEvent::FetchLinkMetadata),
-        );
-        post.extend(
-            text.as_str()
-                .parse_md_custom(HarmonyToken::parse)
-                .into_iter()
-                .flat_map(|tok| {
-                    if let Token::Custom(HarmonyToken::Emote(id)) = tok {
-                        Some(PostProcessEvent::FetchThumbnail(Attachment {
-                            kind: "image".into(),
-                            name: "emote".into(),
-                            ..Attachment::new_unknown(FileId::Id(id.to_string()))
-                        }))
-                    } else {
-                        None
-                    }
-                }),
-        );
     }
 }
 

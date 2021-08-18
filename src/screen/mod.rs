@@ -29,9 +29,10 @@ use client::{
         api::{
             chat::{
                 event::{
-                    EmotePackAdded, EmotePackEmotesUpdated, Event, GuildAddedToList, GuildUpdated, MessageSent,
-                    PermissionUpdated, ProfileUpdated,
+                    EmotePackAdded, EmotePackEmotesUpdated, Event, GuildAddedToList, GuildUpdated, PermissionUpdated,
+                    ProfileUpdated,
                 },
+                get_channel_messages_request::Direction,
                 BatchQueryPermissionsRequest, GetEmotePackEmotesRequest, GetEmotePacksRequest, GetGuildListRequest,
                 GetMessageRequest, GetUserResponse,
             },
@@ -106,20 +107,31 @@ pub enum Message {
     },
     TryEventsReceived(Vec<ClientResult<Event>>),
     EventsReceived(Vec<Event>),
-    InitialLoad {
+    InitialGuildLoad {
         guild_id: u64,
-        channel_id: Option<u64>,
         events: ClientResult<Vec<ClientResult<Event>>>,
+    },
+    InitialChannelLoad {
+        guild_id: u64,
+        channel_id: u64,
+        events: ClientResult<Box<Message>>,
     },
     SocketEvent {
         socket: Box<EventsSocket>,
         event: Option<Result<Event, ClientError>>,
     },
-    GetEventsBackwardsResponse {
+    GetChannelMessagesResponse {
         messages: Vec<HarmonyMessage>,
         reached_top: bool,
         guild_id: u64,
         channel_id: u64,
+        message_id: u64,
+        direction: Direction,
+    },
+    GetReplyMessage {
+        guild_id: u64,
+        channel_id: u64,
+        message: HarmonyMessage,
     },
     MessageSent {
         message_id: u64,
@@ -563,16 +575,16 @@ impl ScreenManager {
                         )
                         .await
                         .map(|message| {
-                            vec![Event::SentMessage(
-                                (MessageSent {
-                                    echo_id: 0,
-                                    message: message.message,
+                            message
+                                .message
+                                .map_or(Message::Nothing, |message| Message::GetReplyMessage {
+                                    guild_id,
+                                    channel_id,
+                                    message,
                                 })
-                                .into(),
-                            )]
                         })
                     },
-                    Message::EventsReceived,
+                    identity,
                 ),
                 PostProcessEvent::FetchLinkMetadata(url) => client.mk_cmd(
                     |inner| async move {
@@ -994,11 +1006,13 @@ impl Application for ScreenManager {
                     return Command::batch(cmds);
                 }
             }
-            Message::GetEventsBackwardsResponse {
+            Message::GetChannelMessagesResponse {
                 messages,
                 reached_top,
                 guild_id,
                 channel_id,
+                message_id,
+                direction,
             } => {
                 return self
                     .client
@@ -1008,7 +1022,14 @@ impl Application for ScreenManager {
                             .get_channel(guild_id, channel_id)
                             .unwrap()
                             .loading_messages_history = false;
-                        client.process_get_message_history_response(guild_id, channel_id, messages, reached_top)
+                        client.process_get_message_history_response(
+                            guild_id,
+                            channel_id,
+                            message_id,
+                            messages,
+                            reached_top,
+                            direction,
+                        )
                     })
                     .map_or_else(Command::none, |posts| {
                         Command::batch(posts.into_iter().map(|post| self.process_post_event(post, clip)))
@@ -1033,24 +1054,27 @@ impl Application for ScreenManager {
                 return self.screens.current_mut().on_error(*err);
             }
             Message::WindowFocusChanged(focus) => self.is_window_focused = focus,
-            Message::InitialLoad {
+            Message::InitialGuildLoad { guild_id, events } => {
+                if let Some(client) = self.client.as_mut() {
+                    client.get_guild(guild_id).and_do(|g| g.init_fetching = false);
+                }
+                return match events {
+                    Ok(events) => self.update(Message::TryEventsReceived(events), clip),
+                    Err(err) => self.update(Message::Error(err.into()), clip),
+                };
+            }
+            Message::InitialChannelLoad {
                 guild_id,
                 channel_id,
                 events,
             } => {
                 if let Some(client) = self.client.as_mut() {
-                    channel_id
-                        .and_do(|channel_id| {
-                            client
-                                .get_channel(guild_id, channel_id)
-                                .and_do(|c| c.init_fetching = false);
-                        })
-                        .or_do(|| {
-                            client.get_guild(guild_id).and_do(|g| g.init_fetching = false);
-                        });
+                    client
+                        .get_channel(guild_id, channel_id)
+                        .and_do(|c| c.init_fetching = false);
                 }
                 return match events {
-                    Ok(events) => self.update(Message::TryEventsReceived(events), clip),
+                    Ok(events) => self.update(*events, clip),
                     Err(err) => self.update(Message::Error(err.into()), clip),
                 };
             }
@@ -1107,6 +1131,16 @@ impl Application for ScreenManager {
 
                 if let Some(cmd) = cmd {
                     return cmd;
+                }
+            }
+            Message::GetReplyMessage {
+                guild_id,
+                channel_id,
+                message,
+            } => {
+                if let Some(client) = self.client.as_mut() {
+                    let posts = client.process_reply_message(guild_id, channel_id, message);
+                    return Command::batch(posts.into_iter().map(|post| self.process_post_event(post, clip)));
                 }
             }
         }

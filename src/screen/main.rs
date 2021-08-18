@@ -17,7 +17,8 @@ use client::{
     harmony_rust_sdk::{
         api::{
             chat::{
-                event::{ChannelCreated, Event, MemberJoined, MessageSent, RoleCreated, UserRolesUpdated},
+                event::{ChannelCreated, Event, MemberJoined, RoleCreated, UserRolesUpdated},
+                get_channel_messages_request::Direction,
                 GetChannelMessagesResponse, GetUserRolesRequest,
             },
             harmonytypes::UserStatus,
@@ -567,7 +568,7 @@ impl MainScreen {
                             .into(),
                     );
                 }
-                if let Some(reply_message) = self.reply_to.and_then(|id| channel.messages.get(&MessageId::Ack(id))) {
+                if let Some(reply_message) = self.reply_to.map(|id| channel.messages.get(&MessageId::Ack(id))) {
                     let widget = make_reply_message(
                         reply_message,
                         client,
@@ -1025,7 +1026,7 @@ impl MainScreen {
                     if let Some((oldest_msg_id, disp, reached_top, loading_messages_history, looking_at_message)) =
                         client.get_channel(guild_id, channel_id).map(|channel| {
                             (
-                                channel.messages.values().next().and_then(|m| m.id.id()),
+                                channel.last_known_message_id,
                                 channel.messages.len(),
                                 channel.reached_top,
                                 &mut channel.loading_messages_history,
@@ -1043,16 +1044,17 @@ impl MainScreen {
                                 |inner| async move {
                                     channel::get_channel_messages(
                                         &inner,
-                                        GetChannelMessages::new(guild_id, channel_id)
-                                            .message_id(oldest_msg_id.unwrap_or_default()),
+                                        GetChannelMessages::new(guild_id, channel_id).message_id(oldest_msg_id),
                                     )
                                     .await
                                     .map(|response| {
-                                        TopLevelMessage::GetEventsBackwardsResponse {
+                                        TopLevelMessage::GetChannelMessagesResponse {
                                             messages: response.messages,
                                             reached_top: response.reached_top,
                                             guild_id,
                                             channel_id,
+                                            message_id: oldest_msg_id,
+                                            direction: Direction::Before,
                                         }
                                     })
                                 },
@@ -1450,11 +1452,7 @@ impl MainScreen {
 
                                 ClientResult::Ok(events)
                             },
-                            move |events| TopLevelMessage::InitialLoad {
-                                guild_id,
-                                channel_id: None,
-                                events,
-                            },
+                            move |events| TopLevelMessage::InitialGuildLoad { guild_id, events },
                         );
                     } else {
                         let switch_to = self
@@ -1497,17 +1495,15 @@ impl MainScreen {
                     let mut cmds = Vec::with_capacity(2);
                     // Try to messages if we dont have any and we arent at the top
                     if !reached_top && disp == 0 && !c.init_fetching {
-                        let convert_to_event = |m: GetChannelMessagesResponse| {
-                            m.messages
-                                .into_iter()
-                                .map(|msg| {
-                                    Ok(Event::SentMessage(Box::new(MessageSent {
-                                        message: Some(msg),
-                                        ..Default::default()
-                                    })))
-                                })
-                                .rev()
-                                .collect()
+                        let convert_to_event = move |m: GetChannelMessagesResponse| {
+                            Box::new(TopLevelMessage::GetChannelMessagesResponse {
+                                guild_id,
+                                channel_id,
+                                message_id: 0,
+                                messages: m.messages,
+                                reached_top: m.reached_top,
+                                direction: Direction::Before,
+                            })
                         };
                         c.init_fetching = true;
                         let inner = client.inner_arc();
@@ -1518,9 +1514,9 @@ impl MainScreen {
                                     .map(convert_to_event)
                                     .map_err(ClientError::from)
                             },
-                            move |events| TopLevelMessage::InitialLoad {
+                            move |events| TopLevelMessage::InitialChannelLoad {
                                 guild_id,
-                                channel_id: Some(channel_id),
+                                channel_id,
                                 events,
                             },
                         ));

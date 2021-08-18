@@ -106,6 +106,12 @@ pub fn build_event_history<'a>(
         .saturating_add(SHOWN_MSGS_LIMIT)
         .min(channel.messages.len());
     let timeline_range_start = timeline_range_end.saturating_sub(SHOWN_MSGS_LIMIT);
+    let timeline_range_start = channel
+        .messages
+        .get_index_of(&MessageId::Ack(channel.last_known_message_id))
+        .map_or(timeline_range_start, |last_message_pos| {
+            timeline_range_start.max(last_message_pos)
+        });
     let mut displayable_events = channel
         .messages
         .iter()
@@ -713,9 +719,7 @@ pub fn build_event_history<'a>(
             .spacing(MSG_LR_PADDING);
         let mut message_row = Vec::with_capacity(3);
 
-        let maybe_reply_message = message
-            .reply_to
-            .and_then(|id| channel.messages.get(&MessageId::Ack(id)));
+        let maybe_reply_message = message.reply_to.map(|id| channel.messages.get(&MessageId::Ack(id)));
 
         let mut options = Vec::with_capacity(4);
         if matches!(message.content, IcyContent::Text(_)) {

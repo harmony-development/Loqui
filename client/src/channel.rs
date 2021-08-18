@@ -12,6 +12,7 @@ pub struct Channel {
     pub name: SmolStr,
     pub is_category: bool,
     pub messages: Messages,
+    pub last_known_message_id: u64,
     pub looking_at_message: usize,
     pub loading_messages_history: bool,
     pub reached_top: bool,

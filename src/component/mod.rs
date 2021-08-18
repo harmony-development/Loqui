@@ -29,51 +29,64 @@ pub use iced_native::Padding;
 use super::style::{PADDING, SPACING};
 
 pub fn make_reply_message<'a, M: Clone + 'a>(
-    reply_message: &Message,
+    reply_message: Option<&Message>,
     client: &Client,
     theme: Theme,
     message: fn(MessageId) -> M,
     but_state: &'a mut button::State,
 ) -> Button<'a, M> {
-    let name_to_use = client
-        .members
-        .get(&reply_message.sender)
-        .map_or_else(SmolStr::default, |member| member.username.clone());
-    let author_name = reply_message
-        .overrides
-        .as_ref()
-        .map_or(name_to_use, |ov| ov.name.as_str().into());
     let color = color!(200, 200, 200);
+    let content = match reply_message {
+        Some(reply_message) => {
+            let name_to_use = client
+                .members
+                .get(&reply_message.sender)
+                .map_or_else(SmolStr::default, |member| member.username.clone());
+            let author_name = reply_message
+                .overrides
+                .as_ref()
+                .map_or(name_to_use, |ov| ov.name.as_str().into());
 
-    let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
-    let content = label!(match &reply_message.content {
-        IcyContent::Text(text) => truncate_string(
-            &render_text(&text.replace('\n', " "), &client.members, &client.emote_packs),
-            75
-        )
-        .to_string(),
-        IcyContent::Files(files) => {
-            let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
-                names.push_str(", ");
-                names.push_str(name);
-                names
-            });
-            format!("sent file(s): {}", file_names)
+            let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
+            let content = label!(match &reply_message.content {
+                IcyContent::Text(text) => truncate_string(
+                    &render_text(&text.replace('\n', " "), &client.members, &client.emote_packs),
+                    75
+                )
+                .to_string(),
+                IcyContent::Files(files) => {
+                    let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
+                        names.push_str(", ");
+                        names.push_str(name);
+                        names
+                    });
+                    format!("sent file(s): {}", file_names)
+                }
+                IcyContent::Embeds(_) => "sent an embed".to_string(),
+            })
+            .size(MESSAGE_SIZE - 4)
+            .color(color);
+            vec![author.into(), content.into()]
         }
-        IcyContent::Embeds(_) => "sent an embed".to_string(),
-    })
-    .size(MESSAGE_SIZE - 4)
-    .color(color);
+        None => {
+            vec![label!("unknown message").color(color).size(MESSAGE_SIZE - 4).into()]
+        }
+    };
 
-    Button::new(
+    let mut but = Button::new(
         but_state,
-        Row::with_children(vec![author.into(), content.into()])
+        Row::with_children(content)
             .align_items(Align::Center)
             .spacing(SPACING / 2)
             .padding(PADDING / 5),
     )
-    .on_press(message(reply_message.id))
-    .style(theme)
+    .style(theme);
+
+    if let Some(id) = reply_message.map(|m| m.id) {
+        but = but.on_press(message(id));
+    }
+
+    but
 }
 
 pub fn column<M>(children: Vec<Element<M>>) -> Column<M> {
