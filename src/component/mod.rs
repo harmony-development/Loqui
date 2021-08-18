@@ -69,7 +69,10 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
             vec![author.into(), content.into()]
         }
         None => {
-            vec![label!("unknown message").color(color).size(MESSAGE_SIZE - 4).into()]
+            vec![label!("can't load reply message")
+                .color(color)
+                .size(MESSAGE_SIZE - 4)
+                .into()]
         }
     };
 
