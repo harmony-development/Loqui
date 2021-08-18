@@ -48,24 +48,23 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
                 .map_or(name_to_use, |ov| ov.name.as_str().into());
 
             let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 4);
-            let content = label!(match &reply_message.content {
-                IcyContent::Text(text) => truncate_string(
-                    &render_text(&text.replace('\n', " "), &client.members, &client.emote_packs),
-                    75
-                )
-                .to_string(),
-                IcyContent::Files(files) => {
-                    let file_names = files.iter().map(|f| &f.name).fold(String::new(), |mut names, name| {
-                        names.push_str(", ");
+            let content_label = match &reply_message.content {
+                IcyContent::Text(text) => render_text(&text.replace('\n', " "), &client.members, &client.emote_packs),
+                IcyContent::Files(files) => files.iter().map(|f| &f.name).enumerate().fold(
+                    String::from("sent file(s): "),
+                    |mut names, (index, name)| {
                         names.push_str(name);
+                        if index < files.len() - 1 {
+                            names.push_str(", ");
+                        }
                         names
-                    });
-                    format!("sent file(s): {}", file_names)
-                }
+                    },
+                ),
                 IcyContent::Embeds(_) => "sent an embed".to_string(),
-            })
-            .size(MESSAGE_SIZE - 4)
-            .color(color);
+            };
+            let content = label!(truncate_string(&content_label, 100))
+                .size(MESSAGE_SIZE - 4)
+                .color(color);
             vec![author.into(), content.into()]
         }
         None => {
