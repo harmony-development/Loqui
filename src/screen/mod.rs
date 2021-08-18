@@ -467,7 +467,7 @@ impl ScreenManager {
                     },
                     Message::EventsReceived,
                 ),
-                PostProcessEvent::FetchThumbnail(id) => make_thumbnail_command(client, id, &self.thumbnail_cache),
+                PostProcessEvent::FetchThumbnail(id) => make_thumbnail_command(client, id, &mut self.thumbnail_cache),
                 PostProcessEvent::FetchProfile(user_id) => client.mk_cmd(
                     |inner| async move {
                         get_user(&inner, UserId::new(user_id)).await.map(|profile| {
@@ -1251,9 +1251,22 @@ fn map_send_msg(data: (u64, u64, u64, IcyMessage, Duration, Option<u64>)) -> Mes
     )
 }
 
-fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &ThumbnailCache) -> Command<Message> {
+fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &mut ThumbnailCache) -> Command<Message> {
+    const FILTER: FilterType = FilterType::Lanczos3;
+
     let is_thumbnailable = data.name == "avatar" || data.name == "guild";
     let is_emote = data.name == "emote";
+    if let Some(m) = data.minithumbnail.as_ref() {
+        if let Some(image) = image::load_from_memory_with_format(&m.data, image::ImageFormat::Jpeg).ok() {
+            let (w, h) = data.resolution.unwrap_or((m.width, m.height));
+            let (w, h) = scale_down(w, h, 400);
+            let image = image.resize(w, h, FILTER);
+            let image = image.blur(8.0);
+            let bgra = image.into_bgra8();
+            let image = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
+            thumbnail_cache.put_minithumbnail(data.id.clone(), image);
+        }
+    }
     thumbnail_cache
         .thumbnails
         .contains_key(&data.id)
@@ -1263,32 +1276,34 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &T
 
             let inner = client.inner_arc();
             let process_image = move |data: &[u8]| {
-                const FILTER: FilterType = FilterType::Lanczos3;
+                let image = image::load_from_memory(data).ok();
+                image
+                    .map(|image| {
+                        let avatar = is_thumbnailable.then(|| {
+                            const RES_LEN: u32 = AVATAR_WIDTH as u32 - 4;
+                            const PRES_LEN: u32 = PROFILE_AVATAR_WIDTH as u32;
 
-                let image = image::load_from_memory(data).unwrap();
-                let avatar = is_thumbnailable.then(|| {
-                    const RES_LEN: u32 = AVATAR_WIDTH as u32 - 4;
-                    const PRES_LEN: u32 = PROFILE_AVATAR_WIDTH as u32;
+                            let bgra = image.resize(RES_LEN, RES_LEN, FILTER).into_bgra8();
+                            let avatar = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
 
-                    let bgra = image.resize(RES_LEN, RES_LEN, FILTER).into_bgra8();
-                    let avatar = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
+                            let bgra = image.resize(PRES_LEN, PRES_LEN, FILTER).into_bgra8();
+                            let profile_avatar = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
 
-                    let bgra = image.resize(PRES_LEN, PRES_LEN, FILTER).into_bgra8();
-                    let profile_avatar = ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec());
+                            (profile_avatar, avatar)
+                        });
+                        let emote = is_emote.then(|| {
+                            const RES_LEN: u32 = 48;
 
-                    (profile_avatar, avatar)
-                });
-                let emote = is_emote.then(|| {
-                    const RES_LEN: u32 = 48;
-
-                    let bgra = image.resize(RES_LEN, RES_LEN, FILTER).into_bgra8();
-                    ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec())
-                });
-                let content = is_thumbnailable.not().then(|| {
-                    let bgra = image.into_bgra8();
-                    ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec())
-                });
-                (content, avatar, emote)
+                            let bgra = image.resize(RES_LEN, RES_LEN, FILTER).into_bgra8();
+                            ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec())
+                        });
+                        let content = is_thumbnailable.not().then(|| {
+                            let bgra = image.into_bgra8();
+                            ImageHandle::from_pixels(bgra.width(), bgra.height(), bgra.into_vec())
+                        });
+                        (content, avatar, emote)
+                    })
+                    .unwrap_or_default()
             };
 
             Command::perform(
@@ -1368,6 +1383,8 @@ async fn upload_files(
                             kind: file_mimetype,
                             name: filename,
                             size: filesize as u32,
+                            resolution: None,
+                            minithumbnail: None,
                         });
                     }
                     Err(err) => {
@@ -1430,4 +1447,12 @@ pub fn sub_escape_pop_screen() -> Subscription<Message> {
             _ => None,
         }
     })
+}
+
+// scale down resolution while preserving ratio
+pub fn scale_down(w: u32, h: u32, max_size: u32) -> (u32, u32) {
+    let ratio = w / h;
+    let new_w = max_size;
+    let new_h = max_size / ratio;
+    (new_w, new_h)
 }

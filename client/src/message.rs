@@ -1,8 +1,12 @@
 use bool_ext::BoolExt;
 use chrono::NaiveDateTime;
 use harmony_rust_sdk::{
-    api::harmonytypes::{
-        self, content, r#override::Reason, ContentEmbed, ContentFiles, ContentText, Message as HarmonyMessage,
+    api::{
+        harmonytypes::{
+            self, content, r#override::Reason, ContentEmbed, ContentFiles, ContentText, Message as HarmonyMessage,
+            Minithumbnail,
+        },
+        Hmc,
     },
     client::{api::rest::FileId, exports::reqwest::Url},
 };
@@ -83,6 +87,8 @@ pub struct Attachment {
     pub name: String,
     pub id: FileId,
     pub size: u32,
+    pub resolution: Option<(u32, u32)>,
+    pub minithumbnail: Option<Minithumbnail>,
 }
 
 impl From<Attachment> for harmonytypes::Attachment {
@@ -104,6 +110,8 @@ impl Attachment {
             kind: "application/octet-stream".into(),
             name: "unknown".to_string(),
             size: 0,
+            resolution: None,
+            minithumbnail: None,
         }
     }
 
@@ -117,6 +125,19 @@ impl Attachment {
             kind: attachment.r#type,
             name: attachment.name,
             size: attachment.size as u32,
+            resolution: None,
+            minithumbnail: None,
+        })
+    }
+
+    pub fn from_harmony_photo(photo: harmonytypes::Photo) -> Option<Self> {
+        Some(Attachment {
+            id: FileId::Hmc(Hmc::from_str(&photo.hmc).ok()?),
+            kind: "image/jpeg".into(),
+            name: photo.name,
+            size: photo.file_size,
+            resolution: Some((photo.width, photo.height)),
+            minithumbnail: photo.minithumbnail,
         })
     }
 }
@@ -209,14 +230,7 @@ impl From<content::Content> for Content {
                 photos
                     .photos
                     .into_iter()
-                    .flat_map(|photo| {
-                        Some(Attachment {
-                            id: photo.hmc.parse().ok()?,
-                            kind: "image/jpeg".to_string(),
-                            name: photo.name,
-                            size: photo.file_size,
-                        })
-                    })
+                    .flat_map(Attachment::from_harmony_photo)
                     .collect(),
             ),
         }

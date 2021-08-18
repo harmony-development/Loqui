@@ -12,7 +12,7 @@ use crate::{
     label,
     screen::{
         main::{Message, Mode},
-        truncate_string,
+        scale_down, truncate_string,
     },
     space,
     style::{
@@ -679,25 +679,48 @@ pub fn build_event_history<'a>(
         if let IcyContent::Files(attachments) = &message.content {
             media_open_button_states.resize_with(attachments.len(), Default::default);
             for (attachment, media_open_button_state) in attachments.iter().zip(media_open_button_states.iter_mut()) {
-                let is_thumbnail = matches!(attachment.kind.split('/').next(), Some("image"));
+                let is_thumbnail = attachment.kind.starts_with("image");
                 let does_content_exist = content_store.content_exists(&attachment.id);
 
+                let resolution = attachment
+                    .resolution
+                    .map(|(w, h)| scale_down(w, h, 400))
+                    .map(|(w, h)| (w as u16, h as u16));
                 let content: Element<Message> = thumbnail_cache.thumbnails.get(&attachment.id).map_or_else(
                     || {
-                        let text = does_content_exist.some("Open").unwrap_or("Download");
-                        label!("{} {}", text, attachment.name).into()
+                        resolution.map_or_else(
+                            || space!(= 0, 0).into(),
+                            |(w, h)| {
+                                thumbnail_cache.minithumbnails.get(&attachment.id).map_or_else(
+                                    || space!(= w, h).into(),
+                                    |handle| {
+                                        Image::new(handle.clone())
+                                            .width(length!(= w))
+                                            .height(length!(= h))
+                                            .into()
+                                    },
+                                )
+                            },
+                        )
                     },
                     |handle| {
                         // TODO: Don't hardcode this length, calculate it using the size of the window
-                        let image = Image::new(handle.clone()).width(length!(= 320));
-                        let text = does_content_exist
-                            .map_or_else(|| label!("Download {}", attachment.name), || label!(&attachment.name));
-
-                        Column::with_children(vec![text.size(DEF_SIZE - 4).into(), image.into()])
-                            .spacing(SPACING)
-                            .into()
+                        if let Some((w, h)) = resolution {
+                            Image::new(handle.clone())
+                                .width(length!(= w))
+                                .height(length!(= h))
+                                .into()
+                        } else {
+                            Image::new(handle.clone()).width(length!(= 400)).into()
+                        }
                     },
                 );
+                let text = label!(
+                    "{} {}",
+                    does_content_exist.some("Open").unwrap_or("Download"),
+                    attachment.name
+                );
+                let content = Column::with_children(vec![text.size(DEF_SIZE - 4).into(), content]).spacing(SPACING);
                 message_body_widgets.push(
                     Button::new(media_open_button_state, content)
                         .on_press(Message::OpenContent {
