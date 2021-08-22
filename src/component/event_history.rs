@@ -302,9 +302,17 @@ pub fn build_event_history<'a>(
         if let Some(textt) = msg_text {
             let tokens = textt.parse_md_custom(HarmonyToken::parse);
             let mut widgets = Vec::with_capacity(tokens.len());
-            let color = (Mode::EditingMessage(id_to_use) == mode)
-                .then(|| ERROR_COLOR)
-                .unwrap_or(theme.colorscheme.text);
+            let color = theme.colorscheme.text;
+            let color = message
+                .id
+                .is_ack()
+                .not()
+                .then(|| color!(. color.r * 0.6, color.g * 0.6, color.b * 0.6))
+                .unwrap_or_else(|| {
+                    (Mode::EditingMessage(id_to_use) == mode)
+                        .then(|| ERROR_COLOR)
+                        .unwrap_or(color)
+                });
 
             let is_emotes_until_line_break = |at: usize| {
                 tokens
