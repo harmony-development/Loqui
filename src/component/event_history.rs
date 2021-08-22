@@ -494,23 +494,30 @@ pub fn build_event_history<'a>(
                                     },
                                 )
                                 .0;
-                            let mut widgets = vec![
+                            let mut widgets = Vec::with_capacity(6);
+                            widgets.push(
                                 Row::with_children(vec![
                                     space!(w = PADDING / 2).into(),
                                     label!(truncate_string(&site.page_title, 50)).size(DEF_SIZE - 2).into(),
                                 ])
                                 .align_items(Align::Center)
                                 .into(),
-                                Rule::horizontal(SPACING)
-                                    .style(theme.border_radius(0.0).padded(FillMode::Full))
+                            );
+                            if !desc_words.is_empty() {
+                                widgets.push(
+                                    Rule::horizontal(SPACING)
+                                        .style(theme.border_radius(0.0).padded(FillMode::Full))
+                                        .into(),
+                                );
+                                widgets.push(
+                                    Row::with_children(vec![
+                                        space!(w = PADDING / 2).into(),
+                                        label!(desc_words).size(DEF_SIZE - 5).into(),
+                                    ])
+                                    .align_items(Align::Center)
                                     .into(),
-                                Row::with_children(vec![
-                                    space!(w = PADDING / 2).into(),
-                                    label!(desc_words).size(DEF_SIZE - 5).into(),
-                                ])
-                                .align_items(Align::Center)
-                                .into(),
-                            ];
+                                );
+                            }
                             let content_width = (DEF_SIZE - 2) * 24;
                             if let Some(handle) = site
                                 .image
