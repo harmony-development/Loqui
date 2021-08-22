@@ -313,6 +313,13 @@ pub fn build_event_history<'a>(
                     .take_while(|tok| !matches!(tok, Token::LineBreak))
                     .all(|tok| matches!(tok, Token::Custom(HarmonyToken::Emote(_))))
             };
+            let has_mention = tokens.iter().any(|tok| {
+                if let Token::Custom(HarmonyToken::Mention(id)) = tok {
+                    current_user_id.eq(id)
+                } else {
+                    false
+                }
+            });
             let mut only_emotes = is_emotes_until_line_break(0);
             let mut line_widgets = Vec::with_capacity(5);
             let mk_text_elem = |text: &Text| -> Element<Message> {
@@ -388,7 +395,10 @@ pub fn build_event_history<'a>(
                                 )
                                 .padding([2, 3])
                                 .height(length!(= MESSAGE_SIZE + 4))
-                                .style(theme.background_color(Color { a: 0.1, ..role_color }))
+                                .style({
+                                    let theme = theme.background_color(Color { a: 0.1, ..role_color });
+                                    has_mention.then(|| theme.border_width(0.0)).unwrap_or(theme)
+                                })
                                 .on_press(Message::SelectedMember(*id))
                                 .into(),
                             );
@@ -409,7 +419,10 @@ pub fn build_event_history<'a>(
                             Tooltip::new(
                                 Button::new(but_state, label)
                                     .padding([2, 3])
-                                    .style(theme.background_color(Color { a: 0.1, ..color }))
+                                    .style({
+                                        let theme = theme.background_color(Color { a: 0.1, ..color });
+                                        has_mention.then(|| theme.border_width(0.0)).unwrap_or(theme)
+                                    })
                                     .on_press(Message::OpenUrl(url.into()))
                                     .height(length!(= MESSAGE_SIZE + 4)),
                                 format!("Go to {}", url),
@@ -469,7 +482,26 @@ pub fn build_event_history<'a>(
                     .align_items(Align::Center)
                     .into(),
             );
-            message_body_widgets.push(Column::with_children(widgets).align_items(Align::Start).into());
+
+            let (container_theme, container_padding) = has_mention
+                .then(|| {
+                    (
+                        theme
+                            .border_width(2.0)
+                            .border_radius(4.0)
+                            .border_color(color!(225, 225, 0, 180)),
+                        2,
+                    )
+                })
+                .unwrap_or((theme, 0));
+            message_body_widgets.push(
+                Container::new(Column::with_children(widgets).align_items(Align::Start))
+                    .center_x()
+                    .center_y()
+                    .padding(container_padding)
+                    .style(container_theme)
+                    .into(),
+            );
 
             let urls = textt.split_whitespace().map(Url::parse).flatten().collect::<Vec<_>>();
             external_url_states.resize_with(urls.len(), Default::default);
