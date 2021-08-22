@@ -135,4 +135,6 @@ pub struct ColorschemeRaw {
     pub disabled_text: String,
     #[serde(default)]
     pub accent: String,
+    #[serde(default)]
+    pub mention_color: String,
 }

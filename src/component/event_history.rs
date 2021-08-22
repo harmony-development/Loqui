@@ -489,11 +489,11 @@ pub fn build_event_history<'a>(
                         theme
                             .border_width(2.0)
                             .border_radius(4.0)
-                            .border_color(color!(225, 225, 0, 180)),
+                            .border_color(theme.colorscheme.mention_color),
                         2,
                     )
                 })
-                .unwrap_or((theme, 0));
+                .unwrap_or((theme.border_width(0.0), 0));
             message_body_widgets.push(
                 Container::new(Column::with_children(widgets).align_items(Align::Start))
                     .center_x()

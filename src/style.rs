@@ -133,6 +133,7 @@ pub struct Colorscheme {
     pub text: Color,
     pub disabled_text: Color,
     pub accent: Color,
+    pub mention_color: Color,
 }
 
 impl Default for Colorscheme {
@@ -147,49 +148,37 @@ impl Default for Colorscheme {
             text: TEXT_COLOR,
             disabled_text: DISABLED_TEXT,
             accent: ACCENT,
+            mention_color: color!(225, 225, 0, 180),
         }
     }
 }
 
 impl From<ColorschemeRaw> for Colorscheme {
     fn from(value: ColorschemeRaw) -> Self {
+        let default = Colorscheme::default();
         Self {
-            error: value
-                .error
-                .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().error),
-            success: value
-                .success
-                .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().success),
-            border: value
-                .border
-                .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().border),
-            primary_bg: value
-                .primary_bg
-                .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().primary_bg),
+            error: value.error.parse_to_color().unwrap_or_else(|| default.error),
+            success: value.success.parse_to_color().unwrap_or_else(|| default.success),
+            border: value.border.parse_to_color().unwrap_or_else(|| default.border),
+            primary_bg: value.primary_bg.parse_to_color().unwrap_or_else(|| default.primary_bg),
             secondary_bg: value
                 .secondary_bg
                 .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().secondary_bg),
+                .unwrap_or_else(|| default.secondary_bg),
             disabled_bg: value
                 .disabled_bg
                 .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().disabled_bg),
-            text: value
-                .text
-                .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().text),
+                .unwrap_or_else(|| default.disabled_bg),
+            text: value.text.parse_to_color().unwrap_or_else(|| default.text),
             disabled_text: value
                 .disabled_text
                 .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().disabled_text),
-            accent: value
-                .accent
+                .unwrap_or_else(|| default.disabled_text),
+            accent: value.accent.parse_to_color().unwrap_or_else(|| default.accent),
+            mention_color: value
+                .mention_color
                 .parse_to_color()
-                .unwrap_or_else(|| Colorscheme::default().accent),
+                .unwrap_or_else(|| default.mention_color),
         }
     }
 }
