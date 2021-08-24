@@ -22,6 +22,7 @@ use client::{
                 GetChannelMessagesResponse, GetUserRolesRequest,
             },
             harmonytypes::UserStatus,
+            rest::FileId,
         },
         client::{
             api::{
@@ -203,6 +204,9 @@ pub enum Message {
     NextBeforeChannel(bool),
     CopyToClipboard(String),
     MessageMenuSelected(MessageMenuOption),
+    AutoCompleteBefore,
+    AutoCompleteNext,
+    AutoComplete,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -215,6 +219,8 @@ pub struct MainScreen {
     goto_reply_state: button::State,
     clear_reply_state: button::State,
     scroll_to_bottom_but_state: button::State,
+    before_after_completion_items: (Option<SmolStr>, Option<SmolStr>),
+    completion_current: Option<SmolStr>,
 
     // Room area state
     channel_menu_state: pick_list::State<GuildMenuOption>,
@@ -272,7 +278,7 @@ impl MainScreen {
             thumbnail_cache,
             self.current_guild_id,
             &mut self.guilds_list_state,
-            &mut self.guilds_buts_state,
+            self.guilds_buts_state.as_mut_slice(),
             Message::GuildChanged,
             theme,
         );
@@ -490,6 +496,271 @@ impl MainScreen {
                 );
 
                 let icon_size = (PADDING / 4) * 3 + MESSAGE_SIZE;
+
+                let mk_seperator = || {
+                    Rule::horizontal(0)
+                        .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
+                        .into()
+                };
+                let mut message_area_widgets = Vec::with_capacity(8);
+                message_area_widgets.push(message_history_list);
+                message_area_widgets.push(mk_seperator());
+                if !channel.uploading_files.is_empty() {
+                    let widgets = std::iter::once("Uploading files: ")
+                        .chain(channel.uploading_files.iter().map(String::as_str))
+                        .map(|label| label!(label).size(MESSAGE_SIZE).into())
+                        .collect();
+                    message_area_widgets.push(
+                        Container::new(Row::with_children(widgets).align_items(Align::Center).spacing(SPACING))
+                            .center_y()
+                            .center_x()
+                            .padding(PADDING / 2)
+                            .into(),
+                    );
+                    message_area_widgets.push(mk_seperator());
+                }
+                if let Some(reply_message) = self.reply_to.map(|id| channel.messages.get(&MessageId::Ack(id))) {
+                    let widget = make_reply_message(
+                        reply_message,
+                        client,
+                        theme,
+                        Message::GotoReply,
+                        &mut self.goto_reply_state,
+                    );
+                    let clear_reply_but = Button::new(&mut self.clear_reply_state, icon(Icon::X))
+                        .style(theme)
+                        .padding(PADDING / 4)
+                        .on_press(Message::ClearReply);
+                    message_area_widgets.push(
+                        Container::new(
+                            Row::with_children(vec![
+                                label!("Replying to").size(MESSAGE_SIZE).into(),
+                                widget.into(),
+                                space!(w+).into(),
+                                clear_reply_but.into(),
+                            ])
+                            .spacing(SPACING)
+                            .align_items(Align::Center),
+                        )
+                        .center_x()
+                        .center_y()
+                        .padding(PADDING / 2)
+                        .into(),
+                    );
+                    message_area_widgets.push(mk_seperator());
+                }
+
+                let mut autocompleting = false;
+                if let Some((word, _, _)) = self.composer_state.get_word_at_cursor(&self.message) {
+                    const LEN: u16 = MESSAGE_SIZE + 10;
+                    if word.starts_with(':') && !word.ends_with(':') {
+                        let emote_name = word.trim_end_matches(':').trim_start_matches(':');
+                        let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+                        let mut matched_emotes = client
+                            .get_all_emotes()
+                            .flat_map(|(id, name)| Some((matcher.fuzzy(name, emote_name, false)?.0, id, name)))
+                            .collect::<Vec<_>>();
+
+                        if !matched_emotes.is_empty() {
+                            matched_emotes.sort_unstable_by_key(|(score, _, _)| *score);
+                            matched_emotes.truncate(8);
+
+                            if let Some(pos) = self
+                                .completion_current
+                                .as_deref()
+                                .and_then(|s| matched_emotes.iter().position(|(_, _, os)| s == *os))
+                            {
+                                self.before_after_completion_items = (
+                                    (pos == 0)
+                                        .not()
+                                        .then(|| matched_emotes.get(pos - 1))
+                                        .flatten()
+                                        .or_else(|| matched_emotes.last())
+                                        .map(|(_, _, name)| SmolStr::new(name)),
+                                    matched_emotes
+                                        .get(pos + 1)
+                                        .or_else(|| matched_emotes.first())
+                                        .map(|(_, _, name)| SmolStr::new(name)),
+                                );
+                            } else {
+                                self.before_after_completion_items = (
+                                    matched_emotes.last().map(|(_, _, name)| SmolStr::new(name)),
+                                    matched_emotes.first().map(|(_, _, name)| SmolStr::new(name)),
+                                );
+                            }
+
+                            let current = self.completion_current.clone();
+                            message_area_widgets.push(
+                                Row::with_children(
+                                    matched_emotes
+                                        .into_iter()
+                                        .map(|(_, image_id, emote_name)| {
+                                            let image =
+                                                match thumbnail_cache.emotes.get(&FileId::Id(image_id.to_string())) {
+                                                    Some(h) => Image::new(h.clone())
+                                                        .width(length!(= LEN))
+                                                        .height(length!(= LEN))
+                                                        .into(),
+                                                    None => space!(= LEN, LEN).into(),
+                                                };
+                                            let bg_color = (current.as_deref() == Some(emote_name))
+                                                .then(|| theme.colorscheme.accent)
+                                                .unwrap_or(theme.colorscheme.primary_bg);
+                                            Container::new(
+                                                Row::with_children(vec![
+                                                    image,
+                                                    label!(emote_name).size(MESSAGE_SIZE).into(),
+                                                ])
+                                                .align_items(Align::Center)
+                                                .spacing(SPACING / 2),
+                                            )
+                                            .style(theme.background_color(bg_color).round())
+                                            .padding(PADDING / 4)
+                                            .into()
+                                        })
+                                        .collect(),
+                                )
+                                .align_items(Align::Center)
+                                .spacing(SPACING)
+                                .padding(PADDING / 4)
+                                .into(),
+                            );
+                            message_area_widgets.push(mk_seperator());
+                            autocompleting = true;
+                        }
+                    } else if word.starts_with('@') {
+                        let member_name = word.trim_start_matches('@');
+                        let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+                        let mut matched_members = guild
+                            .members
+                            .keys()
+                            .flat_map(|id| {
+                                client.members.get(id).and_then(|member| {
+                                    Some((
+                                        matcher.fuzzy(member.username.as_str(), member_name, false)?.0,
+                                        member.avatar_url.as_ref(),
+                                        member.username.as_str(),
+                                    ))
+                                })
+                            })
+                            .collect::<Vec<_>>();
+
+                        if !matched_members.is_empty() {
+                            matched_members.sort_unstable_by_key(|(score, _, _)| *score);
+                            matched_members.truncate(8);
+
+                            if let Some(pos) = self
+                                .completion_current
+                                .as_deref()
+                                .and_then(|s| matched_members.iter().position(|(_, _, os)| s == *os))
+                            {
+                                self.before_after_completion_items = (
+                                    (pos == 0)
+                                        .not()
+                                        .then(|| matched_members.get(pos - 1))
+                                        .flatten()
+                                        .or_else(|| matched_members.last())
+                                        .map(|(_, _, name)| SmolStr::new(name)),
+                                    matched_members
+                                        .get(pos + 1)
+                                        .or_else(|| matched_members.first())
+                                        .map(|(_, _, name)| SmolStr::new(name)),
+                                );
+                            } else {
+                                self.before_after_completion_items = (
+                                    matched_members.last().map(|(_, _, name)| SmolStr::new(name)),
+                                    matched_members.first().map(|(_, _, name)| SmolStr::new(name)),
+                                );
+                            }
+
+                            let current = self.completion_current.clone();
+                            message_area_widgets.push(
+                                Row::with_children(
+                                    matched_members
+                                        .into_iter()
+                                        .map(|(_, image_id, member_name)| {
+                                            let mut widgets = Vec::with_capacity(2);
+                                            if let Some(h) = image_id.and_then(|id| thumbnail_cache.avatars.get(id)) {
+                                                widgets.push(
+                                                    Image::new(h.clone())
+                                                        .width(length!(= LEN))
+                                                        .height(length!(= LEN))
+                                                        .into(),
+                                                );
+                                            }
+                                            widgets.push(label!(member_name).size(MESSAGE_SIZE).into());
+                                            let bg_color = (current.as_deref() == Some(member_name))
+                                                .then(|| theme.colorscheme.accent)
+                                                .unwrap_or(theme.colorscheme.primary_bg);
+                                            Container::new(
+                                                Row::with_children(widgets)
+                                                    .align_items(Align::Center)
+                                                    .spacing(SPACING / 2),
+                                            )
+                                            .style(theme.background_color(bg_color).round())
+                                            .padding(PADDING / 4)
+                                            .into()
+                                        })
+                                        .collect(),
+                                )
+                                .align_items(Align::Center)
+                                .spacing(SPACING)
+                                .padding(PADDING / 4)
+                                .into(),
+                            );
+                            message_area_widgets.push(mk_seperator());
+                            autocompleting = true;
+                        }
+                    }
+                }
+                if !autocompleting {
+                    self.completion_current = None;
+                    self.before_after_completion_items = (None, None);
+                }
+
+                let typing_names = sorted_members
+                    .iter()
+                    .flat_map(|(id, member)| {
+                        // Remove own user id from the list (if its there)
+                        if **id == current_user_id {
+                            return None;
+                        }
+
+                        member
+                            .typing_in_channel
+                            .and_then(|(g, c, _)| (g == guild_id && c == channel_id).then(|| member.username.as_str()))
+                    })
+                    .collect::<Vec<_>>();
+                if !typing_names.is_empty() {
+                    let typing_members_count = typing_names.len();
+                    let typing_users_combined =
+                        typing_names
+                            .iter()
+                            .enumerate()
+                            .fold(String::new(), |mut comb, (index, name)| {
+                                comb += name;
+
+                                comb += match typing_members_count {
+                                    x if x > index + 1 => ", ",
+                                    1 => " is typing...",
+                                    _ => " are typing...",
+                                };
+
+                                comb
+                            });
+
+                    let typing_users = Column::with_children(vec![
+                        space!(w = 6).into(),
+                        Row::with_children(vec![
+                            space!(w = 9).into(),
+                            label!(typing_users_combined).size(14).into(),
+                        ])
+                        .into(),
+                    ])
+                    .height(length!(= 14));
+                    message_area_widgets.push(typing_users.into());
+                }
+
                 let mut send_file_button =
                     Button::new(&mut self.send_file_but_state, icon(Icon::Upload).size(icon_size))
                         .style(theme.secondary())
@@ -543,108 +814,6 @@ impl MainScreen {
                     );
                 }
 
-                let mut message_area_widgets = Vec::with_capacity(5);
-                message_area_widgets.push(message_history_list);
-                message_area_widgets.push(
-                    Rule::horizontal(0)
-                        .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
-                        .into(),
-                );
-                if !channel.uploading_files.is_empty() {
-                    let widgets = std::iter::once("Uploading files: ")
-                        .chain(channel.uploading_files.iter().map(String::as_str))
-                        .map(|label| label!(label).size(MESSAGE_SIZE).into())
-                        .collect();
-                    message_area_widgets.push(
-                        Container::new(Row::with_children(widgets).align_items(Align::Center).spacing(SPACING))
-                            .center_y()
-                            .center_x()
-                            .padding(PADDING / 2)
-                            .into(),
-                    );
-                    message_area_widgets.push(
-                        Rule::horizontal(0)
-                            .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
-                            .into(),
-                    );
-                }
-                if let Some(reply_message) = self.reply_to.map(|id| channel.messages.get(&MessageId::Ack(id))) {
-                    let widget = make_reply_message(
-                        reply_message,
-                        client,
-                        theme,
-                        Message::GotoReply,
-                        &mut self.goto_reply_state,
-                    );
-                    let clear_reply_but = Button::new(&mut self.clear_reply_state, icon(Icon::X))
-                        .style(theme)
-                        .padding(PADDING / 4)
-                        .on_press(Message::ClearReply);
-                    message_area_widgets.push(
-                        Container::new(
-                            Row::with_children(vec![
-                                label!("Replying to").size(MESSAGE_SIZE).into(),
-                                widget.into(),
-                                space!(w+).into(),
-                                clear_reply_but.into(),
-                            ])
-                            .spacing(SPACING)
-                            .align_items(Align::Center),
-                        )
-                        .center_x()
-                        .center_y()
-                        .padding(PADDING / 2)
-                        .into(),
-                    );
-                    message_area_widgets.push(
-                        Rule::horizontal(0)
-                            .style(theme.border_width(2.0).border_radius(0.0).padded(FillMode::Full))
-                            .into(),
-                    );
-                }
-
-                let typing_names = sorted_members
-                    .iter()
-                    .flat_map(|(id, member)| {
-                        // Remove own user id from the list (if its there)
-                        if **id == current_user_id {
-                            return None;
-                        }
-
-                        member
-                            .typing_in_channel
-                            .and_then(|(g, c, _)| (g == guild_id && c == channel_id).then(|| member.username.as_str()))
-                    })
-                    .collect::<Vec<_>>();
-                if !typing_names.is_empty() {
-                    let typing_members_count = typing_names.len();
-                    let typing_users_combined =
-                        typing_names
-                            .iter()
-                            .enumerate()
-                            .fold(String::new(), |mut comb, (index, name)| {
-                                comb += name;
-
-                                comb += match typing_members_count {
-                                    x if x > index + 1 => ", ",
-                                    1 => " is typing...",
-                                    _ => " are typing...",
-                                };
-
-                                comb
-                            });
-
-                    let typing_users = Column::with_children(vec![
-                        space!(w = 6).into(),
-                        Row::with_children(vec![
-                            space!(w = 9).into(),
-                            label!(typing_users_combined).size(14).into(),
-                        ])
-                        .into(),
-                    ])
-                    .height(length!(= 14));
-                    message_area_widgets.push(typing_users.into());
-                }
                 message_area_widgets.push(
                     Container::new(
                         Row::with_children(bottom_area_widgets)
@@ -1630,6 +1799,48 @@ impl MainScreen {
                 MessageMenuOption::CopyMessageId(id) => clip.write(id.to_string()),
             },
             Message::ClearReply => self.reply_to = None,
+            Message::AutoCompleteBefore => {
+                if let Some(before) = &self.before_after_completion_items.0 {
+                    self.completion_current = Some(before.clone());
+                    self.composer_state.unfocus();
+                }
+            }
+            Message::AutoCompleteNext => {
+                if let Some(after) = &self.before_after_completion_items.1 {
+                    self.completion_current = Some(after.clone());
+                    self.composer_state.unfocus();
+                }
+            }
+            Message::AutoComplete => {
+                if let Some(completion_item) = self.completion_current.take() {
+                    if let Some((word, start, end)) = self.composer_state.get_word_at_cursor(&self.message) {
+                        if word.starts_with(':') && !word.ends_with(':') {
+                            self.message.drain(start..end);
+
+                            let mut idx = start;
+                            self.message.insert(idx, ':');
+                            idx += 1;
+                            self.message.insert_str(idx, completion_item.as_str());
+                            idx += completion_item.len();
+                            self.message.insert(idx, ':');
+
+                            self.composer_state.focus();
+                            self.composer_state.move_cursor_to(idx + 1);
+                        } else if word.starts_with('@') {
+                            self.message.drain(start..end);
+
+                            let mut idx = start;
+                            self.message.insert(idx, '@');
+                            idx += 1;
+                            self.message.insert_str(idx, completion_item.as_str());
+                            idx += completion_item.len();
+
+                            self.composer_state.focus();
+                            self.composer_state.move_cursor_to(idx + 1);
+                        }
+                    }
+                }
+            }
         }
 
         Command::none()
@@ -1638,7 +1849,7 @@ impl MainScreen {
     pub fn subscription(&self) -> Subscription<TopLevelMessage> {
         use iced_native::{event::Status, keyboard, Event};
 
-        fn filter_events(ev: Event, status: Status) -> Option<TopLevelMessage> {
+        let filter_events = |ev: Event, status: Status| -> Option<TopLevelMessage> {
             type Ke = keyboard::Event;
             type Kc = keyboard::KeyCode;
 
@@ -1684,11 +1895,25 @@ impl MainScreen {
                     };
                     Some(msg)
                 }
-                Event::Keyboard(Ke::CharacterReceived(c)) => (matches!(status, Status::Ignored) && c != '')
-                    .then(|| TopLevelMessage::main(Message::FocusComposer(c))),
+                Event::Keyboard(Ke::KeyPressed {
+                    key_code: Kc::Tab,
+                    modifiers,
+                }) => {
+                    let msg = modifiers
+                        .shift()
+                        .then(|| Message::AutoCompleteBefore)
+                        .unwrap_or(Message::AutoCompleteNext);
+                    Some(TopLevelMessage::main(msg))
+                }
+                Event::Keyboard(Ke::KeyPressed {
+                    key_code: Kc::Enter, ..
+                }) => Some(TopLevelMessage::main(Message::AutoComplete)),
+                Event::Keyboard(Ke::CharacterReceived(c)) => (matches!(status, Status::Ignored)
+                    && !['', '\t'].contains(&c))
+                .then(|| TopLevelMessage::main(Message::FocusComposer(c))),
                 _ => None,
             }
-        }
+        };
 
         iced_native::subscription::events_with(filter_events)
     }

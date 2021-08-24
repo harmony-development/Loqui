@@ -491,17 +491,7 @@ pub fn build_event_history<'a>(
                     .into(),
             );
 
-            let (container_theme, container_padding) = has_mention
-                .then(|| {
-                    (
-                        theme
-                            .border_width(2.0)
-                            .border_radius(4.0)
-                            .border_color(theme.colorscheme.mention_color),
-                        2,
-                    )
-                })
-                .unwrap_or((theme.border_width(0.0), 0));
+            let (container_theme, container_padding) = mention_container_style(has_mention, theme);
             message_body_widgets.push(
                 Container::new(Column::with_children(widgets).align_items(Align::Start))
                     .center_x()

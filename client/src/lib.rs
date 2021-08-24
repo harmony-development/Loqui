@@ -242,6 +242,13 @@ impl Client {
             .next()
     }
 
+    pub fn get_all_emotes(&self) -> impl Iterator<Item = (&str, &str)> + '_ {
+        self.emote_packs
+            .values()
+            .map(|p| p.emotes.iter().map(|(a, b)| (a.as_str(), b.as_str())))
+            .flatten()
+    }
+
     pub fn send_msg_cmd(
         &mut self,
         guild_id: u64,

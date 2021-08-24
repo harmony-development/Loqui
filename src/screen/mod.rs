@@ -1257,7 +1257,7 @@ fn make_thumbnail_command(client: &Client, data: Attachment, thumbnail_cache: &m
     let is_thumbnailable = data.name == "avatar" || data.name == "guild";
     let is_emote = data.name == "emote";
     if let Some(m) = data.minithumbnail.as_ref() {
-        if let Some(image) = image::load_from_memory_with_format(&m.data, image::ImageFormat::Jpeg).ok() {
+        if let Ok(image) = image::load_from_memory_with_format(&m.data, image::ImageFormat::Jpeg) {
             let (w, h) = data.resolution.unwrap_or((m.width, m.height));
             let (w, h) = scale_down(w, h, 400);
             let image = image.resize(w, h, FILTER);

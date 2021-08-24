@@ -22,9 +22,66 @@ pub use iced::{
     Image, Length, PickList, Row, Rule, Scrollable, Space, Subscription, Text, TextInput, Toggler,
 };
 pub use iced_aw::Icon;
+use iced_native::text_input::{cursor::State, Value};
 pub use iced_native::Padding;
 
 use super::style::{PADDING, SPACING};
+
+pub trait CursorExt {
+    fn get_word_at_cursor<'a>(&self, message: &'a str) -> Option<(&'a str, usize, usize)>;
+}
+
+impl CursorExt for text_input::State {
+    fn get_word_at_cursor<'a>(&self, message: &'a str) -> Option<(&'a str, usize, usize)> {
+        let index = match self.cursor().state(&Value::new(message)) {
+            State::Index(index) => index,
+            _ => return None,
+        };
+
+        let char_count = message.chars().count();
+        let end = message
+            .chars()
+            .enumerate()
+            .skip(index.saturating_sub(1))
+            .find_map(|(index, c)| {
+                let index = index + 1;
+                (index == char_count)
+                    .then(|| index)
+                    .or_else(|| c.is_whitespace().then(|| index - 1))
+            });
+        let start = message
+            .chars()
+            .rev()
+            .enumerate()
+            .skip(char_count - index)
+            .find_map(|(index, c)| {
+                let index = char_count - index - 1;
+                (index == 0)
+                    .then(|| index)
+                    .or_else(|| c.is_whitespace().then(|| index + 1))
+            });
+
+        if let (Some(start), Some(end)) = (start, end) {
+            (end >= start).then(|| (&message[start..end], start, end))
+        } else {
+            None
+        }
+    }
+}
+
+pub fn mention_container_style(has_mention: bool, theme: Theme) -> (Theme, u16) {
+    has_mention
+        .then(|| {
+            (
+                theme
+                    .border_width(2.0)
+                    .border_radius(8.0)
+                    .border_color(theme.colorscheme.mention_color),
+                2,
+            )
+        })
+        .unwrap_or((theme.border_width(0.0), 0))
+}
 
 pub fn make_reply_message<'a, M: Clone + 'a>(
     reply_message: Option<&Message>,
