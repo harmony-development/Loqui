@@ -7,6 +7,7 @@ description = "Rust client for the Harmony protocol."
 license = "GPLv3"
 repository = "https://github.com/harmony-development/crust"
 homepage = "https://github.com/harmony-development/crust"
+resolver = "2"
 
 [workspace]
 members = ["client"]
