@@ -13,6 +13,8 @@ Crust supports changing colorschemes:
     - [For Windows systems](https://github.com/harmony-development/Crust/releases/download/continuous/crust-windows.exe)
     - [For macOS systems](https://github.com/harmony-development/Crust/releases/download/continuous/crust-macos)
 - Note: you might need to **mark the binary as executable** on macOS and Linux systems.
+- Note: **Crust will not work if your system does not support Vulkan / DX12 (on Windows) / Metal (on MacOS)**.
+Make sure your system has Vulkan setup if you are on Linux.
 
 ## Building
 
