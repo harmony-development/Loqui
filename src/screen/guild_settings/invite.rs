@@ -16,9 +16,7 @@ use client::{
     error::ClientResult,
     harmony_rust_sdk::{
         api::exports::hrpc::url::Url,
-        client::api::chat::invite::{
-            create_invite, delete_invite, get_guild_invites_response::Invite, CreateInviteRequest, DeleteInviteRequest,
-        },
+        client::api::chat::invite::{get_guild_invites_response::Invite, CreateInviteRequest, DeleteInviteRequest},
     },
 };
 use iced::{Element, Tooltip};
@@ -80,7 +78,7 @@ impl InviteTab {
                             possible_uses: uses,
                             guild_id,
                         };
-                        let name = create_invite(&inner, request).await?.name;
+                        let name = inner.chat().await.create_invite(request).await?.name;
                         Ok(TopLevelMessage::guild_settings(ParentMessage::Invite(
                             InviteMessage::InviteCreated(name, uses),
                         )))
@@ -115,7 +113,11 @@ impl InviteTab {
                 let invite_id = meta_data.invites.as_ref().unwrap()[n].invite_id.clone();
                 return client.mk_cmd(
                     |inner| async move {
-                        delete_invite(&inner, DeleteInviteRequest { guild_id, invite_id }).await?;
+                        inner
+                            .chat()
+                            .await
+                            .delete_invite(DeleteInviteRequest { guild_id, invite_id })
+                            .await?;
                         ClientResult::Ok(TopLevelMessage::guild_settings(ParentMessage::Invite(
                             InviteMessage::InviteDeleted(n),
                         )))

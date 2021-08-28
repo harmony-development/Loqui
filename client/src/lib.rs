@@ -26,11 +26,8 @@ use harmony_rust_sdk::{
     },
     client::api::{
         chat::{
-            message::{
-                delete_message, send_message, update_message_text, SendMessage, SendMessageSelfBuilder,
-                UpdateMessageTextRequest,
-            },
-            profile::{self, ProfileUpdate},
+            message::{SendMessage, SendMessageSelfBuilder, UpdateMessageTextRequest},
+            profile::{ProfileUpdate, ProfileUpdateSelfBuilder},
             EventSource,
         },
         rest::FileId,
@@ -176,7 +173,11 @@ impl Client {
         let user_id = self.user_id.unwrap();
 
         tokio::spawn(async move {
-            let _ = profile::profile_update(&inner, ProfileUpdate::default().new_status(UserStatus::Offline)).await;
+            let _ = inner
+                .chat()
+                .await
+                .profile_update(ProfileUpdate::default().new_status(UserStatus::Offline))
+                .await;
             Self::remove_session(user_id, inner.homeserver_url().as_str(), &content_store, full_logout).await
         })
     }
@@ -275,7 +276,7 @@ impl Client {
                     .echo_id(echo_id)
                     .overrides(message.overrides.clone().map(Into::into));
 
-                let send_result = send_message(&inner, msg).await;
+                let send_result = inner.chat().await.send_message(msg).await;
                 (
                     guild_id,
                     channel_id,
@@ -304,16 +305,16 @@ impl Client {
         let inner = self.inner().clone();
 
         async move {
-            delete_message(
-                &inner,
-                DeleteMessageRequest {
+            inner
+                .chat()
+                .await
+                .delete_message(DeleteMessageRequest {
                     guild_id,
                     channel_id,
                     message_id,
-                },
-            )
-            .await
-            .map_err(Into::into)
+                })
+                .await
+                .map_err(Into::into)
         }
     }
 
@@ -327,16 +328,16 @@ impl Client {
         let inner = self.inner().clone();
 
         async move {
-            let result = update_message_text(
-                &inner,
-                UpdateMessageTextRequest {
+            let result = inner
+                .chat()
+                .await
+                .update_message_text(UpdateMessageTextRequest {
                     guild_id,
                     channel_id,
                     message_id,
                     new_content,
-                },
-            )
-            .await;
+                })
+                .await;
 
             (
                 guild_id,
@@ -512,7 +513,7 @@ impl Client {
 
                 if let Some(channel) = self.get_channel(guild_id, channel_id) {
                     if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_updated.message_id)) {
-                        msg.content = Content::Text(message_updated.content);
+                        msg.content = Content::Text(message_updated.new_content);
                         msg.post_process(&mut post, guild_id, channel_id);
                     }
                 }
@@ -525,23 +526,19 @@ impl Client {
             Event::EditedChannel(ChannelUpdated {
                 guild_id,
                 channel_id,
-                name,
-                update_name,
-                previous_id,
-                next_id,
-                update_order,
-                metadata: _,
-                update_metadata: _,
+                new_name,
+                new_position,
+                new_metadata: _,
             }) => {
                 if let Some(guild) = self.get_guild(guild_id) {
-                    if update_name {
+                    if let Some(name) = new_name {
                         if let Some(channel) = guild.channels.get_mut(&channel_id) {
                             channel.name = name.into();
                         }
                     }
 
-                    if update_order {
-                        guild.update_channel_order(previous_id, next_id, channel_id);
+                    if let Some(position) = new_position {
+                        guild.update_channel_order(position, channel_id);
                     }
                 }
             }
@@ -549,8 +546,7 @@ impl Client {
                 guild_id,
                 channel_id,
                 name,
-                previous_id,
-                next_id,
+                position,
                 is_category,
                 metadata: _,
             }) => {
@@ -577,8 +573,8 @@ impl Client {
                             uploading_files: Vec::new(),
                         },
                     );
-                    if previous_id != 0 || next_id != 0 {
-                        guild.update_channel_order(previous_id, next_id, channel_id);
+                    if let Some(position) = position {
+                        guild.update_channel_order(position, channel_id);
                     }
                     post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
                 }
@@ -617,22 +613,18 @@ impl Client {
             Event::ProfileUpdated(ProfileUpdated {
                 user_id,
                 new_username,
-                update_username,
                 new_avatar,
-                update_avatar,
                 new_status,
-                update_status,
-                is_bot,
-                update_is_bot,
+                new_is_bot,
             }) => {
                 let member = self.members.entry(user_id).or_default();
-                if update_username {
+                if let Some(new_username) = new_username {
                     member.username = new_username.into();
                 }
-                if update_status {
+                if let Some(new_status) = new_status {
                     member.status = UserStatus::from_i32(new_status).unwrap_or(UserStatus::Offline);
                 }
-                if update_avatar {
+                if let Some(new_avatar) = new_avatar {
                     let parsed = FileId::from_str(&new_avatar).ok();
                     member.avatar_url = parsed.clone();
                     if let Some(id) = parsed {
@@ -643,7 +635,7 @@ impl Client {
                         }));
                     }
                 }
-                if update_is_bot {
+                if let Some(is_bot) = new_is_bot {
                     member.is_bot = is_bot;
                 }
             }
@@ -668,19 +660,16 @@ impl Client {
             }
             Event::EditedGuild(GuildUpdated {
                 guild_id,
-                name,
-                update_name,
-                picture,
-                update_picture,
-                metadata: _,
-                update_metadata: _,
+                new_name,
+                new_picture,
+                new_metadata: _,
             }) => {
                 let guild = self.guilds.entry(guild_id).or_default();
 
-                if update_name {
+                if let Some(name) = new_name {
                     guild.name = name;
                 }
-                if update_picture {
+                if let Some(picture) = new_picture {
                     let parsed = FileId::from_str(&picture).ok();
                     guild.picture = parsed.clone();
                     if let Some(id) = parsed {
@@ -711,10 +700,10 @@ impl Client {
             Event::RoleUpdated(RoleUpdated {
                 guild_id,
                 role_id,
-                role,
+                new_role,
             }) => {
                 self.get_guild(guild_id).and_do(|g| {
-                    role.and_do(|role| {
+                    new_role.and_do(|role| {
                         g.roles.insert(role_id, role.into());
                     });
                 });
@@ -722,31 +711,30 @@ impl Client {
             Event::RoleMoved(RoleMoved {
                 guild_id,
                 role_id,
-                previous_id,
-                next_id,
+                new_position,
             }) => {
-                if previous_id != 0 && next_id != 0 {
+                if let Some(position) = new_position {
                     self.get_guild(guild_id).and_do(|g| {
-                        g.update_role_order(previous_id, next_id, role_id);
+                        g.update_role_order(position, role_id);
                     });
                 }
             }
             Event::UserRolesUpdated(UserRolesUpdated {
                 guild_id,
                 user_id,
-                role_ids,
+                new_role_ids,
             }) => {
                 self.get_guild(guild_id).and_do(|g| {
-                    g.members.insert(user_id, role_ids);
+                    g.members.insert(user_id, new_role_ids);
                 });
             }
             Event::RolePermsUpdated(RolePermissionsUpdated {
                 guild_id,
                 channel_id,
                 role_id,
-                perms,
+                new_perms,
             }) => {
-                if let Some(perms) = perms {
+                if let Some(perms) = new_perms {
                     self.get_guild(guild_id).and_do(|g| {
                         if channel_id != 0 {
                             g.channels.get_mut(&channel_id).and_do(|c| {
@@ -758,13 +746,9 @@ impl Client {
                     });
                 }
             }
-            Event::EmotePackUpdated(EmotePackUpdated {
-                pack_id,
-                pack_name,
-                update_pack_name,
-            }) => {
+            Event::EmotePackUpdated(EmotePackUpdated { pack_id, new_pack_name }) => {
                 if let Some(pack) = self.emote_packs.get_mut(&pack_id) {
-                    if update_pack_name {
+                    if let Some(pack_name) = new_pack_name {
                         pack.pack_name = pack_name;
                     }
                 }

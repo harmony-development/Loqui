@@ -8,7 +8,7 @@ use std::{
 };
 
 use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
-use channel::{get_channel_messages, GetChannelMessages};
+use channel::GetChannelMessages;
 use chat::Typing;
 use client::{
     bool_ext::BoolExt,
@@ -28,10 +28,8 @@ use client::{
             api::{
                 chat::{
                     self,
-                    channel::{self, get_guild_channels, GetChannelMessagesSelfBuilder},
-                    guild::{self, get_guild_members},
-                    permissions::{get_guild_roles, get_user_roles},
-                    profile::{self, ProfileUpdate},
+                    channel::{self, GetChannelMessagesSelfBuilder},
+                    profile::{ProfileUpdate, ProfileUpdateSelfBuilder},
                     GuildId,
                 },
                 rest::download_extract_file,
@@ -988,7 +986,11 @@ impl MainScreen {
             Message::ChangeUserStatus(new_status) => {
                 return client.mk_cmd(
                     |inner| async move {
-                        profile::profile_update(&inner, ProfileUpdate::default().new_status(new_status)).await
+                        inner
+                            .chat()
+                            .await
+                            .profile_update(ProfileUpdate::default().new_status(new_status))
+                            .await
                     },
                     |_| TopLevelMessage::Nothing,
                 );
@@ -1211,21 +1213,21 @@ impl MainScreen {
                             *loading_messages_history = true;
                             return client.mk_cmd(
                                 |inner| async move {
-                                    channel::get_channel_messages(
-                                        &inner,
-                                        GetChannelMessages::new(guild_id, channel_id).message_id(oldest_msg_id),
-                                    )
-                                    .await
-                                    .map(|response| {
-                                        TopLevelMessage::GetChannelMessagesResponse {
+                                    inner
+                                        .chat()
+                                        .await
+                                        .get_channel_messages(
+                                            GetChannelMessages::new(guild_id, channel_id).message_id(oldest_msg_id),
+                                        )
+                                        .await
+                                        .map(|response| TopLevelMessage::GetChannelMessagesResponse {
                                             messages: response.messages,
                                             reached_top: response.reached_top,
                                             guild_id,
                                             channel_id,
                                             message_id: oldest_msg_id,
                                             direction: Direction::Before,
-                                        }
-                                    })
+                                        })
                                 },
                                 identity,
                             );
@@ -1269,7 +1271,7 @@ impl MainScreen {
                 GuildMenuOption::LeaveGuild => {
                     let guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
                     return client.mk_cmd(
-                        |inner| async move { guild::leave_guild(&inner, GuildId::new(guild_id)).await },
+                        |inner| async move { inner.chat().await.leave_guild(GuildId::new(guild_id)).await },
                         |_| TopLevelMessage::Nothing,
                     );
                 }
@@ -1320,7 +1322,7 @@ impl MainScreen {
                     if should_send {
                         *typing = Some((gid, cid, Instant::now()));
                         return client.mk_cmd(
-                            |inner| async move { chat::typing(&inner, Typing::new(gid, cid)).await },
+                            |inner| async move { inner.chat().await.typing(Typing::new(gid, cid)).await },
                             map_to_nothing,
                         );
                     }
@@ -1564,7 +1566,7 @@ impl MainScreen {
                         return Command::perform(
                             async move {
                                 let guildid = GuildId::new(guild_id);
-                                let channels_list = get_guild_channels(&inner, guildid).await?.channels;
+                                let channels_list = inner.chat().await.get_guild_channels(guildid).await?.channels;
                                 let mut events = Vec::with_capacity(channels_list.len());
                                 events.extend(channels_list.into_iter().map(|c| {
                                     Ok(Event::CreatedChannel(ChannelCreated {
@@ -1578,36 +1580,46 @@ impl MainScreen {
                                 }));
 
                                 if user_perms.get_roles {
-                                    events.extend(get_guild_roles(&inner, GuildId::new(guild_id)).await.map_or_else(
-                                        |err| vec![Err(err.into())],
-                                        |roles| {
-                                            roles
-                                                .roles
-                                                .into_iter()
-                                                .map(|role| {
-                                                    Ok(Event::RoleCreated(RoleCreated {
-                                                        guild_id,
-                                                        role_id: role.role_id,
-                                                        role: Some(role),
-                                                    }))
-                                                })
-                                                .collect::<Vec<_>>()
-                                        },
-                                    ));
+                                    events.extend(
+                                        inner
+                                            .chat()
+                                            .await
+                                            .get_guild_roles(GuildId::new(guild_id))
+                                            .await
+                                            .map_or_else(
+                                                |err| vec![Err(err.into())],
+                                                |roles| {
+                                                    roles
+                                                        .roles
+                                                        .into_iter()
+                                                        .map(|role| {
+                                                            Ok(Event::RoleCreated(RoleCreated {
+                                                                guild_id,
+                                                                role_id: role.role_id,
+                                                                role: Some(role),
+                                                            }))
+                                                        })
+                                                        .collect::<Vec<_>>()
+                                                },
+                                            ),
+                                    );
                                 }
 
-                                let members = get_guild_members(&inner, guildid).await?.members;
+                                let members = inner.chat().await.get_guild_members(guildid).await?.members;
                                 events.reserve(members.len() * 2);
                                 if user_perms.get_user_roles {
                                     for id in &members {
                                         events.push(
-                                            get_user_roles(&inner, GetUserRolesRequest { guild_id, user_id: *id })
+                                            inner
+                                                .chat()
+                                                .await
+                                                .get_user_roles(GetUserRolesRequest { guild_id, user_id: *id })
                                                 .await
                                                 .map(|resp| {
                                                     Event::UserRolesUpdated(UserRolesUpdated {
                                                         guild_id,
                                                         user_id: *id,
-                                                        role_ids: resp.roles,
+                                                        new_role_ids: resp.roles,
                                                     })
                                                 })
                                                 .map_err(Into::into),
@@ -1678,7 +1690,10 @@ impl MainScreen {
                         let inner = client.inner_arc();
                         cmds.push(Command::perform(
                             async move {
-                                get_channel_messages(&inner, GetChannelMessages::new(guild_id, channel_id))
+                                inner
+                                    .chat()
+                                    .await
+                                    .get_channel_messages(GetChannelMessages::new(guild_id, channel_id))
                                     .await
                                     .map(convert_to_event)
                                     .map_err(ClientError::from)

@@ -5,9 +5,7 @@ use client::{
     error::ClientResult,
     harmony_rust_sdk::{
         api::chat::Role,
-        client::api::chat::permissions::{
-            self, AddGuildRole, DeleteGuildRole, ModifyGuildRole, ModifyGuildRoleSelfBuilder,
-        },
+        client::api::chat::permissions::{AddGuildRole, DeleteGuildRole, ModifyGuildRole, ModifyGuildRoleSelfBuilder},
     },
 };
 use iced_aw::Card;
@@ -178,40 +176,28 @@ impl RoleModal {
                 return (
                     client.mk_cmd(
                         |inner| async move {
+                            let mut chat = inner.chat().await;
                             let role_id = match editing {
                                 Some(role_id) => {
-                                    permissions::modify_guild_role(
-                                        &inner,
-                                        ModifyGuildRole::new(
-                                            guild_id,
-                                            Role {
-                                                hoist,
-                                                pingable,
-                                                role_id,
-                                                name: role_name,
-                                                ..Default::default()
-                                            },
-                                        )
-                                        .modify_hoist(true)
-                                        .modify_pingable(true)
-                                        .modify_name(true),
+                                    chat.modify_guild_role(
+                                        ModifyGuildRole::new(guild_id, role_id)
+                                            .new_hoist(hoist)
+                                            .new_pingable(pingable)
+                                            .new_name(role_name),
                                     )
                                     .await?;
                                     role_id
                                 }
                                 None => {
-                                    permissions::add_guild_role(
-                                        &inner,
-                                        AddGuildRole::new(
-                                            guild_id,
-                                            Role {
-                                                name: role_name,
-                                                hoist,
-                                                pingable,
-                                                ..Default::default()
-                                            },
-                                        ),
-                                    )
+                                    chat.add_guild_role(AddGuildRole::new(
+                                        guild_id,
+                                        Role {
+                                            name: role_name,
+                                            hoist,
+                                            pingable,
+                                            ..Default::default()
+                                        },
+                                    ))
                                     .await?
                                     .role_id
                                 }
@@ -232,7 +218,11 @@ impl RoleModal {
                     return (
                         client.mk_cmd(
                             |inner| async move {
-                                permissions::delete_guild_role(&inner, DeleteGuildRole::new(guild_id, role_id)).await
+                                inner
+                                    .chat()
+                                    .await
+                                    .delete_guild_role(DeleteGuildRole::new(guild_id, role_id))
+                                    .await
                             },
                             |_| TopLevelMessage::guild_settings(ParentMessage::RoleMessage(Message::GoBack)),
                         ),

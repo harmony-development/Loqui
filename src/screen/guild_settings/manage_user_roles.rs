@@ -1,5 +1,5 @@
 use super::super::Message as TopLevelMessage;
-use client::harmony_rust_sdk::client::api::chat::permissions::{self, ManageUserRoles, ManageUserRolesSelfBuilder};
+use client::harmony_rust_sdk::client::api::chat::permissions::{ManageUserRoles, ManageUserRolesSelfBuilder};
 use iced::{tooltip::Position, Tooltip};
 use iced_aw::Card;
 
@@ -121,7 +121,7 @@ impl ManageUserRolesModal {
                             } else {
                                 request = request.take_role_ids(vec![role_id]);
                             }
-                            permissions::manage_user_roles(&inner, request).await
+                            inner.chat().await.manage_user_roles(request).await
                         },
                         map_to_nothing,
                     )

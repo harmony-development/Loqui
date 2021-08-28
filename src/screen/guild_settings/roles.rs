@@ -2,8 +2,8 @@ use client::{
     color,
     error::ClientError,
     harmony_rust_sdk::{
-        api::chat::{Place, Role},
-        client::api::chat::permissions::{self, ModifyGuildRole, ModifyGuildRoleSelfBuilder, MoveRole},
+        api::chat::Place,
+        client::api::chat::permissions::{ModifyGuildRole, ModifyGuildRoleSelfBuilder, MoveRole},
     },
     smol_str::SmolStr,
     Client,
@@ -95,7 +95,13 @@ impl RolesTab {
     ) -> Command<TopLevelMessage> {
         match message {
             RolesMessage::MoveRole { id, new_place } => client.mk_cmd(
-                |inner| async move { permissions::move_role(&inner, MoveRole::new(guild_id, id, new_place)).await },
+                |inner| async move {
+                    inner
+                        .chat()
+                        .await
+                        .move_role(MoveRole::new(guild_id, id, new_place))
+                        .await
+                },
                 map_to_nothing,
             ),
             RolesMessage::GoBack => TopLevelScreen::pop_screen_cmd(),
@@ -105,23 +111,16 @@ impl RolesTab {
             }
             RolesMessage::SetColor { role_id, color } => client.mk_cmd(
                 |inner| async move {
-                    permissions::modify_guild_role(
-                        &inner,
-                        ModifyGuildRole::new(
-                            guild_id,
-                            Role {
-                                role_id,
-                                color: color::encode_rgb((
-                                    (color.r * 255.0) as u8,
-                                    (color.g * 255.0) as u8,
-                                    (color.b * 255.0) as u8,
-                                )) as i32,
-                                ..Default::default()
-                            },
-                        )
-                        .modify_color(true),
-                    )
-                    .await
+                    inner
+                        .chat()
+                        .await
+                        .modify_guild_role(ModifyGuildRole::new(guild_id, role_id).new_color(color::encode_rgb((
+                            (color.r * 255.0) as u8,
+                            (color.g * 255.0) as u8,
+                            (color.b * 255.0) as u8,
+                        ))
+                            as i32))
+                        .await
                 },
                 map_to_nothing,
             ),

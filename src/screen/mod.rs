@@ -34,7 +34,7 @@ use client::{
                 },
                 get_channel_messages_request::Direction,
                 BatchQueryPermissionsRequest, GetEmotePackEmotesRequest, GetEmotePacksRequest, GetGuildListRequest,
-                GetMessageRequest, GetUserResponse,
+                GetMessageRequest, GetUserBulkRequest, GetUserResponse,
             },
             harmonytypes::UserStatus,
             mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -44,15 +44,11 @@ use client::{
             api::{
                 auth::AuthStepResponse,
                 chat::{
-                    emote::{get_emote_pack_emotes, get_emote_packs},
-                    guild::{get_guild, get_guild_list},
-                    message::get_message,
-                    permissions::{batch_query_has_permission, QueryPermissions, QueryPermissionsSelfBuilder},
-                    profile::{self, get_user, get_user_bulk, ProfileUpdate},
+                    permissions::{QueryPermissions, QueryPermissionsSelfBuilder},
+                    profile::{ProfileUpdate, ProfileUpdateSelfBuilder},
                     EventSource, GuildId, UserId,
                 },
                 harmonytypes::Message as HarmonyMessage,
-                mediaproxy::fetch_link_metadata,
                 rest::download_extract_file,
             },
             error::{ClientError as InnerClientError, InternalClientError as HrpcClientError},
@@ -450,19 +446,21 @@ impl ScreenManager {
                                 })
                                 .collect(),
                         };
-                        events.extend(batch_query_has_permission(&inner, batch_query).await.map(|resp| {
-                            resp.responses
-                                .into_iter()
-                                .zip(IntoIter::new(perm_queries))
-                                .map(|(perm, query)| {
-                                    Event::PermissionUpdated(PermissionUpdated {
-                                        guild_id,
-                                        channel_id,
-                                        ok: perm.ok,
-                                        query: query.to_string(),
+                        events.extend(inner.chat().await.batch_query_has_permission(batch_query).await.map(
+                            |resp| {
+                                resp.responses
+                                    .into_iter()
+                                    .zip(IntoIter::new(perm_queries))
+                                    .map(|(perm, query)| {
+                                        Event::PermissionUpdated(PermissionUpdated {
+                                            guild_id,
+                                            channel_id,
+                                            ok: perm.ok,
+                                            query: query.to_string(),
+                                        })
                                     })
-                                })
-                        })?);
+                            },
+                        )?);
                         ClientResult::Ok(events)
                     },
                     Message::EventsReceived,
@@ -470,17 +468,13 @@ impl ScreenManager {
                 PostProcessEvent::FetchThumbnail(id) => make_thumbnail_command(client, id, &mut self.thumbnail_cache),
                 PostProcessEvent::FetchProfile(user_id) => client.mk_cmd(
                     |inner| async move {
-                        get_user(&inner, UserId::new(user_id)).await.map(|profile| {
+                        inner.chat().await.get_user(UserId::new(user_id)).await.map(|profile| {
                             vec![Event::ProfileUpdated(ProfileUpdated {
                                 user_id,
-                                new_avatar: profile.user_avatar,
-                                new_status: profile.user_status,
-                                new_username: profile.user_name,
-                                is_bot: profile.is_bot,
-                                update_is_bot: true,
-                                update_status: true,
-                                update_avatar: true,
-                                update_username: true,
+                                new_avatar: Some(profile.user_avatar),
+                                new_status: Some(profile.user_status),
+                                new_username: Some(profile.user_name),
+                                new_is_bot: Some(profile.is_bot),
                             })]
                         })
                     },
@@ -501,16 +495,13 @@ impl ScreenManager {
                 PostProcessEvent::FetchGuildData(guild_id) => client.mk_cmd(
                     |inner| async move {
                         let mut events = Vec::with_capacity(10);
-                        events.push(Ok(get_guild(&inner, GuildId::new(guild_id)).await.map(
+                        events.push(Ok(inner.chat().await.get_guild(GuildId::new(guild_id)).await.map(
                             |guild_data| {
                                 Event::EditedGuild(GuildUpdated {
                                     guild_id,
-                                    metadata: guild_data.metadata,
-                                    name: guild_data.guild_name,
-                                    picture: guild_data.guild_picture,
-                                    update_name: true,
-                                    update_picture: true,
-                                    update_metadata: true,
+                                    new_metadata: guild_data.metadata,
+                                    new_name: Some(guild_data.guild_name),
+                                    new_picture: Some(guild_data.guild_picture),
                                 })
                             },
                         )?));
@@ -538,19 +529,24 @@ impl ScreenManager {
                                 .map(|query| QueryPermissions::new(guild_id, query.to_string()).into())
                                 .collect(),
                         };
-                        let batch_resp = batch_query_has_permission(&inner, batch_query).await.map(|resp| {
-                            resp.responses
-                                .into_iter()
-                                .zip(IntoIter::new(perm_queries))
-                                .map(|(perm, query)| {
-                                    Ok(Event::PermissionUpdated(PermissionUpdated {
-                                        guild_id,
-                                        channel_id: 0,
-                                        ok: perm.ok,
-                                        query: query.to_string(),
-                                    }))
-                                })
-                        });
+                        let batch_resp = inner
+                            .chat()
+                            .await
+                            .batch_query_has_permission(batch_query)
+                            .await
+                            .map(|resp| {
+                                resp.responses
+                                    .into_iter()
+                                    .zip(IntoIter::new(perm_queries))
+                                    .map(|(perm, query)| {
+                                        Ok(Event::PermissionUpdated(PermissionUpdated {
+                                            guild_id,
+                                            channel_id: 0,
+                                            ok: perm.ok,
+                                            query: query.to_string(),
+                                        }))
+                                    })
+                            });
                         match batch_resp {
                             Ok(perms) => events.extend(perms),
                             Err(err) => events.push(Err(err.into())),
@@ -565,43 +561,46 @@ impl ScreenManager {
                     message_id,
                 } => client.mk_cmd(
                     |inner| async move {
-                        get_message(
-                            &inner,
-                            GetMessageRequest {
+                        inner
+                            .chat()
+                            .await
+                            .get_message(GetMessageRequest {
                                 guild_id,
                                 channel_id,
                                 message_id,
-                            },
-                        )
-                        .await
-                        .map(|message| {
-                            message
-                                .message
-                                .map_or(Message::Nothing, |message| Message::GetReplyMessage {
-                                    guild_id,
-                                    channel_id,
-                                    message,
-                                })
-                        })
+                            })
+                            .await
+                            .map(|message| {
+                                message
+                                    .message
+                                    .map_or(Message::Nothing, |message| Message::GetReplyMessage {
+                                        guild_id,
+                                        channel_id,
+                                        message,
+                                    })
+                            })
                     },
                     identity,
                 ),
                 PostProcessEvent::FetchLinkMetadata(url) => client.mk_cmd(
                     |inner| async move {
-                        fetch_link_metadata(
-                            &inner,
-                            FetchLinkMetadataRequest {
+                        inner
+                            .mediaproxy()
+                            .await
+                            .fetch_link_metadata(FetchLinkMetadataRequest {
                                 url: url.clone().into(),
-                            },
-                        )
-                        .await
-                        .map(|resp| (resp.data, url))
+                            })
+                            .await
+                            .map(|resp| (resp.data, url))
                     },
                     |(data, url)| data.map_or(Message::Nothing, |data| Message::FetchLinkDataReceived(data, url)),
                 ),
                 PostProcessEvent::FetchEmotes(pack_id) => client.mk_cmd(
                     |inner| async move {
-                        get_emote_pack_emotes(&inner, GetEmotePackEmotesRequest { pack_id })
+                        inner
+                            .chat()
+                            .await
+                            .get_emote_pack_emotes(GetEmotePackEmotesRequest { pack_id })
                             .await
                             .map(|resp| {
                                 vec![Event::EmotePackEmotesUpdated(EmotePackEmotesUpdated {
@@ -642,7 +641,11 @@ impl Application for ScreenManager {
                         content_store,
                     )
                     .await?;
-                    get_user(client.inner(), UserId::new(client.user_id.unwrap()))
+                    client
+                        .inner_arc()
+                        .chat()
+                        .await
+                        .get_user(UserId::new(client.user_id.unwrap()))
                         .await
                         .map(|user_profile| (client, user_profile))
                         .map_err(|err| {
@@ -710,11 +713,11 @@ impl Application for ScreenManager {
                             let _ = sock.close().await;
                         }
                         if let Some(inner) = inner {
-                            let _ = profile::profile_update(
-                                &inner,
-                                ProfileUpdate::default().new_status(UserStatus::Offline),
-                            )
-                            .await;
+                            let _ = inner
+                                .chat()
+                                .await
+                                .profile_update(ProfileUpdate::default().new_status(UserStatus::Offline))
+                                .await;
                         }
                     },
                     |_| Message::ExitReady,
@@ -811,9 +814,9 @@ impl Application for ScreenManager {
                         let self_profile = if let Some(profile) = maybe_profile {
                             profile
                         } else {
-                            get_user(&inner, UserId::new(self_id)).await?
+                            inner.chat().await.get_user(UserId::new(self_id)).await?
                         };
-                        let guilds = get_guild_list(&inner, GetGuildListRequest {}).await?.guilds;
+                        let guilds = inner.chat().await.get_guild_list(GetGuildListRequest {}).await?.guilds;
                         let mut events = Vec::with_capacity(guilds.len() + 1);
                         events.extend(guilds.into_iter().map(|guild| {
                             Event::GuildAddedToList(GuildAddedToList {
@@ -822,26 +825,24 @@ impl Application for ScreenManager {
                             })
                         }));
                         events.push(Event::ProfileUpdated(ProfileUpdated {
-                            update_avatar: true,
-                            update_is_bot: true,
-                            update_status: true,
-                            update_username: true,
-                            is_bot: self_profile.is_bot,
-                            new_avatar: self_profile.user_avatar,
-                            new_status: UserStatus::OnlineUnspecified.into(),
-                            new_username: self_profile.user_name,
+                            new_is_bot: Some(self_profile.is_bot),
+                            new_avatar: Some(self_profile.user_avatar),
+                            new_status: Some(UserStatus::OnlineUnspecified.into()),
+                            new_username: Some(self_profile.user_name),
                             user_id: self_id,
                         }));
-                        events.extend(get_emote_packs(&inner, GetEmotePacksRequest {}).await.map(|resp| {
-                            resp.packs
-                                .into_iter()
-                                .map(|pack| Event::EmotePackAdded(EmotePackAdded { pack: Some(pack) }))
-                        })?);
-                        profile::profile_update(
-                            &inner,
-                            ProfileUpdate::default().new_status(UserStatus::OnlineUnspecified),
-                        )
-                        .await?;
+                        events.extend(inner.chat().await.get_emote_packs(GetEmotePacksRequest {}).await.map(
+                            |resp| {
+                                resp.packs
+                                    .into_iter()
+                                    .map(|pack| Event::EmotePackAdded(EmotePackAdded { pack: Some(pack) }))
+                            },
+                        )?);
+                        inner
+                            .chat()
+                            .await
+                            .profile_update(ProfileUpdate::default().new_status(UserStatus::OnlineUnspecified))
+                            .await?;
                         ClientResult::Ok(events)
                     },
                     Message::EventsReceived,
@@ -976,26 +977,29 @@ impl Application for ScreenManager {
                         if !chunk.is_empty() {
                             let fetch_users_cmd = client.mk_cmd(
                                 |inner| async move {
-                                    get_user_bulk(&inner, chunk.clone()).await.map(|profiles| {
-                                        profiles
-                                            .users
-                                            .into_iter()
-                                            .zip(chunk.into_iter())
-                                            .map(|(profile, user_id)| {
-                                                Event::ProfileUpdated(ProfileUpdated {
-                                                    user_id,
-                                                    new_avatar: profile.user_avatar,
-                                                    new_status: profile.user_status,
-                                                    new_username: profile.user_name,
-                                                    is_bot: profile.is_bot,
-                                                    update_is_bot: true,
-                                                    update_status: true,
-                                                    update_avatar: true,
-                                                    update_username: true,
+                                    inner
+                                        .chat()
+                                        .await
+                                        .get_user_bulk(GetUserBulkRequest {
+                                            user_ids: chunk.clone(),
+                                        })
+                                        .await
+                                        .map(|profiles| {
+                                            profiles
+                                                .users
+                                                .into_iter()
+                                                .zip(chunk.into_iter())
+                                                .map(|(profile, user_id)| {
+                                                    Event::ProfileUpdated(ProfileUpdated {
+                                                        user_id,
+                                                        new_avatar: Some(profile.user_avatar),
+                                                        new_status: Some(profile.user_status),
+                                                        new_username: Some(profile.user_name),
+                                                        new_is_bot: Some(profile.is_bot),
+                                                    })
                                                 })
-                                            })
-                                            .collect()
-                                    })
+                                                .collect()
+                                        })
                                 },
                                 Message::EventsReceived,
                             );

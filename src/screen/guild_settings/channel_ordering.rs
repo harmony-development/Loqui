@@ -1,9 +1,6 @@
 use client::{
     error::ClientError,
-    harmony_rust_sdk::{
-        api::chat::Place,
-        client::api::chat::channel::{self, UpdateChannelOrder},
-    },
+    harmony_rust_sdk::{api::chat::Place, client::api::chat::channel::UpdateChannelOrder},
     Client,
 };
 use iced::Tooltip;
@@ -54,7 +51,11 @@ impl OrderingTab {
         match message {
             OrderingMessage::MoveChannel { id, new_place } => client.mk_cmd(
                 |inner| async move {
-                    channel::update_channel_order(&inner, UpdateChannelOrder::new(guild_id, id, new_place)).await
+                    inner
+                        .chat()
+                        .await
+                        .update_channel_order(UpdateChannelOrder::new(guild_id, id, new_place))
+                        .await
                 },
                 map_to_nothing,
             ),

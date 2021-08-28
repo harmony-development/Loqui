@@ -1,7 +1,7 @@
 use super::super::Message as TopLevelMessage;
 use client::harmony_rust_sdk::{
     api::chat::{permission::Mode, Permission, PermissionList},
-    client::api::chat::permissions::{set_permissions, SetPermissions, SetPermissionsSelfBuilder},
+    client::api::chat::permissions::{SetPermissions, SetPermissionsSelfBuilder},
 };
 use iced_aw::Card;
 
@@ -194,13 +194,15 @@ impl ManageRolePermissionsModal {
 
                     client.mk_cmd(
                         |inner| async move {
-                            set_permissions(
-                                &inner,
-                                SetPermissions::new(guild_id, role_id)
-                                    .channel_id(channel_id)
-                                    .perms(Some(perm_list)),
-                            )
-                            .await
+                            inner
+                                .chat()
+                                .await
+                                .set_permissions(
+                                    SetPermissions::new(guild_id, role_id)
+                                        .channel_id(channel_id)
+                                        .perms(Some(perm_list)),
+                                )
+                                .await
                         },
                         map_to_nothing,
                     )

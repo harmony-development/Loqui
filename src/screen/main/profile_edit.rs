@@ -1,6 +1,6 @@
 use client::{
     error::ClientError,
-    harmony_rust_sdk::client::api::chat::profile::{profile_update, ProfileUpdate},
+    harmony_rust_sdk::client::api::chat::profile::{ProfileUpdate, ProfileUpdateSelfBuilder},
 };
 use iced::Tooltip;
 use iced_aw::Card;
@@ -200,7 +200,13 @@ impl ProfileEditModal {
         (
             match msg {
                 Message::IsBotChecked(is_bot) => client.mk_cmd(
-                    |inner| async move { profile_update(&inner, ProfileUpdate::default().new_is_bot(is_bot)).await },
+                    |inner| async move {
+                        inner
+                            .chat()
+                            .await
+                            .profile_update(ProfileUpdate::default().new_is_bot(is_bot))
+                            .await
+                    },
                     map_to_nothing,
                 ),
                 Message::UpdateNewUsername(new) => {
@@ -211,11 +217,11 @@ impl ProfileEditModal {
                     let username = self.current_username.drain(..).collect::<String>();
                     client.mk_cmd(
                         |inner| async move {
-                            profile_update(
-                                &inner,
-                                ProfileUpdate::default().new_username(username),
-                            )
-                            .await
+                            inner
+                                .chat()
+                                .await
+                                .profile_update(ProfileUpdate::default().new_username(username))
+                                .await
                         },
                         map_to_nothing,
                     )
@@ -225,9 +231,12 @@ impl ProfileEditModal {
                     client.mk_cmd(
                         |inner| async move {
                             let id = select_upload_files(&inner, content_store, true).await?.remove(0).id;
-                            profile_update(&inner, ProfileUpdate::default().new_avatar(Some(id)))
+                            inner
+                                .chat()
                                 .await
-                                .map_err(ClientError::Internal)
+                                .profile_update(ProfileUpdate::default().new_avatar(Some(id)))
+                                .await
+                                .map_err(ClientError::from)
                         },
                         map_to_nothing,
                     )

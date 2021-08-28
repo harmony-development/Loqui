@@ -1,9 +1,6 @@
 use client::{
     error::ClientError,
-    harmony_rust_sdk::{
-        api::chat::{BanUserRequest, KickUserRequest},
-        client::api::chat::guild::{ban_user, kick_user},
-    },
+    harmony_rust_sdk::api::chat::{BanUserRequest, KickUserRequest},
     Client,
 };
 use iced::Tooltip;
@@ -53,11 +50,17 @@ impl MembersTab {
         match message {
             MembersMessage::GoBack => TopLevelScreen::pop_screen_cmd(),
             MembersMessage::BanMember(user_id) => client.mk_cmd(
-                |inner| async move { ban_user(&inner, BanUserRequest { guild_id, user_id }).await },
+                |inner| async move { inner.chat().await.ban_user(BanUserRequest { guild_id, user_id }).await },
                 map_to_nothing,
             ),
             MembersMessage::KickMember(user_id) => client.mk_cmd(
-                |inner| async move { kick_user(&inner, KickUserRequest { guild_id, user_id }).await },
+                |inner| async move {
+                    inner
+                        .chat()
+                        .await
+                        .kick_user(KickUserRequest { guild_id, user_id })
+                        .await
+                },
                 map_to_nothing,
             ),
         }

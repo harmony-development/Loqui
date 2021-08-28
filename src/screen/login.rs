@@ -17,7 +17,7 @@ use client::{
         client::{
             api::{
                 auth::{AuthStep, AuthStepResponse},
-                chat::{profile, UserId},
+                chat::UserId,
             },
             AuthStatus,
         },
@@ -301,7 +301,7 @@ impl LoginScreen {
                         let user_id = client.user_id.unwrap();
                         let session_file = client.content_store().session_path(&session.homeserver, user_id);
                         let latest = client.content_store().latest_session_file();
-                        match profile::get_user(client.inner(), UserId::new(user_id)).await {
+                        match client.inner_arc().chat().await.get_user(UserId::new(user_id)).await {
                             Ok(user_profile) => {
                                 let _ = tokio::fs::remove_file(latest).await;
                                 tokio::fs::hard_link(session_file.as_path(), latest)
@@ -407,7 +407,8 @@ impl LoginScreen {
                             async move {
                                 if let AuthStatus::Complete(session) = auth_status {
                                     let session_file = content_store.session_path(&homeserver, session.user_id);
-                                    let user_profile = profile::get_user(&inner, UserId::new(session.user_id)).await?;
+                                    let user_profile =
+                                        inner.chat().await.get_user(UserId::new(session.user_id)).await?;
                                     let session = Session {
                                         homeserver,
                                         session_token: session.session_token.into(),

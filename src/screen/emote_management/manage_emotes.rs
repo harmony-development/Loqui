@@ -1,7 +1,7 @@
 use super::super::Message as TopLevelMessage;
 use client::harmony_rust_sdk::{
     api::rest::FileId,
-    client::api::chat::emote::{add_emote_to_pack, delete_emote_from_pack, AddEmoteToPack, DeleteEmoteFromPack},
+    client::api::chat::emote::{AddEmoteToPack, DeleteEmoteFromPack},
 };
 use iced::Tooltip;
 use iced_aw::Card;
@@ -184,16 +184,23 @@ impl ManageEmotesModal {
                     let pack_id = self.pack_id;
                     let image_id = FileId::Id(self.new_emote_id.drain(..).collect::<String>());
                     let name = self.new_emote_name.drain(..).collect::<String>();
-                    client.mk_cmd(|inner| async move {
-                        add_emote_to_pack(&inner, AddEmoteToPack::new(pack_id, image_id, name)).await
-                    }, map_to_nothing)
+                    client.mk_cmd(
+                        |inner| async move {
+                            (inner.chat().await)
+                                .add_emote_to_pack(AddEmoteToPack::new(pack_id, image_id, name))
+                                .await
+                        },
+                        map_to_nothing,
+                    )
                 }
                 Message::DeleteEmote(image_id) => {
                     let pack_id = self.pack_id;
                     let image_id = FileId::Id(image_id);
                     client.mk_cmd(
                         |inner| async move {
-                            delete_emote_from_pack(&inner, DeleteEmoteFromPack::new(pack_id, image_id)).await
+                            (inner.chat().await)
+                                .delete_emote_from_pack(DeleteEmoteFromPack::new(pack_id, image_id))
+                                .await
                         },
                         map_to_nothing,
                     )

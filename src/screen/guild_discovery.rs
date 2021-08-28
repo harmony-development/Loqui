@@ -180,7 +180,10 @@ impl GuildDiscovery {
 
                 return client.mk_cmd(
                     |inner| async move {
-                        guild::create_guild(&inner, guild::CreateGuild::new(guild_name))
+                        inner
+                            .chat()
+                            .await
+                            .create_guild(guild::CreateGuild::new(guild_name))
                             .await
                             .map(|g| g.guild_id)
                     },
@@ -193,7 +196,7 @@ impl GuildDiscovery {
                 self.error_text.clear();
 
                 return client.mk_cmd(
-                    |inner| async move { guild::join_guild(&inner, invite).await.map(|e| e.guild_id) },
+                    |inner| async move { inner.chat().await.join_guild(invite).await.map(|e| e.guild_id) },
                     |id| TopLevelMessage::guild_discovery(Message::JoinedGuild(id)),
                 );
             }

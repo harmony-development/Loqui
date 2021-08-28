@@ -27,8 +27,8 @@ use crate::{
 use client::harmony_rust_sdk::{
     api::chat::event::{Event, RolePermissionsUpdated},
     client::api::chat::{
-        invite::{get_guild_invites, get_guild_invites_response::Invite, GetGuildInvitesRequest},
-        permissions::{get_permissions, GetPermissions, GetPermissionsSelfBuilder},
+        invite::{get_guild_invites_response::Invite, GetGuildInvitesRequest},
+        permissions::{GetPermissions, GetPermissionsSelfBuilder},
     },
 };
 use iced::Element;
@@ -147,7 +147,10 @@ impl GuildSettings {
                             let guild_id = self.guild_id;
                             return client.mk_cmd(
                                 |inner| async move {
-                                    get_guild_invites(&inner, GetGuildInvitesRequest { guild_id })
+                                    inner
+                                        .chat()
+                                        .await
+                                        .get_guild_invites(GetGuildInvitesRequest { guild_id })
                                         .await
                                         .map(|resp| resp.invites)
                                 },
@@ -251,19 +254,19 @@ impl GuildSettings {
                         let mk_cmd = |channel_id| {
                             client.mk_cmd(
                                 |inner| async move {
-                                    get_permissions(
-                                        &inner,
-                                        GetPermissions::new(guild_id, role_id).channel_id(channel_id),
-                                    )
-                                    .await
-                                    .map(|p| {
-                                        vec![Event::RolePermsUpdated(RolePermissionsUpdated {
-                                            guild_id,
-                                            channel_id,
-                                            perms: p.perms,
-                                            role_id,
-                                        })]
-                                    })
+                                    inner
+                                        .chat()
+                                        .await
+                                        .get_permissions(GetPermissions::new(guild_id, role_id).channel_id(channel_id))
+                                        .await
+                                        .map(|p| {
+                                            vec![Event::RolePermsUpdated(RolePermissionsUpdated {
+                                                guild_id,
+                                                channel_id,
+                                                new_perms: p.perms,
+                                                role_id,
+                                            })]
+                                        })
                                 },
                                 TopLevelMessage::EventsReceived,
                             )

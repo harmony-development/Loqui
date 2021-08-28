@@ -1,5 +1,5 @@
 use ahash::AHashMap;
-use harmony_rust_sdk::client::api::rest::FileId;
+use harmony_rust_sdk::{api::chat::Place, client::api::rest::FileId};
 
 use crate::{
     role::{Role, RolePerms, Roles},
@@ -24,12 +24,12 @@ pub struct Guild {
 }
 
 impl Guild {
-    pub fn update_channel_order(&mut self, previous_id: u64, next_id: u64, channel_id: u64) {
-        update_order(&mut self.channels, previous_id, next_id, channel_id)
+    pub fn update_channel_order(&mut self, pos: impl Into<Place>, channel_id: u64) {
+        update_order(&mut self.channels, pos, channel_id)
     }
 
-    pub fn update_role_order(&mut self, previous_id: u64, next_id: u64, role_id: u64) {
-        update_order(&mut self.roles, previous_id, next_id, role_id)
+    pub fn update_role_order(&mut self, pos: impl Into<Place>, role_id: u64) {
+        update_order(&mut self.roles, pos, role_id)
     }
 
     pub fn highest_role_for_member(&self, user_id: u64) -> Option<(&u64, &Role)> {
@@ -39,10 +39,12 @@ impl Guild {
     }
 }
 
-fn update_order<V>(map: &mut IndexMap<u64, V>, previous_id: u64, next_id: u64, id: u64) {
+fn update_order<V, P: Into<Place>>(map: &mut IndexMap<u64, V>, pos: P, id: u64) {
+    let place = pos.into();
+
     if let Some(item_pos) = map.get_index_of(&id) {
-        let prev_pos = map.get_index_of(&previous_id);
-        let next_pos = map.get_index_of(&next_id);
+        let prev_pos = place.after().and_then(|previous_id| map.get_index_of(&previous_id));
+        let next_pos = place.before().and_then(|next_id| map.get_index_of(&next_id));
 
         if let Some(pos) = prev_pos {
             let pos = pos + 1;

@@ -3,7 +3,10 @@ use std::ops::Not;
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
 use client::{
     bool_ext::BoolExt,
-    harmony_rust_sdk::{api::chat::DeleteChannelRequest, client::api::chat::channel},
+    harmony_rust_sdk::{
+        api::chat::DeleteChannelRequest,
+        client::api::chat::channel::{UpdateChannelInformation, UpdateChannelInformationSelfBuilder},
+    },
 };
 use iced_aw::Card;
 
@@ -109,12 +112,13 @@ impl UpdateChannelModal {
                 return (
                     client.mk_cmd(
                         |inner| async move {
-                            channel::update_channel_information(
-                                &inner,
-                                channel::UpdateChannelInformation::new(guild_id, channel_id)
-                                    .new_channel_name(channel_name),
-                            )
-                            .await
+                            inner
+                                .chat()
+                                .await
+                                .update_channel_information(
+                                    UpdateChannelInformation::new(guild_id, channel_id).new_name(channel_name),
+                                )
+                                .await
                         },
                         map_to_nothing,
                     ),
@@ -129,7 +133,11 @@ impl UpdateChannelModal {
                 return (
                     client.mk_cmd(
                         |inner| async move {
-                            channel::delete_channel(&inner, DeleteChannelRequest { guild_id, channel_id }).await
+                            inner
+                                .chat()
+                                .await
+                                .delete_channel(DeleteChannelRequest { guild_id, channel_id })
+                                .await
                         },
                         |_| TopLevelMessage::guild_settings(ParentMessage::UpdateChannelMessage(Message::GoBack)),
                     ),

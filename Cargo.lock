@@ -113,9 +113,9 @@ checksum = "be4dc07131ffa69b8072d35f5007352af944213cde02545e2103680baed38fcd"
 
 [[package]]
 name = "ash"
-version = "0.33.1+1.2.186"
+version = "0.33.2+1.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4207a81da2432b483058334763ac2381d00342ec3bdf02d413c4d986a610d874"
+checksum = "73e2b957a47afef62973ed5fa0a52afb3289c7a243bfbc3906090b8434971237"
 dependencies = [
  "libloading 0.7.0",
 ]
@@ -273,9 +273,9 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "bytes"
-version = "1.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
+checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 
 [[package]]
 name = "cache-padded"
@@ -600,9 +600,9 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66c99696f6c9dd7f35d486b9d04d7e6e202aa3e8c40d553f2fdf5e7e0c6a71ef"
+checksum = "95059428f66df56b63431fdb4e1947ed2190586af5c5a8a8b71122bdf5a7f469"
 dependencies = [
  "libc",
 ]
@@ -1489,7 +1489,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#beaaf9ac7a168399e9576fe6c9d9d7b724effb4c"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#ce172ebcce207265717896a890979ab24d3f0848"
 dependencies = [
  "proc-macro2",
  "quote 1.0.9",
@@ -1499,7 +1499,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#beaaf9ac7a168399e9576fe6c9d9d7b724effb4c"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#ce172ebcce207265717896a890979ab24d3f0848"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1511,11 +1511,13 @@ dependencies = [
  "paste",
  "prost",
  "prost-types",
+ "regex",
  "reqwest",
  "serde",
  "tokio",
  "tracing",
  "urlencoding",
+ "walkdir",
 ]
 
 [[package]]
@@ -1563,9 +1565,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.10.4"
+version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f83a4fa1a960b7fe943a53bc77c8c04b57511273066fa414ef49a854b28a0678"
+checksum = "85ba3724d47a1b07b2a503f1faaa48c88e34a06000498a8c6e6062cf90c71940"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1583,9 +1585,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc-build"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4262ecc577abc1f1b05c5313c8c071b15b26bf8755054af77b8d0830608c40e"
+checksum = "4255398ef4300d5c924e7bbd80edff9420f2d5104b0fa471f1773eebf70b0065"
 dependencies = [
  "proc-macro2",
  "prost-build",
@@ -1972,9 +1974,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.100"
+version = "0.2.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1fa8cddc8fbbee11227ef194b5317ed014b8acbf15139bd716a18ad3fe99ec5"
+checksum = "3cb00336871be5ed2c8ed44b60ae9959dc5b9f08539422ed43f09e34ecaeba21"
 
 [[package]]
 name = "libloading"
@@ -3232,9 +3234,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework-sys"
-version = "2.3.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e4effb91b4b8b6fb7732e670b6cee160278ff8e6bf485c7805d9e319d76e284"
+checksum = "19133a286e494cc3311c165c4676ccb1fd47bed45b55f9d71fbd784ad4cea6f8"
 dependencies = [
  "core-foundation-sys 0.8.2",
  "libc",
@@ -3335,9 +3337,9 @@ dependencies = [
 
 [[package]]
 name = "sha-1"
-version = "0.9.7"
+version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a0c8611594e2ab4ebbf06ec7cbbf0a99450b8570e96cbf5188b5d5f6ef18d81"
+checksum = "99cd6713db3cf16b6c84e06321e049a9b9f699826e16096d23bbcc44d15d51a6"
 dependencies = [
  "block-buffer",
  "cfg-if 1.0.0",

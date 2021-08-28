@@ -18,7 +18,7 @@ use crate::{
 };
 use client::{
     error::{ClientError, ClientResult},
-    harmony_rust_sdk::client::api::chat::guild::{update_guild_information, UpdateGuildInformation},
+    harmony_rust_sdk::client::api::chat::guild::{UpdateGuildInformation, UpdateGuildInformationSelfBuilder},
 };
 use iced::Tooltip;
 use iced_aw::Icon;
@@ -65,7 +65,7 @@ impl GeneralTab {
                     |inner| async move {
                         // Build the GuildInformationRequest and update the Name
                         let request = UpdateGuildInformation::new(guild_id).new_guild_name(current_name);
-                        update_guild_information(&inner, request).await
+                        inner.chat().await.update_guild_information(request).await
                     },
                     |_| TopLevelMessage::guild_settings(ParentMessage::General(GeneralMessage::NameButSuccess)),
                 );
@@ -81,11 +81,13 @@ impl GeneralTab {
                         // Select new Guild image and Upload
                         let id = select_upload_files(&inner, content_store, true).await?.remove(0).id;
                         ClientResult::Ok(
-                            update_guild_information(
-                                &inner,
-                                UpdateGuildInformation::new(guild_id).new_guild_picture(Some(id)),
-                            )
-                            .await?,
+                            inner
+                                .chat()
+                                .await
+                                .update_guild_information(
+                                    UpdateGuildInformation::new(guild_id).new_guild_picture(Some(id)),
+                                )
+                                .await?,
                         )
                     },
                     |_| TopLevelMessage::Nothing,

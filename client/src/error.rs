@@ -6,7 +6,7 @@ use harmony_rust_sdk::{
         },
         harmonytypes::Error,
     },
-    client::error::{ClientError as InnerClientError, HmcParseError},
+    client::error::{ClientError as InnerClientError, HmcParseError, InternalClientError},
 };
 use std::fmt::{self, Display};
 
@@ -52,6 +52,12 @@ impl From<std::io::Error> for ClientError {
 impl From<InnerClientError> for ClientError {
     fn from(other: InnerClientError) -> Self {
         Self::Internal(other)
+    }
+}
+
+impl From<InternalClientError> for ClientError {
+    fn from(other: InternalClientError) -> Self {
+        Self::Internal(InnerClientError::Internal(other))
     }
 }
 
