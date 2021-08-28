@@ -1,7 +1,10 @@
 use super::super::Message as TopLevelMessage;
-use client::harmony_rust_sdk::{
-    api::rest::FileId,
-    client::api::chat::emote::{AddEmoteToPack, DeleteEmoteFromPack},
+use client::{
+    error::ClientError,
+    harmony_rust_sdk::{
+        api::rest::FileId,
+        client::api::chat::emote::{AddEmoteToPack, DeleteEmoteFromPack},
+    },
 };
 use iced::Tooltip;
 use iced_aw::Card;
@@ -10,7 +13,7 @@ use crate::{
     client::Client,
     component::*,
     label, label_button, length,
-    screen::{map_to_nothing, ClientExt},
+    screen::{map_to_nothing, select_upload_files, ClientExt},
     style::{Theme, PADDING, SPACING},
 };
 
@@ -18,8 +21,7 @@ use crate::{
 pub enum Message {
     GoBack,
     NewEmoteNameChanged(String),
-    NewEmoteIdChanged(String),
-    AddEmote,
+    UploadEmote,
     DeleteEmote(String),
     CopyToClipboard(String),
 }
@@ -29,10 +31,8 @@ pub struct ManageEmotesModal {
     but_states: Vec<(button::State, button::State, button::State)>,
     emotes_state: scrollable::State,
     new_emote_name_state: text_input::State,
-    new_emote_id_state: text_input::State,
-    new_emote_add_state: button::State,
+    new_emote_upload_state: button::State,
     new_emote_name: String,
-    new_emote_id: String,
     pub pack_id: u64,
 }
 
@@ -121,19 +121,9 @@ impl ManageEmotesModal {
                 .width(length!(%2))
                 .padding(PADDING / 2)
                 .into(),
-                TextInput::new(
-                    &mut self.new_emote_id_state,
-                    "Enter emote image id...",
-                    &self.new_emote_id,
-                    Message::NewEmoteIdChanged,
-                )
-                .style(theme)
-                .width(length!(%2))
-                .padding(PADDING / 2)
-                .into(),
                 space!(w % 1).into(),
-                label_button!(&mut self.new_emote_add_state, "Add emote")
-                    .on_press(Message::AddEmote)
+                label_button!(&mut self.new_emote_upload_state, "Upload emote")
+                    .on_press(Message::UploadEmote)
                     .style(theme)
                     .into(),
             ])
@@ -176,19 +166,18 @@ impl ManageEmotesModal {
                     self.new_emote_name = name;
                     Command::none()
                 }
-                Message::NewEmoteIdChanged(id) => {
-                    self.new_emote_id = id;
-                    Command::none()
-                }
-                Message::AddEmote => {
+                Message::UploadEmote => {
                     let pack_id = self.pack_id;
-                    let image_id = FileId::Id(self.new_emote_id.drain(..).collect::<String>());
                     let name = self.new_emote_name.drain(..).collect::<String>();
+                    let content_store = client.content_store_arc();
                     client.mk_cmd(
                         |inner| async move {
+                            let mut emote_file = select_upload_files(&inner, content_store, true).await?;
+                            let image_id = emote_file.pop().unwrap().id;
                             (inner.chat().await)
                                 .add_emote_to_pack(AddEmoteToPack::new(pack_id, image_id, name))
                                 .await
+                                .map_err(ClientError::from)
                         },
                         map_to_nothing,
                     )
