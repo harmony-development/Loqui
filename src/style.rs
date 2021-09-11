@@ -157,28 +157,16 @@ impl From<ColorschemeRaw> for Colorscheme {
     fn from(value: ColorschemeRaw) -> Self {
         let default = Colorscheme::default();
         Self {
-            error: value.error.parse_to_color().unwrap_or_else(|| default.error),
-            success: value.success.parse_to_color().unwrap_or_else(|| default.success),
-            border: value.border.parse_to_color().unwrap_or_else(|| default.border),
-            primary_bg: value.primary_bg.parse_to_color().unwrap_or_else(|| default.primary_bg),
-            secondary_bg: value
-                .secondary_bg
-                .parse_to_color()
-                .unwrap_or_else(|| default.secondary_bg),
-            disabled_bg: value
-                .disabled_bg
-                .parse_to_color()
-                .unwrap_or_else(|| default.disabled_bg),
-            text: value.text.parse_to_color().unwrap_or_else(|| default.text),
-            disabled_text: value
-                .disabled_text
-                .parse_to_color()
-                .unwrap_or_else(|| default.disabled_text),
-            accent: value.accent.parse_to_color().unwrap_or_else(|| default.accent),
-            mention_color: value
-                .mention_color
-                .parse_to_color()
-                .unwrap_or_else(|| default.mention_color),
+            error: value.error.parse_to_color().unwrap_or(default.error),
+            success: value.success.parse_to_color().unwrap_or(default.success),
+            border: value.border.parse_to_color().unwrap_or(default.border),
+            primary_bg: value.primary_bg.parse_to_color().unwrap_or(default.primary_bg),
+            secondary_bg: value.secondary_bg.parse_to_color().unwrap_or(default.secondary_bg),
+            disabled_bg: value.disabled_bg.parse_to_color().unwrap_or(default.disabled_bg),
+            text: value.text.parse_to_color().unwrap_or(default.text),
+            disabled_text: value.disabled_text.parse_to_color().unwrap_or(default.disabled_text),
+            accent: value.accent.parse_to_color().unwrap_or(default.accent),
+            mention_color: value.mention_color.parse_to_color().unwrap_or(default.mention_color),
         }
     }
 }
