@@ -1,5 +1,5 @@
 use crate::color;
-use client::{content::ColorschemeRaw, harmony_rust_sdk::api::harmonytypes::UserStatus};
+use client::{content::ColorschemeRaw, harmony_rust_sdk::api::profile::UserStatus};
 use hex_color::HexColor;
 use iced::{
     button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color,
@@ -58,10 +58,10 @@ impl Theme {
 
     pub fn status_color(&self, status: UserStatus) -> Color {
         match status {
-            UserStatus::Offline => ALT_COLOR,
+            UserStatus::OfflineUnspecified => ALT_COLOR,
             UserStatus::DoNotDisturb => color!(160, 0, 0),
             UserStatus::Idle => color!(200, 140, 0),
-            UserStatus::OnlineUnspecified => color!(0, 160, 0),
+            UserStatus::Online | UserStatus::Mobile => color!(0, 160, 0),
             UserStatus::Streaming => color!(160, 0, 160),
         }
     }
@@ -183,8 +183,8 @@ impl ParseToColor for String {
     }
 }
 
-pub fn tuple_to_iced_color(color: (u8, u8, u8)) -> Color {
-    Color::from_rgb8(color.0, color.1, color.2)
+pub fn tuple_to_iced_color(color: [u8; 3]) -> Color {
+    Color::from_rgb8(color[0], color[1], color[2])
 }
 
 impl From<Theme> for Box<dyn tabs::StyleSheet> {

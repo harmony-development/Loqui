@@ -15,8 +15,14 @@ use crate::{
 use client::{
     error::ClientResult,
     harmony_rust_sdk::{
-        api::exports::hrpc::url::Url,
-        client::api::chat::invite::{get_guild_invites_response::Invite, CreateInviteRequest, DeleteInviteRequest},
+        api::{
+            chat::{
+                all_permissions::{INVITES_MANAGE_CREATE, INVITES_MANAGE_DELETE, INVITES_VIEW},
+                Invite, InviteWithId,
+            },
+            exports::hrpc::url::Url,
+        },
+        client::api::chat::invite::{CreateInviteRequest, DeleteInviteRequest},
     },
 };
 use iced::{Element, Tooltip};
@@ -27,8 +33,8 @@ pub enum InviteMessage {
     InviteNameChanged(String),
     InviteUsesChanged(String),
     CreateInvitePressed,
-    InviteCreated(String, i32),
-    InvitesLoaded(Vec<Invite>),
+    InviteCreated(String, u32),
+    InvitesLoaded(Vec<InviteWithId>),
     GoBack,
     DeleteInvitePressed(usize),
     InviteDeleted(usize),
@@ -69,7 +75,7 @@ impl InviteTab {
                 let name = self.invite_name_value.clone();
                 return client.mk_cmd(
                     |inner| async move {
-                        let uses: i32 = match uses.parse() {
+                        let uses: u32 = match uses.parse() {
                             Ok(val) => val,
                             Err(err) => return Err(ClientError::Custom(err.to_string())),
                         };
@@ -78,7 +84,7 @@ impl InviteTab {
                             possible_uses: uses,
                             guild_id,
                         };
-                        let name = inner.chat().await.create_invite(request).await?.name;
+                        let name = inner.call(request).await?.invite_id;
                         Ok(TopLevelMessage::guild_settings(ParentMessage::Invite(
                             InviteMessage::InviteCreated(name, uses),
                         )))
@@ -92,10 +98,12 @@ impl InviteTab {
                 meta_data.invites = Some(invites);
             }
             InviteMessage::InviteCreated(name, uses) => {
-                let new_invite = Invite {
+                let new_invite = InviteWithId {
+                    invite: Some(Invite {
+                        possible_uses: uses,
+                        use_count: 0,
+                    }),
                     invite_id: name,
-                    possible_uses: uses,
-                    use_count: 0,
                 };
                 if let Some(invites) = &mut meta_data.invites {
                     invites.push(new_invite);
@@ -159,16 +167,13 @@ impl Tab for InviteTab {
         theme: Theme,
         _: &ThumbnailCache,
     ) -> Element<'_, InviteMessage> {
-        let user_perms = client
-            .guilds
-            .get(&guild_id)
-            .map_or_else(Default::default, |g| g.user_perms.clone());
+        let guild = client.guilds.get(&guild_id).unwrap();
         let mut widgets = Vec::with_capacity(10);
         if !self.error_message.is_empty() {
             widgets.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
         }
         // If there are any invites, create invite list
-        if user_perms.view_invites {
+        if guild.has_perm(INVITES_VIEW) {
             if let Some(invites) = &meta_data.invites {
                 // Create header for invite list
                 let invites_table = row(vec![
@@ -197,34 +202,36 @@ impl Tab for InviteTab {
                 for (n, (cur_invite, (del_but_state, copy_url_state))) in
                     invites.iter().zip(self.but_states.iter_mut()).enumerate()
                 {
-                    url.set_path(&cur_invite.invite_id);
-                    let mut row_widgets = vec![
-                        Tooltip::new(
-                            label_button!(copy_url_state, url.as_str())
-                                .on_press(InviteMessage::CopyToClipboard(url.to_string()))
-                                .style(theme)
-                                .width(length!(% 19)),
-                            "Click to copy",
-                            iced::tooltip::Position::Top,
-                        )
-                        .gap(PADDING / 3)
-                        .style(theme)
-                        .into(),
-                        space!(w % 22).into(),
-                        label!(cur_invite.possible_uses.to_string()).width(length!(% 3)).into(),
-                        space!(w % 3).into(),
-                        label!(cur_invite.use_count.to_string()).width(length!(% 3)).into(),
-                        space!(w % 1).into(),
-                    ];
-                    if user_perms.delete_invite {
-                        row_widgets.push(
-                            Button::new(del_but_state, icon(Icon::Trash))
-                                .style(theme)
-                                .on_press(InviteMessage::DeleteInvitePressed(n))
-                                .into(),
-                        );
+                    if let Some(invite) = &cur_invite.invite {
+                        url.set_path(&cur_invite.invite_id);
+                        let mut row_widgets = vec![
+                            Tooltip::new(
+                                label_button!(copy_url_state, url.as_str())
+                                    .on_press(InviteMessage::CopyToClipboard(url.to_string()))
+                                    .style(theme)
+                                    .width(length!(% 19)),
+                                "Click to copy",
+                                iced::tooltip::Position::Top,
+                            )
+                            .gap(PADDING / 3)
+                            .style(theme)
+                            .into(),
+                            space!(w % 22).into(),
+                            label!(invite.possible_uses.to_string()).width(length!(% 3)).into(),
+                            space!(w % 3).into(),
+                            label!(invite.use_count.to_string()).width(length!(% 3)).into(),
+                            space!(w % 1).into(),
+                        ];
+                        if guild.has_perm(INVITES_MANAGE_DELETE) {
+                            row_widgets.push(
+                                Button::new(del_but_state, icon(Icon::Trash))
+                                    .style(theme)
+                                    .on_press(InviteMessage::DeleteInvitePressed(n))
+                                    .into(),
+                            );
+                        }
+                        invites_scrollable = invites_scrollable.push(Container::new(row(row_widgets)).style(theme));
                     }
-                    invites_scrollable = invites_scrollable.push(Container::new(row(row_widgets)).style(theme));
                 }
                 widgets.push(invites_table.into());
                 widgets.push(fill_container(invites_scrollable).style(theme).into());
@@ -241,7 +248,7 @@ impl Tab for InviteTab {
         }
         widgets.push(space!(h = 20).into());
         // Invite Creation fields
-        if user_perms.create_invite {
+        if guild.has_perm(INVITES_MANAGE_CREATE) {
             widgets.push(
                 row(vec![
                     TextInput::new(

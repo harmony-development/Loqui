@@ -5,8 +5,8 @@ use std::ops::Not;
 use client::{
     error::ClientError,
     harmony_rust_sdk::{
-        api::chat::{DeleteEmotePackRequest, DequipEmotePackRequest, EquipEmotePackRequest},
-        client::api::chat::emote::CreateEmotePack,
+        api::emote::{DeleteEmotePackRequest, DequipEmotePackRequest, EquipEmotePackRequest},
+        client::api::emote::CreateEmotePack,
     },
     Client,
 };
@@ -78,26 +78,14 @@ impl ManageEmotesScreen {
             }
             Message::DeleteEmotePack(pack_id) => {
                 return client.mk_cmd(
-                    |inner| async move {
-                        inner
-                            .chat()
-                            .await
-                            .delete_emote_pack(DeleteEmotePackRequest { pack_id })
-                            .await
-                    },
+                    |inner| async move { inner.call(DeleteEmotePackRequest { pack_id }).await },
                     map_to_nothing,
                 );
             }
             Message::CreateEmotePack => {
                 let pack_name = self.pack_name.drain(..).collect::<String>();
                 return client.mk_cmd(
-                    |inner| async move {
-                        inner
-                            .chat()
-                            .await
-                            .create_emote_pack(CreateEmotePack::new(pack_name))
-                            .await
-                    },
+                    |inner| async move { inner.call(CreateEmotePack::new(pack_name)).await },
                     map_to_nothing,
                 );
             }
@@ -110,26 +98,14 @@ impl ManageEmotesScreen {
             }
             Message::DequipEmotePack(pack_id) => {
                 return client.mk_cmd(
-                    |inner| async move {
-                        inner
-                            .chat()
-                            .await
-                            .dequip_emote_pack(DequipEmotePackRequest { pack_id })
-                            .await
-                    },
+                    |inner| async move { inner.call(DequipEmotePackRequest { pack_id }).await },
                     map_to_nothing,
                 );
             }
             Message::EquipEmotePack => {
                 if let Ok(pack_id) = self.pack_id.parse::<u64>() {
                     return client.mk_cmd(
-                        |inner| async move {
-                            inner
-                                .chat()
-                                .await
-                                .equip_emote_pack(EquipEmotePackRequest { pack_id })
-                                .await
-                        },
+                        |inner| async move { inner.call(EquipEmotePackRequest { pack_id }).await },
                         map_to_nothing,
                     );
                 }

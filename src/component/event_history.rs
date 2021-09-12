@@ -26,8 +26,7 @@ use client::{
     bool_ext::BoolExt,
     guild::Guild,
     harmony_rust_sdk::api::{
-        harmonytypes::{r#override::Reason, UserStatus},
-        mediaproxy::fetch_link_metadata_response::Data as FetchLinkData,
+        chat::r#override::Reason, mediaproxy::fetch_link_metadata_response::Data as FetchLinkData, profile::UserStatus,
     },
     linemd::{
         parser::{Text, Token},
@@ -115,12 +114,11 @@ pub fn build_event_history<'a>(
         .messages
         .iter()
         .skip(timeline_range_start)
-        .take(timeline_range_end - timeline_range_start)
-        .map(|(_, m)| m);
+        .take(timeline_range_end - timeline_range_start);
 
     let timezone = chrono::Local::now().timezone();
 
-    let first_message = if let Some(msg) = displayable_events.next() {
+    let (first_message_id, first_message) = if let Some(msg) = displayable_events.next() {
         msg
     } else {
         return event_history.into();
@@ -150,7 +148,7 @@ pub fn build_event_history<'a>(
     };
 
     for (
-        message,
+        (message_id, message),
         (
             media_open_button_states,
             h_embed_but,
@@ -161,10 +159,9 @@ pub fn build_event_history<'a>(
             external_url_states,
             menu_list_state,
         ),
-    ) in (std::iter::once(first_message).chain(displayable_events)).zip(buts_sate.iter_mut())
+    ) in (std::iter::once((first_message_id, first_message)).chain(displayable_events)).zip(buts_sate.iter_mut())
     {
-        let id_to_use = message
-            .id
+        let id_to_use = message_id
             .is_ack()
             .not()
             .some(current_user_id)
@@ -173,7 +170,7 @@ pub fn build_event_history<'a>(
         let message_timestamp = timezone.from_utc_datetime(&message.timestamp);
         let member = members.get(&id_to_use);
         let name_to_use = member.map_or("unknown member", |member| member.username.as_str());
-        let sender_status = member.map_or(UserStatus::Offline, |m| m.status);
+        let sender_status = member.map_or(UserStatus::OfflineUnspecified, |m| m.status);
         let is_sender_bot = member.map_or(false, |m| m.is_bot);
         let override_reason_raw = message
             .overrides
@@ -190,7 +187,12 @@ pub fn build_event_history<'a>(
             }
             Reason::SystemPlurality(_) => "plurality".to_string(),
         });
-        let sender_display_name = message.overrides.as_ref().map_or(name_to_use, |ov| ov.name.as_str());
+        let sender_display_name = message
+            .overrides
+            .as_ref()
+            .map(|ov| ov.name.as_deref())
+            .flatten()
+            .unwrap_or(name_to_use);
         let sender_avatar_url = message.overrides.as_ref().map_or_else(
             || member.and_then(|m| m.avatar_url.as_ref()),
             |ov| ov.avatar_url.as_ref(),
@@ -303,8 +305,7 @@ pub fn build_event_history<'a>(
             let tokens = textt.parse_md_custom(HarmonyToken::parse);
             let mut widgets = Vec::with_capacity(tokens.len());
             let color = theme.colorscheme.text;
-            let color = message
-                .id
+            let color = message_id
                 .is_ack()
                 .not()
                 .then(|| color!(. color.r * 0.6, color.g * 0.6, color.b * 0.6))
@@ -631,36 +632,31 @@ pub fn build_event_history<'a>(
         if let IcyContent::Embeds(embeds) = &message.content {
             let put_heading =
                 |embed: &mut Vec<Element<'a, Message>>, h: &EmbedHeading, state: &'a mut button::State| {
-                    (h.text.is_empty() && h.subtext.is_empty()).not().and_do(move || {
-                        let mut heading = Vec::with_capacity(3);
+                    let mut heading = Vec::with_capacity(3);
 
-                        if let Some(img_url) = &h.icon {
-                            if let Some(handle) = thumbnail_cache.thumbnails.get(img_url) {
-                                heading.push(
-                                    Image::new(handle.clone())
-                                        .height(length!(=24))
-                                        .width(length!(=24))
-                                        .into(),
-                                );
-                            }
+                    if let Some(img_url) = &h.icon {
+                        if let Some(handle) = thumbnail_cache.thumbnails.get(img_url) {
+                            heading.push(
+                                Image::new(handle.clone())
+                                    .height(length!(=24))
+                                    .width(length!(=24))
+                                    .into(),
+                            );
                         }
+                    }
 
-                        heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
-                        heading.push(
-                            label!(&h.subtext)
-                                .size(DEF_SIZE - 6)
-                                .color(color!(200, 200, 200))
-                                .into(),
-                        );
+                    heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
+                    if let Some(subtext) = h.subtext.as_deref() {
+                        heading.push(label!(subtext).size(DEF_SIZE - 6).color(color!(200, 200, 200)).into());
+                    }
 
-                        let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING)).style(theme.embed());
+                    let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING)).style(theme.embed());
 
-                        if let Some(url) = h.url.clone() {
-                            but = but.on_press(Message::OpenUrl(url));
-                        }
+                    if let Some(url) = h.url.clone() {
+                        but = but.on_press(Message::OpenUrl(url));
+                    }
 
-                        embed.push(but.into());
-                    });
+                    embed.push(but.into());
                 };
 
             let mut embed = Vec::with_capacity(5);
@@ -670,20 +666,21 @@ pub fn build_event_history<'a>(
             }
 
             embed.push(label!(&embeds.title).size(DEF_SIZE + 2).into());
-            embed.push(
-                label!(&embeds.body)
-                    .color(color!(220, 220, 220))
-                    .size(DEF_SIZE - 2)
-                    .into(),
-            );
+            if let Some(body) = embeds.body.as_deref() {
+                embed.push(label!(body).color(color!(220, 220, 220)).size(DEF_SIZE - 2).into());
+            }
 
             for f in &embeds.fields {
                 // TODO: handle presentation
-                let field = vec![
-                    label!(&f.title).size(DEF_SIZE - 1).into(),
-                    label!(&f.subtitle).size(DEF_SIZE - 3).into(),
-                    label!(&f.body).color(color!(220, 220, 220)).size(DEF_SIZE - 3).into(),
-                ];
+                let mut field = Vec::with_capacity(3);
+
+                field.push(label!(&f.title).size(DEF_SIZE - 1).into());
+                if let Some(subtitle) = f.subtitle.as_deref() {
+                    field.push(label!(subtitle).size(DEF_SIZE - 3).into());
+                }
+                if let Some(body) = f.body.as_deref() {
+                    field.push(label!(body).color(color!(220, 220, 220)).size(DEF_SIZE - 3).into());
+                }
 
                 embed.push(
                     Container::new(
@@ -701,6 +698,10 @@ pub fn build_event_history<'a>(
                 put_heading(&mut embed, h, f_embed_but);
             }
 
+            let mut theme = theme.secondary();
+            if let Some(color) = embeds.color {
+                theme = theme.border_color(tuple_to_iced_color(color));
+            }
             message_body_widgets.push(
                 Container::new(
                     column(embed)
@@ -708,7 +709,7 @@ pub fn build_event_history<'a>(
                         .spacing(SPACING / 2)
                         .align_items(Align::Start),
                 )
-                .style(theme.secondary().border_color(tuple_to_iced_color(embeds.color)))
+                .style(theme)
                 .into(),
             );
         }
@@ -775,13 +776,16 @@ pub fn build_event_history<'a>(
             .spacing(MSG_LR_PADDING);
         let mut message_row = Vec::with_capacity(3);
 
-        let maybe_reply_message = message.reply_to.map(|id| channel.messages.get(&MessageId::Ack(id)));
+        let maybe_reply_message = message.reply_to.map(|id| {
+            let id = MessageId::Ack(id);
+            channel.messages.get(&id).map(|m| (id, m))
+        });
 
         let mut options = Vec::with_capacity(4);
         if matches!(message.content, IcyContent::Text(_)) {
-            options.push(MessageMenuOption::Copy(message.id));
+            options.push(MessageMenuOption::Copy(*message_id));
         }
-        if let Some(id) = message.id.id() {
+        if let Some(id) = message_id.id() {
             options.push(MessageMenuOption::Reply(id));
             options.push(MessageMenuOption::CopyMessageId(id));
             if msg_text.is_some() && current_user_id == message.sender {

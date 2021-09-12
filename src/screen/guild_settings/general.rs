@@ -18,7 +18,9 @@ use crate::{
 };
 use client::{
     error::{ClientError, ClientResult},
-    harmony_rust_sdk::client::api::chat::guild::{UpdateGuildInformation, UpdateGuildInformationSelfBuilder},
+    harmony_rust_sdk::{
+        api::chat::all_permissions::GUILD_MANAGE_CHANGE_INFORMATION, client::api::chat::guild::UpdateGuildInformation,
+    },
 };
 use iced::Tooltip;
 use iced_aw::Icon;
@@ -64,8 +66,9 @@ impl GeneralTab {
                 return client.mk_cmd(
                     |inner| async move {
                         // Build the GuildInformationRequest and update the Name
-                        let request = UpdateGuildInformation::new(guild_id).new_guild_name(current_name);
-                        inner.chat().await.update_guild_information(request).await
+                        inner
+                            .call(UpdateGuildInformation::new(guild_id).with_new_guild_name(current_name))
+                            .await
                     },
                     |_| TopLevelMessage::guild_settings(ParentMessage::General(GeneralMessage::NameButSuccess)),
                 );
@@ -82,11 +85,7 @@ impl GeneralTab {
                         let id = select_upload_files(&inner, content_store, true).await?.remove(0).id;
                         ClientResult::Ok(
                             inner
-                                .chat()
-                                .await
-                                .update_guild_information(
-                                    UpdateGuildInformation::new(guild_id).new_guild_picture(Some(id)),
-                                )
+                                .call(UpdateGuildInformation::new(guild_id).with_new_guild_picture(Some(id)))
                                 .await?,
                         )
                     },
@@ -148,7 +147,7 @@ impl Tab for GeneralTab {
             .height(length!(= PROFILE_AVATAR_WIDTH))
             .width(length!(= PROFILE_AVATAR_WIDTH))
             .style(theme);
-        if guild.user_perms.change_info {
+        if guild.has_perm(GUILD_MANAGE_CHANGE_INFORMATION) {
             ui_image_but = ui_image_but.on_press(GeneralMessage::UploadGuildImage);
         }
         let ui_image_but = Element::from(
@@ -199,7 +198,7 @@ impl Tab for GeneralTab {
             .into(),
         );
         content.push(ui_image_but);
-        if guild.user_perms.change_info {
+        if guild.has_perm(GUILD_MANAGE_CHANGE_INFORMATION) {
             content.push(
                 row(vec![
                     Element::from(

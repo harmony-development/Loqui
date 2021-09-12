@@ -20,16 +20,23 @@ pub use harmony_rust_sdk::{
 };
 use harmony_rust_sdk::{
     api::{
-        chat::{event::*, get_channel_messages_request::Direction, DeleteMessageRequest},
-        harmonytypes::{Message as HarmonyMessage, UserStatus},
+        chat::{
+            color,
+            get_channel_messages_request::Direction,
+            stream_event::{Event as ChatEvent, *},
+            DeleteMessageRequest, Event, Message as HarmonyMessage, Permission, Role,
+        },
+        emote::{stream_event::Event as EmoteEvent, *},
+        harmonytypes::FormattedText,
         mediaproxy::fetch_link_metadata_response::Data as FetchLinkData,
+        profile::{stream_event::Event as ProfileEvent, UserStatus, *},
     },
     client::api::{
         chat::{
-            message::{SendMessage, SendMessageSelfBuilder, UpdateMessageTextRequest},
-            profile::{ProfileUpdate, ProfileUpdateSelfBuilder},
+            message::{SendMessage, UpdateMessageTextRequest},
             EventSource,
         },
+        profile::UpdateProfile,
         rest::FileId,
     },
 };
@@ -49,7 +56,7 @@ use std::{
 };
 use tokio::task::JoinError;
 
-use crate::{channel::ChanPerms, emotes::EmotePack};
+use crate::emotes::EmotePack;
 
 use self::{
     guild::Guilds,
@@ -174,9 +181,7 @@ impl Client {
 
         tokio::spawn(async move {
             let _ = inner
-                .chat()
-                .await
-                .profile_update(ProfileUpdate::default().new_status(UserStatus::Offline))
+                .call(UpdateProfile::default().with_new_status(UserStatus::OfflineUnspecified))
                 .await;
             Self::remove_session(user_id, inner.homeserver_url().as_str(), &content_store, full_logout).await
         })
@@ -255,11 +260,12 @@ impl Client {
         guild_id: u64,
         channel_id: u64,
         retry_after: Duration,
+        message_id: MessageId,
         message: Message,
     ) -> Option<impl Future<Output = (u64, u64, u64, Message, Duration, Option<u64>)>> {
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             if retry_after.as_secs() == 0 {
-                channel.messages.insert(message.id, message.clone());
+                channel.messages.insert(message_id, message.clone());
             }
 
             let inner = self.inner().clone();
@@ -267,14 +273,14 @@ impl Client {
             Some(async move {
                 tokio::time::sleep(retry_after).await;
 
-                let echo_id = message.id.transaction_id().unwrap();
+                let echo_id = message_id.transaction_id().unwrap();
                 let msg = SendMessage::new(guild_id, channel_id)
-                    .content(harmony_rust_sdk::api::harmonytypes::Content {
+                    .with_content(harmony_rust_sdk::api::chat::Content {
                         content: Some(message.content.clone().into()),
                     })
-                    .in_reply_to(message.reply_to.unwrap_or(0))
-                    .echo_id(echo_id)
-                    .overrides(message.overrides.clone().map(Into::into));
+                    .with_in_reply_to(message.reply_to.unwrap_or(0))
+                    .with_echo_id(echo_id)
+                    .with_overrides(message.overrides.clone().map(Into::into));
 
                 let send_result = inner.chat().await.send_message(msg).await;
                 (
@@ -306,15 +312,14 @@ impl Client {
 
         async move {
             inner
-                .chat()
-                .await
-                .delete_message(DeleteMessageRequest {
+                .call(DeleteMessageRequest {
                     guild_id,
                     channel_id,
                     message_id,
                 })
                 .await
                 .map_err(Into::into)
+                .map(|_| ())
         }
     }
 
@@ -331,12 +336,15 @@ impl Client {
             let result = inner
                 .chat()
                 .await
-                .update_message_text(UpdateMessageTextRequest {
-                    guild_id,
-                    channel_id,
-                    message_id,
-                    new_content,
-                })
+                .update_message_text(
+                    (UpdateMessageTextRequest {
+                        guild_id,
+                        channel_id,
+                        message_id,
+                        ..Default::default()
+                    })
+                    .with_new_content(FormattedText::default().with_text(new_content)),
+                )
                 .await;
 
             (
@@ -352,444 +360,420 @@ impl Client {
         let mut post = Vec::new();
 
         match event {
-            Event::PermissionUpdated(perm) => {
-                let PermissionUpdated {
-                    guild_id,
-                    channel_id,
-                    query,
-                    ok,
-                } = perm;
+            Event::Chat(ev) => match ev {
+                ChatEvent::PermissionUpdated(perm) => {
+                    let PermissionUpdated {
+                        guild_id,
+                        channel_id,
+                        query,
+                        ok,
+                    } = perm;
 
-                if let Some(g) = self.get_guild(guild_id) {
-                    match query.as_str() {
-                        "channel.manage.*" | "channel.*" => {
-                            g.user_perms.create_channel = ok;
-                            g.user_perms.delete_channel = ok;
-                            g.user_perms.update_channel_order = ok;
-                            g.channels
-                                .get_mut(&channel_id)
-                                .and_do(|c| c.user_perms.manage_channel = ok);
+                    if let Some(g) = self.get_guild(guild_id) {
+                        let perm = Permission { matches: query, ok };
+                        if let Some(channel) = channel_id.map(|id| g.channels.get_mut(&id)).flatten() {
+                            channel.perms.push(perm);
+                        } else {
+                            g.perms.push(perm);
                         }
-                        "channels.manage.move" => g.user_perms.update_channel_order = ok,
-                        "channels.manage.create" => g.user_perms.create_channel = ok,
-                        "channels.manage.delete" => g.user_perms.delete_channel = ok,
-                        "channels.manage.change-information" => {
-                            g.channels
-                                .get_mut(&channel_id)
-                                .and_do(|c| c.user_perms.manage_channel = ok);
-                        }
-                        "messages.send" | "messages.*" => {
-                            g.channels.get_mut(&channel_id).and_do(|c| c.user_perms.send_msg = ok);
-                        }
-                        "guild.manage.change-information" | "guild.manage.*" | "guild.*" => {
-                            g.user_perms.change_info = ok;
-                        }
-                        "user.*" | "user.manage.*" => {
-                            g.user_perms.kick_user = ok;
-                            g.user_perms.ban_user = ok;
-                            g.user_perms.unban_user = ok;
-                        }
-                        "user.manage.ban" => g.user_perms.ban_user = ok,
-                        "user.manage.kick" => g.user_perms.kick_user = ok,
-                        "user.manage.unban" => g.user_perms.unban_user = ok,
-                        "roles.*" => {
-                            g.user_perms.manage_roles = ok;
-                            g.user_perms.get_roles = ok;
-                            g.user_perms.manage_user_roles = ok;
-                            g.user_perms.get_user_roles = ok;
-                        }
-                        "roles.manage" => g.user_perms.manage_roles = ok,
-                        "roles.get" => g.user_perms.get_roles = ok,
-                        "roles.user.*" => {
-                            g.user_perms.manage_user_roles = ok;
-                            g.user_perms.get_user_roles = ok;
-                        }
-                        "roles.user.manage" => g.user_perms.manage_user_roles = ok,
-                        "roles.user.get" => g.user_perms.get_user_roles = ok,
-                        "invites.*" => {
-                            g.user_perms.delete_invite = ok;
-                            g.user_perms.create_invite = ok;
-                            g.user_perms.view_invites = ok;
-                        }
-                        "invites.view" => g.user_perms.view_invites = ok,
-                        "invites.manage.*" => {
-                            g.user_perms.delete_invite = ok;
-                            g.user_perms.create_invite = ok;
-                        }
-                        "invites.manage.delete" => g.user_perms.delete_invite = ok,
-                        "invites.manage.create" => g.user_perms.create_invite = ok,
-                        "permissions.*" | "permissions.manage.*" => {
-                            g.user_perms.get_permission = ok;
-                            g.user_perms.set_permission = ok;
-                        }
-                        "permissions.manage.set" => g.user_perms.set_permission = ok,
-                        "permissions.manage.get" => g.user_perms.get_permission = ok,
-                        _ => {}
                     }
                 }
-            }
-            Event::SentMessage(message_sent) => {
-                let echo_id = message_sent.echo_id;
+                ChatEvent::SentMessage(message_sent) => {
+                    let echo_id = message_sent.echo_id;
+                    let guild_id = message_sent.guild_id;
+                    let channel_id = message_sent.channel_id;
+                    let message_id = message_sent.message_id;
 
-                if let Some(message) = message_sent.message {
-                    let guild_id = message.guild_id;
-                    let channel_id = message.channel_id;
-                    let message_id = message.message_id;
+                    if let Some(message) = message_sent.message {
+                        if let Some(guild) = self.guilds.get_mut(&guild_id) {
+                            if let Some(channel) = guild.channels.get_mut(&channel_id) {
+                                let message = Message::from(message);
 
-                    if let Some(guild) = self.guilds.get_mut(&guild_id) {
-                        if let Some(channel) = guild.channels.get_mut(&channel_id) {
-                            let message = Message::from(message);
+                                message.post_process(&mut post, guild_id, channel_id);
 
-                            message.post_process(&mut post, guild_id, channel_id);
+                                if let Content::Text(text) = &message.content {
+                                    if !channel.looking_at_channel {
+                                        use byte_writer::Writer;
+                                        use std::fmt::Write;
 
-                            if let Content::Text(text) = &message.content {
-                                if !channel.looking_at_channel {
-                                    use byte_writer::Writer;
-                                    use std::fmt::Write;
+                                        let current_user_id = self.user_id.unwrap_or(0);
 
-                                    let current_user_id = self.user_id.unwrap_or(0);
+                                        let mut pattern_arr = [b'0'; 23];
+                                        write!(Writer(&mut pattern_arr), "<@{}>", current_user_id).unwrap();
 
-                                    let mut pattern_arr = [b'0'; 23];
-                                    write!(Writer(&mut pattern_arr), "<@{}>", current_user_id).unwrap();
-
-                                    if text.contains(
-                                        (unsafe { std::str::from_utf8_unchecked(&pattern_arr) })
-                                            .trim_end_matches(|c| c != '>'),
-                                    ) {
-                                        let member_name = self
-                                            .members
-                                            .get(&message.sender)
-                                            .map_or("unknown", |m| m.username.as_str());
-                                        post.push(PostProcessEvent::SendNotification {
-                                            unread_message: false,
-                                            mention: true,
-                                            title: format!("{} | #{}", guild.name, channel.name),
-                                            content: format!(
-                                                "@{}: {}",
-                                                member_name,
-                                                render_text(text, &self.members, &self.emote_packs)
-                                            ),
-                                        });
+                                        if text.contains(
+                                            (unsafe { std::str::from_utf8_unchecked(&pattern_arr) })
+                                                .trim_end_matches(|c| c != '>'),
+                                        ) {
+                                            let member_name = self
+                                                .members
+                                                .get(&message.sender)
+                                                .map_or("unknown", |m| m.username.as_str());
+                                            post.push(PostProcessEvent::SendNotification {
+                                                unread_message: false,
+                                                mention: true,
+                                                title: format!("{} | #{}", guild.name, channel.name),
+                                                content: format!(
+                                                    "@{}: {}",
+                                                    member_name,
+                                                    render_text(text, &self.members, &self.emote_packs)
+                                                ),
+                                            });
+                                        }
                                     }
                                 }
-                            }
 
-                            if let Some(msg_index) = channel.messages.get_index_of(&MessageId::Unack(echo_id)) {
-                                channel.messages.insert(MessageId::Ack(message_id), message);
-                                channel
-                                    .messages
-                                    .swap_indices(msg_index, channel.messages.len().saturating_sub(1));
-                                channel.messages.pop();
-                            } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
-                                *msg = message;
-                            } else {
-                                channel.messages.insert(message.id, message);
-                            }
+                                if let Some(msg_index) = echo_id
+                                    .map(|id| channel.messages.get_index_of(&MessageId::Unack(id)))
+                                    .flatten()
+                                {
+                                    channel.messages.insert(MessageId::Ack(message_id), message);
+                                    channel
+                                        .messages
+                                        .swap_indices(msg_index, channel.messages.len().saturating_sub(1));
+                                    channel.messages.pop();
+                                } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
+                                    *msg = message;
+                                } else {
+                                    channel.messages.insert(MessageId::Ack(message_id), message);
+                                }
 
-                            let disp = channel.messages.len();
-                            if channel.looking_at_message >= disp.saturating_sub(32) {
-                                channel.looking_at_message = disp.saturating_sub(1);
-                                post.push(PostProcessEvent::GoToFirstMsgOnChannel(channel_id));
-                            }
-                            if !channel.looking_at_channel {
-                                channel.has_unread = true;
+                                let disp = channel.messages.len();
+                                if channel.looking_at_message >= disp.saturating_sub(32) {
+                                    channel.looking_at_message = disp.saturating_sub(1);
+                                    post.push(PostProcessEvent::GoToFirstMsgOnChannel(channel_id));
+                                }
+                                if !channel.looking_at_channel {
+                                    channel.has_unread = true;
+                                }
                             }
                         }
                     }
                 }
-            }
-            Event::DeletedMessage(MessageDeleted {
-                guild_id,
-                channel_id,
-                message_id,
-            }) => {
-                if let Some(channel) = self.get_channel(guild_id, channel_id) {
-                    channel.messages.remove(&MessageId::Ack(message_id));
-                }
-            }
-            Event::EditedMessage(message_updated) => {
-                let guild_id = message_updated.guild_id;
-                let channel_id = message_updated.channel_id;
-
-                if let Some(channel) = self.get_channel(guild_id, channel_id) {
-                    if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_updated.message_id)) {
-                        msg.content = Content::Text(message_updated.new_content);
-                        msg.post_process(&mut post, guild_id, channel_id);
+                ChatEvent::DeletedMessage(MessageDeleted {
+                    guild_id,
+                    channel_id,
+                    message_id,
+                }) => {
+                    if let Some(channel) = self.get_channel(guild_id, channel_id) {
+                        channel.messages.remove(&MessageId::Ack(message_id));
                     }
                 }
-            }
-            Event::DeletedChannel(ChannelDeleted { guild_id, channel_id }) => {
-                if let Some(guild) = self.get_guild(guild_id) {
-                    guild.channels.remove(&channel_id);
-                }
-            }
-            Event::EditedChannel(ChannelUpdated {
-                guild_id,
-                channel_id,
-                new_name,
-                new_position,
-                new_metadata: _,
-            }) => {
-                if let Some(guild) = self.get_guild(guild_id) {
-                    if let Some(name) = new_name {
-                        if let Some(channel) = guild.channels.get_mut(&channel_id) {
-                            channel.name = name.into();
+                ChatEvent::EditedMessage(message_updated) => {
+                    let guild_id = message_updated.guild_id;
+                    let channel_id = message_updated.channel_id;
+
+                    if let Some(channel) = self.get_channel(guild_id, channel_id) {
+                        if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_updated.message_id)) {
+                            msg.content =
+                                Content::Text(message_updated.new_content.map_or_else(String::new, |f| f.text));
+                            msg.post_process(&mut post, guild_id, channel_id);
                         }
                     }
-
-                    if let Some(position) = new_position {
-                        guild.update_channel_order(position, channel_id);
+                }
+                ChatEvent::DeletedChannel(ChannelDeleted { guild_id, channel_id }) => {
+                    if let Some(guild) = self.get_guild(guild_id) {
+                        guild.channels.remove(&channel_id);
                     }
                 }
-            }
-            Event::CreatedChannel(ChannelCreated {
-                guild_id,
-                channel_id,
-                name,
-                position,
-                is_category,
-                metadata: _,
-            }) => {
-                if let Some(guild) = self.get_guild(guild_id) {
-                    // [tag:channel_added_to_client]
-                    guild.channels.insert(
-                        channel_id,
-                        Channel {
-                            is_category,
-                            name: name.into(),
-                            loading_messages_history: false,
-                            looking_at_message: 0,
-                            messages: Default::default(),
-                            last_known_message_id: 0,
-                            reached_top: false,
-                            has_unread: false,
-                            looking_at_channel: false,
-                            user_perms: ChanPerms {
-                                manage_channel: false,
-                                send_msg: false,
+                ChatEvent::EditedChannel(ChannelUpdated {
+                    guild_id,
+                    channel_id,
+                    new_name,
+                    new_metadata: _,
+                }) => {
+                    if let Some(guild) = self.get_guild(guild_id) {
+                        if let Some(name) = new_name {
+                            if let Some(channel) = guild.channels.get_mut(&channel_id) {
+                                channel.name = name.into();
+                            }
+                        }
+                    }
+                }
+                ChatEvent::EditedChannelPosition(ChannelPositionUpdated {
+                    guild_id,
+                    channel_id,
+                    new_position,
+                }) => {
+                    if let Some(guild) = self.get_guild(guild_id) {
+                        if let Some(position) = new_position {
+                            guild.update_channel_order(position, channel_id);
+                        }
+                    }
+                }
+                ChatEvent::ChannelsReordered(ChannelsReordered { guild_id, channel_ids }) => {
+                    if let Some(guild) = self.get_guild(guild_id) {
+                        let mut channels = guild.channels.drain(..).collect::<IndexMap<_, _>>();
+                        for id in channel_ids {
+                            if let Some(channel) = channels.remove(&id) {
+                                guild.channels.insert(id, channel);
+                            }
+                        }
+                    }
+                }
+                ChatEvent::CreatedChannel(ChannelCreated {
+                    guild_id,
+                    channel_id,
+                    name,
+                    position,
+                    is_category,
+                    metadata: _,
+                }) => {
+                    if let Some(guild) = self.get_guild(guild_id) {
+                        // [tag:channel_added_to_client]
+                        guild.channels.insert(
+                            channel_id,
+                            Channel {
+                                is_category,
+                                name: name.into(),
+                                loading_messages_history: false,
+                                looking_at_message: 0,
+                                messages: Default::default(),
+                                last_known_message_id: 0,
+                                reached_top: false,
+                                has_unread: false,
+                                looking_at_channel: false,
+                                perms: Vec::new(),
+                                init_fetching: false,
+                                role_perms: AHashMap::new(),
+                                uploading_files: Vec::new(),
                             },
-                            init_fetching: false,
-                            role_perms: AHashMap::new(),
-                            uploading_files: Vec::new(),
+                        );
+                        if let Some(position) = position {
+                            guild.update_channel_order(position, channel_id);
+                        }
+                        post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
+                    }
+                }
+                ChatEvent::Typing(Typing {
+                    guild_id,
+                    channel_id,
+                    user_id,
+                }) => {
+                    if let Some(member) = self.get_member(user_id) {
+                        member.typing_in_channel = Some((guild_id, channel_id, Instant::now()));
+                    }
+                }
+                ChatEvent::JoinedMember(MemberJoined { guild_id, member_id }) => {
+                    if member_id == 0 {
+                        return post;
+                    }
+
+                    if let Some(guild) = self.get_guild(guild_id) {
+                        guild.members.entry(member_id).or_default();
+                    }
+
+                    if !self.members.contains_key(&member_id) {
+                        post.push(PostProcessEvent::FetchProfile(member_id));
+                    }
+                }
+                ChatEvent::LeftMember(MemberLeft {
+                    guild_id,
+                    member_id,
+                    leave_reason: _,
+                }) => {
+                    if let Some(guild) = self.get_guild(guild_id) {
+                        guild.members.remove(&member_id);
+                    }
+                }
+                ChatEvent::GuildAddedToList(GuildAddedToList { guild_id, homeserver }) => {
+                    self.guilds.insert(
+                        guild_id,
+                        Guild {
+                            homeserver,
+                            ..Default::default()
                         },
                     );
-                    if let Some(position) = position {
-                        guild.update_channel_order(position, channel_id);
-                    }
-                    post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
+                    post.push(PostProcessEvent::FetchGuildData(guild_id));
                 }
-            }
-            Event::Typing(Typing {
-                guild_id,
-                channel_id,
-                user_id,
-            }) => {
-                if let Some(member) = self.get_member(user_id) {
-                    member.typing_in_channel = Some((guild_id, channel_id, Instant::now()));
-                }
-            }
-            Event::JoinedMember(MemberJoined { guild_id, member_id }) => {
-                if member_id == 0 {
-                    return post;
-                }
-
-                if let Some(guild) = self.get_guild(guild_id) {
-                    guild.members.entry(member_id).or_default();
-                }
-
-                if !self.members.contains_key(&member_id) {
-                    post.push(PostProcessEvent::FetchProfile(member_id));
-                }
-            }
-            Event::LeftMember(MemberLeft {
-                guild_id,
-                member_id,
-                leave_reason: _,
-            }) => {
-                if let Some(guild) = self.get_guild(guild_id) {
-                    guild.members.remove(&member_id);
-                }
-            }
-            Event::ProfileUpdated(ProfileUpdated {
-                user_id,
-                new_username,
-                new_avatar,
-                new_status,
-                new_is_bot,
-            }) => {
-                let member = self.members.entry(user_id).or_default();
-                if let Some(new_username) = new_username {
-                    member.username = new_username.into();
-                }
-                if let Some(new_status) = new_status {
-                    member.status = UserStatus::from_i32(new_status).unwrap_or(UserStatus::Offline);
-                }
-                if let Some(new_avatar) = new_avatar {
-                    let parsed = FileId::from_str(&new_avatar).ok();
-                    member.avatar_url = parsed.clone();
-                    if let Some(id) = parsed {
-                        post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                            kind: "image".into(),
-                            name: "avatar".into(),
-                            ..Attachment::new_unknown(id)
-                        }));
-                    }
-                }
-                if let Some(is_bot) = new_is_bot {
-                    member.is_bot = is_bot;
-                }
-            }
-            Event::GuildAddedToList(GuildAddedToList { guild_id, homeserver }) => {
-                self.guilds.insert(
+                ChatEvent::GuildRemovedFromList(GuildRemovedFromList {
                     guild_id,
-                    Guild {
-                        homeserver,
-                        ..Default::default()
-                    },
-                );
-                post.push(PostProcessEvent::FetchGuildData(guild_id));
-            }
-            Event::GuildRemovedFromList(GuildRemovedFromList {
-                guild_id,
-                homeserver: _,
-            }) => {
-                self.guilds.remove(&guild_id);
-            }
-            Event::DeletedGuild(GuildDeleted { guild_id }) => {
-                self.guilds.remove(&guild_id);
-            }
-            Event::EditedGuild(GuildUpdated {
-                guild_id,
-                new_name,
-                new_picture,
-                new_metadata: _,
-            }) => {
-                let guild = self.guilds.entry(guild_id).or_default();
-
-                if let Some(name) = new_name {
-                    guild.name = name;
+                    homeserver: _,
+                }) => {
+                    self.guilds.remove(&guild_id);
                 }
-                if let Some(picture) = new_picture {
-                    let parsed = FileId::from_str(&picture).ok();
-                    guild.picture = parsed.clone();
-                    if let Some(id) = parsed {
-                        post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                            kind: "image".into(),
-                            name: "guild".into(),
-                            ..Attachment::new_unknown(id)
-                        }));
+                ChatEvent::DeletedGuild(GuildDeleted { guild_id }) => {
+                    self.guilds.remove(&guild_id);
+                }
+                ChatEvent::EditedGuild(GuildUpdated {
+                    guild_id,
+                    new_name,
+                    new_picture,
+                    new_metadata: _,
+                }) => {
+                    let guild = self.guilds.entry(guild_id).or_default();
+
+                    if let Some(name) = new_name {
+                        guild.name = name;
+                    }
+                    if let Some(picture) = new_picture {
+                        let parsed = FileId::from_str(&picture).ok();
+                        guild.picture = parsed.clone();
+                        if let Some(id) = parsed {
+                            post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                                kind: "image".into(),
+                                name: "guild".into(),
+                                ..Attachment::new_unknown(id)
+                            }));
+                        }
                     }
                 }
-            }
-            Event::RoleCreated(RoleCreated {
-                guild_id,
-                role_id,
-                role,
-            }) => {
-                self.get_guild(guild_id).and_do(|g| {
-                    role.and_do(|role| {
-                        g.roles.insert(role_id, role.into());
-                    });
-                });
-            }
-            Event::RoleDeleted(RoleDeleted { guild_id, role_id }) => {
-                self.get_guild(guild_id).and_do(|g| {
-                    g.roles.remove(&role_id);
-                });
-            }
-            Event::RoleUpdated(RoleUpdated {
-                guild_id,
-                role_id,
-                new_role,
-            }) => {
-                self.get_guild(guild_id).and_do(|g| {
-                    new_role.and_do(|role| {
-                        g.roles.insert(role_id, role.into());
-                    });
-                });
-            }
-            Event::RoleMoved(RoleMoved {
-                guild_id,
-                role_id,
-                new_position,
-            }) => {
-                if let Some(position) = new_position {
+                ChatEvent::RoleCreated(RoleCreated {
+                    guild_id,
+                    role_id,
+                    color,
+                    hoist,
+                    name,
+                    pingable,
+                }) => {
                     self.get_guild(guild_id).and_do(|g| {
-                        g.update_role_order(position, role_id);
+                        g.roles.insert(role_id, Role::new(name, color, hoist, pingable).into());
                     });
                 }
-            }
-            Event::UserRolesUpdated(UserRolesUpdated {
-                guild_id,
-                user_id,
-                new_role_ids,
-            }) => {
-                self.get_guild(guild_id).and_do(|g| {
-                    g.members.insert(user_id, new_role_ids);
-                });
-            }
-            Event::RolePermsUpdated(RolePermissionsUpdated {
-                guild_id,
-                channel_id,
-                role_id,
-                new_perms,
-            }) => {
-                if let Some(perms) = new_perms {
+                ChatEvent::RoleDeleted(RoleDeleted { guild_id, role_id }) => {
                     self.get_guild(guild_id).and_do(|g| {
-                        if channel_id != 0 {
+                        g.roles.remove(&role_id);
+                    });
+                }
+                ChatEvent::RoleUpdated(RoleUpdated {
+                    guild_id,
+                    role_id,
+                    new_color,
+                    new_hoist,
+                    new_name,
+                    new_pingable,
+                }) => {
+                    self.get_guild(guild_id).and_do(|g| {
+                        if let Some(role) = g.roles.get_mut(&role_id) {
+                            if let Some(pingable) = new_pingable {
+                                role.pingable = pingable;
+                            }
+                            if let Some(color) = new_color {
+                                role.color = color::decode_rgb(color);
+                            }
+                            if let Some(name) = new_name {
+                                role.name = name.into();
+                            }
+                            if let Some(hoist) = new_hoist {
+                                role.hoist = hoist;
+                            }
+                        }
+                    });
+                }
+                ChatEvent::RoleMoved(RoleMoved {
+                    guild_id,
+                    role_id,
+                    new_position,
+                }) => {
+                    if let Some(position) = new_position {
+                        self.get_guild(guild_id).and_do(|g| {
+                            g.update_role_order(position, role_id);
+                        });
+                    }
+                }
+                ChatEvent::UserRolesUpdated(UserRolesUpdated {
+                    guild_id,
+                    user_id,
+                    new_role_ids,
+                }) => {
+                    self.get_guild(guild_id).and_do(|g| {
+                        g.members.insert(user_id, new_role_ids);
+                    });
+                }
+                ChatEvent::RolePermsUpdated(RolePermissionsUpdated {
+                    guild_id,
+                    channel_id,
+                    role_id,
+                    new_perms,
+                }) => {
+                    self.get_guild(guild_id).and_do(|g| {
+                        if let Some(channel_id) = channel_id {
                             g.channels.get_mut(&channel_id).and_do(|c| {
-                                c.role_perms.insert(role_id, perms.permissions);
+                                c.role_perms.insert(role_id, new_perms);
                             });
                         } else {
-                            g.role_perms.insert(role_id, perms.permissions);
+                            g.role_perms.insert(role_id, new_perms);
                         }
                     });
                 }
-            }
-            Event::EmotePackUpdated(EmotePackUpdated { pack_id, new_pack_name }) => {
-                if let Some(pack) = self.emote_packs.get_mut(&pack_id) {
-                    if let Some(pack_name) = new_pack_name {
-                        pack.pack_name = pack_name;
+                _ => panic!(),
+            },
+            Event::Profile(ev) => match ev {
+                ProfileEvent::ProfileUpdated(ProfileUpdated {
+                    user_id,
+                    new_username,
+                    new_avatar,
+                    new_status,
+                    new_is_bot,
+                }) => {
+                    let member = self.members.entry(user_id).or_default();
+                    if let Some(new_username) = new_username {
+                        member.username = new_username.into();
+                    }
+                    if let Some(new_status) = new_status {
+                        member.status = UserStatus::from_i32(new_status).unwrap_or(UserStatus::OfflineUnspecified);
+                    }
+                    if let Some(new_avatar) = new_avatar {
+                        let parsed = FileId::from_str(&new_avatar).ok();
+                        member.avatar_url = parsed.clone();
+                        if let Some(id) = parsed {
+                            post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                                kind: "image".into(),
+                                name: "avatar".into(),
+                                ..Attachment::new_unknown(id)
+                            }));
+                        }
+                    }
+                    if let Some(is_bot) = new_is_bot {
+                        member.is_bot = is_bot;
                     }
                 }
-            }
-            Event::EmotePackEmotesUpdated(EmotePackEmotesUpdated {
-                pack_id,
-                added_emotes,
-                deleted_emotes,
-            }) => {
-                if let Some(pack) = self.emote_packs.get_mut(&pack_id) {
-                    post.extend(added_emotes.iter().map(|emote| {
-                        PostProcessEvent::FetchThumbnail(Attachment {
-                            kind: "image".to_string(),
-                            name: "emote".to_string(),
-                            ..Attachment::new_unknown(FileId::Id(emote.image_id.clone()))
-                        })
-                    }));
-                    pack.emotes
-                        .extend(added_emotes.into_iter().map(|emote| (emote.image_id, emote.name)));
-                    for image_id in deleted_emotes {
-                        pack.emotes.remove(&image_id);
+            },
+            Event::Emote(ev) => match ev {
+                EmoteEvent::EmotePackUpdated(EmotePackUpdated { pack_id, new_pack_name }) => {
+                    if let Some(pack) = self.emote_packs.get_mut(&pack_id) {
+                        if let Some(pack_name) = new_pack_name {
+                            pack.pack_name = pack_name;
+                        }
                     }
                 }
-            }
-            Event::EmotePackDeleted(EmotePackDeleted { pack_id }) => {
-                self.emote_packs.remove(&pack_id);
-            }
-            Event::EmotePackAdded(EmotePackAdded { pack }) => {
-                if let Some(pack) = pack {
-                    post.push(PostProcessEvent::FetchEmotes(pack.pack_id));
-                    self.emote_packs.insert(
-                        pack.pack_id,
-                        EmotePack {
-                            pack_name: pack.pack_name,
-                            pack_owner: pack.pack_owner,
-                            emotes: Default::default(),
-                        },
-                    );
+                EmoteEvent::EmotePackEmotesUpdated(EmotePackEmotesUpdated {
+                    pack_id,
+                    added_emotes,
+                    deleted_emotes,
+                }) => {
+                    if let Some(pack) = self.emote_packs.get_mut(&pack_id) {
+                        post.extend(added_emotes.iter().map(|emote| {
+                            PostProcessEvent::FetchThumbnail(Attachment {
+                                kind: "image".to_string(),
+                                name: "emote".to_string(),
+                                ..Attachment::new_unknown(FileId::Id(emote.image_id.clone()))
+                            })
+                        }));
+                        pack.emotes
+                            .extend(added_emotes.into_iter().map(|emote| (emote.image_id, emote.name)));
+                        for image_id in deleted_emotes {
+                            pack.emotes.remove(&image_id);
+                        }
+                    }
                 }
-            }
-            x => tracing::warn!("implement {:?}", x),
+                EmoteEvent::EmotePackDeleted(EmotePackDeleted { pack_id }) => {
+                    self.emote_packs.remove(&pack_id);
+                }
+                EmoteEvent::EmotePackAdded(EmotePackAdded { pack }) => {
+                    if let Some(pack) = pack {
+                        post.push(PostProcessEvent::FetchEmotes(pack.pack_id));
+                        self.emote_packs.insert(
+                            pack.pack_id,
+                            EmotePack {
+                                pack_name: pack.pack_name,
+                                pack_owner: pack.pack_owner,
+                                emotes: Default::default(),
+                            },
+                        );
+                    }
+                }
+            },
         }
 
         post
@@ -799,6 +783,7 @@ impl Client {
         &mut self,
         guild_id: u64,
         channel_id: u64,
+        message_id: u64,
         message: HarmonyMessage,
     ) -> Vec<PostProcessEvent> {
         let mut post = Vec::new();
@@ -806,11 +791,12 @@ impl Client {
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             let message: Message = message.into();
             message.post_process(&mut post, guild_id, channel_id);
-            if channel.messages.contains_key(&message.id) {
-                channel.messages.insert(message.id, message);
+            let message_id = MessageId::Ack(message_id);
+            if channel.messages.contains_key(&message_id) {
+                channel.messages.insert(message_id, message);
             } else {
                 channel.messages.reverse();
-                channel.messages.insert(message.id, message);
+                channel.messages.insert(message_id, message);
                 channel.messages.reverse();
             }
         }
@@ -823,7 +809,7 @@ impl Client {
         guild_id: u64,
         channel_id: u64,
         message_id: u64,
-        messages: Vec<HarmonyMessage>,
+        messages: Vec<(u64, HarmonyMessage)>,
         reached_top: bool,
         direction: Direction,
     ) -> Vec<PostProcessEvent> {
@@ -832,7 +818,7 @@ impl Client {
         if let Some(channel) = self.get_channel(guild_id, channel_id) {
             let mut messages: IndexMap<_, _> = messages
                 .into_iter()
-                .map(|msg| (MessageId::Ack(msg.message_id), Message::from(msg)))
+                .map(|(id, msg)| (MessageId::Ack(id), Message::from(msg)))
                 .collect();
 
             messages.values().for_each(|m| {
@@ -877,7 +863,7 @@ impl Client {
             };
 
             match direction {
-                Direction::Before => {
+                Direction::BeforeUnspecified => {
                     let last_message_id = messages.keys().last().copied();
                     match msg_pos.or_else(|| {
                         channel
@@ -1078,22 +1064,5 @@ impl<'a> HarmonyToken<'a> {
         } else {
             None
         }
-    }
-}
-
-pub mod color {
-    pub fn encode_rgb(color: (u8, u8, u8)) -> i64 {
-        let mut c = color.0 as i64;
-        c = (c << 8) + color.1 as i64;
-        c = (c << 8) + color.2 as i64;
-        c as i64
-    }
-
-    pub fn decode_rgb(color: i64) -> (u8, u8, u8) {
-        (
-            ((color >> 16) & 255) as u8,
-            ((color >> 8) & 255) as u8,
-            (color & 255) as u8,
-        )
     }
 }

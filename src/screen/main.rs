@@ -17,21 +17,18 @@ use client::{
     harmony_rust_sdk::{
         api::{
             chat::{
-                event::{ChannelCreated, Event, MemberJoined, RoleCreated, UserRolesUpdated},
+                all_permissions::{MESSAGES_SEND, ROLES_GET, ROLES_USER_MANAGE},
                 get_channel_messages_request::Direction,
-                GetChannelMessagesResponse, GetUserRolesRequest,
+                stream_event::{ChannelCreated, Event as ChatEvent, MemberJoined, RoleCreated, UserRolesUpdated},
+                Event, GetChannelMessagesResponse, GetGuildRolesRequest, GetUserRolesRequest,
             },
-            harmonytypes::UserStatus,
+            profile::UserStatus,
             rest::FileId,
         },
         client::{
             api::{
-                chat::{
-                    self,
-                    channel::{self, GetChannelMessagesSelfBuilder},
-                    profile::{ProfileUpdate, ProfileUpdateSelfBuilder},
-                    GuildId,
-                },
+                chat::{self, channel, GuildId},
+                profile::UpdateProfile,
                 rest::download_extract_file,
             },
             error::ClientError as InnerClientError,
@@ -185,8 +182,6 @@ pub enum Message {
     SelectedMember(u64),
     /// Sent when the user selects `Yes` or `No` (also backdrop and escape) in the logout modal.
     LogoutChoice(bool),
-    /// Sent when the permission check for viewing a channel is complete
-    ChannelViewPerm(u64, u64, bool),
     /// Modal message passing
     ImageViewMessage(image_viewer::Message),
     QuickSwitchMsg(quick_switcher::Message),
@@ -317,13 +312,13 @@ impl MainScreen {
         let status_menu = PickList::new(
             &mut self.status_list,
             vec![
-                UserStatus::OnlineUnspecified,
+                UserStatus::Online,
                 UserStatus::DoNotDisturb,
                 UserStatus::Idle,
-                UserStatus::Offline,
+                UserStatus::OfflineUnspecified,
                 UserStatus::Streaming,
             ],
-            Some(current_profile.map_or(UserStatus::OnlineUnspecified, |m| m.status)),
+            Some(current_profile.map_or(UserStatus::Online, |m| m.status)),
             Message::ChangeUserStatus,
         )
         .width(length!(+))
@@ -342,8 +337,8 @@ impl MainScreen {
                 .collect::<Vec<_>>();
             sorted_members.sort_unstable_by(|(_, member), (_, other_member)| {
                 let name = member.username.as_str().cmp(other_member.username.as_str());
-                let offline = matches!(member.status, UserStatus::Offline);
-                let other_offline = matches!(other_member.status, UserStatus::Offline);
+                let offline = matches!(member.status, UserStatus::OfflineUnspecified);
+                let other_offline = matches!(other_member.status, UserStatus::OfflineUnspecified);
 
                 match (offline, other_offline) {
                     (false, true) => Ordering::Less,
@@ -371,7 +366,7 @@ impl MainScreen {
                         highest_role.map_or(Color::WHITE, |(_, role)| tuple_to_iced_color(role.color));
                     let mut username = label!(truncate_string(&member.username, TRUNCATE_LEN)).color(sender_name_color);
                     // Set text color to a more dimmed one if the user is offline
-                    if matches!(member.status, UserStatus::Offline) {
+                    if matches!(member.status, UserStatus::OfflineUnspecified) {
                         username = username.color(Color {
                             a: 0.4,
                             ..sender_name_color
@@ -517,7 +512,10 @@ impl MainScreen {
                     );
                     message_area_widgets.push(mk_seperator());
                 }
-                if let Some(reply_message) = self.reply_to.map(|id| channel.messages.get(&MessageId::Ack(id))) {
+                if let Some(reply_message) = self.reply_to.map(|id| {
+                    let id = MessageId::Ack(id);
+                    channel.messages.get(&id).map(|m| (id, m))
+                }) {
                     let widget = make_reply_message(
                         reply_message,
                         client,
@@ -769,7 +767,7 @@ impl MainScreen {
                 let send_file_button =
                     Tooltip::new(send_file_button, "Click to upload a file", iced::tooltip::Position::Top).style(theme);
 
-                let message_composer = if channel.user_perms.send_msg {
+                let message_composer = if channel.has_perm(MESSAGES_SEND) {
                     match self.mode {
                         Mode::Normal | Mode::EditingMessage(_) => TextInput::new(
                             &mut self.composer_state,
@@ -985,13 +983,7 @@ impl MainScreen {
             }
             Message::ChangeUserStatus(new_status) => {
                 return client.mk_cmd(
-                    |inner| async move {
-                        inner
-                            .chat()
-                            .await
-                            .profile_update(ProfileUpdate::default().new_status(new_status))
-                            .await
-                    },
+                    |inner| async move { inner.call(UpdateProfile::default().with_new_status(new_status)).await },
                     |_| TopLevelMessage::Nothing,
                 );
             }
@@ -999,9 +991,6 @@ impl MainScreen {
                 return TopLevelScreen::push_screen_cmd(TopLevelScreen::GuildDiscovery(
                     super::GuildDiscovery::default().into(),
                 ));
-            }
-            Message::ChannelViewPerm(guild_id, channel_id, ok) => {
-                client.get_channel(guild_id, channel_id).unwrap().user_perms.send_msg = ok;
             }
             Message::QuickSwitch => {
                 self.quick_switcher_modal.show(!self.quick_switcher_modal.is_shown());
@@ -1214,19 +1203,25 @@ impl MainScreen {
                             return client.mk_cmd(
                                 |inner| async move {
                                     inner
-                                        .chat()
-                                        .await
-                                        .get_channel_messages(
-                                            GetChannelMessages::new(guild_id, channel_id).message_id(oldest_msg_id),
+                                        .call(
+                                            GetChannelMessages::new(guild_id, channel_id)
+                                                .with_message_id(oldest_msg_id),
                                         )
                                         .await
                                         .map(|response| TopLevelMessage::GetChannelMessagesResponse {
-                                            messages: response.messages,
+                                            messages: response
+                                                .messages
+                                                .into_iter()
+                                                .flat_map(|m| {
+                                                    let msg = m.message?;
+                                                    Some((m.message_id, msg))
+                                                })
+                                                .collect(),
                                             reached_top: response.reached_top,
                                             guild_id,
                                             channel_id,
                                             message_id: oldest_msg_id,
-                                            direction: Direction::Before,
+                                            direction: Direction::BeforeUnspecified,
                                         })
                                 },
                                 identity,
@@ -1462,9 +1457,13 @@ impl MainScreen {
                                 ..Default::default()
                             };
                             self.message.clear();
-                            if let Some(cmd) =
-                                client.send_msg_cmd(guild_id, channel_id, Duration::from_secs(0), message)
-                            {
+                            if let Some(cmd) = client.send_msg_cmd(
+                                guild_id,
+                                channel_id,
+                                Duration::from_secs(0),
+                                MessageId::default(),
+                                message,
+                            ) {
                                 scroll_to_bottom(client, guild_id, channel_id);
                                 self.event_history_state.snap_to(1.0);
                                 return Command::perform(cmd, map_send_msg);
@@ -1561,74 +1560,74 @@ impl MainScreen {
                 if let Some(guild) = client.get_guild(guild_id) {
                     if guild.channels.is_empty() && !guild.init_fetching {
                         guild.init_fetching = true;
-                        let user_perms = guild.user_perms.clone();
+                        let get_roles = guild.has_perm(ROLES_GET);
+                        let get_user_roles = guild.has_perm(ROLES_USER_MANAGE);
                         let inner = client.inner_arc();
                         return Command::perform(
                             async move {
                                 let guildid = GuildId::new(guild_id);
                                 let channels_list = inner.chat().await.get_guild_channels(guildid).await?.channels;
-                                let mut events = Vec::with_capacity(channels_list.len());
-                                events.extend(channels_list.into_iter().map(|c| {
-                                    Ok(Event::CreatedChannel(ChannelCreated {
+                                let mut events: Vec<ClientResult<Event>> = Vec::with_capacity(channels_list.len());
+                                events.extend(channels_list.into_iter().filter_map(|c| {
+                                    let channel = c.channel?;
+                                    Some(Ok(Event::Chat(ChatEvent::CreatedChannel(ChannelCreated {
                                         guild_id,
                                         channel_id: c.channel_id,
-                                        is_category: c.is_category,
-                                        name: c.channel_name,
-                                        metadata: c.metadata,
+                                        is_category: channel.is_category,
+                                        name: channel.channel_name,
+                                        metadata: channel.metadata,
                                         ..Default::default()
-                                    }))
+                                    }))))
                                 }));
 
-                                if user_perms.get_roles {
-                                    events.extend(
-                                        inner
-                                            .chat()
-                                            .await
-                                            .get_guild_roles(GuildId::new(guild_id))
-                                            .await
-                                            .map_or_else(
-                                                |err| vec![Err(err.into())],
-                                                |roles| {
-                                                    roles
-                                                        .roles
-                                                        .into_iter()
-                                                        .map(|role| {
-                                                            Ok(Event::RoleCreated(RoleCreated {
-                                                                guild_id,
-                                                                role_id: role.role_id,
-                                                                role: Some(role),
-                                                            }))
-                                                        })
-                                                        .collect::<Vec<_>>()
-                                                },
-                                            ),
-                                    );
+                                if get_roles {
+                                    events.extend(inner.call(GetGuildRolesRequest::new(guild_id)).await.map_or_else(
+                                        |err| vec![Err(err.into())],
+                                        |roles| {
+                                            roles
+                                                .roles
+                                                .into_iter()
+                                                .filter_map(|r| {
+                                                    let role = r.role?;
+                                                    Some(Ok(Event::Chat(ChatEvent::RoleCreated(RoleCreated {
+                                                        guild_id,
+                                                        role_id: r.role_id,
+                                                        color: role.color,
+                                                        hoist: role.hoist,
+                                                        name: role.name,
+                                                        pingable: role.pingable,
+                                                    }))))
+                                                })
+                                                .collect::<Vec<_>>()
+                                        },
+                                    ));
                                 }
 
                                 let members = inner.chat().await.get_guild_members(guildid).await?.members;
                                 events.reserve(members.len() * 2);
-                                if user_perms.get_user_roles {
+                                if get_user_roles {
                                     for id in &members {
                                         events.push(
                                             inner
-                                                .chat()
-                                                .await
-                                                .get_user_roles(GetUserRolesRequest { guild_id, user_id: *id })
+                                                .call(GetUserRolesRequest::new(guild_id, *id))
                                                 .await
                                                 .map(|resp| {
-                                                    Event::UserRolesUpdated(UserRolesUpdated {
+                                                    Event::Chat(ChatEvent::UserRolesUpdated(UserRolesUpdated {
                                                         guild_id,
                                                         user_id: *id,
                                                         new_role_ids: resp.roles,
-                                                    })
+                                                    }))
                                                 })
                                                 .map_err(Into::into),
                                         );
                                     }
                                 }
-                                let member_events = members
-                                    .into_iter()
-                                    .map(|member_id| Ok(Event::JoinedMember(MemberJoined { member_id, guild_id })));
+                                let member_events = members.into_iter().map(|member_id| {
+                                    Ok(Event::Chat(ChatEvent::JoinedMember(MemberJoined {
+                                        member_id,
+                                        guild_id,
+                                    })))
+                                });
                                 events.extend(member_events);
 
                                 ClientResult::Ok(events)
@@ -1681,9 +1680,16 @@ impl MainScreen {
                                 guild_id,
                                 channel_id,
                                 message_id: 0,
-                                messages: m.messages,
+                                messages: m
+                                    .messages
+                                    .into_iter()
+                                    .flat_map(|m| {
+                                        let msg = m.message?;
+                                        Some((m.message_id, msg))
+                                    })
+                                    .collect(),
                                 reached_top: m.reached_top,
-                                direction: Direction::Before,
+                                direction: Direction::BeforeUnspecified,
                             })
                         };
                         c.init_fetching = true;

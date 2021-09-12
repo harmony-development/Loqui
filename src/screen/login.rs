@@ -13,12 +13,10 @@ use client::{
         api::{
             auth::{auth_step::Step, next_step_request::form_fields::Field},
             exports::hrpc::url::Url,
+            profile::GetProfileRequest,
         },
         client::{
-            api::{
-                auth::{AuthStep, AuthStepResponse},
-                chat::UserId,
-            },
+            api::auth::{AuthStep, AuthStepResponse},
             AuthStatus,
         },
     },
@@ -233,7 +231,7 @@ impl LoginScreen {
             screen.waiting = true;
             client.mk_cmd(
                 |inner| async move { inner.next_auth_step(response).await },
-                |step| TopLevelMessage::login(Message::AuthStep(step)),
+                |step| TopLevelMessage::login(Message::AuthStep(step.map(|s| s.step).flatten())),
             )
         }
 
@@ -278,7 +276,7 @@ impl LoginScreen {
                     self.waiting = true;
                     return client.mk_cmd(
                         |inner| async move { inner.prev_auth_step().await },
-                        |step| TopLevelMessage::login(Message::AuthStep(Some(step))),
+                        |step| TopLevelMessage::login(Message::AuthStep(step.step)),
                     );
                 }
             }
@@ -301,7 +299,7 @@ impl LoginScreen {
                         let user_id = client.user_id.unwrap();
                         let session_file = client.content_store().session_path(&session.homeserver, user_id);
                         let latest = client.content_store().latest_session_file();
-                        match client.inner_arc().chat().await.get_user(UserId::new(user_id)).await {
+                        match client.inner_arc().call(GetProfileRequest::new(user_id)).await {
                             Ok(user_profile) => {
                                 let _ = tokio::fs::remove_file(latest).await;
                                 tokio::fs::hard_link(session_file.as_path(), latest)
@@ -314,7 +312,7 @@ impl LoginScreen {
                                             err
                                         ))
                                     })?;
-                                Ok((client, user_profile))
+                                Ok((client, user_profile.profile))
                             }
                             Err(err) => {
                                 let err = err.into();
@@ -324,7 +322,7 @@ impl LoginScreen {
                     },
                     |result: ClientResult<_>| {
                         result.map_to_msg_def(|(client, profile)| {
-                            TopLevelMessage::LoginComplete((Some(client), Some(profile)).into())
+                            TopLevelMessage::LoginComplete(Box::new((Some(client), profile)))
                         })
                     },
                 );
@@ -407,13 +405,15 @@ impl LoginScreen {
                             async move {
                                 if let AuthStatus::Complete(session) = auth_status {
                                     let session_file = content_store.session_path(&homeserver, session.user_id);
-                                    let user_profile =
-                                        inner.chat().await.get_user(UserId::new(session.user_id)).await?;
+                                    let user_profile = inner.call(GetProfileRequest::new(session.user_id)).await?;
                                     let session = Session {
                                         homeserver,
                                         session_token: session.session_token.into(),
                                         user_id: session.user_id.to_string().into(),
-                                        user_name: user_profile.user_name.as_str().into(),
+                                        user_name: user_profile
+                                            .profile
+                                            .as_ref()
+                                            .map_or_else(SmolStr::default, |profile| profile.user_name.as_str().into()),
                                     };
 
                                     // This should never ever fail in our case, if it does something is very very very wrong
@@ -437,13 +437,14 @@ impl LoginScreen {
                                                 err
                                             ))
                                         })?;
-                                    Ok(Some(user_profile))
+                                    Ok(user_profile.profile)
                                 } else {
                                     Ok(None)
                                 }
                             },
                             |result: ClientResult<_>| {
-                                result.map_to_msg_def(|profile| TopLevelMessage::LoginComplete((None, profile).into()))
+                                result
+                                    .map_to_msg_def(|profile| TopLevelMessage::LoginComplete(Box::new((None, profile))))
                             },
                         );
                     }

@@ -84,7 +84,7 @@ pub fn mention_container_style(has_mention: bool, theme: Theme) -> (Theme, u16) 
 }
 
 pub fn make_reply_message<'a, M: Clone + 'a>(
-    reply_message: Option<&Message>,
+    reply_message: Option<(MessageId, &Message)>,
     client: &Client,
     theme: Theme,
     message: fn(MessageId) -> M,
@@ -92,7 +92,7 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
 ) -> Button<'a, M> {
     let color = color!(200, 200, 200);
     let content = match reply_message {
-        Some(reply_message) => {
+        Some((_, reply_message)) => {
             let name_to_use = client
                 .members
                 .get(&reply_message.sender)
@@ -100,7 +100,9 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
             let author_name = reply_message
                 .overrides
                 .as_ref()
-                .map_or(name_to_use, |ov| ov.name.as_str());
+                .map(|ov| ov.name.as_deref())
+                .flatten()
+                .unwrap_or(name_to_use);
 
             let author = label!(format!("@{}", author_name)).color(color).size(MESSAGE_SIZE - 3);
             let content_label = match &reply_message.content {
@@ -140,7 +142,7 @@ pub fn make_reply_message<'a, M: Clone + 'a>(
     .padding(PADDING / 6)
     .style(theme);
 
-    if let Some(id) = reply_message.map(|m| m.id) {
+    if let Some((id, _)) = reply_message {
         but = but.on_press(message(id));
     }
 

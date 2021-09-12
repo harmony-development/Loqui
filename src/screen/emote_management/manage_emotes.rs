@@ -2,8 +2,8 @@ use super::super::Message as TopLevelMessage;
 use client::{
     error::ClientError,
     harmony_rust_sdk::{
-        api::rest::FileId,
-        client::api::chat::emote::{AddEmoteToPack, DeleteEmoteFromPack},
+        api::{emote::Emote, rest::FileId},
+        client::api::emote::{AddEmoteToPack, DeleteEmoteFromPack},
     },
 };
 use iced::Tooltip;
@@ -90,7 +90,7 @@ impl ManageEmotesModal {
                             Tooltip::new(
                                 Button::new(delete_state, icon(Icon::Trash))
                                     .style(theme)
-                                    .on_press(Message::DeleteEmote(image_id.to_string())),
+                                    .on_press(Message::DeleteEmote(name.to_string())),
                                 "Delete emote",
                                 iced::tooltip::Position::Top,
                             )
@@ -174,23 +174,18 @@ impl ManageEmotesModal {
                         |inner| async move {
                             let mut emote_file = select_upload_files(&inner, content_store, true).await?;
                             let image_id = emote_file.pop().unwrap().id;
-                            (inner.chat().await)
-                                .add_emote_to_pack(AddEmoteToPack::new(pack_id, image_id, name))
+                            inner
+                                .call(AddEmoteToPack::new(pack_id, Emote::new(image_id.into(), name)))
                                 .await
                                 .map_err(ClientError::from)
                         },
                         map_to_nothing,
                     )
                 }
-                Message::DeleteEmote(image_id) => {
+                Message::DeleteEmote(name) => {
                     let pack_id = self.pack_id;
-                    let image_id = FileId::Id(image_id);
                     client.mk_cmd(
-                        |inner| async move {
-                            (inner.chat().await)
-                                .delete_emote_from_pack(DeleteEmoteFromPack::new(pack_id, image_id))
-                                .await
-                        },
+                        |inner| async move { inner.call(DeleteEmoteFromPack::new(pack_id, name)).await },
                         map_to_nothing,
                     )
                 }

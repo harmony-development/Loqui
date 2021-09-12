@@ -1,9 +1,11 @@
 use client::{
-    color,
     error::ClientError,
     harmony_rust_sdk::{
-        api::chat::Place,
-        client::api::chat::permissions::{ModifyGuildRole, ModifyGuildRoleSelfBuilder, MoveRole},
+        api::chat::{
+            all_permissions::{PERMISSIONS_MANAGE_SET, ROLES_MANAGE},
+            color, Place,
+        },
+        client::api::chat::permissions::{ModifyGuildRole, MoveRole},
     },
     smol_str::SmolStr,
     Client,
@@ -112,14 +114,13 @@ impl RolesTab {
             RolesMessage::SetColor { role_id, color } => client.mk_cmd(
                 |inner| async move {
                     inner
-                        .chat()
-                        .await
-                        .modify_guild_role(ModifyGuildRole::new(guild_id, role_id).new_color(color::encode_rgb((
-                            (color.r * 255.0) as u8,
-                            (color.g * 255.0) as u8,
-                            (color.b * 255.0) as u8,
-                        ))
-                            as i32))
+                        .call(
+                            ModifyGuildRole::new(guild_id, role_id).with_new_color(color::encode_rgb([
+                                (color.r * 255.0) as u8,
+                                (color.g * 255.0) as u8,
+                                (color.b * 255.0) as u8,
+                            ])),
+                        )
                         .await
                 },
                 map_to_nothing,
@@ -244,7 +245,7 @@ impl Tab for RolesTab {
                     .into(),
                 );
                 content_widgets.push(space!(w+).into());
-                if guild.user_perms.set_permission {
+                if guild.has_perm(PERMISSIONS_MANAGE_SET) {
                     content_widgets.push(
                         Tooltip::new(
                             Button::new(manage_perms_state, icon(Icon::ListCheck))
@@ -260,7 +261,7 @@ impl Tab for RolesTab {
                         .into(),
                     );
                 }
-                if guild.user_perms.manage_roles {
+                if guild.has_perm(ROLES_MANAGE) {
                     content_widgets.push(
                         ColorPicker::new(
                             color_picker_state,
@@ -302,7 +303,7 @@ impl Tab for RolesTab {
                 }
                 roles = roles.push(Container::new(row(content_widgets)).style(theme));
             }
-            if guild.user_perms.manage_roles {
+            if guild.has_perm(ROLES_MANAGE) {
                 roles = roles.push(
                     fill_container(
                         label_button!(&mut self.create_role_state, "Create Role")
@@ -328,7 +329,7 @@ impl Tab for RolesTab {
                     .iter()
                     .map(|(id, channel)| ChannelSelection(Some((*id, channel.name.clone())))),
             );
-            if guild.user_perms.manage_roles {
+            if guild.has_perm(ROLES_MANAGE) {
                 content.push(
                     Row::with_children(vec![
                         label!("Manage roles on:").into(),

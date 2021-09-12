@@ -1,10 +1,7 @@
 use std::{convert::identity, ops::Not};
 
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
-use client::harmony_rust_sdk::{
-    api::chat::Place,
-    client::api::chat::channel::{CreateChannel, CreateChannelSelfBuilder},
-};
+use client::harmony_rust_sdk::{api::chat::Place, client::api::chat::channel::CreateChannel};
 use iced_aw::Card;
 
 use crate::{
@@ -147,11 +144,9 @@ impl ChannelCreationModal {
                     client.mk_cmd(
                         |inner| async move {
                             let result = inner
-                                .chat()
-                                .await
-                                .create_channel(
+                                .call(
                                     CreateChannel::new(guild_id, channel_name, Place::bottom(after))
-                                        .is_category(is_category),
+                                        .with_is_category(is_category),
                                 )
                                 .await;
                             result.map(|response| {

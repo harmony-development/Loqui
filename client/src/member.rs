@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use ahash::AHashMap;
-use harmony_rust_sdk::{api::harmonytypes::UserStatus, client::api::rest::FileId};
+use harmony_rust_sdk::{api::profile::UserStatus, client::api::rest::FileId};
 use smol_str::SmolStr;
 
 pub type Members = AHashMap<u64, Member>;
@@ -23,7 +23,7 @@ impl Default for Member {
             username: SmolStr::default(),
             display_user: true,
             typing_in_channel: None,
-            status: UserStatus::Offline,
+            status: UserStatus::OfflineUnspecified,
             is_bot: false,
         }
     }

@@ -1,5 +1,5 @@
 use super::super::Message as TopLevelMessage;
-use client::harmony_rust_sdk::client::api::chat::permissions::{ManageUserRoles, ManageUserRolesSelfBuilder};
+use client::harmony_rust_sdk::client::api::chat::permissions::ManageUserRoles;
 use iced::{tooltip::Position, Tooltip};
 use iced_aw::Card;
 
@@ -117,9 +117,9 @@ impl ManageUserRolesModal {
                         |inner| async move {
                             let mut request = ManageUserRoles::new(guild_id, user_id);
                             if give_or_take {
-                                request = request.give_role_ids(vec![role_id]);
+                                request = request.with_give_role_ids(vec![role_id]);
                             } else {
-                                request = request.take_role_ids(vec![role_id]);
+                                request = request.with_take_role_ids(vec![role_id]);
                             }
                             inner.chat().await.manage_user_roles(request).await
                         },

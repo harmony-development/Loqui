@@ -1,5 +1,8 @@
 use ahash::AHashMap;
-use harmony_rust_sdk::{api::chat::Place, client::api::rest::FileId};
+use harmony_rust_sdk::{
+    api::chat::{permission::has_permission, Permission, Place},
+    client::api::rest::FileId,
+};
 
 use crate::{
     role::{Role, RolePerms, Roles},
@@ -19,11 +22,15 @@ pub struct Guild {
     pub role_perms: RolePerms,
     pub members: AHashMap<u64, Vec<u64>>,
     pub homeserver: String,
-    pub user_perms: GuildPerms,
+    pub perms: Vec<Permission>,
     pub init_fetching: bool,
 }
 
 impl Guild {
+    pub fn has_perm(&self, query: &str) -> bool {
+        has_permission(self.perms.iter(), query).unwrap_or(false)
+    }
+
     pub fn update_channel_order(&mut self, pos: impl Into<Place>, channel_id: u64) {
         update_order(&mut self.channels, pos, channel_id)
     }
@@ -62,24 +69,4 @@ fn update_order<V, P: Into<Place>>(map: &mut IndexMap<u64, V>, pos: P, id: u64) 
             }
         }
     }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct GuildPerms {
-    pub change_info: bool,          // guild.manage.change-information
-    pub ban_user: bool,             // user.manage.ban
-    pub kick_user: bool,            // user.manage.kick
-    pub unban_user: bool,           // user.manage.unban
-    pub get_user_roles: bool,       // roles.user.get
-    pub manage_user_roles: bool,    // roles.user.manage
-    pub manage_roles: bool,         // roles.manage
-    pub get_roles: bool,            // roles.get
-    pub update_channel_order: bool, // channels.manage.move
-    pub create_channel: bool,       // channels.manage.create
-    pub delete_channel: bool,       // channels.manage.delete
-    pub create_invite: bool,        // invites.manage.create
-    pub delete_invite: bool,        // invites.manage.delete
-    pub view_invites: bool,         // invites.view
-    pub set_permission: bool,       // permissions.set
-    pub get_permission: bool,       // permissions.get
 }

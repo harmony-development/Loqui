@@ -25,11 +25,13 @@ use crate::{
     style::*,
 };
 use client::harmony_rust_sdk::{
-    api::chat::event::{Event, RolePermissionsUpdated},
-    client::api::chat::{
-        invite::{get_guild_invites_response::Invite, GetGuildInvitesRequest},
-        permissions::{GetPermissions, GetPermissionsSelfBuilder},
+    api::chat::{
+        self,
+        all_permissions::{INVITES_VIEW, PERMISSIONS_MANAGE_GET},
+        stream_event::RolePermissionsUpdated,
+        Event, InviteWithId,
     },
+    client::api::chat::{invite::GetGuildInvitesRequest, permissions::GetPermissions},
 };
 use iced::Element;
 use iced_aw::{modal, Modal, TabLabel, Tabs, ICON_FONT};
@@ -50,7 +52,7 @@ const TAB_PADDING: u16 = 16;
 
 #[derive(Debug, Clone, Default)]
 pub struct GuildMetadata {
-    invites: Option<Vec<Invite>>,
+    invites: Option<Vec<InviteWithId>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -142,15 +144,13 @@ impl GuildSettings {
                         if client
                             .guilds
                             .get(&self.guild_id)
-                            .map_or(false, |g| g.user_perms.view_invites)
+                            .map_or(false, |g| g.has_perm(INVITES_VIEW))
                         {
                             let guild_id = self.guild_id;
                             return client.mk_cmd(
                                 |inner| async move {
                                     inner
-                                        .chat()
-                                        .await
-                                        .get_guild_invites(GetGuildInvitesRequest { guild_id })
+                                        .call(GetGuildInvitesRequest::new(guild_id))
                                         .await
                                         .map(|resp| resp.invites)
                                 },
@@ -248,37 +248,38 @@ impl GuildSettings {
                 self.manage_role_permissions_modal.show(true);
                 self.current_error.clear();
                 if let Some(guild) = client.guilds.get(&self.guild_id) {
-                    if guild.user_perms.get_permission {
+                    if guild.has_perm(PERMISSIONS_MANAGE_GET) {
                         let guild_id = self.guild_id;
                         let mut cmds = Vec::with_capacity(guild.channels.len() + 1);
                         let mk_cmd = |channel_id| {
                             client.mk_cmd(
                                 |inner| async move {
-                                    inner
-                                        .chat()
-                                        .await
-                                        .get_permissions(GetPermissions::new(guild_id, role_id).channel_id(channel_id))
-                                        .await
-                                        .map(|p| {
-                                            vec![Event::RolePermsUpdated(RolePermissionsUpdated {
+                                    let mut request = GetPermissions::new(guild_id, role_id);
+                                    if let Some(channel_id) = channel_id {
+                                        request = request.with_channel_id(channel_id);
+                                    }
+                                    inner.call(request).await.map(|p| {
+                                        vec![Event::Chat(chat::stream_event::Event::RolePermsUpdated(
+                                            RolePermissionsUpdated {
                                                 guild_id,
                                                 channel_id,
                                                 new_perms: p.perms,
                                                 role_id,
-                                            })]
-                                        })
+                                            },
+                                        ))]
+                                    })
                                 },
                                 TopLevelMessage::EventsReceived,
                             )
                         };
 
                         if guild.role_perms.iter().filter(|(id, _)| role_id.eq(*id)).count() == 0 {
-                            cmds.push(mk_cmd(0));
+                            cmds.push(mk_cmd(None));
                         }
 
                         for (channel_id, channel) in &guild.channels {
                             if channel.role_perms.iter().filter(|(id, _)| role_id.eq(*id)).count() == 0 {
-                                cmds.push(mk_cmd(*channel_id));
+                                cmds.push(mk_cmd(Some(*channel_id)));
                             }
                         }
 

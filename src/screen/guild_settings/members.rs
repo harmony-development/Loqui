@@ -1,6 +1,9 @@
 use client::{
     error::ClientError,
-    harmony_rust_sdk::api::chat::{BanUserRequest, KickUserRequest},
+    harmony_rust_sdk::api::chat::{
+        all_permissions::{ROLES_USER_MANAGE, USER_MANAGE_BAN, USER_MANAGE_KICK},
+        BanUserRequest, KickUserRequest,
+    },
     Client,
 };
 use iced::Tooltip;
@@ -134,7 +137,7 @@ impl Tab for MembersTab {
                     .into(),
                 );
                 content_widgets.push(space!(w+).into());
-                if guild.user_perms.kick_user {
+                if guild.has_perm(USER_MANAGE_KICK) {
                     content_widgets.push(
                         label_button!(kick_state, "Kick")
                             .style(theme)
@@ -142,7 +145,7 @@ impl Tab for MembersTab {
                             .into(),
                     );
                 }
-                if guild.user_perms.ban_user {
+                if guild.has_perm(USER_MANAGE_BAN) {
                     content_widgets.push(
                         label_button!(ban_state, "Ban")
                             .style(theme)
@@ -150,7 +153,7 @@ impl Tab for MembersTab {
                             .into(),
                     );
                 }
-                if guild.user_perms.manage_user_roles {
+                if guild.has_perm(ROLES_USER_MANAGE) {
                     content_widgets.push(
                         Tooltip::new(
                             Button::new(edit_state, icon(Icon::Pencil))

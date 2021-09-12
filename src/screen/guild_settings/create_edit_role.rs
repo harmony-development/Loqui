@@ -3,10 +3,7 @@ use std::{convert::identity, ops::Not};
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
 use client::{
     error::ClientResult,
-    harmony_rust_sdk::{
-        api::chat::Role,
-        client::api::chat::permissions::{AddGuildRole, DeleteGuildRole, ModifyGuildRole, ModifyGuildRoleSelfBuilder},
-    },
+    harmony_rust_sdk::client::api::chat::permissions::{AddGuildRole, DeleteGuildRole, ModifyGuildRole},
 };
 use iced_aw::Card;
 
@@ -176,30 +173,27 @@ impl RoleModal {
                 return (
                     client.mk_cmd(
                         |inner| async move {
-                            let mut chat = inner.chat().await;
                             let role_id = match editing {
                                 Some(role_id) => {
-                                    chat.modify_guild_role(
-                                        ModifyGuildRole::new(guild_id, role_id)
-                                            .new_hoist(hoist)
-                                            .new_pingable(pingable)
-                                            .new_name(role_name),
-                                    )
-                                    .await?;
+                                    inner
+                                        .call(
+                                            ModifyGuildRole::new(guild_id, role_id)
+                                                .with_new_hoist(hoist)
+                                                .with_new_pingable(pingable)
+                                                .with_new_name(role_name),
+                                        )
+                                        .await?;
                                     role_id
                                 }
                                 None => {
-                                    chat.add_guild_role(AddGuildRole::new(
-                                        guild_id,
-                                        Role {
-                                            name: role_name,
-                                            hoist,
-                                            pingable,
-                                            ..Default::default()
-                                        },
-                                    ))
-                                    .await?
-                                    .role_id
+                                    inner
+                                        .call(
+                                            AddGuildRole::new(guild_id, role_name)
+                                                .with_hoist(hoist)
+                                                .with_pingable(pingable),
+                                        )
+                                        .await?
+                                        .role_id
                                 }
                             };
                             ClientResult::Ok(TopLevelMessage::guild_settings(ParentMessage::RoleMessage(

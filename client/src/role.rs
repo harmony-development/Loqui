@@ -1,8 +1,8 @@
 use ahash::AHashMap;
-use harmony_rust_sdk::api::chat::{Permission, Role as HarmonyRole};
+use harmony_rust_sdk::api::chat::{color, Permission, Role as HarmonyRole};
 use smol_str::SmolStr;
 
-use crate::{color, IndexMap};
+use crate::IndexMap;
 
 pub type Roles = IndexMap<u64, Role>;
 pub type RolePerms = AHashMap<u64, Vec<Permission>>;
@@ -10,19 +10,18 @@ pub type RolePerms = AHashMap<u64, Vec<Permission>>;
 #[derive(Debug, Default, Clone)]
 pub struct Role {
     pub name: SmolStr,
-    pub color: (u8, u8, u8),
+    pub color: [u8; 3],
     pub hoist: bool,
     pub pingable: bool,
 }
 
-impl Role {
-    pub fn to_harmony_role(self, role_id: u64) -> HarmonyRole {
+impl From<Role> for HarmonyRole {
+    fn from(r: Role) -> Self {
         HarmonyRole {
-            role_id,
-            name: self.name.into(),
-            hoist: self.hoist,
-            pingable: self.pingable,
-            color: color::encode_rgb(self.color) as i32,
+            name: r.name.into(),
+            hoist: r.hoist,
+            pingable: r.pingable,
+            color: color::encode_rgb(r.color),
         }
     }
 }
@@ -33,7 +32,7 @@ impl From<HarmonyRole> for Role {
             name: role.name.into(),
             hoist: role.hoist,
             pingable: role.pingable,
-            color: color::decode_rgb(role.color as i64),
+            color: color::decode_rgb(role.color),
         }
     }
 }

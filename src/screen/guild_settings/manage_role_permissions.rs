@@ -1,8 +1,5 @@
 use super::super::Message as TopLevelMessage;
-use client::harmony_rust_sdk::{
-    api::chat::{permission::Mode, Permission, PermissionList},
-    client::api::chat::permissions::{SetPermissions, SetPermissionsSelfBuilder},
-};
+use client::harmony_rust_sdk::{api::chat::Permission, client::api::chat::permissions::SetPermissions};
 use iced_aw::Card;
 
 use crate::{
@@ -52,19 +49,15 @@ impl ManageRolePermissionsModal {
                     Row::with_children(vec![
                         label!(&perm.matches).into(),
                         space!(w+).into(),
-                        Toggler::new(
-                            matches!(Mode::from_i32(perm.mode).unwrap_or(Mode::Deny), Mode::Allow),
-                            None,
-                            move |set| {
-                                Message::SetPerm(
-                                    Permission {
-                                        matches: matches.clone(),
-                                        mode: set.then(|| Mode::Allow).unwrap_or(Mode::Deny).into(),
-                                    },
-                                    false,
-                                )
-                            },
-                        )
+                        Toggler::new(perm.ok, None, move |set| {
+                            Message::SetPerm(
+                                Permission {
+                                    matches: matches.clone(),
+                                    ok: set,
+                                },
+                                false,
+                            )
+                        })
                         .width(length!(-))
                         .style(theme)
                         .into(),
@@ -128,7 +121,7 @@ impl ManageRolePermissionsModal {
         let role_id = self.role_id;
         let (role_color, role_name) = guild
             .and_then(|g| g.roles.get(&role_id).map(|r| (r.color, r.name.as_str())))
-            .unwrap_or(((255, 255, 255), "role deleted?"));
+            .unwrap_or(([255, 255, 255], "role deleted?"));
         let color = tuple_to_iced_color(role_color);
 
         let mut label_widgets = Vec::with_capacity(3);
@@ -189,18 +182,15 @@ impl ManageRolePermissionsModal {
                         permissions.push(perm);
                     }
 
-                    let perm_list = PermissionList { permissions };
                     let channel_id = self.channel_id.unwrap_or(0);
 
                     client.mk_cmd(
                         |inner| async move {
                             inner
-                                .chat()
-                                .await
-                                .set_permissions(
+                                .call(
                                     SetPermissions::new(guild_id, role_id)
-                                        .channel_id(channel_id)
-                                        .perms(Some(perm_list)),
+                                        .with_channel_id(channel_id)
+                                        .with_perms_to_give(permissions),
                                 )
                                 .await
                         },
@@ -214,13 +204,7 @@ impl ManageRolePermissionsModal {
                 Message::AddPerm => {
                     let matches = self.new_perm_name.drain(..).collect();
                     self.update(
-                        Message::SetPerm(
-                            Permission {
-                                matches,
-                                mode: Mode::Allow.into(),
-                            },
-                            false,
-                        ),
+                        Message::SetPerm(Permission { matches, ok: true }, false),
                         client,
                         guild_id,
                     )

@@ -1,11 +1,8 @@
-use bool_ext::BoolExt;
 use chrono::NaiveDateTime;
 use harmony_rust_sdk::{
     api::{
-        harmonytypes::{
-            self, content, r#override::Reason, ContentEmbed, ContentFiles, ContentText, Message as HarmonyMessage,
-            Minithumbnail,
-        },
+        chat::{self, color, content, embed, r#override::Reason, Message as HarmonyMessage, Minithumbnail},
+        harmonytypes::FormattedText,
         Hmc,
     },
     client::{api::rest::FileId, exports::reqwest::Url},
@@ -15,7 +12,7 @@ use rand::Rng;
 use smol_str::SmolStr;
 use std::{str::FromStr, time::UNIX_EPOCH};
 
-use crate::{color, HarmonyToken, IndexMap};
+use crate::{HarmonyToken, IndexMap};
 
 use super::{content::MAX_THUMB_SIZE, post_heading, PostProcessEvent};
 
@@ -24,16 +21,16 @@ pub type Messages = IndexMap<MessageId, Message>;
 #[derive(Debug, Clone)]
 pub struct EmbedField {
     pub title: String,
-    pub subtitle: String,
-    pub body: String,
+    pub subtitle: Option<String>,
+    pub body: Option<String>,
 }
 
-impl From<EmbedField> for harmonytypes::EmbedField {
-    fn from(f: EmbedField) -> harmonytypes::EmbedField {
-        harmonytypes::EmbedField {
+impl From<EmbedField> for embed::EmbedField {
+    fn from(f: EmbedField) -> embed::EmbedField {
+        embed::EmbedField {
             title: f.title,
             subtitle: f.subtitle,
-            body: f.body,
+            body: f.body.map(|text| FormattedText::default().with_text(text)),
             ..Default::default()
         }
     }
@@ -44,16 +41,16 @@ pub struct EmbedHeading {
     pub url: Option<SmolStr>,
     pub icon: Option<FileId>,
     pub text: String,
-    pub subtext: String,
+    pub subtext: Option<String>,
 }
 
-impl From<EmbedHeading> for harmonytypes::EmbedHeading {
-    fn from(h: EmbedHeading) -> harmonytypes::EmbedHeading {
-        harmonytypes::EmbedHeading {
-            icon: h.icon.map_or_else(String::default, |id| id.to_string()),
+impl From<EmbedHeading> for embed::EmbedHeading {
+    fn from(h: EmbedHeading) -> embed::EmbedHeading {
+        embed::EmbedHeading {
+            icon: h.icon.map(|id| id.to_string()),
             subtext: h.subtext,
             text: h.text,
-            url: h.url.map_or_else(String::default, Into::into),
+            url: h.url.map(Into::into),
         }
     }
 }
@@ -61,18 +58,18 @@ impl From<EmbedHeading> for harmonytypes::EmbedHeading {
 #[derive(Debug, Clone)]
 pub struct Embed {
     pub title: String,
-    pub body: String,
-    pub color: (u8, u8, u8),
+    pub body: Option<String>,
+    pub color: Option<[u8; 3]>,
     pub footer: Option<EmbedHeading>,
     pub header: Option<EmbedHeading>,
     pub fields: Vec<EmbedField>,
 }
 
-impl From<Embed> for harmonytypes::Embed {
-    fn from(e: Embed) -> harmonytypes::Embed {
-        harmonytypes::Embed {
-            body: e.body,
-            color: color::encode_rgb(e.color),
+impl From<Embed> for chat::Embed {
+    fn from(e: Embed) -> chat::Embed {
+        chat::Embed {
+            body: e.body.map(|text| FormattedText::default().with_text(text)),
+            color: e.color.map(color::encode_rgb),
             fields: e.fields.into_iter().map(Into::into).collect(),
             title: e.title,
             footer: e.footer.map(Into::into),
@@ -91,13 +88,13 @@ pub struct Attachment {
     pub minithumbnail: Option<Minithumbnail>,
 }
 
-impl From<Attachment> for harmonytypes::Attachment {
-    fn from(a: Attachment) -> harmonytypes::Attachment {
-        harmonytypes::Attachment {
+impl From<Attachment> for chat::Attachment {
+    fn from(a: Attachment) -> chat::Attachment {
+        chat::Attachment {
             id: a.id.to_string(),
             name: a.name,
-            size: a.size as i32,
-            r#type: a.kind,
+            size: a.size,
+            mimetype: a.kind,
             caption: Default::default(),
         }
     }
@@ -119,10 +116,10 @@ impl Attachment {
         matches!(self.kind.split('/').next(), Some("image")) && (self.size as u64) < MAX_THUMB_SIZE
     }
 
-    pub fn from_harmony_attachment(attachment: harmonytypes::Attachment) -> Option<Self> {
+    pub fn from_harmony_attachment(attachment: chat::Attachment) -> Option<Self> {
         Some(Attachment {
             id: FileId::from_str(&attachment.id).ok()?,
-            kind: attachment.r#type,
+            kind: attachment.mimetype,
             name: attachment.name,
             size: attachment.size as u32,
             resolution: None,
@@ -130,7 +127,7 @@ impl Attachment {
         })
     }
 
-    pub fn from_harmony_photo(photo: harmonytypes::Photo) -> Option<Self> {
+    pub fn from_harmony_photo(photo: chat::Photo) -> Option<Self> {
         Some(Attachment {
             id: FileId::Hmc(Hmc::from_str(&photo.hmc).ok()?),
             kind: "image/jpeg".into(),
@@ -144,16 +141,16 @@ impl Attachment {
 
 #[derive(Debug, Default, Clone)]
 pub struct Override {
-    pub name: String,
+    pub name: Option<String>,
     pub avatar_url: Option<FileId>,
     pub reason: Option<Reason>,
 }
 
-impl From<Override> for harmonytypes::Override {
+impl From<Override> for chat::Override {
     fn from(o: Override) -> Self {
         Self {
-            avatar: o.avatar_url.map_or_else(String::default, |id| id.to_string()),
-            name: o.name,
+            avatar: o.avatar_url.map(|id| id.to_string()),
+            username: o.name,
             reason: o.reason,
         }
     }
@@ -201,12 +198,14 @@ pub enum Content {
 impl From<Content> for content::Content {
     fn from(c: Content) -> content::Content {
         match c {
-            Content::Text(content) => content::Content::TextMessage(ContentText { content }),
-            Content::Embeds(embeds) => content::Content::EmbedMessage(ContentEmbed {
-                embeds: Some(Box::new((*embeds).into())),
+            Content::Text(content) => content::Content::TextMessage(content::TextContent {
+                content: Some(FormattedText::default().with_text(content)),
             }),
-            Content::Files(attachments) => content::Content::FilesMessage(ContentFiles {
-                attachments: attachments.into_iter().map(Into::into).collect(),
+            Content::Embeds(embeds) => content::Content::EmbedMessage(content::EmbedContent {
+                embed: Some(Box::new((*embeds).into())),
+            }),
+            Content::Files(attachments) => content::Content::AttachmentMessage(content::AttachmentContent {
+                files: attachments.into_iter().map(Into::into).collect(),
             }),
         }
     }
@@ -215,18 +214,18 @@ impl From<Content> for content::Content {
 impl From<content::Content> for Content {
     fn from(content: content::Content) -> Self {
         match content {
-            content::Content::TextMessage(text) => Self::Text(text.content),
-            content::Content::FilesMessage(files) => Self::Files(
+            content::Content::TextMessage(text) => Self::Text(text.content.map_or_else(String::new, |f| f.text)),
+            content::Content::AttachmentMessage(files) => Self::Files(
                 files
-                    .attachments
+                    .files
                     .into_iter()
                     .flat_map(Attachment::from_harmony_attachment)
                     .collect(),
             ),
             content::Content::EmbedMessage(embeds) => {
-                Self::Embeds(Box::new((*embeds.embeds.unwrap_or_default()).into()))
+                Self::Embeds(Box::new((*embeds.embed.unwrap_or_default()).into()))
             }
-            content::Content::PhotosMessage(photos) => Self::Files(
+            content::Content::PhotoMessage(photos) => Self::Files(
                 photos
                     .photos
                     .into_iter()
@@ -245,7 +244,6 @@ impl Default for Content {
 
 #[derive(Debug, Clone)]
 pub struct Message {
-    pub id: MessageId,
     pub content: Content,
     pub sender: u64,
     pub timestamp: NaiveDateTime,
@@ -313,7 +311,6 @@ impl Message {
 impl Default for Message {
     fn default() -> Self {
         Self {
-            id: Default::default(),
             content: Default::default(),
             sender: Default::default(),
             timestamp: {
@@ -327,32 +324,32 @@ impl Default for Message {
     }
 }
 
-impl From<harmonytypes::Override> for Override {
-    fn from(overrides: harmonytypes::Override) -> Self {
+impl From<chat::Override> for Override {
+    fn from(overrides: chat::Override) -> Self {
         Override {
-            name: overrides.name,
-            avatar_url: FileId::from_str(&overrides.avatar).ok(),
+            name: overrides.username,
+            avatar_url: overrides.avatar.map(|a| FileId::from_str(&a).ok()).flatten(),
             reason: overrides.reason,
         }
     }
 }
 
-impl From<harmonytypes::EmbedHeading> for EmbedHeading {
-    fn from(h: harmonytypes::EmbedHeading) -> Self {
+impl From<embed::EmbedHeading> for EmbedHeading {
+    fn from(h: embed::EmbedHeading) -> Self {
         EmbedHeading {
             text: h.text,
             subtext: h.subtext,
-            url: h.url.is_empty().some(h.url.into()),
-            icon: FileId::from_str(&h.icon).ok(),
+            url: h.url.map(Into::into),
+            icon: h.icon.map(|i| FileId::from_str(&i).ok()).flatten(),
         }
     }
 }
 
-impl From<harmonytypes::Embed> for Embed {
-    fn from(e: harmonytypes::Embed) -> Self {
+impl From<chat::Embed> for Embed {
+    fn from(e: chat::Embed) -> Self {
         Embed {
             title: e.title,
-            body: e.body,
+            body: e.body.map(|f| f.text),
             footer: e.footer.map(From::from),
             header: e.header.map(From::from),
             fields: e
@@ -361,10 +358,10 @@ impl From<harmonytypes::Embed> for Embed {
                 .map(|f| EmbedField {
                     title: f.title,
                     subtitle: f.subtitle,
-                    body: f.body,
+                    body: f.body.map(|f| f.text),
                 })
                 .collect(),
-            color: color::decode_rgb(e.color),
+            color: e.color.map(color::decode_rgb),
         }
     }
 }
@@ -372,13 +369,12 @@ impl From<harmonytypes::Embed> for Embed {
 impl From<HarmonyMessage> for Message {
     fn from(message: HarmonyMessage) -> Self {
         Message {
-            reply_to: (message.in_reply_to != 0).then(|| message.in_reply_to),
+            reply_to: message.in_reply_to,
             content: message
                 .content
                 .and_then(|c| c.content)
                 .map(|c| c.into())
                 .unwrap_or_default(),
-            id: MessageId::Ack(message.message_id),
             sender: message.author_id,
             timestamp: {
                 let t = message

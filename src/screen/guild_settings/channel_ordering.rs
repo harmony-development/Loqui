@@ -1,6 +1,12 @@
 use client::{
     error::ClientError,
-    harmony_rust_sdk::{api::chat::Place, client::api::chat::channel::UpdateChannelOrder},
+    harmony_rust_sdk::{
+        api::chat::{
+            all_permissions::{CHANNELS_MANAGE_CHANGE_INFORMATION, CHANNELS_MANAGE_CREATE, CHANNELS_MANAGE_MOVE},
+            Place,
+        },
+        client::api::chat::channel::UpdateChannelOrder,
+    },
     Client,
 };
 use iced::Tooltip;
@@ -128,7 +134,7 @@ impl Tab for OrderingTab {
                     .into(),
                 );
                 content_widgets.push(space!(w+).into());
-                if channel.user_perms.manage_channel {
+                if channel.has_perm(CHANNELS_MANAGE_CHANGE_INFORMATION) {
                     content_widgets.push(
                         Tooltip::new(
                             Button::new(edit_state, icon(Icon::Pencil))
@@ -141,7 +147,7 @@ impl Tab for OrderingTab {
                         .into(),
                     );
                 }
-                if guild.user_perms.update_channel_order {
+                if guild.has_perm(CHANNELS_MANAGE_MOVE) {
                     let channel_index = guild.channels.get_index_of(&channel_id).unwrap();
 
                     let up_place = guild
@@ -187,7 +193,7 @@ impl Tab for OrderingTab {
 
                 channels = channels.push(Container::new(row(content_widgets)).style(theme));
             }
-            if guild.user_perms.create_channel {
+            if guild.has_perm(CHANNELS_MANAGE_CREATE) {
                 channels = channels.push(
                     fill_container(
                         label_button!(&mut self.create_channel_state, "Create Channel")

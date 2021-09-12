@@ -3,10 +3,7 @@ use std::ops::Not;
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
 use client::{
     bool_ext::BoolExt,
-    harmony_rust_sdk::{
-        api::chat::DeleteChannelRequest,
-        client::api::chat::channel::{UpdateChannelInformation, UpdateChannelInformationSelfBuilder},
-    },
+    harmony_rust_sdk::{api::chat::DeleteChannelRequest, client::api::chat::channel::UpdateChannelInformation},
 };
 use iced_aw::Card;
 
@@ -113,11 +110,7 @@ impl UpdateChannelModal {
                     client.mk_cmd(
                         |inner| async move {
                             inner
-                                .chat()
-                                .await
-                                .update_channel_information(
-                                    UpdateChannelInformation::new(guild_id, channel_id).new_name(channel_name),
-                                )
+                                .call(UpdateChannelInformation::new(guild_id, channel_id).with_new_name(channel_name))
                                 .await
                         },
                         map_to_nothing,
