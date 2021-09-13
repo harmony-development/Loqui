@@ -45,11 +45,12 @@ use client::{
             mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
             profile::{stream_event::Event as ProfileEvent, GetProfileRequest, Profile, ProfileUpdated, UserStatus},
             rest::FileId,
+            Endpoint,
         },
         client::{
             api::{auth::AuthStepResponse, chat::EventSource, profile::UpdateProfile, rest::download_extract_file},
             error::{ClientError as InnerClientError, InternalClientError as HrpcClientError},
-            CallRequest, Client as InnerClient, EventsSocket,
+            Client as InnerClient, EventsSocket,
         },
     },
     tracing::{debug, error, warn},
@@ -451,7 +452,7 @@ impl ScreenManager {
                                 .zip(IntoIter::new(perm_queries))
                                 .filter_map(|(perm, query)| {
                                     let perm =
-                                        <QueryHasPermissionRequest as CallRequest>::Response::decode(perm.as_slice())
+                                        <QueryHasPermissionRequest as Endpoint>::Response::decode(perm.as_slice())
                                             .ok()?;
                                     Some(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
                                         guild_id,
@@ -541,7 +542,7 @@ impl ScreenManager {
                                 .zip(IntoIter::new(perm_queries))
                                 .filter_map(|(perm, query)| {
                                     let perm =
-                                        <QueryHasPermissionRequest as CallRequest>::Response::decode(perm.as_slice())
+                                        <QueryHasPermissionRequest as Endpoint>::Response::decode(perm.as_slice())
                                             .ok()?;
                                     Some(Ok(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
                                         guild_id,
@@ -980,11 +981,10 @@ impl Application for ScreenManager {
                                             .into_iter()
                                             .zip(chunk.into_iter())
                                             .filter_map(|(resp, user_id)| {
-                                                let profile = <GetProfileRequest as CallRequest>::Response::decode(
-                                                    resp.as_slice(),
-                                                )
-                                                .ok()?
-                                                .profile?;
+                                                let profile =
+                                                    <GetProfileRequest as Endpoint>::Response::decode(resp.as_slice())
+                                                        .ok()?
+                                                        .profile?;
                                                 Some(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
                                                     user_id,
                                                     new_avatar: Some(profile.user_avatar),
