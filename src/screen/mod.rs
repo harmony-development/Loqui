@@ -38,10 +38,7 @@ use client::{
                 stream_event::Event as EmoteEvent, EmotePackAdded, EmotePackEmotesUpdated, GetEmotePackEmotesRequest,
                 GetEmotePacksRequest,
             },
-            exports::{
-                hrpc::encode_protobuf_message_to,
-                prost::{bytes::BytesMut, Message as ProstMessage},
-            },
+            exports::{hrpc::encode_protobuf_message, prost::Message as ProstMessage},
             mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
             profile::{stream_event::Event as ProfileEvent, GetProfileRequest, Profile, ProfileUpdated, UserStatus},
             rest::FileId,
@@ -430,7 +427,6 @@ impl ScreenManager {
                     |inner| async move {
                         let perm_queries = ["channels.manage.change-information", "messages.send"];
                         let mut events = Vec::with_capacity(perm_queries.len());
-                        let mut buf = BytesMut::new();
                         let batch_query = BatchSameRequest::new(
                             QueryHasPermissionRequest::ENDPOINT_PATH.to_string(),
                             IntoIter::new(perm_queries)
@@ -441,8 +437,7 @@ impl ScreenManager {
                                         None,
                                         query.to_string(),
                                     );
-                                    encode_protobuf_message_to(&mut buf, query);
-                                    buf.to_vec()
+                                    encode_protobuf_message(query).freeze()
                                 })
                                 .collect(),
                         );
@@ -451,9 +446,8 @@ impl ScreenManager {
                                 .into_iter()
                                 .zip(IntoIter::new(perm_queries))
                                 .filter_map(|(perm, query)| {
-                                    let perm =
-                                        <QueryHasPermissionRequest as Endpoint>::Response::decode(perm.as_slice())
-                                            .ok()?;
+                                    let perm = <QueryHasPermissionRequest as Endpoint>::Response::decode(perm.as_ref())
+                                        .ok()?;
                                     Some(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
                                         guild_id,
                                         channel_id: Some(channel_id),
@@ -525,14 +519,12 @@ impl ScreenManager {
                             "permissions.manage.get",
                         ];
                         events.reserve(perm_queries.len());
-                        let mut buf = BytesMut::new();
                         let batch_query = BatchSameRequest::new(
                             QueryHasPermissionRequest::ENDPOINT_PATH.to_string(),
                             IntoIter::new(perm_queries)
                                 .map(|query| {
                                     let query = QueryHasPermissionRequest::new(guild_id, None, None, query.to_string());
-                                    encode_protobuf_message_to(&mut buf, query);
-                                    buf.to_vec()
+                                    encode_protobuf_message(query).freeze()
                                 })
                                 .collect(),
                         );
@@ -541,9 +533,8 @@ impl ScreenManager {
                                 .into_iter()
                                 .zip(IntoIter::new(perm_queries))
                                 .filter_map(|(perm, query)| {
-                                    let perm =
-                                        <QueryHasPermissionRequest as Endpoint>::Response::decode(perm.as_slice())
-                                            .ok()?;
+                                    let perm = <QueryHasPermissionRequest as Endpoint>::Response::decode(perm.as_ref())
+                                        .ok()?;
                                     Some(Ok(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
                                         guild_id,
                                         channel_id: None,
@@ -764,17 +755,8 @@ impl Application for ScreenManager {
                         .or_do(|| {
                             cmds.push(Command::perform(
                                 async move {
-                                    let ev;
-                                    loop {
-                                        if let Some(event) = socket.get_event().await {
-                                            ev = event;
-                                            break;
-                                        }
-                                    }
-                                    Message::SocketEvent {
-                                        socket,
-                                        event: Some(ev.map_err(Into::into)),
-                                    }
+                                    let event = socket.get_event().await.map_err(Into::into).transpose();
+                                    Message::SocketEvent { socket, event }
                                 },
                                 identity,
                             ));
@@ -823,7 +805,7 @@ impl Application for ScreenManager {
                         events.extend(guilds.into_iter().map(|guild| {
                             Event::Chat(ChatEvent::GuildAddedToList(GuildAddedToList {
                                 guild_id: guild.guild_id,
-                                homeserver: guild.host,
+                                homeserver: guild.server_id,
                             }))
                         }));
                         events.push(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
@@ -959,7 +941,6 @@ impl Application for ScreenManager {
                     }
 
                     let client = self.client.as_ref().unwrap();
-                    let mut buf = BytesMut::new();
                     for chunk in fetch_users.chunks(64).map(|c| c.to_vec()) {
                         if !chunk.is_empty() {
                             let user_query = BatchSameRequest::new(
@@ -968,8 +949,7 @@ impl Application for ScreenManager {
                                     .iter()
                                     .map(|id| {
                                         let query = GetProfileRequest::new(*id);
-                                        encode_protobuf_message_to(&mut buf, query);
-                                        buf.to_vec()
+                                        encode_protobuf_message(query).freeze()
                                     })
                                     .collect(),
                             );
@@ -982,7 +962,7 @@ impl Application for ScreenManager {
                                             .zip(chunk.into_iter())
                                             .filter_map(|(resp, user_id)| {
                                                 let profile =
-                                                    <GetProfileRequest as Endpoint>::Response::decode(resp.as_slice())
+                                                    <GetProfileRequest as Endpoint>::Response::decode(resp.as_ref())
                                                         .ok()?
                                                         .profile?;
                                                 Some(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {

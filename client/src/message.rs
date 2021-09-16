@@ -376,12 +376,7 @@ impl From<HarmonyMessage> for Message {
                 .map(|c| c.into())
                 .unwrap_or_default(),
             sender: message.author_id,
-            timestamp: {
-                let t = message
-                    .created_at
-                    .unwrap_or_else(|| std::time::SystemTime::now().into());
-                NaiveDateTime::from_timestamp(t.seconds, t.nanos as u32)
-            },
+            timestamp: { NaiveDateTime::from_timestamp(message.created_at as i64, 0) },
             overrides: message.overrides.map(From::from),
             being_edited: None,
         }
