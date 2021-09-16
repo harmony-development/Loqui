@@ -1,5 +1,7 @@
-Crust is a Harmony client written in Rust using the [iced](https://github.com/hecrj/iced) GUI library.
-It uses [harmony-rust-sdk](https://github.com/harmony-development/harmony_rust_sdk) to communicate with Harmony servers.
+[<img src="https://gist.githubusercontent.com/hecrj/ad7ecd38f6e47ff3688a38c79fd108f0/raw/74384875ecbad02ae2a926425e9bcafd0695bade/color.svg" width="256"/>](https://github.com/hecrj/iced)
+
+Crust is a [Harmony] client written in Rust using the [iced] GUI library.
+It uses [harmony-rust-sdk] to communicate with Harmony servers.
 
 Crust supports changing colorschemes:
 ![Crust themes](resources/screenshot.png)
@@ -38,3 +40,7 @@ Make sure your system has Vulkan setup if you are on Linux.
 ### Nix
 - For flakes: `nix profile install github:harmony-development/crust`
 - For non-flakes: `nix-env -i -f "https://github.com/harmony-development/crust/tarball/master"`
+
+[Harmony]: https://github.com/harmony-development
+[harmony-rust-sdk]: https://github.com/harmony-development/harmony_rust_sdk
+[iced]: https://github.com/hecrj/iced
