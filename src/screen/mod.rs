@@ -27,7 +27,6 @@ use client::{
     harmony_rust_sdk::{
         self,
         api::{
-            batch::BatchSameRequest,
             chat::{
                 get_channel_messages_request::Direction,
                 stream_event::{Event as ChatEvent, GuildAddedToList, GuildUpdated, PermissionUpdated},
@@ -38,11 +37,9 @@ use client::{
                 stream_event::Event as EmoteEvent, EmotePackAdded, EmotePackEmotesUpdated, GetEmotePackEmotesRequest,
                 GetEmotePacksRequest,
             },
-            exports::{hrpc::encode_protobuf_message, prost::Message as ProstMessage},
             mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
             profile::{stream_event::Event as ProfileEvent, GetProfileRequest, Profile, ProfileUpdated, UserStatus},
             rest::FileId,
-            Endpoint,
         },
         client::{
             api::{auth::AuthStepResponse, chat::EventSource, profile::UpdateProfile, rest::download_extract_file},
@@ -428,35 +425,26 @@ impl ScreenManager {
                     |inner| async move {
                         let perm_queries = ["channels.manage.change-information", "messages.send"];
                         let mut events = Vec::with_capacity(perm_queries.len());
-                        let batch_query = BatchSameRequest::new(
-                            QueryHasPermissionRequest::ENDPOINT_PATH.to_string(),
-                            IntoIter::new(perm_queries)
-                                .map(|query| {
-                                    let query = QueryHasPermissionRequest::new(
-                                        guild_id,
-                                        Some(channel_id),
-                                        None,
-                                        query.to_string(),
-                                    );
-                                    encode_protobuf_message(query).freeze()
-                                })
-                                .collect(),
-                        );
-                        events.extend(inner.call(batch_query).await.map(|resp| {
-                            resp.responses
+                        let queries = IntoIter::new(perm_queries)
+                            .map(|query| {
+                                QueryHasPermissionRequest::new(guild_id, Some(channel_id), None, query.to_string())
+                            })
+                            .collect();
+                        events.extend(
+                            inner
+                                .batch_call(queries)
+                                .await?
                                 .into_iter()
                                 .zip(IntoIter::new(perm_queries))
-                                .filter_map(|(perm, query)| {
-                                    let perm = <QueryHasPermissionRequest as Endpoint>::Response::decode(perm.as_ref())
-                                        .ok()?;
-                                    Some(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
+                                .map(|(resp, query)| {
+                                    Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
                                         guild_id,
                                         channel_id: Some(channel_id),
-                                        ok: perm.ok,
+                                        ok: resp.ok,
                                         query: query.to_string(),
-                                    })))
-                                })
-                        })?);
+                                    }))
+                                }),
+                        );
                         ClientResult::Ok(events)
                     },
                     Message::EventsReceived,
@@ -520,28 +508,20 @@ impl ScreenManager {
                             "permissions.manage.get",
                         ];
                         events.reserve(perm_queries.len());
-                        let batch_query = BatchSameRequest::new(
-                            QueryHasPermissionRequest::ENDPOINT_PATH.to_string(),
-                            IntoIter::new(perm_queries)
-                                .map(|query| {
-                                    let query = QueryHasPermissionRequest::new(guild_id, None, None, query.to_string());
-                                    encode_protobuf_message(query).freeze()
-                                })
-                                .collect(),
-                        );
-                        let batch_resp = inner.call(batch_query).await.map(|resp| {
-                            resp.responses
+                        let queries = IntoIter::new(perm_queries)
+                            .map(|query| QueryHasPermissionRequest::new(guild_id, None, None, query.to_string()))
+                            .collect();
+                        let batch_resp = inner.batch_call(queries).await.map(|response| {
+                            response
                                 .into_iter()
                                 .zip(IntoIter::new(perm_queries))
-                                .filter_map(|(perm, query)| {
-                                    let perm = <QueryHasPermissionRequest as Endpoint>::Response::decode(perm.as_ref())
-                                        .ok()?;
-                                    Some(Ok(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
+                                .map(|(resp, query)| {
+                                    Ok(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
                                         guild_id,
                                         channel_id: None,
-                                        ok: perm.ok,
+                                        ok: resp.ok,
                                         query: query.to_string(),
-                                    }))))
+                                    })))
                                 })
                         });
                         match batch_resp {
@@ -944,28 +924,15 @@ impl Application for ScreenManager {
                     let client = self.client.as_ref().unwrap();
                     for chunk in fetch_users.chunks(64).map(|c| c.to_vec()) {
                         if !chunk.is_empty() {
-                            let user_query = BatchSameRequest::new(
-                                GetProfileRequest::ENDPOINT_PATH.to_string(),
-                                chunk
-                                    .iter()
-                                    .map(|id| {
-                                        let query = GetProfileRequest::new(*id);
-                                        encode_protobuf_message(query).freeze()
-                                    })
-                                    .collect(),
-                            );
+                            let queries = chunk.iter().copied().map(GetProfileRequest::new).collect();
                             let fetch_users_cmd = client.mk_cmd(
                                 |inner| async move {
-                                    inner.call(user_query).await.map(|batch_resp| {
+                                    inner.batch_call(queries).await.map(|batch_resp| {
                                         batch_resp
-                                            .responses
                                             .into_iter()
                                             .zip(chunk.into_iter())
                                             .filter_map(|(resp, user_id)| {
-                                                let profile =
-                                                    <GetProfileRequest as Endpoint>::Response::decode(resp.as_ref())
-                                                        .ok()?
-                                                        .profile?;
+                                                let profile = resp.profile?;
                                                 Some(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
                                                     user_id,
                                                     new_avatar: Some(profile.user_avatar),
