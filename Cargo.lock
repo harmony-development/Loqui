@@ -241,9 +241,9 @@ checksum = "ad807f2fc2bf185eeb98ff3a901bd46dc5ad58163d0fa4577ba0d25674d71708"
 
 [[package]]
 name = "bumpalo"
-version = "3.7.0"
+version = "3.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c59e7af012c713f529e7a3ee57ce9b31ddd858d4b512923602f74608b009631"
+checksum = "d9df67f7bf9ef8498769f994239c45613ef0c5899415fb58e9add412d2c1a538"
 
 [[package]]
 name = "bytemuck"
@@ -1514,7 +1514,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#0fe4bea7a6d28f6584f6b53bdcc5e425c6c580e1"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#38982b2ed2562088dcb6f02c0c4a413e19ccd8cc"
 dependencies = [
  "proc-macro2",
  "quote 1.0.9",
@@ -1524,7 +1524,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#0fe4bea7a6d28f6584f6b53bdcc5e425c6c580e1"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#38982b2ed2562088dcb6f02c0c4a413e19ccd8cc"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -4106,7 +4106,7 @@ version = "0.2.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a317bf8f9fba2476b4b2c85ef4c4af8ff39c3c7f0cdfeed4f82c34a880aa837b"
 dependencies = [
- "bumpalo 3.7.0",
+ "bumpalo 3.7.1",
  "lazy_static",
  "log",
  "proc-macro2",
