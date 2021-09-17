@@ -116,25 +116,29 @@ impl ContentStore {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ColorschemeRaw {
+pub struct ThemeRaw {
     #[serde(default)]
-    pub error: String,
+    pub error_color: String,
     #[serde(default)]
-    pub success: String,
+    pub success_color: String,
     #[serde(default)]
-    pub border: String,
+    pub border_color: String,
     #[serde(default)]
-    pub primary_bg: String,
+    pub border_radius: u8,
     #[serde(default)]
-    pub secondary_bg: String,
+    pub primary_bg_color: String,
     #[serde(default)]
-    pub disabled_bg: String,
+    pub secondary_bg_color: String,
     #[serde(default)]
-    pub text: String,
+    pub disabled_bg_color: String,
     #[serde(default)]
-    pub disabled_text: String,
+    pub text_color: String,
     #[serde(default)]
-    pub accent: String,
+    pub disabled_text_color: String,
+    #[serde(default)]
+    pub dimmed_text_color: String,
+    #[serde(default)]
+    pub accent_color: String,
     #[serde(default)]
     pub mention_color: String,
 }

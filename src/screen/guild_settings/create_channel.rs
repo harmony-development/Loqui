@@ -9,7 +9,7 @@ use crate::{
     component::*,
     label, label_button, length,
     screen::ClientExt,
-    style::{Theme, ERROR_COLOR, PADDING, SPACING, SUCCESS_COLOR},
+    style::{Theme, PADDING, SPACING},
 };
 
 #[derive(Debug, Clone)]
@@ -53,7 +53,7 @@ pub struct ChannelCreationModal {
 }
 
 impl ChannelCreationModal {
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme) -> Element<Message> {
         let mut create_text_edit = TextInput::new(
             &mut self.channel_name_textedit_state,
             "Enter a channel name...",
@@ -80,7 +80,7 @@ impl ChannelCreationModal {
             ChannelState::Created { name, .. } => {
                 create_widgets.push(
                     label!("Successfully created channel {}", name)
-                        .color(SUCCESS_COLOR)
+                        .color(theme.user_theme.success)
                         .into(),
                 );
             }
@@ -89,7 +89,7 @@ impl ChannelCreationModal {
         }
 
         if self.error_text.is_empty().not() {
-            create_widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
+            create_widgets.push(label!(&self.error_text).color(theme.user_theme.error).into());
         }
         create_widgets.push(
             Row::with_children(vec![

@@ -3,7 +3,7 @@
 Crust is a [Harmony] client written in Rust using the [iced] GUI library.
 It uses [harmony-rust-sdk] to communicate with Harmony servers.
 
-Crust supports changing colorschemes:
+Crust supports changing user_themes:
 ![Crust themes](resources/screenshot.png)
 
 ![Autocompletion gif](resources/autocompletion.gif)

@@ -7,7 +7,7 @@ use crate::{
     label,
     screen::{main::Message, truncate_string},
     space,
-    style::{Theme, ALT_COLOR, AVATAR_WIDTH, DEF_SIZE, PADDING, SPACING},
+    style::{Theme, AVATAR_WIDTH, DEF_SIZE, PADDING, SPACING},
 };
 
 use client::{bool_ext::BoolExt, channel::Channel};
@@ -21,14 +21,17 @@ pub fn build_channel_list<'a>(
     state: &'a mut scrollable::State,
     buttons_state: &'a mut [button::State],
     on_button_press: fn(u64) -> Message,
-    theme: Theme,
+    theme: &Theme,
 ) -> Element<'a, Message> {
     type Item<'a, 'b> = ((&'b u64, &'b Channel), &'a mut button::State);
     let process_item = |mut list: Scrollable<'a, Message>, ((channel_id, channel), button_state): Item<'a, '_>| {
-        let read_color = channel.has_unread.then(|| Color::WHITE).unwrap_or(ALT_COLOR);
+        let read_color = channel
+            .has_unread
+            .then(|| Color::WHITE)
+            .unwrap_or(theme.user_theme.dimmed_text);
 
         let mut content_widgets = Vec::with_capacity(5);
-        content_widgets.push(channel_icon(channel));
+        content_widgets.push(channel_icon(channel, theme));
         channel
             .is_category
             .and_do(|| content_widgets.push(space!(w = SPACING).into()));
@@ -83,7 +86,7 @@ pub fn build_guild_list<'a>(
     state: &'a mut scrollable::State,
     buttons_state: &'a mut [button::State],
     on_button_press: fn(u64) -> Message,
-    theme: Theme,
+    theme: &Theme,
 ) -> Element<'a, Message> {
     let buttons_state_len = buttons_state.len();
 
@@ -93,7 +96,7 @@ pub fn build_guild_list<'a>(
             let theme = if guild.channels.values().any(|c| c.has_unread) {
                 theme.border_color(Color::WHITE)
             } else {
-                theme
+                *theme
             };
 
             Button::new(state, fill_container(content).style(theme.border_width(0.0)))

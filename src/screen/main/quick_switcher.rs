@@ -28,7 +28,7 @@ pub struct QuickSwitcherModal {
 }
 
 impl QuickSwitcherModal {
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme) -> Element<Message> {
         self.search_state.focus();
 
         let mut result_widgets = Vec::with_capacity(self.results.len());

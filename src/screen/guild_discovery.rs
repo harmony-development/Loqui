@@ -13,7 +13,7 @@ use crate::{
     client::{error::ClientError, Client},
     component::*,
     label, label_button, length, space,
-    style::{Theme, ERROR_COLOR, PADDING, SUCCESS_COLOR},
+    style::{Theme, PADDING},
 };
 
 #[derive(Clone, Debug)]
@@ -41,7 +41,7 @@ pub struct GuildDiscovery {
 }
 
 impl GuildDiscovery {
-    pub fn view(&mut self, theme: Theme, client: &Client) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme, client: &Client) -> Element<Message> {
         let mut join_text_edit = TextInput::new(
             &mut self.direct_join_textedit_state,
             "Enter a guild invite...",
@@ -90,7 +90,7 @@ impl GuildDiscovery {
                 Err(e) => {
                     self.invite.is_empty().not().and_do(|| {
                         debug!("{}", e); // We don't print this as an error since it'll spam the logs
-                        texts.push(label!(e.to_string()).color(ERROR_COLOR).into());
+                        texts.push(label!(e.to_string()).color(theme.user_theme.error).into());
                     });
                 }
             }
@@ -99,7 +99,13 @@ impl GuildDiscovery {
         self.joined_guild
             .as_ref()
             .and_then(|id| client.guilds.get(id).map(|r| &r.name))
-            .and_do(|name| texts.push(label!("Successfully joined guild {}", name).color(SUCCESS_COLOR).into()));
+            .and_do(|name| {
+                texts.push(
+                    label!("Successfully joined guild {}", name)
+                        .color(theme.user_theme.success)
+                        .into(),
+                )
+            });
 
         self.joining_guild
             .as_ref()
@@ -109,7 +115,7 @@ impl GuildDiscovery {
         self.error_text
             .is_empty()
             .not()
-            .and_do(|| texts.push(label!(err_text).color(ERROR_COLOR).into()));
+            .and_do(|| texts.push(label!(err_text).color(theme.user_theme.error).into()));
 
         create_widgets.push(
             row(vec![

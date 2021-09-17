@@ -5,7 +5,7 @@ pub use crate::{color, label, space};
 use crate::{
     length,
     screen::truncate_string,
-    style::{Theme, ALT_COLOR, DEF_SIZE, MESSAGE_SIZE},
+    style::{Theme, DEF_SIZE, MESSAGE_SIZE},
 };
 pub use chan_guild_list::build_channel_list;
 use client::{
@@ -69,14 +69,14 @@ impl CursorExt for text_input::State {
     }
 }
 
-pub fn mention_container_style(has_mention: bool, theme: Theme) -> (Theme, u16) {
+pub fn mention_container_style(has_mention: bool, theme: &Theme) -> (Theme, u16) {
     has_mention
         .then(|| {
             (
                 theme
                     .border_width(2.0)
                     .border_radius(8.0)
-                    .border_color(theme.colorscheme.mention_color),
+                    .border_color(theme.user_theme.mention_color),
                 2,
             )
         })
@@ -86,7 +86,7 @@ pub fn mention_container_style(has_mention: bool, theme: Theme) -> (Theme, u16) 
 pub fn make_reply_message<'a, M: Clone + 'a>(
     reply_message: Option<(MessageId, &Message)>,
     client: &Client,
-    theme: Theme,
+    theme: &Theme,
     message: fn(MessageId) -> M,
     but_state: &'a mut button::State,
 ) -> Button<'a, M> {
@@ -176,13 +176,15 @@ pub fn icon(icon: Icon) -> Text {
     label!(icon).font(iced_aw::ICON_FONT)
 }
 
-pub fn channel_icon<'a, M: 'a>(channel: &Channel) -> Element<'a, M> {
+pub fn channel_icon<'a, M: 'a>(channel: &Channel, theme: &Theme) -> Element<'a, M> {
     let (channel_name_prefix, channel_prefix_size) = channel
         .is_category
         .then(|| (Icon::ListNested, DEF_SIZE - 4))
         .unwrap_or((Icon::Hash, DEF_SIZE));
 
-    let icon_content = icon(channel_name_prefix).color(ALT_COLOR).size(channel_prefix_size);
+    let icon_content = icon(channel_name_prefix)
+        .color(theme.user_theme.dimmed_text)
+        .size(channel_prefix_size);
     if channel.is_category {
         Column::with_children(vec![space!(h = SPACING - (SPACING / 4)).into(), icon_content.into()])
             .align_items(Align::Center)

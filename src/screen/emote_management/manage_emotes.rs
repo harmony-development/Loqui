@@ -37,7 +37,7 @@ pub struct ManageEmotesModal {
 }
 
 impl ManageEmotesModal {
-    pub fn view<'a>(&'a mut self, theme: Theme, client: &Client, thumbnails: &ThumbnailCache) -> Element<'a, Message> {
+    pub fn view<'a>(&'a mut self, theme: &Theme, client: &Client, thumbnails: &ThumbnailCache) -> Element<'a, Message> {
         let mut emotes = Scrollable::new(&mut self.emotes_state)
             .style(theme)
             .align_items(Align::Start)

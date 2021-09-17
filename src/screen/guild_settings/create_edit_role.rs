@@ -12,7 +12,7 @@ use crate::{
     component::*,
     label, label_button, length,
     screen::ClientExt,
-    style::{Theme, ERROR_COLOR, PADDING, SPACING, SUCCESS_COLOR},
+    style::{Theme, PADDING, SPACING},
 };
 
 #[derive(Debug, Clone)]
@@ -62,7 +62,7 @@ pub struct RoleModal {
 }
 
 impl RoleModal {
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme) -> Element<Message> {
         let mut create_text_edit = TextInput::new(
             &mut self.role_name_textedit_state,
             "Enter a role name...",
@@ -92,7 +92,7 @@ impl RoleModal {
                 let keyword = self.editing.is_some().then(|| "edited").unwrap_or("created");
                 create_widgets.push(
                     label!("Successfully {} role {}", keyword, name)
-                        .color(SUCCESS_COLOR)
+                        .color(theme.user_theme.success)
                         .into(),
                 );
             }
@@ -104,7 +104,7 @@ impl RoleModal {
         }
 
         if self.error_text.is_empty().not() {
-            create_widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
+            create_widgets.push(label!(&self.error_text).color(theme.user_theme.error).into());
         }
         let mut buttons = Vec::with_capacity(2);
         buttons.push(create.width(length!(+)).into());

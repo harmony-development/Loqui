@@ -18,12 +18,12 @@ use crate::{
         Client, PostProcessEvent, Session,
     },
     component::*,
-    style::{Colorscheme, Theme, AVATAR_WIDTH, PROFILE_AVATAR_WIDTH},
+    style::{Theme, UserTheme, AVATAR_WIDTH, PROFILE_AVATAR_WIDTH},
 };
 
 use client::{
     bool_ext::BoolExt,
-    content::ColorschemeRaw,
+    content::ThemeRaw,
     harmony_rust_sdk::{
         self,
         api::{
@@ -207,12 +207,12 @@ impl Screen {
     #[inline(always)]
     fn view<'a>(
         &'a mut self,
-        theme: Theme,
+        theme: &'a Theme,
         client: Option<&'a Client>,
         content_store: &'a Arc<ContentStore>,
         thumbnail_cache: &'a ThumbnailCache,
     ) -> Element<Message> {
-        match self {
+        let element = match self {
             Screen::Login(screen) => screen.view(theme, content_store).map(ScreenMessage::LoginScreen),
             Screen::Main(screen) => screen
                 .view(
@@ -231,7 +231,8 @@ impl Screen {
                 .view(theme, client.unwrap(), thumbnail_cache) // This will not panic cause [ref:client_set_before_main_view]
                 .map(ScreenMessage::EmoteManagement),
         }
-        .map(|msg| Message::ChildMessage(msg.into()))
+        .map(|msg| Message::ChildMessage(msg.into()));
+        fill_container(element).style(theme.border_radius(0.0)).into()
     }
 
     #[inline(always)]
@@ -343,7 +344,7 @@ impl ScreenStack {
 }
 
 pub struct ScreenManager {
-    theme: Theme,
+    theme: Box<Theme>,
     screens: ScreenStack,
     client: Option<Box<Client>>,
     content_store: Arc<ContentStore>,
@@ -384,7 +385,7 @@ impl ScreenManager {
         });
 
         let mut this = Self {
-            theme: Theme::default(),
+            theme: Box::new(Theme::default()),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new().into())),
             client: None,
             content_store,
@@ -396,18 +397,18 @@ impl ScreenManager {
             theme_rx: ev_rx,
         };
 
-        this.reload_colorscheme();
+        this.reload_user_theme();
 
         this
     }
 
-    fn reload_colorscheme(&mut self) {
-        let colorscheme = std::fs::read(self.content_store.theme_file())
+    fn reload_user_theme(&mut self) {
+        let user_theme = std::fs::read(self.content_store.theme_file())
             .ok()
-            .and_then(|data| toml::from_slice::<ColorschemeRaw>(&data).ok())
-            .map_or_else(Default::default, Colorscheme::from);
+            .and_then(|data| toml::from_slice::<ThemeRaw>(&data).ok())
+            .map_or_else(Default::default, UserTheme::from);
 
-        self.theme.colorscheme = colorscheme;
+        self.theme.user_theme = user_theme;
     }
 
     fn process_post_event(&mut self, post: PostProcessEvent, clip: &mut iced::Clipboard) -> Command<Message> {
@@ -681,7 +682,7 @@ impl Application for ScreenManager {
         });
 
         if self.theme_rx.try_recv().is_ok() {
-            self.reload_colorscheme();
+            self.reload_user_theme();
         }
 
         match msg {
@@ -1146,7 +1147,7 @@ impl Application for ScreenManager {
 
     fn view(&mut self) -> Element<Self::Message> {
         self.screens.current_mut().view(
-            self.theme,
+            self.theme.as_ref(),
             self.client.as_ref().map(Box::as_ref),
             &self.content_store,
             &self.thumbnail_cache,

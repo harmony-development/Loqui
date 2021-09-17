@@ -22,7 +22,7 @@ use crate::{
         Screen as TopLevelScreen,
     },
     space,
-    style::{tuple_to_iced_color, Theme, ERROR_COLOR, PADDING, SPACING},
+    style::{tuple_to_iced_color, Theme, PADDING, SPACING},
 };
 
 use std::fmt::{self, Display, Formatter};
@@ -154,7 +154,7 @@ impl Tab for RolesTab {
         client: &Client,
         guild_id: u64,
         _: &mut GuildMetadata,
-        theme: Theme,
+        theme: &Theme,
         _: &ThumbnailCache,
     ) -> Element<'_, ParentMessage> {
         let mut roles = Scrollable::new(&mut self.role_list_state)
@@ -318,7 +318,7 @@ impl Tab for RolesTab {
         let mut content = Vec::with_capacity(4);
 
         if !self.error_message.is_empty() {
-            content.push(label!(self.error_message.as_str()).color(ERROR_COLOR).into())
+            content.push(label!(self.error_message.as_str()).color(theme.user_theme.error).into())
         }
         let mut options = Vec::with_capacity(guild.map_or(0, |g| g.channels.len()) + 1);
         options.push(ChannelSelection(None));

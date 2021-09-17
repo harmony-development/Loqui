@@ -696,6 +696,7 @@ dependencies = [
  "iced_aw",
  "iced_native",
  "image",
+ "lazy_static",
  "notify",
  "notify-rust",
  "open",
@@ -1590,9 +1591,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.11.0"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05f0d7339b7150e8bf94e5d935502e988b1d9d7ccae2f551206816010520bb44"
+checksum = "9e42835bb7b772101771dfc64a451c4fac4f3c60130324c33027f0237d8d477b"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1658,9 +1659,9 @@ checksum = "6456b8a6c8f33fee7d958fcd1b60d55b11940a79e63ae87013e6d22e26034440"
 
 [[package]]
 name = "hyper"
-version = "0.14.12"
+version = "0.14.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13f67199e765030fa08fe0bd581af683f0d5bc04ea09c2b1102012c5fb90e7fd"
+checksum = "15d1cfb9e4f68655fa04c01f59edb405b6074a0f7118ea881e5026e4a1cd8593"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -2432,9 +2433,9 @@ dependencies = [
 
 [[package]]
 name = "notify-rust"
-version = "4.5.2"
+version = "4.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a2ca742cd7268b60c35828d318357f0b1bb9b82088e157ccf3013eb3ce70247"
+checksum = "e4b2d5d72d16b6abdb6fa2c364d9363e23d6ed7c20c1a1e85fd8cd880144442c"
 dependencies = [
  "mac-notification-sys",
  "serde",
@@ -3863,9 +3864,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.2.22"
+version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62af966210b88ad5776ee3ba12d5f35b8d6a2b2a12168f3080cf02b814d7376b"
+checksum = "56c42e73a9d277d4d2b6a88389a137ccf3c58599660b17e8f5fc39305e490669"
 dependencies = [
  "ansi_term",
  "chrono",

@@ -320,7 +320,7 @@ impl GuildSettings {
 
     pub fn view<'a>(
         &'a mut self,
-        theme: Theme,
+        theme: &'a Theme,
         client: &'a Client,
         thumbnail_cache: &ThumbnailCache,
     ) -> Element<'_, Message> {
@@ -451,7 +451,7 @@ trait Tab {
         client: &Client,
         guild_id: u64,
         meta_data: &mut GuildMetadata,
-        theme: Theme,
+        theme: &Theme,
         thumbnail_cache: &ThumbnailCache,
     ) -> Element<'_, Self::Message> {
         fill_container(self.content(client, guild_id, meta_data, theme, thumbnail_cache))
@@ -465,7 +465,7 @@ trait Tab {
         client: &Client,
         guild_id: u64,
         meta_data: &mut GuildMetadata,
-        theme: Theme,
+        theme: &Theme,
         thumbnail_cache: &ThumbnailCache,
     ) -> Element<'_, Self::Message>;
 }

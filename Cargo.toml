@@ -63,6 +63,7 @@ tracing-appender = "0.1"
 fuzzy-matcher = "0.3.7"
 notify-rust = "4"
 notify = { git = "https://github.com/notify-rs/notify.git", tag = "5.0.0-pre.11" }
+lazy_static = "1"
 
 [package.metadata.nix]
 longDescription = """

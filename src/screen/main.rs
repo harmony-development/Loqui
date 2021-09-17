@@ -63,9 +63,7 @@ use crate::{
     label, label_button, length,
     screen::{map_send_msg, map_to_nothing, select_files, truncate_string, ClientExt, ResultExt},
     space,
-    style::{
-        tuple_to_iced_color, Theme, ALT_COLOR, AVATAR_WIDTH, DEF_SIZE, ERROR_COLOR, MESSAGE_SIZE, PADDING, SPACING,
-    },
+    style::{tuple_to_iced_color, Theme, AVATAR_WIDTH, DEF_SIZE, MESSAGE_SIZE, PADDING, SPACING},
 };
 
 use self::quick_switcher::QuickSwitcherModal;
@@ -254,7 +252,7 @@ pub struct MainScreen {
 impl MainScreen {
     pub fn view<'a>(
         &'a mut self,
-        theme: Theme,
+        theme: &'a Theme,
         client: &'a Client,
         thumbnail_cache: &'a ThumbnailCache,
     ) -> Element<'a, Message> {
@@ -307,7 +305,7 @@ impl MainScreen {
         .placeholder(current_username)
         .width(length!(+))
         .padding(PADDING / 2)
-        .style(theme.placeholder_color(theme.colorscheme.text));
+        .style(theme.placeholder_color(theme.user_theme.text));
 
         let status_menu = PickList::new(
             &mut self.status_list,
@@ -441,7 +439,7 @@ impl MainScreen {
             .placeholder(truncate_string(&guild.name, 16))
             .width(length!(+))
             .padding(PADDING / 2)
-            .style(theme.placeholder_color(theme.colorscheme.text));
+            .style(theme.placeholder_color(theme.user_theme.text));
 
             self.channels_buts_state
                 .resize_with(guild.channels.len(), Default::default);
@@ -600,8 +598,8 @@ impl MainScreen {
                                                     None => space!(= LEN, LEN).into(),
                                                 };
                                             let bg_color = (current.as_deref() == Some(emote_name))
-                                                .then(|| theme.colorscheme.accent)
-                                                .unwrap_or(theme.colorscheme.primary_bg);
+                                                .then(|| theme.user_theme.accent)
+                                                .unwrap_or(theme.user_theme.primary_bg);
                                             Container::new(
                                                 Row::with_children(vec![
                                                     image,
@@ -686,8 +684,8 @@ impl MainScreen {
                                             }
                                             widgets.push(label!(member_name).size(MESSAGE_SIZE).into());
                                             let bg_color = (current.as_deref() == Some(member_name))
-                                                .then(|| theme.colorscheme.accent)
-                                                .unwrap_or(theme.colorscheme.primary_bg);
+                                                .then(|| theme.user_theme.accent)
+                                                .unwrap_or(theme.user_theme.primary_bg);
                                             Container::new(
                                                 Row::with_children(widgets)
                                                     .align_items(Align::Center)
@@ -826,7 +824,8 @@ impl MainScreen {
                 screen_widgets.push(fill_container(message_area).style(theme).into());
             } else {
                 let no_selected_channel_warning =
-                    fill_container(label!("Select a channel").size(35).color(ALT_COLOR)).style(theme);
+                    fill_container(label!("Select a channel").size(35).color(theme.user_theme.dimmed_text))
+                        .style(theme);
 
                 screen_widgets.push(no_selected_channel_warning.into());
             }
@@ -847,8 +846,12 @@ impl MainScreen {
                 .into(),
             );
         } else {
-            let no_selected_guild_warning =
-                fill_container(label!("Select / join a guild").size(35).color(ALT_COLOR)).style(theme);
+            let no_selected_guild_warning = fill_container(
+                label!("Select / join a guild")
+                    .size(35)
+                    .color(theme.user_theme.dimmed_text),
+            )
+            .style(theme);
 
             screen_widgets.push(no_selected_guild_warning.into());
             screen_widgets.push(
@@ -880,7 +883,7 @@ impl MainScreen {
                 fill_container(
                     Row::with_children(vec![
                         label!(truncate_string(&self.error_text, 128))
-                            .color(ERROR_COLOR)
+                            .color(theme.user_theme.error)
                             .width(length!(+))
                             .into(),
                         space!(w+).into(),

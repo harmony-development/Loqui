@@ -10,7 +10,7 @@ use crate::{
         Client, ClientExt, Message as TopLevelMessage,
     },
     space,
-    style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING},
+    style::{Theme, DEF_SIZE, PADDING},
 };
 use client::{
     error::ClientResult,
@@ -164,13 +164,18 @@ impl Tab for InviteTab {
         client: &Client,
         guild_id: u64,
         meta_data: &mut GuildMetadata,
-        theme: Theme,
+        theme: &Theme,
         _: &ThumbnailCache,
     ) -> Element<'_, InviteMessage> {
         let guild = client.guilds.get(&guild_id).unwrap();
         let mut widgets = Vec::with_capacity(10);
         if !self.error_message.is_empty() {
-            widgets.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
+            widgets.push(
+                label!(&self.error_message)
+                    .color(theme.user_theme.error)
+                    .size(DEF_SIZE + 2)
+                    .into(),
+            );
         }
         // If there are any invites, create invite list
         if guild.has_perm(INVITES_VIEW) {
@@ -242,7 +247,7 @@ impl Tab for InviteTab {
         } else {
             widgets.push(
                 label!("You don't have permission to view invites")
-                    .color(theme.colorscheme.error)
+                    .color(theme.user_theme.error)
                     .into(),
             );
         }

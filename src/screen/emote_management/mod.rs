@@ -18,7 +18,7 @@ use crate::{
     label_button, length,
     screen::{map_to_nothing, ClientExt, Message as TopLevelMessage, Screen as TopLevelScreen},
     space,
-    style::{Theme, ERROR_COLOR, PADDING, SPACING},
+    style::{Theme, PADDING, SPACING},
 };
 
 use self::manage_emotes::ManageEmotesModal;
@@ -122,7 +122,7 @@ impl ManageEmotesScreen {
 
     pub fn view<'a>(
         &'a mut self,
-        theme: Theme,
+        theme: &'a Theme,
         client: &'a Client,
         thumbnails: &'a ThumbnailCache,
     ) -> Element<'a, Message> {
@@ -207,7 +207,7 @@ impl ManageEmotesScreen {
         let mut content = Vec::with_capacity(4);
 
         if !self.error_message.is_empty() {
-            content.push(label!(self.error_message.as_str()).color(ERROR_COLOR).into())
+            content.push(label!(self.error_message.as_str()).color(theme.user_theme.error).into())
         }
         content.push(fill_container(packs).style(theme).into());
         content.push(

@@ -26,7 +26,7 @@ pub struct ImageViewerModal {
 }
 
 impl ImageViewerModal {
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme) -> Element<Message> {
         self.image_handle
             .as_ref()
             .map(|(handle, (_, name))| (handle.clone(), name.clone()))

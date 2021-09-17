@@ -8,7 +8,7 @@ use crate::{
     label, label_button, length,
     screen::ResultExt,
     space,
-    style::{Theme, DEF_SIZE, ERROR_COLOR},
+    style::{Theme, DEF_SIZE},
 };
 
 pub type Message = bool;
@@ -21,7 +21,7 @@ pub struct LogoutModal {
 }
 
 impl LogoutModal {
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme) -> Element<Message> {
         self.confirmation.map_or_else(
             move || {
                 let make_button = |state, confirm: bool| {
@@ -36,7 +36,7 @@ impl LogoutModal {
                 let logout_confirm_panel = column(vec![
                     label!("Do you want to logout?").size(DEF_SIZE + 2).into(),
                     label!("This will delete your current session.")
-                        .color(ERROR_COLOR)
+                        .color(theme.user_theme.error)
                         .size(DEF_SIZE + 2)
                         .into(),
                     row(vec![

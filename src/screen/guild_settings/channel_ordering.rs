@@ -20,7 +20,7 @@ use crate::{
         Screen as TopLevelScreen,
     },
     space,
-    style::{Theme, ERROR_COLOR, PADDING, SPACING},
+    style::{Theme, PADDING, SPACING},
 };
 
 use super::{GuildMetadata, Tab};
@@ -91,7 +91,7 @@ impl Tab for OrderingTab {
         client: &Client,
         guild_id: u64,
         _: &mut GuildMetadata,
-        theme: Theme,
+        theme: &Theme,
         _: &ThumbnailCache,
     ) -> Element<'_, ParentMessage> {
         let mut channels = Scrollable::new(&mut self.channel_list_state)
@@ -110,7 +110,7 @@ impl Tab for OrderingTab {
                 let channel_id = *channel_id;
 
                 let mut content_widgets = Vec::with_capacity(6);
-                content_widgets.push(channel_icon(channel));
+                content_widgets.push(channel_icon(channel, theme));
                 content_widgets.push(
                     Tooltip::new(
                         label_button!(copy_name_state, channel.name.as_str())
@@ -208,7 +208,7 @@ impl Tab for OrderingTab {
         let mut content = Vec::with_capacity(3);
 
         if !self.error_message.is_empty() {
-            content.push(label!(self.error_message.as_str()).color(ERROR_COLOR).into())
+            content.push(label!(self.error_message.as_str()).color(theme.user_theme.error).into())
         }
         content.push(fill_container(channels).style(theme).into());
         content.push(

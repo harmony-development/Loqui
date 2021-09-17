@@ -16,8 +16,8 @@ use crate::{
     },
     space,
     style::{
-        tuple_to_iced_color, Theme, ALT_COLOR, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, ERROR_COLOR,
-        MESSAGE_SENDER_SIZE, MESSAGE_SIZE, MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
+        tuple_to_iced_color, Theme, AVATAR_WIDTH, DATE_SEPERATOR_SIZE, DEF_SIZE, MESSAGE_SENDER_SIZE, MESSAGE_SIZE,
+        MESSAGE_TIMESTAMP_SIZE, PADDING, SPACING,
     },
     IOSEVKA,
 };
@@ -90,7 +90,7 @@ pub fn build_event_history<'a>(
     scrollable_state: &'a mut scrollable::State,
     buts_sate: &'a mut EventHistoryButsState,
     mode: Mode,
-    theme: Theme,
+    theme: &Theme,
 ) -> Element<'a, Message> {
     let mut event_history = Scrollable::new(scrollable_state)
         .on_scroll(Message::MessageHistoryScrolled)
@@ -248,7 +248,10 @@ pub fn build_event_history<'a>(
             override_reason.as_ref().and_do(|reason| {
                 widgets.push(space!(w = SPACING * 2).into());
                 widgets.push(label_container(
-                    label!(reason).color(ALT_COLOR).size(MESSAGE_SIZE).width(length!(-)),
+                    label!(reason)
+                        .color(theme.user_theme.dimmed_text)
+                        .size(MESSAGE_SIZE)
+                        .width(length!(-)),
                 ));
             });
 
@@ -304,14 +307,14 @@ pub fn build_event_history<'a>(
         if let Some(textt) = msg_text {
             let tokens = textt.parse_md_custom(HarmonyToken::parse);
             let mut widgets = Vec::with_capacity(tokens.len());
-            let color = theme.colorscheme.text;
+            let color = theme.user_theme.text;
             let color = message_id
                 .is_ack()
                 .not()
                 .then(|| color!(. color.r * 0.6, color.g * 0.6, color.b * 0.6))
                 .unwrap_or_else(|| {
                     (Mode::EditingMessage(id_to_use) == mode)
-                        .then(|| ERROR_COLOR)
+                        .then(|| theme.user_theme.error)
                         .unwrap_or(color)
                 });
 
@@ -336,7 +339,7 @@ pub fn build_event_history<'a>(
                 let mut text = label!(value.trim()).color(color).size(MESSAGE_SIZE);
                 if *code {
                     text = text.font(IOSEVKA);
-                    let mut bg_color = theme.colorscheme.primary_bg;
+                    let mut bg_color = theme.user_theme.primary_bg;
                     bg_color.r *= 1.6;
                     bg_color.g *= 1.6;
                     bg_color.b *= 1.6;
@@ -395,7 +398,7 @@ pub fn build_event_history<'a>(
                             let member_name = members.get(id).map_or_else(|| "unknown user", |m| m.username.as_str());
                             let role_color = guild
                                 .highest_role_for_member(*id)
-                                .map_or(theme.colorscheme.text, |(_, role)| tuple_to_iced_color(role.color));
+                                .map_or(theme.user_theme.text, |(_, role)| tuple_to_iced_color(role.color));
 
                             line_widgets.push(
                                 Button::new(
@@ -420,7 +423,7 @@ pub fn build_event_history<'a>(
                     }
                     Token::Url { name, url, .. } => {
                         let url = *url;
-                        let color = theme.colorscheme.accent;
+                        let color = theme.user_theme.accent;
                         let label = label!(name.as_ref().map_or(url, |text| text.value))
                             .color(color)
                             .size(MESSAGE_SIZE);

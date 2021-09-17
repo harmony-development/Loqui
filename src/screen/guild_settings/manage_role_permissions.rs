@@ -30,7 +30,7 @@ pub struct ManageRolePermissionsModal {
 }
 
 impl ManageRolePermissionsModal {
-    pub fn view<'a>(&'a mut self, theme: Theme, client: &Client, guild_id: u64) -> Element<'a, Message> {
+    pub fn view<'a>(&'a mut self, theme: &Theme, client: &Client, guild_id: u64) -> Element<'a, Message> {
         let guild = client.guilds.get(&guild_id);
         let channel = |channel_id| guild.and_then(|g| g.channels.get(&channel_id));
         let mut perms = Scrollable::new(&mut self.perms_state)

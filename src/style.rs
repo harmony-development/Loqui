@@ -1,5 +1,5 @@
 use crate::color;
-use client::{content::ColorschemeRaw, harmony_rust_sdk::api::profile::UserStatus};
+use client::{content::ThemeRaw, harmony_rust_sdk::api::profile::UserStatus};
 use hex_color::HexColor;
 use iced::{
     button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler, Color,
@@ -21,23 +21,13 @@ pub const SPACING: u16 = 4;
 pub const AVATAR_WIDTH: u16 = 44;
 pub const PROFILE_AVATAR_WIDTH: u16 = 96;
 
-pub const ERROR_COLOR: Color = color!(. 1.0, 0.0, 0.0);
-pub const SUCCESS_COLOR: Color = color!(. 0.0, 1.0, 0.0);
-pub const ALT_COLOR: Color = color!(. 0.65, 0.65, 0.65);
-pub const DARKER: Color = color!(0x14, 0x14, 0x11);
-pub const DARK_BG: Color = color!(0x1b, 0x1b, 0x18);
-pub const BRIGHT_BG: Color = color!(0x26, 0x26, 0x22);
-pub const DISABLED: Color = color!(0x67, 0x30, 0x28);
-pub const ACCENT: Color = color!(0xaa, 0x50, 0x42);
-pub const DISABLED_TEXT: Color = color!(0xe2, 0xc9, 0x9f);
-pub const TEXT_COLOR: Color = color!(0xf2, 0xee, 0xd3);
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Theme {
     secondary: bool,
     round: bool,
     embed: bool,
     overrides: OverrideStyle,
-    pub colorscheme: Colorscheme,
+    pub user_theme: UserTheme,
 }
 
 impl Theme {
@@ -58,7 +48,7 @@ impl Theme {
 
     pub fn status_color(&self, status: UserStatus) -> Color {
         match status {
-            UserStatus::OfflineUnspecified => ALT_COLOR,
+            UserStatus::OfflineUnspecified => self.user_theme.dimmed_text,
             UserStatus::DoNotDisturb => color!(160, 0, 0),
             UserStatus::Idle => color!(200, 140, 0),
             UserStatus::Online | UserStatus::Mobile => color!(0, 160, 0),
@@ -123,49 +113,64 @@ impl Theme {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Colorscheme {
+pub struct UserTheme {
     pub error: Color,
     pub success: Color,
     pub border: Color,
+    pub border_radius: u8,
     pub primary_bg: Color,
     pub secondary_bg: Color,
     pub disabled_bg: Color,
     pub text: Color,
     pub disabled_text: Color,
+    pub dimmed_text: Color,
     pub accent: Color,
     pub mention_color: Color,
 }
 
-impl Default for Colorscheme {
+const DEF_THEME: &[u8] = include_bytes!("../contrib/colorschemes/iced-dark.toml");
+
+impl Default for UserTheme {
     fn default() -> Self {
+        let value = toml::from_slice::<ThemeRaw>(DEF_THEME).unwrap();
         Self {
-            error: ERROR_COLOR,
-            success: SUCCESS_COLOR,
-            border: DARKER,
-            primary_bg: DARK_BG,
-            secondary_bg: BRIGHT_BG,
-            disabled_bg: DISABLED,
-            text: TEXT_COLOR,
-            disabled_text: DISABLED_TEXT,
-            accent: ACCENT,
-            mention_color: color!(225, 225, 0, 180),
+            error: value.error_color.parse_to_color().unwrap(),
+            success: value.success_color.parse_to_color().unwrap(),
+            border: value.border_color.parse_to_color().unwrap(),
+            border_radius: value.border_radius,
+            primary_bg: value.primary_bg_color.parse_to_color().unwrap(),
+            secondary_bg: value.secondary_bg_color.parse_to_color().unwrap(),
+            disabled_bg: value.disabled_bg_color.parse_to_color().unwrap(),
+            text: value.text_color.parse_to_color().unwrap(),
+            disabled_text: value.disabled_text_color.parse_to_color().unwrap(),
+            dimmed_text: value.dimmed_text_color.parse_to_color().unwrap(),
+            accent: value.accent_color.parse_to_color().unwrap(),
+            mention_color: value.mention_color.parse_to_color().unwrap(),
         }
     }
 }
 
-impl From<ColorschemeRaw> for Colorscheme {
-    fn from(value: ColorschemeRaw) -> Self {
-        let default = Colorscheme::default();
+impl From<ThemeRaw> for UserTheme {
+    fn from(value: ThemeRaw) -> Self {
+        let default = UserTheme::default();
         Self {
-            error: value.error.parse_to_color().unwrap_or(default.error),
-            success: value.success.parse_to_color().unwrap_or(default.success),
-            border: value.border.parse_to_color().unwrap_or(default.border),
-            primary_bg: value.primary_bg.parse_to_color().unwrap_or(default.primary_bg),
-            secondary_bg: value.secondary_bg.parse_to_color().unwrap_or(default.secondary_bg),
-            disabled_bg: value.disabled_bg.parse_to_color().unwrap_or(default.disabled_bg),
-            text: value.text.parse_to_color().unwrap_or(default.text),
-            disabled_text: value.disabled_text.parse_to_color().unwrap_or(default.disabled_text),
-            accent: value.accent.parse_to_color().unwrap_or(default.accent),
+            error: value.error_color.parse_to_color().unwrap_or(default.error),
+            success: value.success_color.parse_to_color().unwrap_or(default.success),
+            border: value.border_color.parse_to_color().unwrap_or(default.border),
+            border_radius: value.border_radius,
+            primary_bg: value.primary_bg_color.parse_to_color().unwrap_or(default.primary_bg),
+            secondary_bg: value
+                .secondary_bg_color
+                .parse_to_color()
+                .unwrap_or(default.secondary_bg),
+            disabled_bg: value.disabled_bg_color.parse_to_color().unwrap_or(default.disabled_bg),
+            text: value.text_color.parse_to_color().unwrap_or(default.text),
+            disabled_text: value
+                .disabled_text_color
+                .parse_to_color()
+                .unwrap_or(default.disabled_text),
+            dimmed_text: value.dimmed_text_color.parse_to_color().unwrap_or(default.dimmed_text),
+            accent: value.accent_color.parse_to_color().unwrap_or(default.accent),
             mention_color: value.mention_color.parse_to_color().unwrap_or(default.mention_color),
         }
     }
@@ -189,7 +194,13 @@ pub fn tuple_to_iced_color(color: [u8; 3]) -> Color {
 
 impl From<Theme> for Box<dyn tabs::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::TabBar(theme.colorscheme).into()
+        styles::TabBar(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn tabs::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
@@ -197,83 +208,143 @@ impl From<Theme> for Box<dyn container::StyleSheet> {
     fn from(theme: Theme) -> Self {
         if theme.secondary {
             if theme.round {
-                styles::BrightRoundContainer(theme.overrides, theme.colorscheme).into()
+                styles::BrightRoundContainer(theme.overrides, theme.user_theme).into()
             } else {
-                styles::BrightContainer(theme.overrides, theme.colorscheme).into()
+                styles::BrightContainer(theme.overrides, theme.user_theme).into()
             }
         } else if theme.round {
-            styles::RoundContainer(theme.overrides, theme.colorscheme).into()
+            styles::RoundContainer(theme.overrides, theme.user_theme).into()
         } else {
-            styles::Container(theme.overrides, theme.colorscheme).into()
+            styles::Container(theme.overrides, theme.user_theme).into()
         }
+    }
+}
+
+impl From<&Theme> for Box<dyn container::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn radio::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::Radio(theme.colorscheme).into()
+        styles::Radio(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn radio::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn text_input::StyleSheet> {
     fn from(theme: Theme) -> Self {
         if theme.secondary {
-            styles::DarkTextInput(theme.colorscheme).into()
+            styles::DarkTextInput(theme.user_theme).into()
         } else {
-            styles::TextInput(theme.colorscheme).into()
+            styles::TextInput(theme.user_theme).into()
         }
+    }
+}
+
+impl From<&Theme> for Box<dyn text_input::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn button::StyleSheet> {
     fn from(theme: Theme) -> Self {
         if theme.secondary {
-            styles::DarkButton(theme.overrides, theme.colorscheme).into()
+            styles::DarkButton(theme.overrides, theme.user_theme).into()
         } else if theme.embed {
-            styles::EmbedButton(theme.overrides, theme.colorscheme).into()
+            styles::EmbedButton(theme.overrides, theme.user_theme).into()
         } else {
-            styles::Button(theme.overrides, theme.colorscheme).into()
+            styles::Button(theme.overrides, theme.user_theme).into()
         }
+    }
+}
+
+impl From<&Theme> for Box<dyn button::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn scrollable::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::Scrollable(theme.colorscheme).into()
+        styles::Scrollable(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn scrollable::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn slider::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::Slider(theme.colorscheme).into()
+        styles::Slider(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn slider::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn progress_bar::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::ProgressBar(theme.colorscheme).into()
+        styles::ProgressBar(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn progress_bar::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn checkbox::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::Checkbox(theme.colorscheme).into()
+        styles::Checkbox(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn checkbox::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn pick_list::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::PickList(theme.colorscheme, theme.overrides).into()
+        styles::PickList(theme.user_theme, theme.overrides).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn pick_list::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn rule::StyleSheet> {
     fn from(theme: Theme) -> Self {
         if theme.secondary {
-            styles::RuleBright(theme.overrides, theme.colorscheme).into()
+            styles::RuleBright(theme.overrides, theme.user_theme).into()
         } else {
-            styles::Rule(theme.overrides, theme.colorscheme).into()
+            styles::Rule(theme.overrides, theme.user_theme).into()
         }
+    }
+}
+
+impl From<&Theme> for Box<dyn rule::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
@@ -283,27 +354,51 @@ impl From<Theme> for Box<dyn iced_aw::modal::StyleSheet> {
     }
 }
 
+impl From<&Theme> for Box<dyn iced_aw::modal::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
+    }
+}
+
 impl From<Theme> for Box<dyn iced_aw::card::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::Card(theme.colorscheme).into()
+        styles::Card(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn iced_aw::card::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 impl From<Theme> for Box<dyn toggler::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::Toggler(theme.colorscheme).into()
+        styles::Toggler(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn toggler::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
 /*impl From<Theme> for Box<dyn number_input::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::NumberInput(theme.colorscheme).into()
+        styles::NumberInput(theme.user_theme).into()
     }
 }*/
 
 impl From<Theme> for Box<dyn style::color_picker::StyleSheet> {
     fn from(theme: Theme) -> Self {
-        styles::ColorPicker(theme.colorscheme).into()
+        styles::ColorPicker(theme.user_theme).into()
+    }
+}
+
+impl From<&Theme> for Box<dyn style::color_picker::StyleSheet> {
+    fn from(theme: &Theme) -> Self {
+        (*theme).into()
     }
 }
 
@@ -408,7 +503,7 @@ impl OverrideStyle {
 }
 
 mod styles {
-    use super::{Colorscheme, OverrideStyle};
+    use super::{OverrideStyle, UserTheme};
     use crate::color;
     use iced::{
         button, checkbox, container, pick_list, progress_bar, radio, rule, scrollable, slider, text_input, toggler,
@@ -419,13 +514,13 @@ mod styles {
         tabs,
     };
 
-    pub struct ColorPicker(pub Colorscheme);
+    pub struct ColorPicker(pub UserTheme);
 
     impl style::color_picker::StyleSheet for ColorPicker {
         fn active(&self) -> style::color_picker::Style {
             style::color_picker::Style {
                 background: self.0.primary_bg.into(),
-                border_radius: 15.0,
+                border_radius: self.0.border_radius.into(),
                 border_width: 1.0,
                 border_color: self.0.border,
                 bar_border_radius: 5.0,
@@ -451,7 +546,7 @@ mod styles {
         }
     }
 
-    /*pub struct NumberInput(pub Colorscheme);
+    /*pub struct NumberInput(pub UserTheme);
 
     impl number_input::StyleSheet for NumberInput {
         fn active(&self) -> number_input::Style {
@@ -462,7 +557,7 @@ mod styles {
         }
     }*/
 
-    pub struct Toggler(pub Colorscheme);
+    pub struct Toggler(pub UserTheme);
 
     impl toggler::StyleSheet for Toggler {
         fn active(&self, is_active: bool) -> toggler::Style {
@@ -490,7 +585,7 @@ mod styles {
         }
     }
 
-    pub struct TabBar(pub Colorscheme);
+    pub struct TabBar(pub UserTheme);
 
     impl tabs::StyleSheet for TabBar {
         fn active(&self, is_selected: bool) -> tabs::Style {
@@ -527,7 +622,7 @@ mod styles {
         }
     }
 
-    pub struct Card(pub Colorscheme);
+    pub struct Card(pub UserTheme);
 
     impl card::StyleSheet for Card {
         fn active(&self) -> card::Style {
@@ -541,7 +636,7 @@ mod styles {
                 head_text_color: self.0.text,
                 close_color: self.0.text,
                 border_width: 2.0,
-                border_radius: 0.0,
+                border_radius: self.0.border_radius.into(),
                 ..Default::default()
             }
         }
@@ -557,7 +652,7 @@ mod styles {
         }
     }
 
-    pub struct Container(pub OverrideStyle, pub Colorscheme);
+    pub struct Container(pub OverrideStyle, pub UserTheme);
 
     impl container::StyleSheet for Container {
         fn style(&self) -> container::Style {
@@ -566,12 +661,12 @@ mod styles {
                 text_color: Some(self.1.text),
                 border_color: self.1.border,
                 border_width: 1.5,
-                border_radius: 0.0,
+                border_radius: self.1.border_radius.into(),
             })
         }
     }
 
-    pub struct RoundContainer(pub OverrideStyle, pub Colorscheme);
+    pub struct RoundContainer(pub OverrideStyle, pub UserTheme);
 
     impl container::StyleSheet for RoundContainer {
         fn style(&self) -> container::Style {
@@ -584,7 +679,7 @@ mod styles {
         }
     }
 
-    pub struct BrightRoundContainer(pub OverrideStyle, pub Colorscheme);
+    pub struct BrightRoundContainer(pub OverrideStyle, pub UserTheme);
 
     impl container::StyleSheet for BrightRoundContainer {
         fn style(&self) -> container::Style {
@@ -597,7 +692,7 @@ mod styles {
         }
     }
 
-    pub struct BrightContainer(pub OverrideStyle, pub Colorscheme);
+    pub struct BrightContainer(pub OverrideStyle, pub UserTheme);
 
     impl container::StyleSheet for BrightContainer {
         fn style(&self) -> container::Style {
@@ -608,7 +703,7 @@ mod styles {
         }
     }
 
-    pub struct Radio(pub Colorscheme);
+    pub struct Radio(pub UserTheme);
 
     impl radio::StyleSheet for Radio {
         fn active(&self) -> radio::Style {
@@ -632,7 +727,7 @@ mod styles {
         }
     }
 
-    pub struct DarkTextInput(pub Colorscheme);
+    pub struct DarkTextInput(pub UserTheme);
 
     impl text_input::StyleSheet for DarkTextInput {
         fn active(&self) -> text_input::Style {
@@ -674,13 +769,13 @@ mod styles {
         }
     }
 
-    pub struct TextInput(pub Colorscheme);
+    pub struct TextInput(pub UserTheme);
 
     impl text_input::StyleSheet for TextInput {
         fn active(&self) -> text_input::Style {
             text_input::Style {
                 background: self.0.secondary_bg.into(),
-                border_radius: 0.0,
+                border_radius: self.0.border_radius.into(),
                 border_width: 1.0,
                 border_color: self.0.border,
             }
@@ -718,14 +813,14 @@ mod styles {
         }
     }
 
-    pub struct DarkButton(pub OverrideStyle, pub Colorscheme);
+    pub struct DarkButton(pub OverrideStyle, pub UserTheme);
 
     impl button::StyleSheet for DarkButton {
         fn active(&self) -> button::Style {
             self.0.button(button::Style {
                 background: self.1.primary_bg.into(),
                 border_color: self.1.border,
-                border_radius: 0.0,
+                border_radius: self.1.border_radius.into(),
                 border_width: 1.0,
                 text_color: self.1.text,
                 ..button::Style::default()
@@ -760,7 +855,7 @@ mod styles {
         }
     }
 
-    pub struct EmbedButton(pub OverrideStyle, pub Colorscheme);
+    pub struct EmbedButton(pub OverrideStyle, pub UserTheme);
 
     impl button::StyleSheet for EmbedButton {
         fn active(&self) -> button::Style {
@@ -780,14 +875,14 @@ mod styles {
         }
     }
 
-    pub struct Button(pub OverrideStyle, pub Colorscheme);
+    pub struct Button(pub OverrideStyle, pub UserTheme);
 
     impl button::StyleSheet for Button {
         fn active(&self) -> button::Style {
             self.0.button(button::Style {
                 background: self.1.secondary_bg.into(),
                 border_color: self.1.border,
-                border_radius: 0.0,
+                border_radius: self.1.border_radius.into(),
                 border_width: 1.0,
                 text_color: self.1.text,
                 ..button::Style::default()
@@ -822,7 +917,7 @@ mod styles {
         }
     }
 
-    pub struct Scrollable(pub Colorscheme);
+    pub struct Scrollable(pub UserTheme);
 
     impl scrollable::StyleSheet for Scrollable {
         fn active(&self) -> scrollable::Scrollbar {
@@ -870,7 +965,7 @@ mod styles {
         }
     }
 
-    pub struct Slider(pub Colorscheme);
+    pub struct Slider(pub UserTheme);
 
     impl slider::StyleSheet for Slider {
         fn active(&self) -> slider::Style {
@@ -916,7 +1011,7 @@ mod styles {
         }
     }
 
-    pub struct ProgressBar(pub Colorscheme);
+    pub struct ProgressBar(pub UserTheme);
 
     impl progress_bar::StyleSheet for ProgressBar {
         fn style(&self) -> progress_bar::Style {
@@ -928,14 +1023,14 @@ mod styles {
         }
     }
 
-    pub struct Checkbox(pub Colorscheme);
+    pub struct Checkbox(pub UserTheme);
 
     impl checkbox::StyleSheet for Checkbox {
         fn active(&self, is_checked: bool) -> checkbox::Style {
             checkbox::Style {
                 background: if is_checked { self.0.accent } else { self.0.secondary_bg }.into(),
                 checkmark_color: Color::WHITE,
-                border_radius: 2.0,
+                border_radius: self.0.border_radius.into(),
                 border_width: 1.0,
                 border_color: self.0.accent,
             }
@@ -953,7 +1048,7 @@ mod styles {
         }
     }
 
-    pub struct PickList(pub Colorscheme, pub OverrideStyle);
+    pub struct PickList(pub UserTheme, pub OverrideStyle);
 
     impl pick_list::StyleSheet for PickList {
         fn menu(&self) -> pick_list::Menu {
@@ -972,7 +1067,7 @@ mod styles {
                 background: self.0.primary_bg.into(),
                 text_color: self.0.text,
                 border_width: 1.5,
-                border_radius: 0.0,
+                border_radius: self.0.border_radius.into(),
                 border_color: self.0.border,
                 ..pick_list::Style::default()
             })
@@ -987,7 +1082,7 @@ mod styles {
         }
     }
 
-    pub struct Rule(pub OverrideStyle, pub Colorscheme);
+    pub struct Rule(pub OverrideStyle, pub UserTheme);
 
     impl rule::StyleSheet for Rule {
         fn style(&self) -> rule::Style {
@@ -1000,7 +1095,7 @@ mod styles {
         }
     }
 
-    pub struct RuleBright(pub OverrideStyle, pub Colorscheme);
+    pub struct RuleBright(pub OverrideStyle, pub UserTheme);
 
     impl rule::StyleSheet for RuleBright {
         fn style(&self) -> rule::Style {

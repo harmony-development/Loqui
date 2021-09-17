@@ -14,7 +14,7 @@ use crate::{
 };
 use crate::{
     screen::{guild_settings::TabLabel, ClientExt},
-    style::{DEF_SIZE, ERROR_COLOR},
+    style::DEF_SIZE,
 };
 use client::{
     error::{ClientError, ClientResult},
@@ -121,7 +121,7 @@ impl Tab for GeneralTab {
         client: &Client,
         guild_id: u64,
         _: &mut GuildMetadata,
-        theme: Theme,
+        theme: &Theme,
         thumbnail_cache: &ThumbnailCache,
     ) -> Element<'_, ParentMessage> {
         let name_edit_but_state = &mut self.name_edit_but_state;
@@ -169,7 +169,12 @@ impl Tab for GeneralTab {
 
         let mut content = Vec::with_capacity(5);
         if !self.error_message.is_empty() {
-            content.push(label!(&self.error_message).color(ERROR_COLOR).size(DEF_SIZE + 2).into());
+            content.push(
+                label!(&self.error_message)
+                    .color(theme.user_theme.error)
+                    .size(DEF_SIZE + 2)
+                    .into(),
+            );
         }
         if let Some(ldg_text) = &self.loading_text {
             content.push(label!(ldg_text).into());

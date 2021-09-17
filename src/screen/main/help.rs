@@ -10,7 +10,7 @@ const HELP: &str = include_str!("help.txt");
 pub struct HelpModal;
 
 impl HelpModal {
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme) -> Element<Message> {
         Container::new(
             Card::new(
                 label!("Help").width(length!(=512 - PADDING - SPACING)),

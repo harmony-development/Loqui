@@ -5,7 +5,7 @@ use crate::{
     label, label_button, length,
     screen::{try_convert_err_to_login_err, ClientExt, ResultExt},
     space,
-    style::{Theme, DEF_SIZE, ERROR_COLOR, PADDING, SPACING},
+    style::{Theme, DEF_SIZE, PADDING, SPACING},
 };
 use client::{
     error::ClientResult,
@@ -105,7 +105,7 @@ impl LoginScreen {
         self.title = SmolStr::new_inline("choose homeserver");
     }
 
-    pub fn view(&mut self, theme: Theme, content_store: &Arc<ContentStore>) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme, content_store: &Arc<ContentStore>) -> Element<Message> {
         if self.waiting {
             return fill_container(label!("Please wait...").size(DEF_SIZE + 10))
                 .style(theme)
@@ -124,7 +124,9 @@ impl LoginScreen {
         }
 
         if self.current_error.is_empty().not() {
-            let error_text = label!(&self.current_error).color(ERROR_COLOR).size(DEF_SIZE - 2);
+            let error_text = label!(&self.current_error)
+                .color(theme.user_theme.error)
+                .size(DEF_SIZE - 2);
             widgets.push(error_text.into());
         }
 

@@ -26,7 +26,7 @@ pub struct ManageUserRolesModal {
 }
 
 impl ManageUserRolesModal {
-    pub fn view(&mut self, theme: Theme, client: &Client, guild_id: u64) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme, client: &Client, guild_id: u64) -> Element<Message> {
         let mut widgets = Vec::with_capacity(3);
 
         let mut given_roles = Scrollable::new(&mut self.given_roles_state)

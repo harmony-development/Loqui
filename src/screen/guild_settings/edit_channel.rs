@@ -12,7 +12,7 @@ use crate::{
     component::*,
     label, label_button, length,
     screen::{map_to_nothing, ClientExt},
-    style::{Theme, ERROR_COLOR, PADDING, SPACING},
+    style::{Theme, PADDING, SPACING},
 };
 
 #[derive(Clone, Debug)]
@@ -36,7 +36,7 @@ pub struct UpdateChannelModal {
 }
 
 impl UpdateChannelModal {
-    pub fn view(&mut self, theme: Theme) -> Element<Message> {
+    pub fn view(&mut self, theme: &Theme) -> Element<Message> {
         let mut name_text_edit = TextInput::new(
             &mut self.channel_name_textedit_state,
             "Enter new channel name...",
@@ -57,7 +57,7 @@ impl UpdateChannelModal {
         let mut widgets = Vec::with_capacity(2);
 
         if self.error_text.is_empty().not() {
-            widgets.push(label!(&self.error_text).color(ERROR_COLOR).into());
+            widgets.push(label!(&self.error_text).color(theme.user_theme.error).into());
         }
         widgets.push(
             Row::with_children(vec![
