@@ -757,7 +757,7 @@ impl MainScreen {
 
                 let mut send_file_button =
                     Button::new(&mut self.send_file_but_state, icon(Icon::Upload).size(icon_size))
-                        .style(theme.secondary())
+                        .style(theme.secondary().border_width(2.0))
                         .padding(PADDING / 4);
                 if channel.uploading_files.is_empty() {
                     send_file_button = send_file_button.on_press(Message::SelectFilesToSend);
@@ -803,7 +803,7 @@ impl MainScreen {
                             "Scroll to bottom",
                             iced::tooltip::Position::Top,
                         )
-                        .style(theme)
+                        .style(theme.secondary().border_width(2.0))
                         .into(),
                     );
                 }

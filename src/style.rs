@@ -241,9 +241,9 @@ impl From<&Theme> for Box<dyn radio::StyleSheet> {
 impl From<Theme> for Box<dyn text_input::StyleSheet> {
     fn from(theme: Theme) -> Self {
         if theme.secondary {
-            styles::DarkTextInput(theme.user_theme).into()
+            styles::DarkTextInput(theme.user_theme, theme.overrides).into()
         } else {
-            styles::TextInput(theme.user_theme).into()
+            styles::TextInput(theme.user_theme, theme.overrides).into()
         }
     }
 }
@@ -500,6 +500,22 @@ impl OverrideStyle {
         }
         style
     }
+
+    fn text_input(self, mut style: text_input::Style) -> text_input::Style {
+        if let Some(color) = self.border_color {
+            style.border_color = color;
+        }
+        if let Some(radius) = self.border_radius {
+            style.border_radius = radius;
+        }
+        if let Some(width) = self.border_width {
+            style.border_width = width;
+        }
+        if let Some(color) = self.background_color {
+            style.background = color.into();
+        }
+        style
+    }
 }
 
 mod styles {
@@ -727,13 +743,13 @@ mod styles {
         }
     }
 
-    pub struct DarkTextInput(pub UserTheme);
+    pub struct DarkTextInput(pub UserTheme, pub OverrideStyle);
 
     impl text_input::StyleSheet for DarkTextInput {
         fn active(&self) -> text_input::Style {
             text_input::Style {
                 background: self.0.primary_bg.into(),
-                ..TextInput(self.0).active()
+                ..TextInput(self.0, self.1).active()
             }
         }
 
@@ -750,11 +766,11 @@ mod styles {
         }
 
         fn value_color(&self) -> Color {
-            TextInput(self.0).value_color()
+            TextInput(self.0, self.1).value_color()
         }
 
         fn selection_color(&self) -> Color {
-            TextInput(self.0).selection_color()
+            TextInput(self.0, self.1).selection_color()
         }
 
         fn hovered(&self) -> text_input::Style {
@@ -769,16 +785,16 @@ mod styles {
         }
     }
 
-    pub struct TextInput(pub UserTheme);
+    pub struct TextInput(pub UserTheme, pub OverrideStyle);
 
     impl text_input::StyleSheet for TextInput {
         fn active(&self) -> text_input::Style {
-            text_input::Style {
+            self.1.text_input(text_input::Style {
                 background: self.0.secondary_bg.into(),
                 border_radius: self.0.border_radius.into(),
                 border_width: 1.0,
                 border_color: self.0.border,
-            }
+            })
         }
 
         fn focused(&self) -> text_input::Style {
@@ -802,14 +818,14 @@ mod styles {
         }
 
         fn hovered(&self) -> text_input::Style {
-            text_input::Style {
+            self.1.text_input(text_input::Style {
                 border_width: 2.0,
                 border_color: Color {
                     a: 0.5,
                     ..self.0.accent
                 },
                 ..self.focused()
-            }
+            })
         }
     }
 
