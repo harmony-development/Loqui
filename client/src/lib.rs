@@ -278,11 +278,11 @@ impl Client {
                     .with_content(harmony_rust_sdk::api::chat::Content {
                         content: Some(message.content.clone().into()),
                     })
-                    .with_in_reply_to(message.reply_to.unwrap_or(0))
+                    .with_in_reply_to(message.reply_to)
                     .with_echo_id(echo_id)
                     .with_overrides(message.overrides.clone().map(Into::into));
 
-                let send_result = inner.chat().await.send_message(msg).await;
+                let send_result = inner.call(msg).await;
                 (
                     guild_id,
                     channel_id,
