@@ -1514,7 +1514,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#a7d02fd8d5c66b0eced2c1b03856d7a4758aee18"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#36dca8c7ba1d7374ebe1b95e6eef921e2ca8b0c0"
 dependencies = [
  "proc-macro2",
  "quote 1.0.9",
@@ -1524,7 +1524,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#a7d02fd8d5c66b0eced2c1b03856d7a4758aee18"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#36dca8c7ba1d7374ebe1b95e6eef921e2ca8b0c0"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1591,9 +1591,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.11.5"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3090e9325c9713021a3e9948a4ba515d6c994a79e165a63a9dc04e2c41fe1b42"
+checksum = "a6a646677d07112dd808830ece3be36c4f1e891749d898dd90f6dee328a98a46"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1613,9 +1613,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc-build"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6234e6e22a205e17d6a209475fea16441ff8b5e62e5c82a42472e57c83396f52"
+checksum = "0d0ff9dcc318689bce114950f55c9a8741c8e772b24dae1426205ab3444503ef"
 dependencies = [
  "proc-macro2",
  "prost-build",
@@ -3800,9 +3800,9 @@ checksum = "360dfd1d6d30e05fda32ace2c8c70e9c0a9da713275777f5a4dbb8a1893930c6"
 
 [[package]]
 name = "tracing"
-version = "0.1.27"
+version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2ba9ab62b7d6497a8638dfda5e5c4fb3b2d5a7fca4118f2b96151c8ef1a437e"
+checksum = "84f96e095c0c82419687c20ddf5cb3eadb61f4e1405923c9dc8e53a1adacbda8"
 dependencies = [
  "cfg-if 1.0.0",
  "pin-project-lite",

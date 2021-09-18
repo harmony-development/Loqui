@@ -27,6 +27,6 @@ pub struct Channel {
 
 impl Channel {
     pub fn has_perm(&self, query: &str) -> bool {
-        has_permission(self.perms.iter(), query).unwrap_or(false)
+        has_permission(self.perms.iter().map(|p| (p.matches.as_str(), p.ok)), query).unwrap_or(false)
     }
 }
