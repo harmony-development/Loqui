@@ -313,7 +313,8 @@ pub fn build_event_history<'a>(
                 .not()
                 .then(|| color!(. color.r * 0.6, color.g * 0.6, color.b * 0.6))
                 .unwrap_or_else(|| {
-                    (Mode::EditingMessage(id_to_use) == mode)
+                    // Safety: unwrap is safe since we check if it's acked beforehand
+                    (Mode::EditingMessage(message_id.id().unwrap()) == mode)
                         .then(|| theme.user_theme.error)
                         .unwrap_or(color)
                 });
