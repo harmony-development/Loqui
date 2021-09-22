@@ -54,7 +54,7 @@ open = "2.0.0"
 rfd = "0.4"
 image = "0.23.14"
 
-tokio = { version = "1.9", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
+tokio = { version = "1.12", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
 
 toml = "0.5"
 chrono = "0.4.19"
