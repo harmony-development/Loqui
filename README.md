@@ -11,8 +11,16 @@ It uses [harmony-rust-sdk] to communicate with Harmony servers.
 
 - Voice channels (needs implementation in `scherzo` server first)
 - Video / audio files embedding
+- Animated emotes / pfp / images support
 - Instant (website) view (ala Telegram)
 - UI & UX polish
+
+## Features
+
+- All essential chat functions Harmony provides
+- User theming support
+- Partial rich messages support (code, mentions, emotes, URLs)
+- Website embeds (previews)
 
 ## Running
 
