@@ -282,7 +282,7 @@ impl Message {
             Content::Text(text) => {
                 post.extend(
                     text.split_whitespace()
-                        .map(Url::parse)
+                        .map(|a| Url::parse(a.trim_end_matches('>').trim_start_matches('<')))
                         .flatten()
                         .filter(|url| ["https", "http"].contains(&url.scheme()))
                         .map(PostProcessEvent::FetchLinkMetadata),

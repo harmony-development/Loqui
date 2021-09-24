@@ -425,6 +425,12 @@ pub fn build_event_history<'a>(
                     Token::Url { name, url, .. } => {
                         let url = *url;
                         let color = theme.user_theme.accent;
+                        let color = Color {
+                            r: color.r * 1.35,
+                            g: color.g * 1.35,
+                            b: color.b * 1.35,
+                            a: color.a,
+                        };
                         let label = label!(name.as_ref().map_or(url, |text| text.value))
                             .color(color)
                             .size(MESSAGE_SIZE);
@@ -506,7 +512,11 @@ pub fn build_event_history<'a>(
                     .into(),
             );
 
-            let urls = textt.split_whitespace().map(Url::parse).flatten().collect::<Vec<_>>();
+            let urls = textt
+                .split_whitespace()
+                .map(|a| Url::parse(a.trim_end_matches('>').trim_start_matches('<')))
+                .flatten()
+                .collect::<Vec<_>>();
             external_url_states.resize_with(urls.len(), Default::default);
             for (url, media_open_button_state) in urls.into_iter().zip(external_url_states.iter_mut()) {
                 if let Some(data) = client.link_datas.get(&url) {
@@ -794,6 +804,8 @@ pub fn build_event_history<'a>(
             options.push(MessageMenuOption::CopyMessageId(id));
             if msg_text.is_some() && current_user_id == message.sender {
                 options.push(MessageMenuOption::Edit(id));
+            }
+            if current_user_id == message.sender {
                 options.push(MessageMenuOption::Delete(id));
             }
         }
