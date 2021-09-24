@@ -7,6 +7,13 @@ It uses [harmony-rust-sdk] to communicate with Harmony servers.
 
 [See more screenshots](./resources)
 
+## Roadmap
+
+- Voice channels (needs implementation in `scherzo` server first)
+- Video / audio files embedding
+- Instant (website) view (ala Telegram)
+- UI & UX polish
+
 ## Running
 
 - Get a binary from one of the links below
