@@ -850,6 +850,7 @@ mod styles {
                     .background_color
                     .map_or(self.1.accent, |c| Color { a: c.a * 0.3, ..c })
                     .into(),
+                text_color: self.1.secondary_bg,
                 ..self.active()
             }
         }
@@ -912,6 +913,7 @@ mod styles {
                     .background_color
                     .map_or(self.1.accent, |c| Color { a: c.a * 0.3, ..c })
                     .into(),
+                text_color: self.1.secondary_bg,
                 ..self.active()
             }
         }
@@ -1072,7 +1074,7 @@ mod styles {
                 background: self.0.secondary_bg.into(),
                 text_color: self.0.text,
                 selected_background: self.0.accent.into(),
-                selected_text_color: self.0.text,
+                selected_text_color: self.0.secondary_bg,
                 border_width: 3.0,
                 border_color: Color::TRANSPARENT,
             })
@@ -1093,6 +1095,8 @@ mod styles {
             pick_list::Style {
                 background: self.0.accent.into(),
                 border_color: self.0.accent,
+                text_color: self.0.primary_bg,
+                placeholder_color: self.0.primary_bg,
                 ..self.active()
             }
         }

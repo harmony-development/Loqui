@@ -176,15 +176,13 @@ pub fn icon(icon: Icon) -> Text {
     label!(icon).font(iced_aw::ICON_FONT)
 }
 
-pub fn channel_icon<'a, M: 'a>(channel: &Channel, theme: &Theme) -> Element<'a, M> {
+pub fn channel_icon<'a, M: 'a>(channel: &Channel) -> Element<'a, M> {
     let (channel_name_prefix, channel_prefix_size) = channel
         .is_category
         .then(|| (Icon::ListNested, DEF_SIZE - 4))
         .unwrap_or((Icon::Hash, DEF_SIZE));
 
-    let icon_content = icon(channel_name_prefix)
-        .color(theme.user_theme.dimmed_text)
-        .size(channel_prefix_size);
+    let icon_content = icon(channel_name_prefix).size(channel_prefix_size);
     if channel.is_category {
         Column::with_children(vec![space!(h = SPACING - (SPACING / 4)).into(), icon_content.into()])
             .align_items(Align::Center)

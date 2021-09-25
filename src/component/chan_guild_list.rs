@@ -25,32 +25,29 @@ pub fn build_channel_list<'a>(
 ) -> Element<'a, Message> {
     type Item<'a, 'b> = ((&'b u64, &'b Channel), &'a mut button::State);
     let process_item = |mut list: Scrollable<'a, Message>, ((channel_id, channel), button_state): Item<'a, '_>| {
-        let read_color = channel
-            .has_unread
-            .then(|| Color::WHITE)
-            .unwrap_or(theme.user_theme.dimmed_text);
+        let read_color = channel.has_unread.then(|| theme.user_theme.text).unwrap_or(Color {
+            r: theme.user_theme.dimmed_text.r * 0.7,
+            g: theme.user_theme.dimmed_text.g * 0.7,
+            b: theme.user_theme.dimmed_text.b * 0.7,
+            a: theme.user_theme.dimmed_text.a,
+        });
 
         let mut content_widgets = Vec::with_capacity(5);
-        content_widgets.push(channel_icon(channel, theme));
+        content_widgets.push(channel_icon(channel));
         channel
             .is_category
             .and_do(|| content_widgets.push(space!(w = SPACING).into()));
-        content_widgets.push(
-            label!(truncate_string(&channel.name, 17))
-                .color(read_color)
-                .size(DEF_SIZE - 2)
-                .into(),
-        );
+        content_widgets.push(label!(truncate_string(&channel.name, 17)).size(DEF_SIZE - 2).into());
 
         let mut but = Button::new(
             button_state,
             Row::with_children(content_widgets).align_items(Align::Center),
         )
         .width(length!(+))
-        .style(theme.secondary());
+        .style(theme.secondary().text_color(read_color));
 
         if channel.is_category {
-            but = but.style(theme.embed().border_width(0.0));
+            but = but.style(theme.embed().border_width(0.0).text_color(read_color));
         } else if current_channel_id != Some(*channel_id) {
             but = but.on_press(on_button_press(*channel_id));
         }

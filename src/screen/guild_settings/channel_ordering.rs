@@ -110,7 +110,7 @@ impl Tab for OrderingTab {
                 let channel_id = *channel_id;
 
                 let mut content_widgets = Vec::with_capacity(6);
-                content_widgets.push(channel_icon(channel, theme));
+                content_widgets.push(channel_icon(channel));
                 content_widgets.push(
                     Tooltip::new(
                         label_button!(copy_name_state, channel.name.as_str())

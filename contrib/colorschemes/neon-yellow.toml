@@ -1,0 +1,13 @@
+border_color = "#232323"
+primary_bg_color = "#161616"
+secondary_bg_color = "#2D2D2D"
+disabled_bg_color = "#3E3E3E"
+accent_color = "#CCEE00"
+text_color = "#DCDCDC"
+disabled_text_color = "#CBCBCB"
+
+border_radius = 2
+error_color = "#FF0000"
+success_color = "#00FF00"
+mention_color = "#FFFFDD"
+dimmed_text_color = "#DDDDDD"
