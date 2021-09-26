@@ -1576,7 +1576,7 @@ impl MainScreen {
                                     Some(Ok(Event::Chat(ChatEvent::CreatedChannel(ChannelCreated {
                                         guild_id,
                                         channel_id: c.channel_id,
-                                        is_category: channel.is_category,
+                                        kind: channel.kind,
                                         name: channel.channel_name,
                                         metadata: channel.metadata,
                                         ..Default::default()

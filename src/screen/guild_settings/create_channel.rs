@@ -1,7 +1,10 @@
 use std::{convert::identity, ops::Not};
 
 use super::{super::Message as TopLevelMessage, Message as ParentMessage};
-use client::harmony_rust_sdk::{api::chat::Place, client::api::chat::channel::CreateChannel};
+use client::harmony_rust_sdk::{
+    api::chat::{ChannelKind, Place},
+    client::api::chat::channel::CreateChannel,
+};
 use iced_aw::Card;
 
 use crate::{
@@ -133,21 +136,16 @@ impl ChannelCreationModal {
                     name: channel_name.clone(),
                 };
                 let guild_id = self.guild_id;
-                let is_category = self.is_category;
-                let after = client
-                    .guilds
-                    .get(&guild_id)
-                    .and_then(|g| g.channels.last().map(|(k, _)| *k))
-                    .unwrap_or(0);
+                let kind = self
+                    .is_category
+                    .then(|| ChannelKind::Category)
+                    .unwrap_or(ChannelKind::TextUnspecified);
 
                 return (
                     client.mk_cmd(
                         |inner| async move {
                             let result = inner
-                                .call(
-                                    CreateChannel::new(guild_id, channel_name, Place::bottom(after))
-                                        .with_is_category(is_category),
-                                )
+                                .call(CreateChannel::new(guild_id, channel_name, Place::bottom()).with_kind(kind))
                                 .await;
                             result.map(|response| {
                                 TopLevelMessage::guild_settings(ParentMessage::ChannelCreationMessage(

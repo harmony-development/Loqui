@@ -190,10 +190,8 @@ impl Tab for RolesTab {
 
                 let mk_place = |id, id_after| match (id, id_after) {
                     (Some(before), Some(after)) => (before != after).then(|| Place::between(before, after)),
-                    (Some(before), None) => {
-                        (role_index != guild.roles.len().saturating_sub(1)).then(|| Place::top(before))
-                    }
-                    (None, Some(after)) => (role_index != 0).then(|| Place::bottom(after)),
+                    (Some(_), None) => (role_index != guild.roles.len().saturating_sub(1)).then(Place::top),
+                    (None, Some(_)) => (role_index != 0).then(Place::bottom),
                     (None, None) => None,
                 };
                 let mut up_but = Button::new(up_state, icon(Icon::ArrowUp)).style(theme);

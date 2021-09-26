@@ -26,7 +26,7 @@ use client::{
     bool_ext::BoolExt,
     guild::Guild,
     harmony_rust_sdk::api::{
-        chat::r#override::Reason, mediaproxy::fetch_link_metadata_response::Data as FetchLinkData, profile::UserStatus,
+        chat::overrides::Reason, mediaproxy::fetch_link_metadata_response::Data as FetchLinkData, profile::UserStatus,
     },
     linemd::{
         parser::{Text, Token},

@@ -158,10 +158,8 @@ impl Tab for OrderingTab {
 
                     let mk_place = |id, id_after| match (id, id_after) {
                         (Some(before), Some(after)) => (before != after).then(|| Place::between(before, after)),
-                        (Some(before), None) => {
-                            (channel_index != guild.channels.len().saturating_sub(1)).then(|| Place::top(before))
-                        }
-                        (None, Some(after)) => (channel_index != 0).then(|| Place::bottom(after)),
+                        (Some(_), None) => (channel_index != guild.channels.len().saturating_sub(1)).then(Place::top),
+                        (None, Some(_)) => (channel_index != 0).then(Place::bottom),
                         (None, None) => None,
                     };
                     let mut up_but = Button::new(up_state, icon(Icon::ArrowUp)).style(theme);

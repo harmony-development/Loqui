@@ -24,10 +24,9 @@ use harmony_rust_sdk::{
             color,
             get_channel_messages_request::Direction,
             stream_event::{Event as ChatEvent, *},
-            DeleteMessageRequest, Event, Message as HarmonyMessage, Permission, Role,
+            ChannelKind, DeleteMessageRequest, Event, FormattedText, Message as HarmonyMessage, Permission, Role,
         },
         emote::{stream_event::Event as EmoteEvent, *},
-        harmonytypes::FormattedText,
         mediaproxy::fetch_link_metadata_response::Data as FetchLinkData,
         profile::{stream_event::Event as ProfileEvent, UserStatus, *},
     },
@@ -516,7 +515,7 @@ impl Client {
                     channel_id,
                     name,
                     position,
-                    is_category,
+                    kind,
                     metadata: _,
                 }) => {
                     if let Some(guild) = self.get_guild(guild_id) {
@@ -524,7 +523,7 @@ impl Client {
                         guild.channels.insert(
                             channel_id,
                             Channel {
-                                is_category,
+                                is_category: kind == i32::from(ChannelKind::Category),
                                 name: name.into(),
                                 loading_messages_history: false,
                                 looking_at_message: 0,

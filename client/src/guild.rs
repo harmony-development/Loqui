@@ -50,22 +50,36 @@ fn update_order<V, P: Into<Place>>(map: &mut IndexMap<u64, V>, pos: P, id: u64) 
     let place = pos.into();
 
     if let Some(item_pos) = map.get_index_of(&id) {
-        let prev_pos = place.after().and_then(|previous_id| map.get_index_of(&previous_id));
-        let next_pos = place.before().and_then(|next_id| map.get_index_of(&next_id));
-
-        if let Some(pos) = prev_pos {
-            let pos = pos + 1;
-            if pos != item_pos && pos < map.len() {
-                map.swap_indices(pos, item_pos);
-            }
-        } else if let Some(pos) = next_pos {
-            if pos != 0 {
-                map.swap_indices(pos - 1, item_pos);
-            } else {
-                let (k, v) = map.pop().unwrap();
+        match place {
+            Place::Top => {
+                let (k, v) = map.shift_remove_entry(&id).unwrap();
                 map.reverse();
                 map.insert(k, v);
                 map.reverse();
+            }
+            Place::Between { after, before } => {
+                let prev_pos = map.get_index_of(&after);
+                let next_pos = map.get_index_of(&before);
+
+                if let Some(pos) = prev_pos {
+                    let pos = pos + 1;
+                    if pos != item_pos && pos < map.len() {
+                        map.swap_indices(pos, item_pos);
+                    }
+                } else if let Some(pos) = next_pos {
+                    if pos != 0 {
+                        map.swap_indices(pos - 1, item_pos);
+                    } else {
+                        let (k, v) = map.pop().unwrap();
+                        map.reverse();
+                        map.insert(k, v);
+                        map.reverse();
+                    }
+                }
+            }
+            Place::Bottom => {
+                let (k, v) = map.shift_remove_entry(&id).unwrap();
+                map.insert(k, v);
             }
         }
     }

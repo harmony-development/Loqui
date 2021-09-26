@@ -1,8 +1,9 @@
 use chrono::NaiveDateTime;
 use harmony_rust_sdk::{
     api::{
-        chat::{self, color, content, embed, r#override::Reason, Message as HarmonyMessage, Minithumbnail},
-        harmonytypes::FormattedText,
+        chat::{
+            self, color, content, embed, overrides::Reason, FormattedText, Message as HarmonyMessage, Minithumbnail,
+        },
         Hmc,
     },
     client::{api::rest::FileId, exports::reqwest::Url},
@@ -146,7 +147,7 @@ pub struct Override {
     pub reason: Option<Reason>,
 }
 
-impl From<Override> for chat::Override {
+impl From<Override> for chat::Overrides {
     fn from(o: Override) -> Self {
         Self {
             avatar: o.avatar_url.map(|id| id.to_string()),
@@ -324,8 +325,8 @@ impl Default for Message {
     }
 }
 
-impl From<chat::Override> for Override {
-    fn from(overrides: chat::Override) -> Self {
+impl From<chat::Overrides> for Override {
+    fn from(overrides: chat::Overrides) -> Self {
         Override {
             name: overrides.username,
             avatar_url: overrides.avatar.map(|a| FileId::from_str(&a).ok()).flatten(),
