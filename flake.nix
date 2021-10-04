@@ -68,8 +68,8 @@
           mainBuild = common: prev: {
             nativeBuildInputs = prev.nativeBuildInputs ++ (with common.pkgs; [ makeWrapper wrapGAppsHook ]);
             postInstall = with common.pkgs; ''
-              if [ -f $out/bin/crust ]; then
-                wrapProgram $out/bin/crust\
+              if [ -f $out/bin/loqui ]; then
+                wrapProgram $out/bin/loqui\
                   --set LD_LIBRARY_PATH ${lib.makeLibraryPath common.runtimeLibs}\
                   --set XDG_DATA_DIRS ${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share
               fi
@@ -85,18 +85,18 @@
             let
               pkgs = import inputs.nixpkgs { system = "x86_64-linux"; config = { allowUnfree = true; }; };
               cmd =
-                pkgs.writeScriptBin "run-crust-latest" ''
+                pkgs.writeScriptBin "run-loqui-latest" ''
                   #!${pkgs.stdenv.shell}
-                  mkdir -p /tmp/crust-binary
-                  cd /tmp/crust-binary
-                  ${pkgs.curl}/bin/curl -L https://github.com/harmony-development/Crust/releases/download/continuous/crust-linux > crust
-                  chmod +x crust
-                  ${pkgs.steam-run}/bin/steam-run ./crust
+                  mkdir -p /tmp/loqui-binary
+                  cd /tmp/loqui-binary
+                  ${pkgs.curl}/bin/curl -L https://github.com/harmony-development/Loqui/releases/download/continuous/loqui-linux > loqui
+                  chmod +x loqui
+                  ${pkgs.steam-run}/bin/steam-run ./loqui
                 '';
             in
             {
               type = "app";
-              program = "${cmd}/bin/run-crust-latest";
+              program = "${cmd}/bin/run-loqui-latest";
             };
         };
       };

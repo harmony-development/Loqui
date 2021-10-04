@@ -1,20 +1,20 @@
 [package]
-name = "crust"
+name = "loqui"
 version = "0.1.0"
 authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
 edition = "2018"
 description = "Rust client for the Harmony protocol."
 license = "GPLv3"
-repository = "https://github.com/harmony-development/crust"
-homepage = "https://github.com/harmony-development/crust"
+repository = "https://github.com/harmony-development/loqui"
+homepage = "https://github.com/harmony-development/loqui"
 resolver = "2"
 
 [workspace]
 members = ["client"]
 
 [package.metadata.bundle]
-name = "Crust"
-identifier = "nodomain.yusdacra.crust"
+name = "Loqui"
+identifier = "nodomain.yusdacra.loqui"
 short_description = "Rust client for the Harmony protocol."
 
 [profile.dev]
@@ -67,7 +67,7 @@ lazy_static = "1"
 
 [package.metadata.nix]
 longDescription = """
-Crust is a Harmony client written in Rust using the iced GUI library.
+Loqui is a Harmony client written in Rust using the iced GUI library.
 
 It aims to be lightweight with a good out-of-the-box experience.
 """
@@ -88,11 +88,11 @@ runtimeLibs = [
 cCompiler = "llvmPackages_12.clang"
 buildInputs = ["libxkbcommon"]
 devshell.packages = ["cargo-deny"]
-devshell.name = "crust-shell"
+devshell.name = "loqui-shell"
 devshell.commands = [{ package = "tagref" }]
 env.RUSTC_FORCE_INCREMENTAL = "1"
 
 [package.metadata.nix.desktopFile]
-name = "Crust"
+name = "Loqui"
 genericName = "Harmony Client"
 categories = "Network;"

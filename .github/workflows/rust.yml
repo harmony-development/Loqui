@@ -72,32 +72,32 @@ jobs:
 
     - name: UPX windows
       if: ${{ matrix.os == 'windows-latest' }}
-      run: .github/upx.exe target/release/crust.exe
+      run: .github/upx.exe target/release/loqui.exe
 
     - name: UPX linux
       if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: .github/upx target/release/crust
+      run: .github/upx target/release/loqui
 
     - name: Artifact macOS
       if: ${{ matrix.os == 'macOS-latest' }}
       uses: actions/upload-artifact@v2.2.4
       with:
         name: build-macos
-        path: target/release/crust
+        path: target/release/loqui
 
     - name: Artifact Linux
       if: ${{ matrix.os == 'ubuntu-latest' }}
       uses: actions/upload-artifact@v2.2.4
       with:
         name: build-linux
-        path: target/release/crust
+        path: target/release/loqui
 
     - name: Artifact Windows
       if: ${{ matrix.os == 'windows-latest' }}
       uses: actions/upload-artifact@v2.2.4
       with:
         name: build-windows
-        path: target/release/crust.exe
+        path: target/release/loqui.exe
 
   upload-release:
     if: github.event_name == 'push'
@@ -111,9 +111,9 @@ jobs:
 
     - name: Rename artifacts
       run: |
-          mv build-windows/crust.exe build-windows/crust-windows.exe
-          mv build-linux/crust build-linux/crust-linux
-          mv build-macos/crust build-macos/crust-macos
+          mv build-windows/loqui.exe build-windows/loqui-windows.exe
+          mv build-linux/loqui build-linux/loqui-linux
+          mv build-macos/loqui build-macos/loqui-macos
           chmod +x build-{windows,linux,macos}/*
 
     - name: Upload release
@@ -122,4 +122,4 @@ jobs:
       run: |
           wget -q https://github.com/TheAssassin/pyuploadtool/releases/download/continuous/pyuploadtool-x86_64.AppImage
           chmod +x pyuploadtool-x86_64.AppImage
-          ./pyuploadtool-x86_64.AppImage build-windows/crust-windows.exe build-linux/crust-linux build-macos/crust-macos
+          ./pyuploadtool-x86_64.AppImage build-windows/loqui-windows.exe build-linux/loqui-linux build-macos/loqui-macos

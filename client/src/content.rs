@@ -35,7 +35,7 @@ pub struct ContentStore {
 impl Default for ContentStore {
     fn default() -> Self {
         let (sessions_dir, log_file, content_dir, theme_file) =
-            match directories_next::ProjectDirs::from("nodomain", "yusdacra", "crust") {
+            match directories_next::ProjectDirs::from("nodomain", "yusdacra", "loqui") {
                 Some(app_dirs) => (
                     app_dirs.data_dir().join(SESSIONS_DIR_NAME),
                     app_dirs.data_dir().join(LOG_FILENAME),

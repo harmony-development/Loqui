@@ -640,7 +640,7 @@ impl Application for ScreenManager {
     fn title(&self) -> String {
         use std::fmt::Write;
 
-        let mut title = String::from("Crust");
+        let mut title = String::from("Loqui");
         if let (Screen::Main(screen), Some(client)) = (self.screens.current(), self.client.as_ref()) {
             if let Some(guild) = screen.current_guild_id.map(|id| client.guilds.get(&id)).flatten() {
                 write!(&mut title, " | *{}", guild.name).unwrap();
