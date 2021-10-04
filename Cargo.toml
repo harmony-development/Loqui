@@ -16,6 +16,7 @@ members = ["client"]
 name = "Loqui"
 identifier = "nodomain.yusdacra.loqui"
 short_description = "Rust client for the Harmony protocol."
+icon = ["./resources/loqui.ico"]
 
 [profile.dev]
 opt-level = 0

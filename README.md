@@ -1,3 +1,6 @@
+<p align="center"><img src="./resources/loqui.svg" width="128"/></p>
+<h1 align="center" style="font-weight: bold;">Loqui</h1>
+
 [<img src="https://gist.githubusercontent.com/hecrj/ad7ecd38f6e47ff3688a38c79fd108f0/raw/74384875ecbad02ae2a926425e9bcafd0695bade/color.svg" width="256"/>](https://github.com/hecrj/iced)
 
 Loqui is a [Harmony] client written in Rust using the [iced] GUI library.
