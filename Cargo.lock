@@ -698,29 +698,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crust"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "client",
- "fuzzy-matcher",
- "hex_color",
- "iced",
- "iced_aw",
- "iced_native",
- "image",
- "lazy_static",
- "notify",
- "notify-rust",
- "open",
- "rfd",
- "tokio",
- "toml",
- "tracing-appender",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "d3d12"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2086,6 +2063,29 @@ name = "longest-increasing-subsequence"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3bd0dd2cd90571056fdb71f6275fada10131182f84899f4b2a916e565d81d86"
+
+[[package]]
+name = "loqui"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "client",
+ "fuzzy-matcher",
+ "hex_color",
+ "iced",
+ "iced_aw",
+ "iced_native",
+ "image",
+ "lazy_static",
+ "notify",
+ "notify-rust",
+ "open",
+ "rfd",
+ "tokio",
+ "toml",
+ "tracing-appender",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "lyon"
