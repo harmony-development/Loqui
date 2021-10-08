@@ -48,7 +48,7 @@ use client::{
         },
     },
     tracing::{debug, error, warn},
-    OptionExt, Url,
+    OptionExt, Uri,
 };
 use iced::{
     executor,
@@ -139,7 +139,7 @@ pub enum Message {
     Exit,
     ExitReady,
     WindowFocusChanged(bool),
-    FetchLinkDataReceived(FetchLinkData, Url),
+    FetchLinkDataReceived(FetchLinkData, Uri),
 }
 
 impl Message {
@@ -565,9 +565,7 @@ impl ScreenManager {
                         inner
                             .mediaproxy()
                             .await
-                            .fetch_link_metadata(FetchLinkMetadataRequest {
-                                url: url.clone().into(),
-                            })
+                            .fetch_link_metadata(FetchLinkMetadataRequest { url: url.to_string() })
                             .await
                             .map(|resp| (resp.data, url))
                     },
@@ -1041,7 +1039,7 @@ impl Application for ScreenManager {
                 let mut cmd = None;
                 if let Some(client) = self.client.as_mut() {
                     if let FetchLinkData::IsSite(site) = &data {
-                        if let Ok(url) = site.image.parse::<Url>() {
+                        if let Ok(url) = site.image.parse::<Uri>() {
                             let id = FileId::External(url);
                             cmd = Some(client.mk_cmd(
                                 |inner| async move {

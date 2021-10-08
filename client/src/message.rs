@@ -4,9 +4,10 @@ use harmony_rust_sdk::{
         chat::{
             self, color, content, embed, overrides::Reason, FormattedText, Message as HarmonyMessage, Minithumbnail,
         },
+        exports::hrpc::exports::hyper::Uri,
         Hmc,
     },
-    client::{api::rest::FileId, exports::reqwest::Url},
+    client::api::rest::FileId,
 };
 use linemd::{parser::Token, Parser};
 use rand::Rng;
@@ -283,9 +284,9 @@ impl Message {
             Content::Text(text) => {
                 post.extend(
                     text.split_whitespace()
-                        .map(|a| Url::parse(a.trim_end_matches('>').trim_start_matches('<')))
+                        .map(|a| a.trim_end_matches('>').trim_start_matches('<').parse::<Uri>())
                         .flatten()
-                        .filter(|url| ["https", "http"].contains(&url.scheme()))
+                        .filter(|url| matches!(url.scheme_str(), Some("http" | "https")))
                         .map(PostProcessEvent::FetchLinkMetadata),
                 );
                 post.extend(

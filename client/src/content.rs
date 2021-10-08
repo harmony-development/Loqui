@@ -68,6 +68,7 @@ impl ContentStore {
     }
 
     pub fn content_path(&self, id: &FileId) -> PathBuf {
+        let id = id.to_string();
         let normalized_id = urlencoding::encode(id.as_str());
         self.content_dir().join(normalized_id.as_ref())
     }

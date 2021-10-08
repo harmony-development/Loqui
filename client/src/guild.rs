@@ -1,6 +1,9 @@
 use ahash::AHashMap;
 use harmony_rust_sdk::{
-    api::chat::{permission::has_permission, Permission, Place},
+    api::{
+        chat::{permission::has_permission, Permission},
+        harmonytypes::{item_position::Position, ItemPosition},
+    },
     client::api::rest::FileId,
 };
 
@@ -31,11 +34,11 @@ impl Guild {
         has_permission(self.perms.iter().map(|p| (p.matches.as_str(), p.ok)), query).unwrap_or(false)
     }
 
-    pub fn update_channel_order(&mut self, pos: impl Into<Place>, channel_id: u64) {
+    pub fn update_channel_order(&mut self, pos: ItemPosition, channel_id: u64) {
         update_order(&mut self.channels, pos, channel_id)
     }
 
-    pub fn update_role_order(&mut self, pos: impl Into<Place>, role_id: u64) {
+    pub fn update_role_order(&mut self, pos: ItemPosition, role_id: u64) {
         update_order(&mut self.roles, pos, role_id)
     }
 
@@ -46,40 +49,25 @@ impl Guild {
     }
 }
 
-fn update_order<V, P: Into<Place>>(map: &mut IndexMap<u64, V>, pos: P, id: u64) {
-    let place = pos.into();
-
+fn update_order<V>(map: &mut IndexMap<u64, V>, position: ItemPosition, id: u64) {
     if let Some(item_pos) = map.get_index_of(&id) {
-        match place {
-            Place::Top => {
-                let (k, v) = map.shift_remove_entry(&id).unwrap();
-                map.reverse();
-                map.insert(k, v);
-                map.reverse();
-            }
-            Place::Between { after, before } => {
-                let prev_pos = map.get_index_of(&after);
-                let next_pos = map.get_index_of(&before);
-
-                if let Some(pos) = prev_pos {
-                    let pos = pos + 1;
-                    if pos != item_pos && pos < map.len() {
-                        map.swap_indices(pos, item_pos);
-                    }
-                } else if let Some(pos) = next_pos {
-                    if pos != 0 {
-                        map.swap_indices(pos - 1, item_pos);
-                    } else {
-                        let (k, v) = map.pop().unwrap();
-                        map.reverse();
-                        map.insert(k, v);
-                        map.reverse();
-                    }
+        let pos = position.item_id as usize;
+        match position.position() {
+            Position::BeforeUnspecified => {
+                let pos = pos + 1;
+                if pos != item_pos && pos < map.len() {
+                    map.swap_indices(pos, item_pos);
                 }
             }
-            Place::Bottom => {
-                let (k, v) = map.shift_remove_entry(&id).unwrap();
-                map.insert(k, v);
+            Position::After => {
+                if pos != 0 {
+                    map.swap_indices(pos - 1, item_pos);
+                } else {
+                    let (k, v) = map.pop().unwrap();
+                    map.reverse();
+                    map.insert(k, v);
+                    map.reverse();
+                }
             }
         }
     }

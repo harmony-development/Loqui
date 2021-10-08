@@ -1,7 +1,7 @@
 use harmony_rust_sdk::{
     api::{
         exports::{
-            hrpc::url::{ParseError, Url},
+            hrpc::exports::http::uri::{InvalidUri as UrlParseError, Uri},
             prost::Message,
         },
         harmonytypes::Error,
@@ -17,9 +17,9 @@ pub enum ClientError {
     /// Error occurred during an IO operation.
     IoError(std::io::Error),
     /// Error occurred while parsing a string as URL.
-    UrlParse(String, ParseError),
+    UrlParse(String, UrlParseError),
     /// Error occurred while parsing an URL as HMC.
-    HmcParse(Url, HmcParseError),
+    HmcParse(Uri, HmcParseError),
     /// Error occurred in the Harmony client library.
     Internal(InnerClientError),
     /// The user is already logged in.
@@ -72,7 +72,9 @@ impl Display for ClientError {
             }
             ClientError::Internal(err) => {
                 if let InnerClientError::Internal(
-                    harmony_rust_sdk::api::exports::hrpc::client::ClientError::EndpointError { raw_error, .. },
+                    harmony_rust_sdk::api::exports::hrpc::client::error::ClientError::EndpointError {
+                        raw_error, ..
+                    },
                 ) = err
                 {
                     match Error::decode(raw_error.clone()) {

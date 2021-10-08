@@ -15,12 +15,9 @@ use crate::{
 use client::{
     error::ClientResult,
     harmony_rust_sdk::{
-        api::{
-            chat::{
-                all_permissions::{INVITES_MANAGE_CREATE, INVITES_MANAGE_DELETE, INVITES_VIEW},
-                Invite, InviteWithId,
-            },
-            exports::hrpc::url::Url,
+        api::chat::{
+            all_permissions::{INVITES_MANAGE_CREATE, INVITES_MANAGE_DELETE, INVITES_VIEW},
+            Invite, InviteWithId,
         },
         client::api::chat::invite::{CreateInviteRequest, DeleteInviteRequest},
     },
@@ -190,15 +187,11 @@ impl Tab for InviteTab {
                     space!(w % 3).into(),
                 ]);
                 let homeserver_url = client.inner().homeserver_url();
-                let mut url = Url::parse(
-                    format!(
-                        "harmony://{}:{}/",
-                        homeserver_url.host().unwrap(),
-                        homeserver_url.port().unwrap_or(2289)
-                    )
-                    .as_str(),
-                )
-                .unwrap();
+                let url = format!(
+                    "harmony://{}:{}/",
+                    homeserver_url.host().unwrap(),
+                    homeserver_url.port_u16().unwrap_or(2289)
+                );
                 self.but_states.resize_with(invites.len(), Default::default);
                 let mut invites_scrollable = Scrollable::new(&mut self.invite_list_state)
                     .style(theme)
@@ -208,7 +201,7 @@ impl Tab for InviteTab {
                     invites.iter().zip(self.but_states.iter_mut()).enumerate()
                 {
                     if let Some(invite) = &cur_invite.invite {
-                        url.set_path(&cur_invite.invite_id);
+                        let url = format!("{}{}", url, cur_invite.invite_id);
                         let mut row_widgets = vec![
                             Tooltip::new(
                                 label_button!(copy_url_state, url.as_str())

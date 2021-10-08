@@ -1,9 +1,12 @@
 use client::{
     error::ClientError,
     harmony_rust_sdk::{
-        api::chat::{
-            all_permissions::{PERMISSIONS_MANAGE_SET, ROLES_MANAGE},
-            color, Place,
+        api::{
+            chat::{
+                all_permissions::{PERMISSIONS_MANAGE_SET, ROLES_MANAGE},
+                color,
+            },
+            harmonytypes::ItemPosition,
         },
         client::api::chat::permissions::{ModifyGuildRole, MoveRole},
     },
@@ -41,7 +44,7 @@ impl Display for ChannelSelection {
 
 #[derive(Debug, Clone)]
 pub enum RolesMessage {
-    MoveRole { id: u64, new_place: Place },
+    MoveRole { id: u64, new_place: ItemPosition },
     GoBack,
     ShowColorPicker(usize, bool),
     SetColor { role_id: u64, color: Color },
@@ -189,9 +192,11 @@ impl Tab for RolesTab {
                 let down_place = guild.roles.get_index(role_index + 2).map(|(id, _)| *id);
 
                 let mk_place = |id, id_after| match (id, id_after) {
-                    (Some(before), Some(after)) => (before != after).then(|| Place::between(before, after)),
-                    (Some(_), None) => (role_index != guild.roles.len().saturating_sub(1)).then(Place::top),
-                    (None, Some(_)) => (role_index != 0).then(Place::bottom),
+                    (Some(before), Some(after)) => (before != after).then(|| ItemPosition::new_after(after)),
+                    (Some(before), None) => {
+                        (role_index != guild.roles.len().saturating_sub(1)).then(|| ItemPosition::new_before(before))
+                    }
+                    (None, Some(after)) => (role_index != 0).then(|| ItemPosition::new_after(after)),
                     (None, None) => None,
                 };
                 let mut up_but = Button::new(up_state, icon(Icon::ArrowUp)).style(theme);

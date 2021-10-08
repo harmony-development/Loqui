@@ -33,7 +33,7 @@ use client::{
         Parser,
     },
     message::{Attachment, MessageId},
-    Client, HarmonyToken, OptionExt, Url,
+    Client, HarmonyToken, OptionExt, Uri,
 };
 use iced::{rule::FillMode, Font, Tooltip};
 
@@ -514,7 +514,7 @@ pub fn build_event_history<'a>(
 
             let urls = textt
                 .split_whitespace()
-                .map(|a| Url::parse(a.trim_end_matches('>').trim_start_matches('<')))
+                .map(|a| a.trim_end_matches('>').trim_start_matches('<').parse::<Uri>())
                 .flatten()
                 .collect::<Vec<_>>();
             external_url_states.resize_with(urls.len(), Default::default);
@@ -592,7 +592,7 @@ pub fn build_event_history<'a>(
                                 .spacing(SPACING)
                                 .align_items(Align::Start);
 
-                            let url: String = url.into();
+                            let url = url.to_string();
                             message_body_widgets.push(
                                 Button::new(media_open_button_state, content)
                                     .padding([PADDING / 2, 0])

@@ -15,7 +15,7 @@ use emotes::EmotePacks;
 use guild::Guild;
 pub use harmony_rust_sdk::{
     self,
-    api::exports::hrpc::url::Url,
+    api::exports::hrpc::exports::http::Uri,
     client::{api::auth::Session as InnerSession, AuthStatus, Client as InnerClient},
 };
 use harmony_rust_sdk::{
@@ -126,7 +126,7 @@ pub enum PostProcessEvent {
         title: String,
         content: String,
     },
-    FetchLinkMetadata(Url),
+    FetchLinkMetadata(Uri),
     FetchEmotes(u64),
 }
 
@@ -136,7 +136,7 @@ pub struct Client {
     pub guilds: Guilds,
     pub members: Members,
     pub user_id: Option<u64>,
-    pub link_datas: AHashMap<Url, FetchLinkData>,
+    pub link_datas: AHashMap<Uri, FetchLinkData>,
     pub emote_packs: EmotePacks,
     content_store: Arc<ContentStore>,
 }
@@ -155,7 +155,7 @@ impl Debug for Client {
 
 impl Client {
     pub async fn new(
-        homeserver_url: Url,
+        homeserver_url: Uri,
         session: Option<InnerSession>,
         content_store: Arc<ContentStore>,
     ) -> ClientResult<Self> {
@@ -182,7 +182,13 @@ impl Client {
             let _ = inner
                 .call(UpdateProfile::default().with_new_status(UserStatus::OfflineUnspecified))
                 .await;
-            Self::remove_session(user_id, inner.homeserver_url().as_str(), &content_store, full_logout).await
+            Self::remove_session(
+                user_id,
+                inner.homeserver_url().to_string().as_str(),
+                &content_store,
+                full_logout,
+            )
+            .await
         })
     }
 

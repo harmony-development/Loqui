@@ -1,9 +1,9 @@
 use client::{
     error::ClientError,
     harmony_rust_sdk::{
-        api::chat::{
-            all_permissions::{CHANNELS_MANAGE_CHANGE_INFORMATION, CHANNELS_MANAGE_CREATE, CHANNELS_MANAGE_MOVE},
-            Place,
+        api::{
+            chat::all_permissions::{CHANNELS_MANAGE_CHANGE_INFORMATION, CHANNELS_MANAGE_CREATE, CHANNELS_MANAGE_MOVE},
+            harmonytypes::ItemPosition,
         },
         client::api::chat::channel::UpdateChannelOrder,
     },
@@ -27,7 +27,7 @@ use super::{GuildMetadata, Tab};
 
 #[derive(Debug, Clone)]
 pub enum OrderingMessage {
-    MoveChannel { id: u64, new_place: Place },
+    MoveChannel { id: u64, new_place: ItemPosition },
     GoBack,
 }
 
@@ -157,9 +157,10 @@ impl Tab for OrderingTab {
                     let down_place = guild.channels.get_index(channel_index + 2).map(|(id, _)| *id);
 
                     let mk_place = |id, id_after| match (id, id_after) {
-                        (Some(before), Some(after)) => (before != after).then(|| Place::between(before, after)),
-                        (Some(_), None) => (channel_index != guild.channels.len().saturating_sub(1)).then(Place::top),
-                        (None, Some(_)) => (channel_index != 0).then(Place::bottom),
+                        (Some(before), Some(after)) => (before != after).then(|| ItemPosition::new_after(after)),
+                        (Some(before), None) => (channel_index != guild.channels.len().saturating_sub(1))
+                            .then(|| ItemPosition::new_before(before)),
+                        (None, Some(after)) => (channel_index != 0).then(|| ItemPosition::new_after(after)),
                         (None, None) => None,
                     };
                     let mut up_but = Button::new(up_state, icon(Icon::ArrowUp)).style(theme);

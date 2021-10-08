@@ -12,7 +12,7 @@ use client::{
     harmony_rust_sdk::{
         api::{
             auth::{auth_step::Step, next_step_request::form_fields::Field},
-            exports::hrpc::url::Url,
+            exports::hrpc::exports::http::Uri,
             profile::GetProfileRequest,
         },
         client::{
@@ -349,7 +349,7 @@ impl LoginScreen {
                         .get("homeserver")
                         .map(|(_, homeserver, _)| homeserver.clone())
                     {
-                        return match homeserver.parse::<Url>() {
+                        return match homeserver.parse::<Uri>() {
                             Ok(uri) => {
                                 let content_store = content_store.clone();
                                 self.waiting = true;
@@ -400,7 +400,7 @@ impl LoginScreen {
                         // (How can there be no client, but we get authenticated?)
                         // We *can* recover from here but it's not worth the effort
                         let auth_status = client.unwrap().auth_status();
-                        let homeserver = SmolStr::new(client.unwrap().inner().homeserver_url().as_str());
+                        let homeserver: SmolStr = client.unwrap().inner().homeserver_url().to_string().into();
                         let content_store = client.unwrap().content_store_arc();
                         let inner = client.unwrap().inner_arc();
                         return Command::perform(
