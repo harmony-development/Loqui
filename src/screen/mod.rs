@@ -456,7 +456,7 @@ impl ScreenManager {
                             let profile = resp.profile.unwrap_or_default();
                             vec![Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
                                 user_id,
-                                new_avatar: Some(profile.user_avatar),
+                                new_avatar: profile.user_avatar,
                                 new_status: Some(profile.user_status),
                                 new_username: Some(profile.user_name),
                                 new_is_bot: Some(profile.is_bot),
@@ -486,7 +486,7 @@ impl ScreenManager {
                                 guild_id,
                                 new_metadata: guild.metadata,
                                 new_name: Some(guild.name),
-                                new_picture: Some(guild.picture),
+                                new_picture: guild.picture,
                             }))
                         })?));
                         let perm_queries = [
@@ -789,7 +789,7 @@ impl Application for ScreenManager {
                         }));
                         events.push(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
                             new_is_bot: Some(self_profile.is_bot),
-                            new_avatar: Some(self_profile.user_avatar),
+                            new_avatar: self_profile.user_avatar,
                             new_status: Some(UserStatus::Online.into()),
                             new_username: Some(self_profile.user_name),
                             user_id: self_id,
@@ -933,7 +933,7 @@ impl Application for ScreenManager {
                                                 let profile = resp.profile?;
                                                 Some(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
                                                     user_id,
-                                                    new_avatar: Some(profile.user_avatar),
+                                                    new_avatar: profile.user_avatar,
                                                     new_status: Some(profile.user_status),
                                                     new_username: Some(profile.user_name),
                                                     new_is_bot: Some(profile.is_bot),
