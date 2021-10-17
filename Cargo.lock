@@ -292,9 +292,9 @@ checksum = "631ae5198c9be5e753e5cc215e1bd73c2b466a3565173db433f52bb9d3e66dba"
 
 [[package]]
 name = "cairo-sys-rs"
-version = "0.14.0"
+version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c9c3928781e8a017ece15eace05230f04b647457d170d2d9641c94a444ff80"
+checksum = "b448b876970834fda82ba3aeaccadbd760206b75388fc5c1b02f1e343b697570"
 dependencies = [
  "libc",
  "system-deps",
@@ -1539,7 +1539,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#b83e5d82bac093f2f53be8dfe514c0553c4a9243"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#45851e5d4258a7b2bd16f50366e38139c229ecfc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1549,7 +1549,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#b83e5d82bac093f2f53be8dfe514c0553c4a9243"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#45851e5d4258a7b2bd16f50366e38139c229ecfc"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1615,9 +1615,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.18.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368e54831e60d85037b1a9d1af790b0284606fd2b545c2dc4b6db9d53a39ac06"
+checksum = "5f77fee9eb6c49f43e7486c40198cb43188007c4a8a1f0c73dde6e217e24c011"
 dependencies = [
  "async-trait",
  "bytes",
@@ -2290,9 +2290,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.7.13"
+version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c2bdb6314ec10835cd3293dd268473a835c02b7b352e788be788b3c6ca6bb16"
+checksum = "8067b404fe97c70829f082dec8bcf4f71225d7eaea1d8645349cb76fa06205cc"
 dependencies = [
  "libc",
  "log",
