@@ -934,9 +934,9 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "encoding_rs"
-version = "0.8.28"
+version = "0.8.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80df024fbc5ac80f87dfef0d9f5209a252f2a497f7f42944cff24d8253cac065"
+checksum = "a74ea89a0a1b98f6332de42c95baff457ada66d1cb4030f9ff151b2041a1c746"
 dependencies = [
  "cfg-if 1.0.0",
 ]
@@ -1539,7 +1539,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#45851e5d4258a7b2bd16f50366e38139c229ecfc"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#84c53d9253c701a106b65996c718bb81f00df1e4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1549,7 +1549,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#45851e5d4258a7b2bd16f50366e38139c229ecfc"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#84c53d9253c701a106b65996c718bb81f00df1e4"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1615,9 +1615,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.18.1"
+version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f77fee9eb6c49f43e7486c40198cb43188007c4a8a1f0c73dde6e217e24c011"
+checksum = "7e1d2b972a9f204183e35368dba5a8dad85fc4a995961c29d2812d492bf2a555"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1640,9 +1640,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc-build"
-version = "0.18.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91d6dec41afe9e6061351f2fc47838b5629318652644f10acc0a6a37efd39198"
+checksum = "3eb7d5dc20dabe94374772cc1bcd1c0926d083cfad62a9726a2e473881d488d1"
 dependencies = [
  "proc-macro2",
  "prost-build",
@@ -1939,9 +1939,9 @@ checksum = "90953f308a79fe6d62a4643e51f848fbfddcd05975a38e69fdf4ab86a7baf7ca"
 
 [[package]]
 name = "instant"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "716d3d89f35ac6a34fd0eed635395f4c3b76fa889338a4632e5231a8684216bd"
+checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
 dependencies = [
  "cfg-if 1.0.0",
  "js-sys",
