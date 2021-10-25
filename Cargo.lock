@@ -2059,7 +2059,7 @@ dependencies = [
 [[package]]
 name = "linemd"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/linemd.git?branch=master#04521260663d6c65b02e55b34dad809b5258b5f2"
+source = "git+https://github.com/yusdacra/linemd.git?branch=master#17964e0e964b28d3804ff95c2bbd38bb9a1de9c9"
 
 [[package]]
 name = "linked-hash-map"
