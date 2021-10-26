@@ -1,11 +1,5 @@
 use harmony_rust_sdk::{
-    api::{
-        exports::{
-            hrpc::exports::http::uri::{InvalidUri as UrlParseError, Uri},
-            prost::Message,
-        },
-        harmonytypes::Error,
-    },
+    api::exports::hrpc::exports::http::uri::{InvalidUri as UrlParseError, Uri},
     client::error::{ClientError as InnerClientError, HmcParseError, InternalClientError},
 };
 use std::fmt::{self, Display};
@@ -73,29 +67,17 @@ impl Display for ClientError {
             ClientError::Internal(err) => {
                 if let InnerClientError::Internal(
                     harmony_rust_sdk::api::exports::hrpc::client::error::ClientError::EndpointError {
-                        raw_error, ..
+                        hrpc_error: err,
+                        ..
                     },
                 ) = err
                 {
-                    match Error::decode(raw_error.clone()) {
-                        Ok(err) => {
-                            write!(
-                                fmt,
-                                "API error: {} | {}",
-                                err.identifier.replace('\n', " "),
-                                err.human_message.replace('\n', " ")
-                            )
-                        }
-                        Err(_) => {
-                            write!(
-                                fmt,
-                                "API error: {}",
-                                std::str::from_utf8(raw_error)
-                                    .unwrap_or("couldn't parse error")
-                                    .replace('\n', " "),
-                            )
-                        }
-                    }
+                    write!(
+                        fmt,
+                        "API error: {} | {}",
+                        err.identifier.replace('\n', " "),
+                        err.human_message.replace('\n', " ")
+                    )
                 } else {
                     write!(fmt, "{}", err)
                 }

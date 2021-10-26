@@ -40,15 +40,16 @@
         "rustOverlay": "rustOverlay"
       },
       "locked": {
-        "lastModified": 1635142208,
-        "narHash": "sha256-toWtFQNybLPtX6p/uEcC8GccOq0adhK3mEdFIraELfg=",
+        "lastModified": 1635224417,
+        "narHash": "sha256-1UHxhZCAudeB1N0mo41fpkW6Jq766skE3PF078b+naQ=",
         "owner": "yusdacra",
         "repo": "nix-cargo-integration",
-        "rev": "cb5b586b605988214a1fae07155c02cca19bd1f0",
+        "rev": "e012798f2eeb73b4a18d8d9deafbb37673f87d77",
         "type": "github"
       },
       "original": {
         "owner": "yusdacra",
+        "ref": "fix/runtime-libs",
         "repo": "nix-cargo-integration",
         "type": "github"
       }

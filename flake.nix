@@ -6,7 +6,7 @@
     };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixCargoIntegration = {
-      url = "github:yusdacra/nix-cargo-integration";
+      url = "github:yusdacra/nix-cargo-integration/fix/runtime-libs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
