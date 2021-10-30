@@ -234,6 +234,9 @@ impl From<content::Content> for Content {
                     .flat_map(Attachment::from_harmony_photo)
                     .collect(),
             ),
+            content::Content::InviteRejected(_) => todo!(),
+            content::Content::InviteAccepted(_) => todo!(),
+            content::Content::RoomUpgradedToGuild(_) => todo!(),
         }
     }
 }
