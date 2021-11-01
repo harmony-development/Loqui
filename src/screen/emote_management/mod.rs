@@ -62,15 +62,10 @@ pub struct ManageEmotesScreen {
 }
 
 impl ManageEmotesScreen {
-    pub fn update(
-        &mut self,
-        message: Message,
-        client: &Client,
-        clip: &mut iced::Clipboard,
-    ) -> Command<TopLevelMessage> {
+    pub fn update(&mut self, message: Message, client: &Client) -> Command<TopLevelMessage> {
         match message {
-            Message::CopyToClipboard(val) => clip.write(val),
-            Message::CopyIdToClipboard(id) => clip.write(id.to_string()),
+            Message::CopyToClipboard(val) => return iced::clipboard::write(val),
+            Message::CopyIdToClipboard(id) => return iced::clipboard::write(id.to_string()),
             Message::ManageEmotes(pack_id) => {
                 self.manage_emotes_modal.inner_mut().pack_id = pack_id;
                 self.manage_emotes_modal.show(true);
@@ -92,7 +87,7 @@ impl ManageEmotesScreen {
             Message::GoBack => return TopLevelScreen::pop_screen_cmd(),
             Message::PackNameChanged(pack_name) => self.pack_name = pack_name,
             Message::ManageEmotesMessage(message) => {
-                let (cmd, go_back) = self.manage_emotes_modal.inner_mut().update(message, client, clip);
+                let (cmd, go_back) = self.manage_emotes_modal.inner_mut().update(message, client);
                 self.manage_emotes_modal.show(!go_back);
                 return cmd;
             }

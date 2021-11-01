@@ -107,12 +107,7 @@ impl GuildSettings {
         }
     }
 
-    pub fn update(
-        &mut self,
-        message: Message,
-        client: &Client,
-        clip: &mut iced::Clipboard,
-    ) -> Command<TopLevelMessage> {
+    pub fn update(&mut self, message: Message, client: &Client) -> Command<TopLevelMessage> {
         match message {
             Message::ShowUpdateChannelModal(channel_id) => {
                 self.update_channel_modal.show(true);
@@ -128,8 +123,8 @@ impl GuildSettings {
                 modal_state.guild_id = self.guild_id;
                 modal_state.channel_id = channel_id;
             }
-            Message::CopyIdToClipboard(id) => clip.write(id.to_string()),
-            Message::CopyToClipboard(msg) => clip.write(msg),
+            Message::CopyIdToClipboard(id) => return iced::clipboard::write(id.to_string()),
+            Message::CopyToClipboard(msg) => return iced::clipboard::write(msg),
             Message::TabSelected(selected) => {
                 self.active_tab = selected;
                 match selected {
@@ -182,7 +177,7 @@ impl GuildSettings {
             Message::Invite(message) => {
                 return self
                     .invite_tab
-                    .update(message, client, &mut self.meta_data, self.guild_id, clip)
+                    .update(message, client, &mut self.meta_data, self.guild_id)
             }
             Message::Ordering(message) => {
                 return self

@@ -153,12 +153,7 @@ impl ManageEmotesModal {
         .into()
     }
 
-    pub fn update(
-        &mut self,
-        message: Message,
-        client: &Client,
-        clip: &mut iced::Clipboard,
-    ) -> (Command<TopLevelMessage>, bool) {
+    pub fn update(&mut self, message: Message, client: &Client) -> (Command<TopLevelMessage>, bool) {
         (
             match message {
                 Message::GoBack => return (Command::none(), true),
@@ -189,10 +184,7 @@ impl ManageEmotesModal {
                         map_to_nothing,
                     )
                 }
-                Message::CopyToClipboard(value) => {
-                    clip.write(value);
-                    Command::none()
-                }
+                Message::CopyToClipboard(value) => iced::clipboard::write(value),
             },
             false,
         )

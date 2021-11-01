@@ -188,12 +188,7 @@ impl ProfileEditModal {
         .into()
     }
 
-    pub fn update(
-        &mut self,
-        msg: Message,
-        client: &Client,
-        clip: &mut iced::Clipboard,
-    ) -> (Command<TopLevelMessage>, bool) {
+    pub fn update(&mut self, msg: Message, client: &Client) -> (Command<TopLevelMessage>, bool) {
         (
             match msg {
                 Message::IsBotChecked(is_bot) => client.mk_cmd(
@@ -225,14 +220,8 @@ impl ProfileEditModal {
                     )
                 }
                 Message::Back => return (Command::none(), true),
-                Message::CopyId => {
-                    clip.write(self.user_id.to_string());
-                    Command::none()
-                }
-                Message::CopyUsername(username) => {
-                    clip.write(username);
-                    Command::none()
-                }
+                Message::CopyId => iced::clipboard::write(self.user_id.to_string()),
+                Message::CopyUsername(username) => iced::clipboard::write(username),
             },
             false,
         )

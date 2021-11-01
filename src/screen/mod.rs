@@ -239,7 +239,6 @@ impl Screen {
         client: Option<&mut Client>,
         content_store: &Arc<ContentStore>,
         thumbnail_cache: &ThumbnailCache,
-        clip: &mut iced::Clipboard,
     ) -> Command<Message> {
         match msg {
             ScreenMessage::LoginScreen(msg) => {
@@ -249,7 +248,7 @@ impl Screen {
             }
             ScreenMessage::MainScreen(msg) => {
                 if let (Screen::Main(screen), Some(client)) = (self, client) {
-                    return screen.update(msg, client, thumbnail_cache, clip);
+                    return screen.update(msg, client, thumbnail_cache);
                 }
             }
             ScreenMessage::GuildDiscovery(msg) => {
@@ -259,12 +258,12 @@ impl Screen {
             }
             ScreenMessage::GuildSettings(msg) => {
                 if let (Screen::GuildSettings(screen), Some(client)) = (self, client) {
-                    return screen.update(msg, client, clip);
+                    return screen.update(msg, client);
                 }
             }
             ScreenMessage::EmoteManagement(msg) => {
                 if let (Screen::EmoteManagement(screen), Some(client)) = (self, client) {
-                    return screen.update(msg, client, clip);
+                    return screen.update(msg, client);
                 }
             }
         }
@@ -408,7 +407,7 @@ impl ScreenManager {
         self.theme.user_theme = user_theme;
     }
 
-    fn process_post_event(&mut self, post: PostProcessEvent, clip: &mut iced::Clipboard) -> Command<Message> {
+    fn process_post_event(&mut self, post: PostProcessEvent) -> Command<Message> {
         if let Some(client) = self.client.as_mut() {
             match post {
                 PostProcessEvent::SendNotification { content, title, .. } => {
@@ -467,12 +466,7 @@ impl ScreenManager {
                 ),
                 PostProcessEvent::GoToFirstMsgOnChannel(channel_id) => {
                     if let Some(s) = self.screens.find_map_mut(Screen::main_screen_mut) {
-                        s.update(
-                            main::Message::ScrollToBottom(channel_id),
-                            client,
-                            &self.thumbnail_cache,
-                            clip,
-                        )
+                        s.update(main::Message::ScrollToBottom(channel_id), client, &self.thumbnail_cache)
                     } else {
                         Command::none()
                     }
@@ -650,7 +644,7 @@ impl Application for ScreenManager {
         title
     }
 
-    fn update(&mut self, msg: Self::Message, clip: &mut iced::Clipboard) -> Command<Self::Message> {
+    fn update(&mut self, msg: Self::Message) -> Command<Self::Message> {
         // TODO: move this to a subscription
         self.client.as_mut().and_do(|client| {
             client
@@ -670,7 +664,6 @@ impl Application for ScreenManager {
                     self.client.as_mut().map(Box::as_mut),
                     &self.content_store,
                     &self.thumbnail_cache,
-                    clip,
                 );
             }
             Message::Nothing => {}
@@ -711,8 +704,8 @@ impl Application for ScreenManager {
                         .and_do(|ev| {
                             debug!("event received from socket: {:?}", ev);
                             let cmd = match ev {
-                                Ok(ev) => self.update(Message::EventsReceived(vec![ev]), clip),
-                                Err(err) => self.update(err.into(), clip),
+                                Ok(ev) => self.update(Message::EventsReceived(vec![ev])),
+                                Err(err) => self.update(err.into()),
                             };
                             cmds.push(cmd);
                         })
@@ -832,7 +825,7 @@ impl Application for ScreenManager {
                     .and_do(|msg| msg.being_edited = None);
 
                 if let Some(err) = err {
-                    return self.update(Message::Error(err), clip);
+                    return self.update(Message::Error(err));
                 }
             }
             Message::SendMessage {
@@ -915,7 +908,7 @@ impl Application for ScreenManager {
                         if let PostProcessEvent::FetchProfile(user_id) = post {
                             fetch_users.push(user_id);
                         } else {
-                            cmds.push(self.process_post_event(post, clip));
+                            cmds.push(self.process_post_event(post));
                         }
                     }
 
@@ -977,7 +970,7 @@ impl Application for ScreenManager {
                         )
                     })
                     .map_or_else(Command::none, |posts| {
-                        Command::batch(posts.into_iter().map(|post| self.process_post_event(post, clip)))
+                        Command::batch(posts.into_iter().map(|post| self.process_post_event(post)))
                     });
             }
             Message::Error(err) => {
@@ -993,7 +986,7 @@ impl Application for ScreenManager {
 
                 // Return to login screen if its a connection error
                 if err_disp.contains("invalid-session") || err_disp.contains("connect error") {
-                    self.update(Message::Logout(Screen::Login(LoginScreen::new().into()).into()), clip);
+                    self.update(Message::Logout(Screen::Login(LoginScreen::new().into()).into()));
                 }
 
                 return self.screens.current_mut().on_error(*err);
@@ -1004,8 +997,8 @@ impl Application for ScreenManager {
                     client.get_guild(guild_id).and_do(|g| g.init_fetching = false);
                 }
                 return match events {
-                    Ok(events) => self.update(Message::TryEventsReceived(events), clip),
-                    Err(err) => self.update(Message::Error(err.into()), clip),
+                    Ok(events) => self.update(Message::TryEventsReceived(events)),
+                    Err(err) => self.update(Message::Error(err.into())),
                 };
             }
             Message::InitialChannelLoad {
@@ -1019,8 +1012,8 @@ impl Application for ScreenManager {
                         .and_do(|c| c.init_fetching = false);
                 }
                 return match events {
-                    Ok(events) => self.update(*events, clip),
-                    Err(err) => self.update(Message::Error(err.into()), clip),
+                    Ok(events) => self.update(*events),
+                    Err(err) => self.update(Message::Error(err.into())),
                 };
             }
             Message::TryEventsReceived(maybe_events) => {
@@ -1029,10 +1022,10 @@ impl Application for ScreenManager {
                 for maybe_event in maybe_events {
                     match maybe_event {
                         Ok(event) => events.push(event),
-                        Err(err) => cmds.push(self.update(Message::Error(Box::new(err)), clip)),
+                        Err(err) => cmds.push(self.update(Message::Error(Box::new(err)))),
                     }
                 }
-                cmds.push(self.update(Message::EventsReceived(events), clip));
+                cmds.push(self.update(Message::EventsReceived(events)));
                 return Command::batch(cmds);
             }
             Message::FetchLinkDataReceived(data, url) => {
@@ -1086,7 +1079,7 @@ impl Application for ScreenManager {
             } => {
                 if let Some(client) = self.client.as_mut() {
                     let posts = client.process_reply_message(guild_id, channel_id, message_id, message);
-                    return Command::batch(posts.into_iter().map(|post| self.process_post_event(post, clip)));
+                    return Command::batch(posts.into_iter().map(|post| self.process_post_event(post)));
                 }
             }
         }

@@ -58,7 +58,6 @@ impl InviteTab {
         client: &Client,
         meta_data: &mut GuildMetadata,
         guild_id: u64,
-        clip: &mut iced::Clipboard,
     ) -> Command<TopLevelMessage> {
         match message {
             InviteMessage::InviteNameChanged(s) => {
@@ -133,7 +132,7 @@ impl InviteTab {
             InviteMessage::InviteDeleted(n) => {
                 meta_data.invites.as_mut().unwrap().remove(n);
             }
-            InviteMessage::CopyToClipboard(string) => clip.write(string),
+            InviteMessage::CopyToClipboard(string) => return iced::clipboard::write(string),
         }
 
         Command::none()

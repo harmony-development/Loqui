@@ -18,8 +18,8 @@ use client::{
 };
 pub use event_history::build_event_history;
 pub use iced::{
-    button, pick_list, scrollable, text_input, Align, Button, Checkbox, Color, Column, Command, Container, Element,
-    Image, Length, PickList, Row, Rule, Scrollable, Space, Subscription, Text, TextInput, Toggler,
+    button, pick_list, scrollable, text_input, Alignment as Align, Button, Checkbox, Color, Column, Command, Container,
+    Element, Image, Length, PickList, Row, Rule, Scrollable, Space, Subscription, Text, TextInput, Toggler,
 };
 pub use iced_aw::Icon;
 use iced_native::text_input::{cursor::State, Value};
