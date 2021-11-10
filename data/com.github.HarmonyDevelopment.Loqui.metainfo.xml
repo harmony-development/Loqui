@@ -1,0 +1,26 @@
+<?xml version="1.0" encodings="UTF-8"?>
+
+<component type="desktop-application">
+	<id>com.github.HarmonyDevelopment.Loqui</id>
+	<metadata_license>CC0</metadata_license>
+	<project_license>GPL-3.0</project_license>
+	<name>Loqui</name>
+	<summary>Desktop client for Harmony chat</summary>
+	<description>
+		<p>Loqui is a Rust desktop client for the Harmony chat protocol.</p>
+	</description>
+	<url type="homepage">https://github.com/harmony-development/loqui</url>
+	<content_rating type="oars-1.1">
+		<content_attribute id="social-chat">intense</content_attribute>
+		<content_attribute id="social-info">mild</content_attribute>
+		<content_attribute id="social-audio">intense</content_attribute>
+		<content_attribute id="social-contacts">intense</content_attribute>
+	</content_rating>
+	<kudos>
+		<kudo>ModernToolkit</kudo>
+		<kudo>HiDpiIcon</kudo>
+	</kudos>
+	<developer_name>Yusuf Bera Ertan</developer_name>
+	<update_contact>y.bera003.06@protonmail.com</update_contact>
+	<launchable type="desktop-id">com.github.HarmonyDevelopment.Loqui.desktop</launchable>
+</component>

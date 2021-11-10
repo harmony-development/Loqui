@@ -1,0 +1,31 @@
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - 'README.md'
+      - '**/*.nix'
+      - 'nix/envrc'
+      - 'flake.lock'
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - 'README.md'
+      - '**/*.nix'
+      - 'nix/envrc'
+      - 'flake.lock'
+
+name: Flatpak CI
+jobs:
+  flatpak:
+    name: "Flatpak"
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:gnome-40
+      options: --privileged
+    steps:
+    - uses: actions/checkout@v2
+    - uses: bilelmoussaoui/flatpak-github-actions/flatpak-builder@v4
+      with:
+        bundle: loqui.flatpak
+        manifest-path: com.github.HarmonyDevelopment.Loqui.yml
+        cache-key: flatpak-builder-${{ github.sha }}
