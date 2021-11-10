@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Loqui
+Comment=Desktop client for Harmony
+Type=Application
+Exec=loqui
+Terminal=Application
+Terminal=false
+Categories=Network
+Keywords=Harmony;Chat
+Icon=com.github.HarmonyDevelopment.Loqui
