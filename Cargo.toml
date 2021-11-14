@@ -63,7 +63,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 fuzzy-matcher = "0.3.7"
 notify-rust = "4"
-notify = { git = "https://github.com/notify-rs/notify.git", tag = "5.0.0-pre.11" }
+notify = { git = "https://github.com/notify-rs/notify.git", tag = "5.0.0-pre.12" }
 lazy_static = "1"
 
 [package.metadata.nix]
