@@ -4,7 +4,7 @@ use harmony_rust_sdk::{
         chat::{
             self, color, content, embed, overrides::Reason, FormattedText, Message as HarmonyMessage, Minithumbnail,
         },
-        exports::hrpc::exports::hyper::Uri,
+        exports::hrpc::exports::http::Uri,
         Hmc,
     },
     client::api::rest::FileId,

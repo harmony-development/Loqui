@@ -20,7 +20,8 @@ use client::{
                 all_permissions::{MESSAGES_SEND, ROLES_GET, ROLES_USER_MANAGE},
                 get_channel_messages_request::Direction,
                 stream_event::{ChannelCreated, Event as ChatEvent, MemberJoined, RoleCreated, UserRolesUpdated},
-                Event, GetChannelMessagesResponse, GetGuildRolesRequest, GetUserRolesRequest,
+                Event, GetChannelMessagesResponse, GetGuildChannelsRequest, GetGuildMembersRequest,
+                GetGuildRolesRequest, GetUserRolesRequest,
             },
             profile::UserStatus,
             rest::FileId,
@@ -1561,8 +1562,7 @@ impl MainScreen {
                         let inner = client.inner_arc();
                         return Command::perform(
                             async move {
-                                let guildid = GuildId::new(guild_id);
-                                let channels_list = inner.chat().await.get_guild_channels(guildid).await?.channels;
+                                let channels_list = inner.call(GetGuildChannelsRequest::new(guild_id)).await?.channels;
                                 let mut events: Vec<ClientResult<Event>> = Vec::with_capacity(channels_list.len());
                                 events.extend(channels_list.into_iter().filter_map(|c| {
                                     let channel = c.channel?;
@@ -1599,7 +1599,7 @@ impl MainScreen {
                                     ));
                                 }
 
-                                let members = inner.chat().await.get_guild_members(guildid).await?.members;
+                                let members = inner.call(GetGuildMembersRequest::new(guild_id)).await?.members;
                                 events.reserve(members.len() * 2);
                                 if get_user_roles {
                                     for id in &members {
@@ -1693,9 +1693,7 @@ impl MainScreen {
                         cmds.push(Command::perform(
                             async move {
                                 inner
-                                    .chat()
-                                    .await
-                                    .get_channel_messages(GetChannelMessages::new(guild_id, channel_id))
+                                    .call(GetChannelMessages::new(guild_id, channel_id))
                                     .await
                                     .map(convert_to_event)
                                     .map_err(ClientError::from)

@@ -2,7 +2,10 @@ use std::ops::Not;
 
 use client::{
     bool_ext::BoolExt,
-    harmony_rust_sdk::{api::chat::InviteId, client::api::chat::*},
+    harmony_rust_sdk::{
+        api::chat::{InviteId, JoinGuildRequest},
+        client::api::chat::*,
+    },
     tracing::debug,
     OptionExt,
 };
@@ -187,9 +190,7 @@ impl GuildDiscovery {
                 return client.mk_cmd(
                     |inner| async move {
                         inner
-                            .chat()
-                            .await
-                            .create_guild(guild::CreateGuild::new(guild_name))
+                            .call(guild::CreateGuild::new(guild_name))
                             .await
                             .map(|g| g.guild_id)
                     },
@@ -197,12 +198,13 @@ impl GuildDiscovery {
                 );
             }
             Message::JoinGuild(invite) => {
+                let invite: String = invite.into();
                 self.joined_guild = None;
-                self.joining_guild = Some(invite.to_string());
+                self.joining_guild = Some(invite.clone());
                 self.error_text.clear();
 
                 return client.mk_cmd(
-                    |inner| async move { inner.chat().await.join_guild(invite).await.map(|e| e.guild_id) },
+                    |inner| async move { inner.call(JoinGuildRequest::new(invite)).await.map(|e| e.guild_id) },
                     |id| TopLevelMessage::guild_discovery(Message::JoinedGuild(id)),
                 );
             }

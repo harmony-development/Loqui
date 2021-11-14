@@ -37,6 +37,7 @@ use client::{
                 stream_event::Event as EmoteEvent, EmotePackAdded, EmotePackEmotesUpdated, GetEmotePackEmotesRequest,
                 GetEmotePacksRequest,
             },
+            exports::hrpc::client::transport::http::HyperError,
             mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
             profile::{stream_event::Event as ProfileEvent, GetProfileRequest, Profile, ProfileUpdated, UserStatus},
             rest::FileId,
@@ -533,9 +534,7 @@ impl ScreenManager {
                 } => client.mk_cmd(
                     |inner| async move {
                         inner
-                            .chat()
-                            .await
-                            .get_message(GetMessageRequest {
+                            .call(GetMessageRequest {
                                 guild_id,
                                 channel_id,
                                 message_id,
@@ -557,9 +556,7 @@ impl ScreenManager {
                 PostProcessEvent::FetchLinkMetadata(url) => client.mk_cmd(
                     |inner| async move {
                         inner
-                            .mediaproxy()
-                            .await
-                            .fetch_link_metadata(FetchLinkMetadataRequest { url: url.to_string() })
+                            .call(FetchLinkMetadataRequest::new(url.to_string()))
                             .await
                             .map(|resp| (resp.data, url))
                     },
@@ -772,7 +769,7 @@ impl Application for ScreenManager {
                                 .profile
                                 .unwrap_or_default()
                         };
-                        let guilds = inner.chat().await.get_guild_list(GetGuildListRequest {}).await?.guilds;
+                        let guilds = inner.call(GetGuildListRequest::new()).await?.guilds;
                         let mut events = Vec::with_capacity(guilds.len() + 1);
                         events.extend(guilds.into_iter().map(|guild| {
                             Event::Chat(ChatEvent::GuildAddedToList(GuildAddedToList {
@@ -787,7 +784,7 @@ impl Application for ScreenManager {
                             new_username: Some(self_profile.user_name),
                             user_id: self_id,
                         })));
-                        events.extend(inner.call(GetEmotePacksRequest {}).await.map(|resp| {
+                        events.extend(inner.call(GetEmotePacksRequest::new()).await.map(|resp| {
                             resp.packs.into_iter().map(|pack| {
                                 Event::Emote(EmoteEvent::EmotePackAdded(EmotePackAdded { pack: Some(pack) }))
                             })
@@ -980,7 +977,9 @@ impl Application for ScreenManager {
                 // Reset socket if socket error happened
                 matches!(
                     &*err,
-                    ClientError::Internal(InnerClientError::Internal(HrpcClientError::SocketError(_)))
+                    ClientError::Internal(InnerClientError::Internal(HrpcClientError::Transport(
+                        HyperError::SocketInitError(_)
+                    )))
                 )
                 .and_do(|| self.socket_reset = true);
 
