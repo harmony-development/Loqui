@@ -1513,9 +1513,9 @@ checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
 name = "hrpc"
-version = "0.29.2"
+version = "0.29.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75df85957ff10ff56227439de417b8fae9d063a54010d5daf8f51d551c45c14c"
+checksum = "65eec0f7d918d2927b6713991a5225aebfafb4cccaf08962dc86500b320d1947"
 dependencies = [
  "bytes",
  "flume",
@@ -1626,7 +1626,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1639,7 +1639,7 @@ dependencies = [
 [[package]]
 name = "iced_aw"
 version = "0.1.0"
-source = "git+https://github.com/yusdacra/iced_aw.git?branch=crust#bf0bc31a5580ec9156695c2a2f5f5e09a41275f5"
+source = "git+https://github.com/yusdacra/iced_aw.git?branch=crust#bd4812aadf199da305f2427d8af03143ed3a1e6b"
 dependencies = [
  "dodrio",
  "iced_graphics",
@@ -1653,7 +1653,7 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "bitflags",
 ]
@@ -1661,7 +1661,7 @@ dependencies = [
 [[package]]
 name = "iced_futures"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "futures",
  "log",
@@ -1672,7 +1672,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.2.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "bytemuck",
  "font-kit",
@@ -1687,7 +1687,7 @@ dependencies = [
 [[package]]
 name = "iced_native"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -1699,7 +1699,7 @@ dependencies = [
 [[package]]
 name = "iced_style"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "iced_core",
 ]
@@ -1707,7 +1707,7 @@ dependencies = [
 [[package]]
 name = "iced_web"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "base64",
  "dodrio",
@@ -1724,7 +1724,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.4.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "bitflags",
  "bytemuck",
@@ -1744,7 +1744,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.3.0"
-source = "git+https://github.com/yusdacra/iced.git?branch=crust#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
+source = "git+https://github.com/yusdacra/iced.git?rev=60f33f787c0ef6ae7394e0a78f06a856b8c67a47#60f33f787c0ef6ae7394e0a78f06a856b8c67a47"
 dependencies = [
  "iced_futures",
  "iced_graphics",
@@ -2035,9 +2035,9 @@ dependencies = [
 
 [[package]]
 name = "lyon_geom"
-version = "0.17.5"
+version = "0.17.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe153a6ce93cb97c85ba47a007fd437079bbff5592b9c0f77195973b8b169d69"
+checksum = "ce99ce77c22bfd8f39a95b9c749dffbfc3e2491ea30c874764c801a8b1485489"
 dependencies = [
  "arrayvec 0.5.2",
  "euclid",

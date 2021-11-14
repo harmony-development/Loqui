@@ -39,8 +39,8 @@ panic = 'abort'
 [dependencies]
 client = { path = "./client" }
 
-iced = { git = "https://github.com/yusdacra/iced.git", branch = "crust", features = ["tokio", "image"] }
-iced_native = { git = "https://github.com/yusdacra/iced.git", branch = "crust" }
+iced = { git = "https://github.com/yusdacra/iced.git", rev = "60f33f787c0ef6ae7394e0a78f06a856b8c67a47", features = ["tokio", "image"] }
+iced_native = { git = "https://github.com/yusdacra/iced.git", rev = "60f33f787c0ef6ae7394e0a78f06a856b8c67a47" }
 iced_aw = { git = "https://github.com/yusdacra/iced_aw.git", branch = "crust", default-features = false, features = [
     "icons",
     "card",
