@@ -951,17 +951,19 @@ pub fn render_text(textt: &str, members: &Members, emote_packs: &EmotePacks) -> 
     text
 }
 
-fn post_heading(post: &mut Vec<PostProcessEvent>, embed: &Embed) {
-    let mut inner = |h: Option<&EmbedHeading>| {
-        if let Some(id) = h.and_then(|h| h.icon.clone()) {
-            post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                kind: "image".into(),
-                ..Attachment::new_unknown(id)
-            }));
-        }
-    };
-    inner(embed.header.as_ref());
-    inner(embed.footer.as_ref());
+fn post_heading(post: &mut Vec<PostProcessEvent>, embeds: &Vec<Embed>) {
+    for embed in embeds {
+        let mut inner = |h: Option<&EmbedHeading>| {
+            if let Some(id) = h.and_then(|h| h.icon.clone()) {
+                post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                    kind: "image".into(),
+                    ..Attachment::new_unknown(id)
+                }));
+            }
+        };
+        inner(embed.header.as_ref());
+        inner(embed.footer.as_ref());
+    }
 }
 
 pub trait ResultExt<T, E> {

@@ -194,7 +194,7 @@ impl Default for MessageId {
 pub enum Content {
     Text(String),
     Files(Vec<Attachment>),
-    Embeds(Box<Embed>),
+    Embeds(Vec<Embed>),
 }
 
 impl From<Content> for content::Content {
@@ -204,7 +204,7 @@ impl From<Content> for content::Content {
                 content: Some(FormattedText::default().with_text(content)),
             }),
             Content::Embeds(embeds) => content::Content::EmbedMessage(content::EmbedContent {
-                embed: Some(Box::new((*embeds).into())),
+                embeds: embeds.into_iter().map(Into::into).collect(),
             }),
             Content::Files(attachments) => content::Content::AttachmentMessage(content::AttachmentContent {
                 files: attachments.into_iter().map(Into::into).collect(),
@@ -224,9 +224,7 @@ impl From<content::Content> for Content {
                     .flat_map(Attachment::from_harmony_attachment)
                     .collect(),
             ),
-            content::Content::EmbedMessage(embeds) => {
-                Self::Embeds(Box::new((*embeds.embed.unwrap_or_default()).into()))
-            }
+            content::Content::EmbedMessage(embeds) => Self::Embeds(embeds.embeds.into_iter().map(Into::into).collect()),
             content::Content::PhotoMessage(photos) => Self::Files(
                 photos
                     .photos

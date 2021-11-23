@@ -644,88 +644,91 @@ pub fn build_event_history<'a>(
         }
 
         if let IcyContent::Embeds(embeds) = &message.content {
-            let put_heading =
-                |embed: &mut Vec<Element<'a, Message>>, h: &EmbedHeading, state: &'a mut button::State| {
-                    let mut heading = Vec::with_capacity(3);
+            // TODO: show multiple embeds
+            if let Some(embed) = embeds.first() {
+                let put_heading =
+                    |embed_widgets: &mut Vec<Element<'a, Message>>, h: &EmbedHeading, state: &'a mut button::State| {
+                        let mut heading = Vec::with_capacity(3);
 
-                    if let Some(img_url) = &h.icon {
-                        if let Some(handle) = thumbnail_cache.thumbnails.get(img_url) {
-                            heading.push(
-                                Image::new(handle.clone())
-                                    .height(length!(=24))
-                                    .width(length!(=24))
-                                    .into(),
-                            );
+                        if let Some(img_url) = &h.icon {
+                            if let Some(handle) = thumbnail_cache.thumbnails.get(img_url) {
+                                heading.push(
+                                    Image::new(handle.clone())
+                                        .height(length!(=24))
+                                        .width(length!(=24))
+                                        .into(),
+                                );
+                            }
                         }
-                    }
 
-                    heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
-                    if let Some(subtext) = h.subtext.as_deref() {
-                        heading.push(label!(subtext).size(DEF_SIZE - 6).color(color!(200, 200, 200)).into());
-                    }
+                        heading.push(label!(&h.text).size(DEF_SIZE + 2).into());
+                        if let Some(subtext) = h.subtext.as_deref() {
+                            heading.push(label!(subtext).size(DEF_SIZE - 6).color(color!(200, 200, 200)).into());
+                        }
 
-                    let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING)).style(theme.embed());
+                        let mut but = Button::new(state, row(heading).padding(0).spacing(SPACING)).style(theme.embed());
 
-                    if let Some(url) = h.url.clone() {
-                        but = but.on_press(Message::OpenUrl(url));
-                    }
+                        if let Some(url) = h.url.clone() {
+                            but = but.on_press(Message::OpenUrl(url));
+                        }
 
-                    embed.push(but.into());
-                };
+                        embed_widgets.push(but.into());
+                    };
 
-            let mut embed = Vec::with_capacity(5);
+                let mut embed_widgets = Vec::with_capacity(5);
 
-            if let Some(h) = &embeds.header {
-                put_heading(&mut embed, h, h_embed_but);
-            }
-
-            embed.push(label!(&embeds.title).size(DEF_SIZE + 2).into());
-            if let Some(body) = embeds.body.as_deref() {
-                embed.push(label!(body).color(color!(220, 220, 220)).size(DEF_SIZE - 2).into());
-            }
-
-            for f in &embeds.fields {
-                // TODO: handle presentation
-                let mut field = Vec::with_capacity(3);
-
-                field.push(label!(&f.title).size(DEF_SIZE - 1).into());
-                if let Some(subtitle) = f.subtitle.as_deref() {
-                    field.push(label!(subtitle).size(DEF_SIZE - 3).into());
-                }
-                if let Some(body) = f.body.as_deref() {
-                    field.push(label!(body).color(color!(220, 220, 220)).size(DEF_SIZE - 3).into());
+                if let Some(h) = &embed.header {
+                    put_heading(&mut embed_widgets, h, h_embed_but);
                 }
 
-                embed.push(
+                embed_widgets.push(label!(&embed.title).size(DEF_SIZE + 2).into());
+                if let Some(body) = embed.body.as_deref() {
+                    embed_widgets.push(label!(body).color(color!(220, 220, 220)).size(DEF_SIZE - 2).into());
+                }
+
+                for f in &embed.fields {
+                    // TODO: handle presentation
+                    let mut field = Vec::with_capacity(3);
+
+                    field.push(label!(&f.title).size(DEF_SIZE - 1).into());
+                    if let Some(subtitle) = f.subtitle.as_deref() {
+                        field.push(label!(subtitle).size(DEF_SIZE - 3).into());
+                    }
+                    if let Some(body) = f.body.as_deref() {
+                        field.push(label!(body).color(color!(220, 220, 220)).size(DEF_SIZE - 3).into());
+                    }
+
+                    embed_widgets.push(
+                        Container::new(
+                            column(field)
+                                .padding(PADDING / 4)
+                                .spacing(SPACING / 4)
+                                .align_items(Align::Start),
+                        )
+                        .style(theme)
+                        .into(),
+                    );
+                }
+
+                if let Some(h) = &embed.footer {
+                    put_heading(&mut embed_widgets, h, f_embed_but);
+                }
+
+                let mut theme = theme.secondary();
+                if let Some(color) = embed.color {
+                    theme = theme.border_color(tuple_to_iced_color(color));
+                }
+                message_body_widgets.push(
                     Container::new(
-                        column(field)
-                            .padding(PADDING / 4)
-                            .spacing(SPACING / 4)
+                        column(embed_widgets)
+                            .padding(PADDING / 2)
+                            .spacing(SPACING / 2)
                             .align_items(Align::Start),
                     )
                     .style(theme)
                     .into(),
                 );
             }
-
-            if let Some(h) = &embeds.footer {
-                put_heading(&mut embed, h, f_embed_but);
-            }
-
-            let mut theme = theme.secondary();
-            if let Some(color) = embeds.color {
-                theme = theme.border_color(tuple_to_iced_color(color));
-            }
-            message_body_widgets.push(
-                Container::new(
-                    column(embed)
-                        .padding(PADDING / 2)
-                        .spacing(SPACING / 2)
-                        .align_items(Align::Start),
-                )
-                .style(theme)
-                .into(),
-            );
         }
 
         if let IcyContent::Files(attachments) = &message.content {

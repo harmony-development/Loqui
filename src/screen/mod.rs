@@ -45,7 +45,7 @@ use client::{
         client::{
             api::{auth::AuthStepResponse, chat::EventSource, profile::UpdateProfile, rest::download_extract_file},
             error::{ClientError as InnerClientError, InternalClientError as HrpcClientError},
-            Client as InnerClient, EventsSocket,
+            Client as InnerClient, EventsReadSocket, EventsWriteSocket,
         },
     },
     tracing::{debug, error, warn},
@@ -78,7 +78,7 @@ pub enum ScreenMessage {
     EmoteManagement(emote_management::Message),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Message {
     ChildMessage(Box<ScreenMessage>),
     PopScreen,
@@ -106,7 +106,8 @@ pub enum Message {
         events: ClientResult<Box<Message>>,
     },
     SocketEvent {
-        socket: Box<EventsSocket>,
+        tx: Option<EventsWriteSocket>,
+        rx: EventsReadSocket,
         event: Option<Result<Event, ClientError>>,
     },
     GetChannelMessagesResponse {
@@ -141,6 +142,10 @@ pub enum Message {
     ExitReady,
     WindowFocusChanged(bool),
     FetchLinkDataReceived(FetchLinkData, Uri),
+    GuildSubAddResult {
+        tx: EventsWriteSocket,
+        result: Option<Box<ClientError>>,
+    },
 }
 
 impl Message {
@@ -346,7 +351,7 @@ pub struct ScreenManager {
     client: Option<Box<Client>>,
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
-    cur_socket: Option<Box<EventsSocket>>,
+    cur_socket: Option<EventsWriteSocket>,
     socket_reset: bool,
     should_exit: bool,
     is_window_focused: bool,
@@ -655,6 +660,13 @@ impl Application for ScreenManager {
         }
 
         match msg {
+            Message::GuildSubAddResult { tx, result } => {
+                self.cur_socket = Some(tx);
+
+                if let Some(err) = result {
+                    return self.update(Message::Error(err));
+                }
+            }
             Message::ChildMessage(msg) => {
                 return self.screens.current_mut().update(
                     *msg,
@@ -693,7 +705,7 @@ impl Application for ScreenManager {
                 self.client = Some(client);
                 return cmd;
             }
-            Message::SocketEvent { mut socket, event } => {
+            Message::SocketEvent { tx, mut rx, event } => {
                 return if self.client.is_some() {
                     let mut cmds = Vec::with_capacity(2);
 
@@ -706,7 +718,7 @@ impl Application for ScreenManager {
                             };
                             cmds.push(cmd);
                         })
-                        .or_do(|| self.cur_socket = Some(socket.clone()));
+                        .or_do(|| self.cur_socket = tx);
 
                     self.socket_reset
                         .and_do(|| {
@@ -714,9 +726,13 @@ impl Application for ScreenManager {
                             let sources = client.subscribe_to();
                             cmds.push(client.mk_cmd(
                                 |inner| async move { inner.subscribe_events(sources).await },
-                                |socket| Message::SocketEvent {
-                                    socket: socket.into(),
-                                    event: None,
+                                |socket| {
+                                    let (tx, rx) = socket.split();
+                                    Message::SocketEvent {
+                                        tx: Some(tx),
+                                        rx,
+                                        event: None,
+                                    }
                                 },
                             ));
                             self.socket_reset = false;
@@ -724,8 +740,8 @@ impl Application for ScreenManager {
                         .or_do(|| {
                             cmds.push(Command::perform(
                                 async move {
-                                    let event = socket.get_event().await.map_err(Into::into).transpose();
-                                    Message::SocketEvent { socket, event }
+                                    let event = rx.get_event().await.map_err(Into::into).transpose();
+                                    Message::SocketEvent { tx: None, rx, event }
                                 },
                                 identity,
                             ));
@@ -733,7 +749,7 @@ impl Application for ScreenManager {
 
                     Command::batch(cmds)
                 } else {
-                    Command::perform(socket.close(), |_| Message::Nothing)
+                    tx.map_or_else(Command::none, |tx| Command::perform(tx.close(), |_| Message::Nothing))
                 };
             }
             Message::LoginComplete(res) => {
@@ -751,9 +767,13 @@ impl Application for ScreenManager {
                 let sources = client.subscribe_to();
                 let ws_cmd = client.mk_cmd(
                     |inner| async move { inner.subscribe_events(sources).await },
-                    |socket| Message::SocketEvent {
-                        socket: socket.into(),
-                        event: None,
+                    |socket| {
+                        let (tx, rx) = socket.split();
+                        Message::SocketEvent {
+                            tx: Some(tx),
+                            rx,
+                            event: None,
+                        }
                     },
                 );
                 client.user_id = Some(client.inner().auth_status().session().unwrap().user_id);
@@ -887,15 +907,24 @@ impl Application for ScreenManager {
                             }
                         })
                         .collect::<Vec<_>>();
-                    if let Some(mut sock) = self.cur_socket.clone() {
+                    if let Some(mut tx) = self.cur_socket.take() {
                         cmds.push(Command::perform(
                             async move {
+                                let mut result = None;
+
                                 for source in sources_to_add {
-                                    sock.add_source(source).await?;
+                                    match tx.add_source(source).await {
+                                        Ok(_) => {}
+                                        Err(err) => {
+                                            result = Some(Box::new(err.into()));
+                                            break;
+                                        }
+                                    }
                                 }
-                                ClientResult::Ok(())
+
+                                Message::GuildSubAddResult { tx, result }
                             },
-                            ResultExt::map_to_nothing,
+                            identity,
                         ));
                     }
 
