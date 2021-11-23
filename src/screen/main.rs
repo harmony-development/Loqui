@@ -299,6 +299,7 @@ impl MainScreen {
                 ProfileMenuOption::ManageEmotes,
                 ProfileMenuOption::Help,
                 ProfileMenuOption::SwitchAccount,
+                ProfileMenuOption::CopyToken,
                 ProfileMenuOption::Logout,
                 ProfileMenuOption::Exit,
             ],
