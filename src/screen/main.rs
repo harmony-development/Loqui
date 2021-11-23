@@ -94,6 +94,7 @@ pub enum ProfileMenuOption {
     Help,
     Logout,
     SwitchAccount,
+    CopyToken,
     Exit,
 }
 
@@ -105,6 +106,7 @@ impl Display for ProfileMenuOption {
             ProfileMenuOption::Help => "Help",
             ProfileMenuOption::Logout => "Logout",
             ProfileMenuOption::SwitchAccount => "Switch Account",
+            ProfileMenuOption::CopyToken => "Copy Token",
             ProfileMenuOption::Exit => "Exit",
         };
 
@@ -1292,6 +1294,10 @@ impl MainScreen {
                     modal.is_edit = true;
                     self.profile_edit_modal.show(true);
                     return self.update(Message::ChangeMode(Mode::Normal), client, thumbnail_cache);
+                }
+                ProfileMenuOption::CopyToken => {
+                    let token = client.auth_status().session().unwrap().session_token.clone();
+                    return iced::clipboard::write(token);
                 }
                 ProfileMenuOption::Help => {
                     self.help_modal.show(true);
