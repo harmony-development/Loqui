@@ -6,7 +6,7 @@
     };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixCargoIntegration = {
-      url = "github:yusdacra/nix-cargo-integration/fix/runtime-libs";
+      url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -32,9 +32,9 @@
 
                   src = prev.fetchgit {
                     url = "https://github.com/rui314/mold.git";
-                    rev = "f127281d050d25032b44790a865b8a128a8145e8";
+                    rev = "72cea9a0bfcdee7cb17cc34bed9aacdea2f80adf";
                     fetchSubmodules = true;
-                    sha256 = "sha256-3cYE9/hZtnbCx4Y4I1hbGhUtFRjB/X+uUiJZjxA6Qw4=";
+                    sha256 = "sha256-ocug5DAPq7LU8HH6yHQI3FhW8XF4H31krmr6ttJ9V9k=";
                   };
 
                   buildPhase = "make";
