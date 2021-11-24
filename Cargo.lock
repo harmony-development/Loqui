@@ -1402,7 +1402,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#5dd3aab479772f744b3d64787be6fc50afe81658"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#f9d7a98cc06c2218b6f406ff1689ee50c41f7fee"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1412,7 +1412,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#5dd3aab479772f744b3d64787be6fc50afe81658"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#f9d7a98cc06c2218b6f406ff1689ee50c41f7fee"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1478,9 +1478,9 @@ checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
 name = "hrpc"
-version = "0.30.1"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "386ba844ff68ef7e4bdc50f4c42e3d119e42b7b9377e97de457d7248bbb00311"
+checksum = "d0a119682c4839e58ec2d77f8d17484f8b4409b92a76e8f743d1da1b07d17c5b"
 dependencies = [
  "bytes",
  "futures-util",
@@ -2827,9 +2827,9 @@ dependencies = [
 
 [[package]]
 name = "raw-window-handle"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "503bdbfa9605024fdc97f845002e3690d14c5f553594f1cd0f819317a70de02c"
+checksum = "fba75eee94a9d5273a68c9e1e105d9cffe1ef700532325788389e5a83e2522b7"
 dependencies = [
  "cty",
 ]
@@ -2989,7 +2989,7 @@ dependencies = [
  "objc",
  "objc-foundation",
  "objc_id",
- "raw-window-handle 0.4.1",
+ "raw-window-handle 0.4.2",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
