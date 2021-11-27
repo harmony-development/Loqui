@@ -61,9 +61,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.48"
+version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62e1f47f7dc0422027a4e370dd4548d4d66b26782e513e98dca1e689e058a80e"
+checksum = "0a03e93e97a28fbc9f42fbc5ba0886a3c67eb637b476dbee711f80a6ffe8223d"
 
 [[package]]
 name = "approx"
@@ -1402,7 +1402,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.2"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#f9d7a98cc06c2218b6f406ff1689ee50c41f7fee"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#6f16db608cebeec6533f45ee5e5c057281aa70f3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1412,7 +1412,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.6.1"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#f9d7a98cc06c2218b6f406ff1689ee50c41f7fee"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#6f16db608cebeec6533f45ee5e5c057281aa70f3"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1478,9 +1478,9 @@ checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
 name = "hrpc"
-version = "0.30.3"
+version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0a119682c4839e58ec2d77f8d17484f8b4409b92a76e8f743d1da1b07d17c5b"
+checksum = "254c47ad3266357d181946fec0817ad4881b8d8fc124777ac00ebda016af8ca4"
 dependencies = [
  "bytes",
  "futures-util",
@@ -1500,9 +1500,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc-build"
-version = "0.30.0"
+version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44af89843546afddc23788c7bdfa0cfcafcb9b794dfcabd8c3902d0f74d044d3"
+checksum = "5195d64a8470b798001a157068ff5bd12325a8323f78ac493bc9a3ad2f85c252"
 dependencies = [
  "proc-macro2",
  "prost-build",
@@ -1654,7 +1654,7 @@ dependencies = [
  "iced_native",
  "iced_style",
  "lyon",
- "raw-window-handle 0.3.3",
+ "raw-window-handle 0.3.4",
  "thiserror",
 ]
 
@@ -1710,7 +1710,7 @@ dependencies = [
  "image",
  "kamadak-exif",
  "log",
- "raw-window-handle 0.3.3",
+ "raw-window-handle 0.3.4",
  "wgpu",
  "wgpu_glyph",
 ]
@@ -2818,11 +2818,12 @@ checksum = "63e935c45e09cc6dcf00d2f0b2d630a58f4095320223d47fc68918722f0538b6"
 
 [[package]]
 name = "raw-window-handle"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a441a7a6c80ad6473bd4b74ec1c9a4c951794285bf941c2126f607c72e48211"
+checksum = "e28f55143d0548dad60bb4fbdc835a3d7ac6acc3324506450c5fdd6e42903a76"
 dependencies = [
  "libc",
+ "raw-window-handle 0.4.2",
 ]
 
 [[package]]
@@ -3222,9 +3223,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.71"
+version = "1.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "063bf466a64011ac24040a49009724ee60a57da1b437617ceb32e53ad61bfb19"
+checksum = "d0ffa0837f2dfa6fb90868c2b5468cad482e175f7dad97e7421951e663f2b527"
 dependencies = [
  "itoa",
  "ryu",
@@ -3456,9 +3457,9 @@ checksum = "8fb1df15f412ee2e9dfc1c504260fa695c1c3f10fe9f4a6ee2d2184d7d6450e2"
 
 [[package]]
 name = "syn"
-version = "1.0.81"
+version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2afee18b8beb5a596ecb4a2dce128c719b4ba399d34126b9e4396e3f9860966"
+checksum = "8daf5dd0bb60cbd4137b1b587d2fc0ae729bc07cf01cd70b36a1ed5ade3b9d59"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4155,7 +4156,7 @@ dependencies = [
  "js-sys",
  "log",
  "parking_lot",
- "raw-window-handle 0.3.3",
+ "raw-window-handle 0.3.4",
  "smallvec",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -4180,7 +4181,7 @@ dependencies = [
  "naga",
  "parking_lot",
  "profiling",
- "raw-window-handle 0.3.3",
+ "raw-window-handle 0.3.4",
  "smallvec",
  "thiserror",
  "wgpu-hal",
@@ -4216,7 +4217,7 @@ dependencies = [
  "parking_lot",
  "profiling",
  "range-alloc",
- "raw-window-handle 0.3.3",
+ "raw-window-handle 0.3.4",
  "renderdoc-sys",
  "thiserror",
  "wasm-bindgen",
@@ -4307,7 +4308,7 @@ dependencies = [
  "clipboard_macos",
  "clipboard_wayland",
  "clipboard_x11",
- "raw-window-handle 0.3.3",
+ "raw-window-handle 0.3.4",
 ]
 
 [[package]]
@@ -4421,7 +4422,7 @@ dependencies = [
  "objc",
  "parking_lot",
  "percent-encoding",
- "raw-window-handle 0.3.3",
+ "raw-window-handle 0.3.4",
  "smithay-client-toolkit",
  "wasm-bindgen",
  "wayland-client",
