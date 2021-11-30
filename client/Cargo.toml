@@ -8,7 +8,7 @@ repository = "https://github.com/harmony-development/loqui"
 homepage = "https://github.com/harmony-development/loqui"
 
 [dependencies]
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client"] }
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client_native"] }
 
 infer = "0.5.0"
 directories-next = "2.0.0"

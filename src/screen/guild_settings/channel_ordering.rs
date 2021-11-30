@@ -56,13 +56,7 @@ impl OrderingTab {
     ) -> Command<TopLevelMessage> {
         match message {
             OrderingMessage::MoveChannel { id, new_place } => client.mk_cmd(
-                |inner| async move {
-                    inner
-                        .chat()
-                        .await
-                        .update_channel_order(UpdateChannelOrder::new(guild_id, id, new_place))
-                        .await
-                },
+                |inner| async move { inner.call(UpdateChannelOrder::new(guild_id, id, new_place)).await },
                 map_to_nothing,
             ),
             OrderingMessage::GoBack => TopLevelScreen::pop_screen_cmd(),

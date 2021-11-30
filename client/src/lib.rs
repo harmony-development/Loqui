@@ -27,6 +27,7 @@ use harmony_rust_sdk::{
             ChannelKind, DeleteMessageRequest, Event, FormattedText, Message as HarmonyMessage, Permission, Role,
         },
         emote::{stream_event::Event as EmoteEvent, *},
+        exports::hrpc::exports::futures_util::FutureExt,
         mediaproxy::fetch_link_metadata_response::Data as FetchLinkData,
         profile::{stream_event::Event as ProfileEvent, UserStatus, *},
     },
@@ -335,30 +336,24 @@ impl Client {
         message_id: u64,
         new_content: String,
     ) -> impl Future<Output = (u64, u64, u64, Option<Box<ClientError>>)> {
-        let inner = self.inner().clone();
+        let fut = self.inner().chat().update_message_text(
+            (UpdateMessageTextRequest {
+                guild_id,
+                channel_id,
+                message_id,
+                ..Default::default()
+            })
+            .with_new_content(FormattedText::default().with_text(new_content)),
+        );
 
-        async move {
-            let result = inner
-                .chat()
-                .await
-                .update_message_text(
-                    (UpdateMessageTextRequest {
-                        guild_id,
-                        channel_id,
-                        message_id,
-                        ..Default::default()
-                    })
-                    .with_new_content(FormattedText::default().with_text(new_content)),
-                )
-                .await;
-
+        fut.map(move |result| {
             (
                 guild_id,
                 channel_id,
                 message_id,
                 result.err().map(|err| Box::new(err.into())),
             )
-        }
+        })
     }
 
     pub fn process_event(&mut self, event: Event) -> Vec<PostProcessEvent> {

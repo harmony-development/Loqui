@@ -117,11 +117,7 @@ impl InviteTab {
                 let invite_id = meta_data.invites.as_ref().unwrap()[n].invite_id.clone();
                 return client.mk_cmd(
                     |inner| async move {
-                        inner
-                            .chat()
-                            .await
-                            .delete_invite(DeleteInviteRequest { guild_id, invite_id })
-                            .await?;
+                        inner.call(DeleteInviteRequest::new(guild_id, invite_id)).await?;
                         ClientResult::Ok(TopLevelMessage::guild_settings(ParentMessage::Invite(
                             InviteMessage::InviteDeleted(n),
                         )))

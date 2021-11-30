@@ -211,13 +211,7 @@ impl RoleModal {
                     let guild_id = self.guild_id;
                     return (
                         client.mk_cmd(
-                            |inner| async move {
-                                inner
-                                    .chat()
-                                    .await
-                                    .delete_guild_role(DeleteGuildRole::new(guild_id, role_id))
-                                    .await
-                            },
+                            |inner| async move { inner.call(DeleteGuildRole::new(guild_id, role_id)).await },
                             |_| TopLevelMessage::guild_settings(ParentMessage::RoleMessage(Message::GoBack)),
                         ),
                         false,

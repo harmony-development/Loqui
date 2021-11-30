@@ -125,13 +125,7 @@ impl UpdateChannelModal {
 
                 return (
                     client.mk_cmd(
-                        |inner| async move {
-                            inner
-                                .chat()
-                                .await
-                                .delete_channel(DeleteChannelRequest { guild_id, channel_id })
-                                .await
-                        },
+                        |inner| async move { inner.call(DeleteChannelRequest::new(guild_id, channel_id)).await },
                         |_| TopLevelMessage::guild_settings(ParentMessage::UpdateChannelMessage(Message::GoBack)),
                     ),
                     false,

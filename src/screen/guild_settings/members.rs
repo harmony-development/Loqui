@@ -53,17 +53,11 @@ impl MembersTab {
         match message {
             MembersMessage::GoBack => TopLevelScreen::pop_screen_cmd(),
             MembersMessage::BanMember(user_id) => client.mk_cmd(
-                |inner| async move { inner.chat().await.ban_user(BanUserRequest { guild_id, user_id }).await },
+                |inner| async move { inner.call(BanUserRequest::new(guild_id, user_id)).await },
                 map_to_nothing,
             ),
             MembersMessage::KickMember(user_id) => client.mk_cmd(
-                |inner| async move {
-                    inner
-                        .chat()
-                        .await
-                        .kick_user(KickUserRequest { guild_id, user_id })
-                        .await
-                },
+                |inner| async move { inner.call(KickUserRequest::new(guild_id, user_id)).await },
                 map_to_nothing,
             ),
         }

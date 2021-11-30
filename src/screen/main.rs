@@ -9,7 +9,6 @@ use std::{
 
 use super::{Message as TopLevelMessage, Screen as TopLevelScreen};
 use channel::GetChannelMessages;
-use chat::Typing;
 use client::{
     bool_ext::BoolExt,
     content,
@@ -21,17 +20,13 @@ use client::{
                 get_channel_messages_request::Direction,
                 stream_event::{ChannelCreated, Event as ChatEvent, MemberJoined, RoleCreated, UserRolesUpdated},
                 Event, GetChannelMessagesResponse, GetGuildChannelsRequest, GetGuildMembersRequest,
-                GetGuildRolesRequest, GetUserRolesRequest,
+                GetGuildRolesRequest, GetUserRolesRequest, LeaveGuildRequest, TypingRequest,
             },
             profile::UserStatus,
             rest::FileId,
         },
         client::{
-            api::{
-                chat::{self, channel, GuildId},
-                profile::UpdateProfile,
-                rest::download_extract_file,
-            },
+            api::{chat::channel, profile::UpdateProfile, rest::download_extract_file},
             error::ClientError as InnerClientError,
             exports::reqwest::StatusCode,
         },
@@ -1266,7 +1261,7 @@ impl MainScreen {
                 GuildMenuOption::LeaveGuild => {
                     let guild_id = self.current_guild_id.unwrap(); // [ref:guild_menu_entry]
                     return client.mk_cmd(
-                        |inner| async move { inner.chat().await.leave_guild(GuildId::new(guild_id)).await },
+                        |inner| async move { inner.call(LeaveGuildRequest::new(guild_id)).await },
                         |_| TopLevelMessage::Nothing,
                     );
                 }
@@ -1321,7 +1316,7 @@ impl MainScreen {
                     if should_send {
                         *typing = Some((gid, cid, Instant::now()));
                         return client.mk_cmd(
-                            |inner| async move { inner.chat().await.typing(Typing::new(gid, cid)).await },
+                            |inner| async move { inner.call(TypingRequest::new(gid, cid)).await },
                             map_to_nothing,
                         );
                     }

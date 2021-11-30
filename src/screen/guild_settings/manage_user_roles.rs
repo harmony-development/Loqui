@@ -113,18 +113,13 @@ impl ManageUserRolesModal {
                 Message::GoBack => return (Command::none(), true),
                 Message::RoleChange { role_id, give_or_take } => {
                     let user_id = self.user_id;
-                    client.mk_cmd(
-                        |inner| async move {
-                            let mut request = ManageUserRoles::new(guild_id, user_id);
-                            if give_or_take {
-                                request = request.with_give_role_ids(vec![role_id]);
-                            } else {
-                                request = request.with_take_role_ids(vec![role_id]);
-                            }
-                            inner.chat().await.manage_user_roles(request).await
-                        },
-                        map_to_nothing,
-                    )
+                    let mut request = ManageUserRoles::new(guild_id, user_id);
+                    if give_or_take {
+                        request = request.with_give_role_ids(vec![role_id]);
+                    } else {
+                        request = request.with_take_role_ids(vec![role_id]);
+                    }
+                    client.mk_cmd(|inner| async move { inner.call(request).await }, map_to_nothing)
                 }
             },
             false,

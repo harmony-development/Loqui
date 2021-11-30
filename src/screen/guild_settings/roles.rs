@@ -100,13 +100,7 @@ impl RolesTab {
     ) -> Command<TopLevelMessage> {
         match message {
             RolesMessage::MoveRole { id, new_place } => client.mk_cmd(
-                |inner| async move {
-                    inner
-                        .chat()
-                        .await
-                        .move_role(MoveRole::new(guild_id, id, new_place))
-                        .await
-                },
+                |inner| async move { inner.call(MoveRole::new(guild_id, id, new_place)).await },
                 map_to_nothing,
             ),
             RolesMessage::GoBack => TopLevelScreen::pop_screen_cmd(),
