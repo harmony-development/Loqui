@@ -9,6 +9,7 @@ pub use guild_settings::GuildSettings;
 use image::imageops::FilterType;
 pub use login::LoginScreen;
 pub use main::MainScreen;
+use tokio::sync::mpsc;
 
 use crate::{
     client::{
@@ -48,7 +49,7 @@ use client::{
             Client as InnerClient, EventsReadSocket, EventsWriteSocket,
         },
     },
-    tracing::{debug, error, warn},
+    tracing::{self, debug, error, warn},
     OptionExt, Uri,
 };
 use iced::{
@@ -142,10 +143,6 @@ pub enum Message {
     ExitReady,
     WindowFocusChanged(bool),
     FetchLinkDataReceived(FetchLinkData, Uri),
-    GuildSubAddResult {
-        tx: EventsWriteSocket,
-        result: Option<Box<ClientError>>,
-    },
 }
 
 impl Message {
@@ -351,7 +348,7 @@ pub struct ScreenManager {
     client: Option<Box<Client>>,
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
-    cur_socket: Option<EventsWriteSocket>,
+    sub_tx: Option<mpsc::UnboundedSender<Option<EventSource>>>,
     socket_reset: bool,
     should_exit: bool,
     is_window_focused: bool,
@@ -392,7 +389,7 @@ impl ScreenManager {
             client: None,
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
-            cur_socket: None,
+            sub_tx: None,
             socket_reset: false,
             should_exit: false,
             is_window_focused: true,
@@ -660,13 +657,6 @@ impl Application for ScreenManager {
         }
 
         match msg {
-            Message::GuildSubAddResult { tx, result } => {
-                self.cur_socket = Some(tx);
-
-                if let Some(err) = result {
-                    return self.update(Message::Error(err));
-                }
-            }
             Message::ChildMessage(msg) => {
                 return self.screens.current_mut().update(
                     *msg,
@@ -677,13 +667,12 @@ impl Application for ScreenManager {
             }
             Message::Nothing => {}
             Message::Exit => {
-                let sock = self.cur_socket.take();
+                if let Some(tx) = &mut self.sub_tx {
+                    let _ = tx.send(None);
+                }
                 let inner = self.client.as_ref().map(|c| c.inner_arc());
                 return Command::perform(
                     async move {
-                        if let Some(sock) = sock {
-                            let _ = sock.close().await;
-                        }
                         if let Some(inner) = inner {
                             let _ = inner
                                 .call(UpdateProfile::default().with_new_status(UserStatus::OfflineUnspecified))
@@ -718,7 +707,22 @@ impl Application for ScreenManager {
                             };
                             cmds.push(cmd);
                         })
-                        .or_do(|| self.cur_socket = tx);
+                        .or_do(|| {
+                            if let Some(mut tx) = tx {
+                                let (sub_tx, mut sub_rx) = mpsc::unbounded_channel();
+                                self.sub_tx = Some(sub_tx);
+                                tokio::spawn(async move {
+                                    while let Some(Some(src)) = sub_rx.recv().await {
+                                        if let Err(err) = tx.add_source(src).await {
+                                            tracing::error!("error sending source: {}", err);
+                                        }
+                                    }
+                                    if let Err(err) = tx.close().await {
+                                        tracing::error!("error closing socket: {}", err);
+                                    }
+                                });
+                            }
+                        });
 
                     self.socket_reset
                         .and_do(|| {
@@ -897,35 +901,17 @@ impl Application for ScreenManager {
                     let mut cmds = Vec::with_capacity(processed.len() + 1);
                     cmds.push(Command::perform(ready(()), map_to_nothing));
 
-                    let sources_to_add = processed
-                        .iter()
-                        .flat_map(|post| {
+                    if let Some(tx) = self.sub_tx.as_mut() {
+                        let sources_to_add = processed.iter().flat_map(|post| {
                             if let PostProcessEvent::FetchGuildData(id) = post {
                                 Some(EventSource::Guild(*id))
                             } else {
                                 None
                             }
-                        })
-                        .collect::<Vec<_>>();
-                    if let Some(mut tx) = self.cur_socket.take() {
-                        cmds.push(Command::perform(
-                            async move {
-                                let mut result = None;
-
-                                for source in sources_to_add {
-                                    match tx.add_source(source).await {
-                                        Ok(_) => {}
-                                        Err(err) => {
-                                            result = Some(Box::new(err.into()));
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                Message::GuildSubAddResult { tx, result }
-                            },
-                            identity,
-                        ));
+                        });
+                        for source in sources_to_add {
+                            let _ = tx.send(Some(source));
+                        }
                     }
 
                     let mut fetch_users = Vec::with_capacity(64);
