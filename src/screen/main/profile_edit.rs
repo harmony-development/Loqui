@@ -30,7 +30,6 @@ pub struct ProfileEditModal {
     pub guild_id: Option<u64>,
     pub is_edit: bool,
     avatar_but: button::State,
-    back_but: button::State,
     username_edit: text_input::State,
     username_change_but: button::State,
     username_but_state: button::State,

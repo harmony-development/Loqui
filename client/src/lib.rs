@@ -946,7 +946,7 @@ pub fn render_text(textt: &str, members: &Members, emote_packs: &EmotePacks) -> 
     text
 }
 
-fn post_heading(post: &mut Vec<PostProcessEvent>, embeds: &Vec<Embed>) {
+fn post_heading(post: &mut Vec<PostProcessEvent>, embeds: &[Embed]) {
     for embed in embeds {
         let mut inner = |h: Option<&EmbedHeading>| {
             if let Some(id) = h.and_then(|h| h.icon.clone()) {
@@ -1006,10 +1006,7 @@ impl<T> OptionExt<T> for Option<T> {
 }
 
 pub mod byte_writer {
-    use core::{
-        fmt::{Error, Write},
-        mem,
-    };
+    use core::fmt::{Error, Write};
 
     pub struct Writer<'a>(pub &'a mut [u8]);
 
@@ -1019,7 +1016,7 @@ pub mod byte_writer {
                 return Err(Error);
             }
 
-            let (a, b) = mem::replace(&mut self.0, &mut []).split_at_mut(data.len());
+            let (a, b) = std::mem::take(&mut self.0).split_at_mut(data.len());
             a.copy_from_slice(data.as_bytes());
             self.0 = b;
 

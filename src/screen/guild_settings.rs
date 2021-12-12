@@ -66,7 +66,6 @@ pub struct GuildSettings {
     members_tab: MembersTab,
     current_error: String,
     meta_data: GuildMetadata,
-    back_button: button::State,
     update_channel_modal: modal::State<UpdateChannelModal>,
     create_channel_modal: modal::State<ChannelCreationModal>,
     role_modal: modal::State<RoleModal>,

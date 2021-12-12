@@ -22,7 +22,6 @@ pub struct ImageViewerModal {
     pub image_handle: Option<(ImageHandle, (PathBuf, String))>,
     viewer_state: viewer::State,
     external_but_state: button::State,
-    close_but_state: button::State,
 }
 
 impl ImageViewerModal {

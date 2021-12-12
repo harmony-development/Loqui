@@ -47,12 +47,10 @@ pub enum Message {
 
 #[derive(Default, Debug, Clone)]
 pub struct RoleModal {
-    role_back_but_state: button::State,
     role_name_textedit_state: text_input::State,
     role_create_but_state: button::State,
     role_delete_but_state: button::State,
     role_creation_state: RoleState,
-    color_but_state: button::State,
     pub role_name_field: String,
     error_text: String,
     pub is_hoist: bool,

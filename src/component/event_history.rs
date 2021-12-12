@@ -185,7 +185,7 @@ pub fn build_event_history<'a>(
             Reason::Webhook(_) => {
                 format!("webhook by {}", name_to_use)
             }
-            Reason::SystemPlurality(_) => "plurality".to_string(),
+            Reason::SystemPlurality(_) => format!("by {}", name_to_use),
         });
         let sender_display_name = message
             .overrides

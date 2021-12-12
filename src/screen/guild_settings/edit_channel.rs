@@ -25,7 +25,6 @@ pub enum Message {
 
 #[derive(Default, Debug, Clone)]
 pub struct UpdateChannelModal {
-    back_but_state: button::State,
     channel_name_textedit_state: text_input::State,
     channel_update_but_state: button::State,
     channel_delete_but_state: button::State,

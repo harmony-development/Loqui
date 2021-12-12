@@ -45,7 +45,6 @@ pub enum Message {
 
 #[derive(Default, Debug, Clone)]
 pub struct ChannelCreationModal {
-    create_channel_back_but_state: button::State,
     channel_name_textedit_state: text_input::State,
     channel_create_but_state: button::State,
     channel_creation_state: ChannelState,
