@@ -1038,28 +1038,25 @@ pub enum HarmonyToken<'a> {
 
 impl<'a> HarmonyToken<'a> {
     pub fn parse(value: &'a &str, at: usize) -> Option<AtToken<'a, HarmonyToken<'a>>> {
-        if let Some(nat) = value.consume_char_if(at, |c| c == '<') {
-            if let Some(nat) = value.consume_char_if(nat, |c| c == '@') {
-                value
-                    .consume_while(nat, |c| c != '>')
-                    .ok()
-                    .flatten()
-                    .map(|(maybe_id, nat)| {
-                        maybe_id
-                            .parse::<u64>()
-                            .ok()
-                            .map(|id| (Token::Custom(HarmonyToken::Mention(id)), nat + 1))
-                    })
-                    .flatten()
-            } else if let Some(nat) = value.consume_char_if(nat, |c| c == ':') {
-                if let Some((id, nat)) = value.consume_until_str(nat, ":>").ok().flatten() {
-                    Some((Token::Custom(HarmonyToken::Emote(id)), nat + 2))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+        let nat = value.consume_char_if(at, |c| c == '<')?;
+
+        if let Some(nat) = value.consume_char_if(nat, |c| c == '@') {
+            value
+                .consume_while(nat, |c| c != '>')
+                .ok()
+                .flatten()
+                .and_then(|(maybe_id, nat)| {
+                    maybe_id
+                        .parse::<u64>()
+                        .ok()
+                        .map(|id| (Token::Custom(HarmonyToken::Mention(id)), nat + 1))
+                })
+        } else if let Some(nat) = value.consume_char_if(nat, |c| c == ':') {
+            value
+                .consume_until_str(nat, ":>")
+                .ok()
+                .flatten()
+                .map(|(id, nat)| (Token::Custom(HarmonyToken::Emote(id)), nat + 2))
         } else {
             None
         }
