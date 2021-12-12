@@ -257,7 +257,7 @@ pub struct Message {
 
 impl Message {
     pub fn post_process(&self, post: &mut Vec<PostProcessEvent>, guild_id: u64, channel_id: u64) {
-        if let Some(message_id) = self.reply_to {
+        if let Some(message_id) = self.reply_to.filter(|id| id != &0) {
             post.push(PostProcessEvent::FetchMessage {
                 guild_id,
                 channel_id,

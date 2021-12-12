@@ -348,7 +348,8 @@ pub struct ScreenManager {
     client: Option<Box<Client>>,
     content_store: Arc<ContentStore>,
     thumbnail_cache: ThumbnailCache,
-    sub_tx: Option<mpsc::UnboundedSender<Option<EventSource>>>,
+    sub_tx: mpsc::UnboundedSender<Option<EventSource>>,
+    socket_tx: mpsc::Sender<EventsWriteSocket>,
     socket_reset: bool,
     should_exit: bool,
     is_window_focused: bool,
@@ -383,13 +384,45 @@ impl ScreenManager {
             std::thread::park();
         });
 
+        let (socket_tx, mut socket_rx) = mpsc::channel::<EventsWriteSocket>(2);
+        let (sub_tx, mut sub_rx) = mpsc::unbounded_channel::<Option<EventSource>>();
+        tokio::spawn(async move {
+            let mut tx = socket_rx.recv().await.expect("no socket");
+
+            loop {
+                tokio::select! {
+                    maybe_socket = socket_rx.recv() => {
+                        match maybe_socket {
+                            Some(socket) => tx = socket,
+                            None => break,
+                        }
+                    }
+                    Some(maybe_sub) = sub_rx.recv() => {
+                        match maybe_sub {
+                            Some(sub) => {
+                                if let Err(err) = tx.add_source(sub).await {
+                                    tracing::error!("error sending source: {}", err);
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                }
+            }
+
+            if let Err(err) = tx.close().await {
+                tracing::error!("error closing socket: {}", err);
+            }
+        });
+
         let mut this = Self {
             theme: Box::new(Theme::default()),
             screens: ScreenStack::new(Screen::Login(LoginScreen::new().into())),
             client: None,
             content_store,
             thumbnail_cache: ThumbnailCache::default(),
-            sub_tx: None,
+            sub_tx,
+            socket_tx,
             socket_reset: false,
             should_exit: false,
             is_window_focused: true,
@@ -667,9 +700,7 @@ impl Application for ScreenManager {
             }
             Message::Nothing => {}
             Message::Exit => {
-                if let Some(tx) = &mut self.sub_tx {
-                    let _ = tx.send(None);
-                }
+                let _ = self.sub_tx.send(None);
                 let inner = self.client.as_ref().map(|c| c.inner_arc());
                 return Command::perform(
                     async move {
@@ -708,19 +739,10 @@ impl Application for ScreenManager {
                             cmds.push(cmd);
                         })
                         .or_do(|| {
-                            if let Some(mut tx) = tx {
-                                let (sub_tx, mut sub_rx) = mpsc::unbounded_channel();
-                                self.sub_tx = Some(sub_tx);
-                                tokio::spawn(async move {
-                                    while let Some(Some(src)) = sub_rx.recv().await {
-                                        if let Err(err) = tx.add_source(src).await {
-                                            tracing::error!("error sending source: {}", err);
-                                        }
-                                    }
-                                    if let Err(err) = tx.close().await {
-                                        tracing::error!("error closing socket: {}", err);
-                                    }
-                                });
+                            if let Some(tx) = tx {
+                                self.socket_tx
+                                    .try_send(tx)
+                                    .expect("sockets shouldnt be dropped and created fast");
                             }
                         });
 
@@ -901,17 +923,15 @@ impl Application for ScreenManager {
                     let mut cmds = Vec::with_capacity(processed.len() + 1);
                     cmds.push(Command::perform(ready(()), map_to_nothing));
 
-                    if let Some(tx) = self.sub_tx.as_mut() {
-                        let sources_to_add = processed.iter().flat_map(|post| {
-                            if let PostProcessEvent::FetchGuildData(id) = post {
-                                Some(EventSource::Guild(*id))
-                            } else {
-                                None
-                            }
-                        });
-                        for source in sources_to_add {
-                            let _ = tx.send(Some(source));
+                    let sources_to_add = processed.iter().flat_map(|post| {
+                        if let PostProcessEvent::FetchGuildData(id) = post {
+                            Some(EventSource::Guild(*id))
+                        } else {
+                            None
                         }
+                    });
+                    for source in sources_to_add {
+                        let _ = self.sub_tx.send(Some(source));
                     }
 
                     let mut fetch_users = Vec::with_capacity(64);
