@@ -50,8 +50,7 @@ impl Guild {
 }
 
 fn update_order<V>(map: &mut IndexMap<u64, V>, position: ItemPosition, id: u64) {
-    if let Some(item_pos) = map.get_index_of(&id) {
-        let pos = position.item_id as usize;
+    if let (Some(item_pos), Some(pos)) = (map.get_index_of(&id), map.get_index_of(&position.item_id)) {
         match position.position() {
             Position::BeforeUnspecified => {
                 let pos = pos + 1;
