@@ -9,9 +9,11 @@ use client::{
         client::api::auth::{next_step_request::form_fields::Field, AuthStepResponse},
     },
     smol_str::SmolStr,
-    Client, IndexMap, Uri,
+    AuthStatus, Client, IndexMap, Uri,
 };
 use eframe::egui::RichText;
+
+use crate::screen::{future_markers, main};
 
 use super::prelude::*;
 
@@ -46,8 +48,8 @@ impl Screen {
     fn handle_step(&mut self, state: &mut State) {
         handle_future!(state, StepFut, |res: ClientResult<Option<AuthStep>>| {
             match res {
-                Ok(step) => match step {
-                    Some(step) => {
+                Ok(step) => {
+                    if let Some(step) = step {
                         self.fields.clear();
                         self.choices.clear();
                         self.can_go_back = step.can_go_back;
@@ -70,11 +72,18 @@ impl Screen {
                                 _ => todo!("Implement waiting"),
                             }
                         }
+                    } else {
+                        self.reset();
+                        // TODO: session saving
+                        state.push_screen(main::Screen::default());
+                        let client = state.client_mut();
+                        if let AuthStatus::Complete(session) = client.auth_status() {
+                            client.user_id = Some(session.user_id);
+                        }
+                        let fut = client.initial_sync();
+                        spawn_future!(state, future_markers::InitialSync, fut);
                     }
-                    None => {
-                        todo!()
-                    }
-                },
+                }
                 Err(err) => {
                     state.latest_error = Some(anyhow!(err));
                     state.client = None;

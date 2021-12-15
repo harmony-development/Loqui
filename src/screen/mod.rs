@@ -9,13 +9,18 @@ mod prelude {
     };
 }
 
-pub(crate) mod auth;
+pub mod auth;
+pub mod main;
+pub mod future_markers {
+    pub struct InitialSync;
+    pub struct ProcessEvents;
+}
 
 pub trait Screen: 'static {
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, app: &mut State);
 }
 
-type BoxedScreen = Box<dyn Screen>;
+pub type BoxedScreen = Box<dyn Screen>;
 
 pub struct ScreenStack {
     stack: Vec<BoxedScreen>,
@@ -46,6 +51,10 @@ impl ScreenStack {
 
     pub fn push<S: Screen>(&mut self, screen: S) {
         self.stack.push(Box::new(screen));
+    }
+
+    pub(super) fn push_boxed(&mut self, screen: BoxedScreen) {
+        self.stack.push(screen);
     }
 
     pub fn pop(&mut self) -> Option<BoxedScreen> {

@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{cell::RefCell, future::Future, sync::Arc};
 
-use client::{content::ContentStore, Client};
+use client::{content::ContentStore, harmony_rust_sdk::api::chat::Event, Client};
 use eframe::{
     egui::{self, RichText},
     epi,
@@ -8,18 +8,32 @@ use eframe::{
 
 use super::utils::*;
 
-use crate::screen::{auth, ScreenStack};
+use crate::screen::{auth, future_markers, BoxedScreen, Screen, ScreenStack};
 
 pub struct State {
     pub client: Option<Client>,
-    pub futures: futures::Futures,
+    pub futures: RefCell<futures::Futures>,
     pub content_store: Arc<ContentStore>,
     pub latest_error: Option<Error>,
+    next_screen: Option<BoxedScreen>,
+    prev_screen: bool,
 }
 
 impl State {
-    pub fn client(&mut self) -> &mut Client {
+    pub fn client(&self) -> &Client {
+        self.client.as_ref().expect("client not initialized yet")
+    }
+
+    pub fn client_mut(&mut self) -> &mut Client {
         self.client.as_mut().expect("client not initialized yet")
+    }
+
+    pub fn push_screen<S: Screen>(&mut self, screen: S) {
+        self.next_screen = Some(Box::new(screen));
+    }
+
+    pub fn pop_screen(&mut self) {
+        self.prev_screen = true;
     }
 
     pub fn run<F, E, O>(&mut self, res: Result<O, E>, f: F)
@@ -31,6 +45,15 @@ impl State {
             Ok(val) => f(self, val),
             Err(err) => self.latest_error = Some(anyhow::Error::new(err)),
         }
+    }
+
+    pub fn spawn_cmd<F, Fut>(&self, f: F)
+    where
+        F: FnOnce(&Client) -> Fut,
+        Fut: Future<Output = ClientResult<Vec<Event>>> + Send + 'static,
+    {
+        let fut = f(self.client());
+        spawn_future!(self, future_markers::ProcessEvents, fut);
     }
 }
 
@@ -45,12 +68,38 @@ impl App {
         Self {
             state: State {
                 client: None,
-                futures: futures::Futures::default(),
+                futures: RefCell::new(futures::Futures::default()),
                 content_store: Arc::new(content_store),
                 latest_error: None,
+                next_screen: None,
+                prev_screen: false,
             },
             screens: ScreenStack::new(auth::Screen::new()),
         }
+    }
+
+    fn handle_initial_sync(&mut self) {
+        let state = &mut self.state;
+        handle_future!(state, future_markers::InitialSync, |res: ClientResult<Vec<Event>>| {
+            self.state.run(res, |state, events| {
+                let client = state.client_mut();
+                let posts = client.process_event(events);
+                let fut = post_process_events(client, posts);
+                spawn_future!(state, future_markers::ProcessEvents, fut);
+            });
+        });
+    }
+
+    fn handle_process_events(&mut self) {
+        let state = &mut self.state;
+        handle_future!(state, future_markers::ProcessEvents, |res: ClientResult<Vec<Event>>| {
+            self.state.run(res, |state, events| {
+                let client = state.client_mut();
+                let posts = client.process_event(events);
+                let fut = post_process_events(client, posts);
+                spawn_future!(state, future_markers::ProcessEvents, fut);
+            });
+        });
     }
 }
 
@@ -60,10 +109,13 @@ impl epi::App for App {
     }
 
     fn setup(&mut self, _ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
-        self.state.futures.init(frame);
+        self.state.futures.borrow_mut().init(frame);
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+        self.handle_initial_sync();
+        self.handle_process_events();
+
         ctx.set_pixels_per_point(1.5);
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Bottom, "bottom_panel")
             .max_height(25.0)
@@ -84,6 +136,12 @@ impl epi::App for App {
                     None => ui.label("no errors"),
                 });
             });
+
         self.screens.current_mut().update(ctx, frame, &mut self.state);
+        if let Some(screen) = self.state.next_screen.take() {
+            self.screens.push_boxed(screen);
+        } else if self.state.prev_screen {
+            self.screens.pop();
+        }
     }
 }
