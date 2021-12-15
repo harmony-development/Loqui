@@ -97,7 +97,7 @@ pub fn post_process_events(
                     })?);
                 }
                 PostProcessEvent::GoToFirstMsgOnChannel(channel_id) => {
-                    todo!()
+                    //todo!()
                 }
                 PostProcessEvent::FetchGuildData(guild_id) => {
                     events.push(inner.call(GetGuildRequest::new(guild_id)).await.map(|resp| {
@@ -150,8 +150,8 @@ pub fn post_process_events(
                     guild_id,
                     channel_id,
                     message_id,
-                } => todo!(),
-                PostProcessEvent::FetchLinkMetadata(url) => todo!(),
+                } => {}
+                PostProcessEvent::FetchLinkMetadata(url) => {}
                 PostProcessEvent::FetchEmotes(pack_id) => {
                     events.push(inner.call(GetEmotePackEmotesRequest { pack_id }).await.map(|resp| {
                         Event::Emote(EmoteEvent::EmotePackEmotesUpdated(EmotePackEmotesUpdated {
