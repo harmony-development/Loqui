@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use client::{content::ContentStore, Client};
-use eframe::{egui, epi};
+use eframe::{
+    egui::{self, RichText},
+    epi,
+};
 
 use super::utils::*;
 
@@ -56,7 +59,29 @@ impl epi::App for App {
         "loqui"
     }
 
+    fn setup(&mut self, _ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
+        self.state.futures.init(frame);
+    }
+
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+        egui::TopBottomPanel::new(egui::panel::TopBottomSide::Bottom, "bottom_panel")
+            .max_height(80.0)
+            .show(ctx, |ui| {
+                let maybe_err_msg = self
+                    .state
+                    .latest_error
+                    .as_ref()
+                    .map(|err| format!("last error: {}", err));
+                ui.horizontal(|ui| match maybe_err_msg {
+                    Some(text) => {
+                        if ui.button("clear").clicked() {
+                            self.state.latest_error = None;
+                        }
+                        ui.label(RichText::new(text).color(egui::Color32::RED))
+                    }
+                    None => ui.label("no errors"),
+                });
+            });
         self.screens.current_mut().update(ctx, frame, &mut self.state);
     }
 }

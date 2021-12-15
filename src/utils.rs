@@ -16,11 +16,13 @@ impl TextInputExt for Response {
 pub(crate) use futures::{handle_future, spawn_future};
 
 pub mod futures {
+    use eframe::epi::RepaintSignal;
     use std::{
         any::{Any, TypeId},
         collections::HashMap,
         future::Future,
         hash::{BuildHasherDefault, Hasher},
+        sync::Arc,
     };
     use tokio::sync::oneshot;
 
@@ -82,9 +84,14 @@ pub mod futures {
     #[derive(Default)]
     pub struct Futures {
         inner: FutureMap,
+        rr: Option<Arc<dyn RepaintSignal>>,
     }
 
     impl Futures {
+        pub fn init(&mut self, frame: &eframe::epi::Frame) {
+            self.rr = Some(frame.repaint_signal());
+        }
+
         pub fn spawn<Id, Fut, Out>(&mut self, fut: Fut)
         where
             Fut: Future<Output = Out> + Send + 'static,
@@ -93,10 +100,12 @@ pub mod futures {
         {
             let (tx, rx) = oneshot::channel::<AnyItem>();
 
+            let rr = self.rr.clone().expect("futures not initialized yet -- this is a bug");
             tokio::spawn(async move {
                 let result = fut.await;
                 let item = Box::new(result);
                 assert!(!tx.send(item).is_err(), "future output dropped before result was sent");
+                rr.request_repaint();
             });
 
             self.inner.insert(TypeId::of::<Id>(), rx);
