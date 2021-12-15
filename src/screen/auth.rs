@@ -11,6 +11,7 @@ use client::{
     smol_str::SmolStr,
     Client, IndexMap, Uri,
 };
+use eframe::egui::RichText;
 
 use super::prelude::*;
 
@@ -133,6 +134,76 @@ impl Screen {
         );
         self.waiting = true;
     }
+
+    fn view_fields(&mut self, ui: &mut Ui) -> bool {
+        let mut focus_after = false;
+        for ((name, _type), value) in self.fields.iter_mut() {
+            ui.group(|ui| {
+                ui.label(name.as_str());
+                let edit = ui.text_edit_singleline(value);
+                if focus_after {
+                    edit.request_focus();
+                }
+                focus_after = edit.did_submit(ui);
+            });
+            ui.end_row();
+        }
+        focus_after
+    }
+
+    fn view_choices(&mut self, ui: &mut Ui) -> Option<SmolStr> {
+        let mut selected_choice = None;
+        for choice in &self.choices {
+            if ui.button(choice.as_str()).clicked() {
+                selected_choice = Some(choice.clone());
+            }
+            ui.end_row();
+        }
+        selected_choice
+    }
+
+    fn view_grid(&mut self, state: &mut State, ui: &mut Ui) {
+        let did_submit = self.view_fields(ui);
+        let selected_choice = self.view_choices(ui);
+
+        if let Some(choice) = selected_choice {
+            self.next_step(state, AuthStepResponse::Choice(choice.into()));
+        } else if self.fields.is_empty().not() && (did_submit || ui.button("continue").clicked()) {
+            if self.title == "homeserver" {
+                self.homeserver(state);
+            } else {
+                let response = AuthStepResponse::form(
+                    self.fields
+                        .iter()
+                        .map(|((_, r#type), value)| match r#type.as_str() {
+                            "number" => Field::Number(value.parse().unwrap()),
+                            "new-password" | "password" => Field::Bytes(value.as_bytes().to_vec()),
+                            _ => Field::String(value.clone()),
+                        })
+                        .collect(),
+                );
+                self.next_step(state, response);
+            }
+        }
+
+        if self.can_go_back && ui.button("back").clicked() {
+            self.prev_step(state);
+        }
+    }
+
+    fn view_main(&mut self, state: &mut State, ui: &mut Ui) {
+        if self.waiting {
+            ui.label(RichText::new("please wait...").heading());
+            return;
+        }
+
+        egui::Grid::new("auth_grid")
+            .spacing((0.0, 15.0))
+            .min_col_width(300.0)
+            .show(ui, |ui| {
+                self.view_grid(state, ui);
+            });
+    }
 }
 
 impl AppScreen for Screen {
@@ -140,58 +211,18 @@ impl AppScreen for Screen {
         self.handle_connect(state);
         self.handle_step(state);
 
+        egui::TopBottomPanel::top("auth_title").show(ctx, |ui| {
+            ui.label(RichText::new(self.title.as_str()).strong().heading());
+        });
+
         egui::CentralPanel::default().show(ctx, |ui| {
-            if self.waiting {
-                ui.label("please wait...");
-                return;
-            }
-
-            egui::Grid::new("auth_grid").min_col_width(300.0).show(ui, |ui| {
-                let mut focus_after = false;
-                for ((name, _type), value) in self.fields.iter_mut() {
-                    ui.group(|ui| {
-                        ui.label(name.as_str());
-                        let edit = ui.text_edit_singleline(value);
-                        if focus_after {
-                            edit.request_focus();
-                        }
-                        focus_after = edit.did_submit(ui);
-                    });
-                    ui.end_row();
-                }
-
-                let mut chosen_choice = None;
-                for choice in &self.choices {
-                    if ui.button(choice.as_str()).clicked() {
-                        chosen_choice = Some(choice.clone());
-                    }
-                    ui.end_row();
-                }
-
-                if let Some(choice) = chosen_choice {
-                    self.next_step(state, AuthStepResponse::Choice(choice.into()));
-                } else if self.fields.is_empty().not() && (focus_after || ui.button("continue").clicked()) {
-                    if self.title == "homeserver" {
-                        self.homeserver(state);
-                    } else {
-                        let response = AuthStepResponse::form(
-                            self.fields
-                                .iter()
-                                .map(|((_, r#type), value)| match r#type.as_str() {
-                                    "number" => Field::Number(value.parse().unwrap()),
-                                    "new-password" | "password" => Field::Bytes(value.as_bytes().to_vec()),
-                                    _ => Field::String(value.clone()),
-                                })
-                                .collect(),
-                        );
-                        self.next_step(state, response);
-                    }
-                }
-
-                if self.can_go_back && ui.button("back").clicked() {
-                    self.prev_step(state);
-                }
-            });
+            ui.with_layout(
+                Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
+                |ui| {
+                    ui.add_space(50.0);
+                    self.view_main(state, ui);
+                },
+            )
         });
     }
 }

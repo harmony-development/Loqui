@@ -64,8 +64,10 @@ impl epi::App for App {
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+        ctx.set_pixels_per_point(1.5);
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Bottom, "bottom_panel")
-            .max_height(80.0)
+            .max_height(25.0)
+            .min_height(25.0)
             .show(ctx, |ui| {
                 let maybe_err_msg = self
                     .state
