@@ -2,7 +2,10 @@ use harmony_rust_sdk::{
     api::exports::hrpc::exports::http::uri::{InvalidUri as UrlParseError, Uri},
     client::error::{ClientError as InnerClientError, HmcParseError, InternalClientError},
 };
-use std::fmt::{self, Display};
+use std::{
+    error::Error,
+    fmt::{self, Display},
+};
 
 pub type ClientResult<T> = Result<T, ClientError>;
 
@@ -88,6 +91,16 @@ impl Display for ClientError {
                 write!(fmt, "Missing required login information, can't login.")
             }
             ClientError::Custom(msg) => write!(fmt, "{}", msg),
+        }
+    }
+}
+
+impl Error for ClientError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ClientError::Internal(err) => Some(err),
+            ClientError::IoError(err) => Some(err),
+            _ => None,
         }
     }
 }

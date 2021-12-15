@@ -46,16 +46,23 @@ open = "2.0.0"
 rfd = "0.6"
 image = "0.23.14"
 
-tokio = { version = "1.9", features = ["rt-multi-thread", "parking_lot", "time", "fs", "macros"] }
+tokio = { version = "1.9", features = [
+    "rt-multi-thread",
+    "parking_lot",
+    "time",
+    "fs",
+    "macros",
+] }
 
 toml = "0.5"
 chrono = "0.4.19"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing-appender = "0.2"
 fuzzy-matcher = "0.3.7"
 notify-rust = "4"
 notify = { git = "https://github.com/notify-rs/notify.git", tag = "5.0.0-pre.13" }
-lazy_static = "1"
+
+anyhow = "1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 
 [package.metadata.nix]
 longDescription = """
@@ -67,13 +74,13 @@ systems = ["x86_64-linux"]
 app = true
 build = true
 runtimeLibs = [
-    "vulkan-loader",
     "wayland",
     "wayland-protocols",
     "libxkbcommon",
     "xorg.libX11",
     "xorg.libXrandr",
     "xorg.libXi",
+    "libGL",
 ]
 
 [workspace.metadata.nix]

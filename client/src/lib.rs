@@ -64,7 +64,7 @@ use self::{
 };
 
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
-pub use ahash::AHashMap;
+pub use ahash::{AHashMap, AHasher};
 pub use bool_ext;
 pub use linemd;
 pub use smol_str;
