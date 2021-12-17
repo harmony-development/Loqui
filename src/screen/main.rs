@@ -176,6 +176,29 @@ impl Screen {
             });
     }
 
+    fn view_profile_menu(&mut self, state: &mut State, ui: &mut Ui) {
+        let username = state
+            .cache
+            .get_user(state.client().user_id())
+            .map_or_else(|| SmolStr::new_inline("loading..."), |u| u.username.clone());
+
+        ui.vertical_centered_justified(|ui| {
+            ui.menu_button(username.as_str(), |ui| {
+                if ui.button("logout").clicked() {
+                    let client = state.client().clone();
+                    let content_store = state.content_store.clone();
+                    spawn_future!(state, async move { client.logout(content_store.as_ref(), true).await });
+                    state.client = None;
+                    state.pop_screen();
+                }
+
+                if ui.button("exit loqui").clicked() {
+                    std::process::exit(0);
+                }
+            });
+        });
+    }
+
     fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
         let mut sorted_members = guild
             .members
@@ -205,15 +228,20 @@ impl AppScreen for Screen {
             .resizable(false)
             .show(ctx, |ui| self.view_guilds(state, ui));
         egui::panel::SidePanel::left("channel_panel")
-            .min_width(175.0)
-            .max_width(500.0)
+            .min_width(100.0)
+            .max_width(400.0)
             .resizable(true)
             .show(ctx, |ui| self.view_channels(state, ui));
         egui::panel::SidePanel::right("member_panel")
-            .min_width(175.0)
-            .max_width(500.0)
+            .min_width(100.0)
+            .max_width(400.0)
             .resizable(true)
-            .show(ctx, |ui| self.view_members(state, ui));
+            .show(ctx, |ui| {
+                self.view_profile_menu(state, ui);
+                ui.separator();
+                ui.add_space(4.0);
+                self.view_members(state, ui);
+            });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(
