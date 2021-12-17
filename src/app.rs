@@ -16,7 +16,10 @@ use tokio::sync::mpsc as tokio_mpsc;
 
 use super::utils::*;
 
-use crate::screen::{auth, BoxedScreen, Screen, ScreenStack};
+use crate::{
+    futures::Futures,
+    screen::{auth, BoxedScreen, Screen, ScreenStack},
+};
 
 pub struct State {
     pub socket_tx_tx: tokio_mpsc::Sender<EventsWriteSocket>,
@@ -24,7 +27,7 @@ pub struct State {
     pub socket_event_rx: mpsc::Receiver<Event>,
     pub client: Option<Client>,
     pub cache: Cache,
-    pub futures: futures::Futures,
+    pub futures: Futures,
     pub content_store: Arc<ContentStore>,
     pub latest_error: Option<Error>,
     next_screen: Option<BoxedScreen>,
@@ -66,7 +69,7 @@ impl App {
     #[allow(clippy::missing_panics_doc)]
     pub fn new(content_store: ContentStore) -> Self {
         let mut cache = Cache::default();
-        let futures = futures::Futures::new();
+        let futures = Futures::new();
         let (socket_sub_tx, mut socket_sub_rx) = tokio_mpsc::unbounded_channel::<EventSource>();
         cache.set_sub_tx(socket_sub_tx);
         let (socket_tx_tx, mut socket_tx_rx) = tokio_mpsc::channel::<EventsWriteSocket>(2);

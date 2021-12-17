@@ -198,7 +198,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::CtxRef, _: &mut epi::Frame, state: &mut State) {
         egui::panel::SidePanel::left("guild_panel")
             .min_width(32.0)
             .max_width(32.0)
