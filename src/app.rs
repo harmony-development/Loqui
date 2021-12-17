@@ -1,18 +1,30 @@
-use std::{cell::RefCell, future::Future, sync::Arc};
+use std::sync::{mpsc, Arc};
 
-use client::{content::ContentStore, harmony_rust_sdk::api::chat::Event, Client};
+use client::{
+    content::ContentStore,
+    harmony_rust_sdk::{
+        api::chat::{Event, EventSource},
+        client::{EventsReadSocket, EventsSocket, EventsWriteSocket},
+    },
+    Cache, Client,
+};
 use eframe::{
     egui::{self, RichText},
     epi,
 };
+use tokio::sync::mpsc as tokio_mpsc;
 
 use super::utils::*;
 
-use crate::screen::{auth, future_markers, BoxedScreen, Screen, ScreenStack};
+use crate::screen::{auth, BoxedScreen, Screen, ScreenStack};
 
 pub struct State {
+    pub socket_tx_tx: tokio_mpsc::Sender<EventsWriteSocket>,
+    pub socket_rx_tx: tokio_mpsc::Sender<EventsReadSocket>,
+    pub socket_event_rx: mpsc::Receiver<Event>,
     pub client: Option<Client>,
-    pub futures: RefCell<futures::Futures>,
+    pub cache: Cache,
+    pub futures: futures::Futures,
     pub content_store: Arc<ContentStore>,
     pub latest_error: Option<Error>,
     next_screen: Option<BoxedScreen>,
@@ -22,10 +34,6 @@ pub struct State {
 impl State {
     pub fn client(&self) -> &Client {
         self.client.as_ref().expect("client not initialized yet")
-    }
-
-    pub fn client_mut(&mut self) -> &mut Client {
-        self.client.as_mut().expect("client not initialized yet")
     }
 
     pub fn push_screen<S: Screen>(&mut self, screen: S) {
@@ -46,15 +54,6 @@ impl State {
             Err(err) => self.latest_error = Some(anyhow::Error::new(err)),
         }
     }
-
-    pub fn spawn_cmd<F, Fut>(&self, f: F)
-    where
-        F: FnOnce(&Client) -> Fut,
-        Fut: Future<Output = ClientResult<Vec<Event>>> + Send + 'static,
-    {
-        let fut = f(self.client());
-        spawn_future!(self, future_markers::ProcessEvents, fut);
-    }
 }
 
 pub struct App {
@@ -64,11 +63,59 @@ pub struct App {
 
 impl App {
     #[must_use]
+    #[allow(clippy::missing_panics_doc)]
     pub fn new(content_store: ContentStore) -> Self {
+        let mut cache = Cache::default();
+        let futures = futures::Futures::new();
+        let (socket_sub_tx, mut socket_sub_rx) = tokio_mpsc::unbounded_channel::<EventSource>();
+        cache.set_sub_tx(socket_sub_tx);
+        let (socket_tx_tx, mut socket_tx_rx) = tokio_mpsc::channel::<EventsWriteSocket>(2);
+        futures.spawn(async move {
+            let mut tx = socket_tx_rx.recv().await.expect("closed");
+
+            loop {
+                tokio::select! {
+                    Some(sock) = socket_tx_rx.recv() => {
+                        tx = sock;
+                    }
+                    Some(sub) = socket_sub_rx.recv() => {
+                        if tx.add_source(sub).await.is_err() {
+                            // reset socket
+                        }
+                    }
+                    else => tokio::task::yield_now().await,
+                }
+            }
+        });
+
+        let (socket_rx_tx, mut socket_rx_rx) = tokio_mpsc::channel::<EventsReadSocket>(2);
+        let (socket_event_tx, socket_event_rx) = mpsc::channel::<Event>();
+        futures.spawn(async move {
+            let mut rx = socket_rx_rx.recv().await.expect("closed");
+
+            loop {
+                tokio::select! {
+                    Some(sock) = socket_rx_rx.recv() => {
+                        rx = sock;
+                    }
+                    Ok(Some(ev)) = rx.get_event() => {
+                        if socket_event_tx.send(ev).is_err() {
+                            // reset socket
+                        }
+                    }
+                    else => tokio::task::yield_now().await,
+                }
+            }
+        });
+
         Self {
             state: State {
+                socket_rx_tx,
+                socket_tx_tx,
+                socket_event_rx,
                 client: None,
-                futures: RefCell::new(futures::Futures::default()),
+                cache,
+                futures,
                 content_store: Arc::new(content_store),
                 latest_error: None,
                 next_screen: None,
@@ -76,30 +123,6 @@ impl App {
             },
             screens: ScreenStack::new(auth::Screen::new()),
         }
-    }
-
-    fn handle_initial_sync(&mut self) {
-        let state = &mut self.state;
-        handle_future!(state, future_markers::InitialSync, |res: ClientResult<Vec<Event>>| {
-            self.state.run(res, |state, events| {
-                let client = state.client_mut();
-                let posts = client.process_event(events);
-                let fut = post_process_events(client, posts);
-                spawn_future!(state, future_markers::ProcessEvents, fut);
-            });
-        });
-    }
-
-    fn handle_process_events(&mut self) {
-        let state = &mut self.state;
-        handle_future!(state, future_markers::ProcessEvents, |res: ClientResult<Vec<Event>>| {
-            self.state.run(res, |state, events| {
-                let client = state.client_mut();
-                let posts = client.process_event(events);
-                let fut = post_process_events(client, posts);
-                spawn_future!(state, future_markers::ProcessEvents, fut);
-            });
-        });
     }
 }
 
@@ -109,12 +132,56 @@ impl epi::App for App {
     }
 
     fn setup(&mut self, _ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
-        self.state.futures.borrow_mut().init(frame);
+        self.state.futures.init(frame);
+        if self.state.content_store.latest_session_file().exists() {
+            let content_store = self.state.content_store.clone();
+            self.state.futures.spawn(async move {
+                let session = Client::read_latest_session(content_store.as_ref()).await?;
+                let client = Client::new(session.homeserver.parse().unwrap(), Some(session.into())).await?;
+                ClientResult::Ok(client)
+            });
+        }
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
-        self.handle_initial_sync();
-        self.handle_process_events();
+        self.state.futures.run();
+
+        let state = &mut self.state;
+        handle_future!(state, |res: ClientResult<Vec<Event>>| {
+            state.run(res, |state, events| {
+                let mut posts = Vec::new();
+                for event in events {
+                    state.cache.process_event(&mut posts, event);
+                }
+                spawn_future!(state, {
+                    let client = state.client().clone();
+                    async move {
+                        let mut events = Vec::with_capacity(posts.len());
+                        for post in posts {
+                            client.process_post(&mut events, post).await?;
+                        }
+                        ClientResult::Ok(events)
+                    }
+                });
+            });
+        });
+
+        handle_future!(state, |res: ClientResult<EventsSocket>| {
+            state.run(res, |state, sock| {
+                let (tx, rx) = sock.split();
+                state.socket_tx_tx.try_send(tx);
+                state.socket_rx_tx.try_send(rx);
+            });
+        });
+
+        // handle socket events
+        let mut evs = Vec::new();
+        while let Ok(ev) = state.socket_event_rx.try_recv() {
+            evs.push(ev);
+        }
+        if !evs.is_empty() {
+            spawn_future!(state, std::future::ready(ClientResult::Ok(evs)));
+        }
 
         ctx.set_pixels_per_point(1.5);
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Bottom, "bottom_panel")

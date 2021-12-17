@@ -9,11 +9,11 @@ use client::{
         client::api::auth::{next_step_request::form_fields::Field, AuthStepResponse},
     },
     smol_str::SmolStr,
-    AuthStatus, Client, IndexMap, Uri,
+    Client, IndexMap, Uri,
 };
 use eframe::egui::RichText;
 
-use crate::screen::{future_markers, main};
+use crate::screen::main;
 
 use super::prelude::*;
 
@@ -46,7 +46,7 @@ impl Screen {
     }
 
     fn handle_step(&mut self, state: &mut State) {
-        handle_future!(state, StepFut, |res: ClientResult<Option<AuthStep>>| {
+        handle_future!(state, |res: ClientResult<Option<AuthStep>>| {
             match res {
                 Ok(step) => {
                     if let Some(step) = step {
@@ -74,14 +74,19 @@ impl Screen {
                         }
                     } else {
                         self.reset();
-                        // TODO: session saving
                         state.push_screen(main::Screen::default());
-                        let client = state.client_mut();
-                        if let AuthStatus::Complete(session) = client.auth_status() {
-                            client.user_id = Some(session.user_id);
-                        }
-                        let fut = client.initial_sync();
-                        spawn_future!(state, future_markers::InitialSync, fut);
+                        spawn_evs!(state, |events, client| async move {
+                            client.initial_sync(events).await?;
+                            Ok(())
+                        });
+                        let client = state.client().clone();
+                        spawn_future!(state, async move { client.connect_socket(Vec::new()).await });
+                        let client = state.client().clone();
+                        let content_store = state.content_store.clone();
+                        spawn_future!(
+                            state,
+                            async move { client.save_session_to(content_store.as_ref()).await }
+                        );
                     }
                 }
                 Err(err) => {
@@ -94,11 +99,15 @@ impl Screen {
     }
 
     fn handle_connect(&mut self, state: &mut State) {
-        handle_future!(state, HomeserverFut, |res: ClientResult<Client>| {
+        handle_future!(state, |res: ClientResult<Client>| {
             match res {
                 Ok(client) => {
                     state.client = Some(client);
-                    self.next_step(state, AuthStepResponse::Initial);
+                    if state.client().auth_status().is_authenticated() {
+                        spawn_future!(state, std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
+                    } else {
+                        self.next_step(state, AuthStepResponse::Initial);
+                    }
                 }
                 Err(err) => {
                     state.latest_error = Some(anyhow!(err));
@@ -118,8 +127,8 @@ impl Screen {
 
         state.run(maybe_homeserver_url, |state, homeserver_url| {
             let content_store = state.content_store.clone();
-            spawn_future!(state, HomeserverFut, async move {
-                let client = Client::new(homeserver_url, None, content_store).await?;
+            spawn_future!(state, async move {
+                let client = Client::new(homeserver_url, None).await?;
                 client.inner().begin_auth().await?;
                 ClientResult::Ok(client)
             });
@@ -129,7 +138,7 @@ impl Screen {
 
     fn prev_step(&mut self, state: &mut State) {
         let fut = state.client().inner().prev_auth_step();
-        spawn_future!(state, StepFut, fut.map_ok(|resp| resp.step).map_err(ClientError::from));
+        spawn_future!(state, fut.map_ok(|resp| resp.step).map_err(ClientError::from));
         self.waiting = true;
     }
 
@@ -137,7 +146,6 @@ impl Screen {
         let fut = state.client().inner().next_auth_step(response);
         spawn_future!(
             state,
-            StepFut,
             fut.map_ok(|resp| resp.and_then(|resp| resp.step))
                 .map_err(ClientError::from)
         );
@@ -146,10 +154,11 @@ impl Screen {
 
     fn view_fields(&mut self, ui: &mut Ui) -> bool {
         let mut focus_after = false;
-        for ((name, _type), value) in self.fields.iter_mut() {
+        for ((name, r#type), value) in self.fields.iter_mut() {
             ui.group(|ui| {
                 ui.label(name.as_str());
-                let edit = ui.text_edit_singleline(value);
+                let edit = egui::TextEdit::singleline(value).password(r#type == "password" || r#type == "new-password");
+                let edit = ui.add(edit);
                 if focus_after {
                     edit.request_focus();
                 }
@@ -235,6 +244,3 @@ impl AppScreen for Screen {
         });
     }
 }
-
-struct HomeserverFut;
-struct StepFut;

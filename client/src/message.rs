@@ -9,12 +9,11 @@ use harmony_rust_sdk::{
     },
     client::api::rest::FileId,
 };
-use linemd::{parser::Token, Parser};
 use rand::Rng;
 use smol_str::SmolStr;
 use std::{str::FromStr, time::UNIX_EPOCH};
 
-use crate::{HarmonyToken, IndexMap};
+use crate::IndexMap;
 
 use super::{content::MAX_THUMB_SIZE, post_heading, PostProcessEvent};
 
@@ -143,7 +142,7 @@ impl Attachment {
 
 #[derive(Debug, Default, Clone)]
 pub struct Override {
-    pub name: Option<String>,
+    pub name: Option<SmolStr>,
     pub avatar_url: Option<FileId>,
     pub reason: Option<Reason>,
 }
@@ -152,7 +151,7 @@ impl From<Override> for chat::Overrides {
     fn from(o: Override) -> Self {
         Self {
             avatar: o.avatar_url.map(|id| id.to_string()),
-            username: o.name,
+            username: o.name.map(|n| n.into()),
             reason: o.reason,
         }
     }
@@ -251,7 +250,6 @@ pub struct Message {
     pub sender: u64,
     pub timestamp: NaiveDateTime,
     pub overrides: Option<Override>,
-    pub being_edited: Option<String>,
     pub reply_to: Option<u64>,
 }
 
@@ -290,22 +288,6 @@ impl Message {
                         .filter(|url| matches!(url.scheme_str(), Some("http" | "https")))
                         .map(PostProcessEvent::FetchLinkMetadata),
                 );
-                post.extend(
-                    text.as_str()
-                        .parse_md_custom(HarmonyToken::parse)
-                        .into_iter()
-                        .flat_map(|tok| {
-                            if let Token::Custom(HarmonyToken::Emote(id)) = tok {
-                                Some(PostProcessEvent::FetchThumbnail(Attachment {
-                                    kind: "image".into(),
-                                    name: "emote".into(),
-                                    ..Attachment::new_unknown(FileId::Id(id.to_string()))
-                                }))
-                            } else {
-                                None
-                            }
-                        }),
-                );
             }
         }
     }
@@ -321,7 +303,6 @@ impl Default for Message {
                 NaiveDateTime::from_timestamp(timestamp.as_secs() as i64, timestamp.subsec_nanos())
             },
             overrides: None,
-            being_edited: None,
             reply_to: None,
         }
     }
@@ -330,7 +311,7 @@ impl Default for Message {
 impl From<chat::Overrides> for Override {
     fn from(overrides: chat::Overrides) -> Self {
         Override {
-            name: overrides.username,
+            name: overrides.username.map(Into::into),
             avatar_url: overrides.avatar.map(|a| FileId::from_str(&a).ok()).flatten(),
             reason: overrides.reason,
         }
@@ -381,7 +362,6 @@ impl From<HarmonyMessage> for Message {
             sender: message.author_id,
             timestamp: { NaiveDateTime::from_timestamp(message.created_at as i64, 0) },
             overrides: message.overrides.map(From::from),
-            being_edited: None,
         }
     }
 }

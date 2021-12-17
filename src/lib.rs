@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-#![warn(clippy::pedantic)]
 
 pub(crate) mod app;
 pub(crate) mod screen;

@@ -1,10 +1,7 @@
 use std::time::Instant;
 
-use ahash::AHashMap;
 use harmony_rust_sdk::{api::profile::UserStatus, client::api::rest::FileId};
 use smol_str::SmolStr;
-
-pub type Members = AHashMap<u64, Member>;
 
 #[derive(Debug, Clone)]
 pub struct Member {

@@ -202,12 +202,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bool_ext"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4aaa5af5d1705aba49bace04f3d29c8fa9c0c20829fdea161b89718b2955ef1"
-
-[[package]]
 name = "bumpalo"
 version = "3.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -321,18 +315,17 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "bool_ext",
  "chrono",
  "directories-next",
  "harmony_rust_sdk",
  "indexmap",
  "infer",
- "lazy_static",
- "linemd",
+ "itertools",
  "rand",
  "serde",
  "smol_str",
  "tokio",
+ "toml",
  "tracing",
  "urlencoding",
 ]
@@ -1298,6 +1291,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "guard"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff893cc51ea04f8a3b73fbaf4376c06ebc5a0ccbe86d460896f805d9417c93ea"
+
+[[package]]
 name = "h2"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1689,11 +1688,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "linemd"
-version = "0.4.0"
-source = "git+https://github.com/yusdacra/linemd.git?branch=master#17964e0e964b28d3804ff95c2bbd38bb9a1de9c9"
-
-[[package]]
 name = "lock_api"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1720,6 +1714,7 @@ dependencies = [
  "client",
  "eframe",
  "fuzzy-matcher",
+ "guard",
  "hex_color",
  "image",
  "notify",
@@ -1727,7 +1722,6 @@ dependencies = [
  "open",
  "rfd",
  "tokio",
- "toml",
  "tracing-appender",
  "tracing-subscriber",
 ]

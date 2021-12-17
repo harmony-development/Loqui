@@ -11,10 +11,6 @@ mod prelude {
 
 pub mod auth;
 pub mod main;
-pub mod future_markers {
-    pub struct InitialSync;
-    pub struct ProcessEvents;
-}
 
 pub trait Screen: 'static {
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, app: &mut State);

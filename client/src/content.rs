@@ -1,6 +1,5 @@
 use super::ClientError;
 use harmony_rust_sdk::client::api::rest::FileId;
-use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 pub const MAX_THUMB_SIZE: u64 = 1000 * 500; // 500kb
@@ -8,7 +7,6 @@ pub const MAX_THUMB_SIZE: u64 = 1000 * 500; // 500kb
 pub const SESSIONS_DIR_NAME: &str = "sessions";
 pub const LOG_FILENAME: &str = "log";
 pub const CONTENT_DIR_NAME: &str = "content";
-pub const THEME_NAME: &str = "theme.toml";
 
 pub fn infer_type_from_bytes(data: &[u8]) -> String {
     infer::get(data)
@@ -29,26 +27,19 @@ pub struct ContentStore {
     sessions_dir: PathBuf,
     log_file: PathBuf,
     content_dir: PathBuf,
-    theme_file: PathBuf,
 }
 
 impl Default for ContentStore {
     fn default() -> Self {
-        let (sessions_dir, log_file, content_dir, theme_file) =
+        let (sessions_dir, log_file, content_dir) =
             match directories_next::ProjectDirs::from("nodomain", "yusdacra", "loqui") {
                 Some(app_dirs) => (
                     app_dirs.data_dir().join(SESSIONS_DIR_NAME),
                     app_dirs.data_dir().join(LOG_FILENAME),
                     app_dirs.cache_dir().join(CONTENT_DIR_NAME),
-                    app_dirs.config_dir().join(THEME_NAME),
                 ),
                 // Fallback to current working directory if no HOME is present
-                None => (
-                    SESSIONS_DIR_NAME.into(),
-                    LOG_FILENAME.into(),
-                    CONTENT_DIR_NAME.into(),
-                    THEME_NAME.into(),
-                ),
+                None => (SESSIONS_DIR_NAME.into(), LOG_FILENAME.into(), CONTENT_DIR_NAME.into()),
             };
 
         Self {
@@ -56,7 +47,6 @@ impl Default for ContentStore {
             sessions_dir,
             log_file,
             content_dir,
-            theme_file,
         }
     }
 }
@@ -91,7 +81,6 @@ impl ContentStore {
         create_dir_all(self.content_dir())?;
         create_dir_all(self.sessions_dir())?;
         create_dir_all(self.log_file().parent().unwrap_or_else(|| Path::new(".")))?;
-        create_dir_all(self.theme_file().parent().unwrap_or_else(|| Path::new(".")))?;
 
         Ok(())
     }
@@ -111,35 +100,4 @@ impl ContentStore {
     pub fn log_file(&self) -> &Path {
         self.log_file.as_path()
     }
-    pub fn theme_file(&self) -> &Path {
-        self.theme_file.as_path()
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ThemeRaw {
-    #[serde(default)]
-    pub error_color: String,
-    #[serde(default)]
-    pub success_color: String,
-    #[serde(default)]
-    pub border_color: String,
-    #[serde(default)]
-    pub border_radius: u8,
-    #[serde(default)]
-    pub primary_bg_color: String,
-    #[serde(default)]
-    pub secondary_bg_color: String,
-    #[serde(default)]
-    pub disabled_bg_color: String,
-    #[serde(default)]
-    pub text_color: String,
-    #[serde(default)]
-    pub disabled_text_color: String,
-    #[serde(default)]
-    pub dimmed_text_color: String,
-    #[serde(default)]
-    pub accent_color: String,
-    #[serde(default)]
-    pub mention_color: String,
 }
