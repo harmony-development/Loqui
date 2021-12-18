@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+<!-- Disable zooming: -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+<head>
+    <title>loqui</title>
+    <style>
+        html {
+            /* Remove touch delay: */
+            touch-action: manipulation;
+        }
+
+        body {
+            /* Background color for what is not covered by the egui canvas,
+            or where the egui canvas is translucent. */
+            background: #404040;
+        }
+
+        /* Allow canvas to fill entire web page: */
+        html,
+        body {
+            overflow: hidden;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Position canvas in center-top: */
+        canvas {
+            margin-right: auto;
+            margin-left: auto;
+            display: block;
+            position: absolute;
+            top: 0%;
+            left: 50%;
+            transform: translate(-50%, 0%);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- The WASM code will resize this canvas to cover the entire screen -->
+    <canvas id="egui_canvas"></canvas>
+</body>
+
+</html>

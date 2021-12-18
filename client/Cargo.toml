@@ -8,13 +8,10 @@ repository = "https://github.com/harmony-development/loqui"
 homepage = "https://github.com/harmony-development/loqui"
 
 [dependencies]
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client_native"] }
-
 infer = "0.5.0"
 directories-next = "2.0.0"
 
-tokio = { version = "1.9", features = ["parking_lot", "time", "fs"] }
-rand = "0.8"
+tokio = { version = "1.9", features = ["parking_lot", "sync"] }
 ahash = "0.7"
 indexmap = "1.7.0"
 urlencoding = "2.0.0"
@@ -25,3 +22,12 @@ chrono = "0.4.19"
 tracing = "0.1"
 smol_str = { version = "0.1.20", features = ["serde"] }
 itertools = "0.10"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client_native"] }
+getrandom = "0.2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = ["client_web"] }
+gloo-storage = "0.2"
+getrandom = { version = "0.2", features = ["js"] }

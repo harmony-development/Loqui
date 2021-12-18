@@ -5,6 +5,12 @@ use std::{
     future::Future,
     sync::{mpsc, Arc},
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::spawn;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_futures::spawn_local as spawn;
+
 type AnyItem = Box<dyn Any + Send + 'static>;
 
 pub struct Futures {
@@ -29,6 +35,7 @@ impl Futures {
         self.rr = Some(frame.repaint_signal());
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn spawn<Fut, Out>(&self, fut: Fut)
     where
         Fut: Future<Output = Out> + Send + 'static,
@@ -36,7 +43,27 @@ impl Futures {
     {
         let tx = self.tx.clone();
         let rr = self.rr.clone();
-        tokio::spawn(async move {
+        spawn(async move {
+            let result = fut.await;
+            let item = Box::new(result);
+            if tx.send(item).is_err() {
+                tracing::debug!("future output dropped before result was sent");
+            }
+            if let Some(rr) = rr {
+                rr.request_repaint();
+            }
+        });
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn spawn<Fut, Out>(&self, fut: Fut)
+    where
+        Fut: Future<Output = Out> + 'static,
+        Out: Send + 'static,
+    {
+        let tx = self.tx.clone();
+        let rr = self.rr.clone();
+        spawn(async move {
             let result = fut.await;
             let item = Box::new(result);
             if tx.send(item).is_err() {

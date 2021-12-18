@@ -40,17 +40,14 @@ use harmony_rust_sdk::{
     },
 };
 
-use content::ContentStore;
-use error::{ClientError, ClientResult};
+use error::ClientResult;
 use member::Member;
 use message::{Attachment, Content, Embed, MessageId};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::{
     array::IntoIter,
     fmt::{self, Debug, Display, Formatter},
-    path::Path,
     str::FromStr,
     time::Instant,
 };
@@ -700,7 +697,9 @@ impl Cache {
     }
 
     pub fn prepare_send_message(&mut self, guild_id: u64, channel_id: u64, message: Message) -> u64 {
-        let echo_id = rand::thread_rng().gen::<u64>();
+        let mut bytes = [0; 8];
+        getrandom::getrandom(&mut bytes).expect("cant get random");
+        let echo_id = u64::from_ne_bytes(bytes);
         if let Some(channel) = self.get_channel_mut(guild_id, channel_id) {
             channel.messages.insert(MessageId::Unack(echo_id), message);
         }
@@ -731,44 +730,32 @@ impl Client {
         })
     }
 
-    pub async fn read_latest_session(content_store: &ContentStore) -> ClientResult<Session> {
-        let session_file = tokio::fs::read_link(content_store.latest_session_file()).await?;
-        let session_raw = tokio::fs::read(session_file).await?;
-        let session = toml::from_slice::<Session>(&session_raw).map_err(|err| ClientError::Custom(err.to_string()))?;
-        Ok(session)
+    pub async fn read_latest_session() -> Option<Session> {
+        content::get_latest_session()
     }
 
-    pub async fn logout(self, content_store: &ContentStore, full_logout: bool) -> ClientResult<()> {
+    pub async fn logout(self) -> ClientResult<()> {
         self.inner
             .call(UpdateProfile::default().with_new_status(UserStatus::OfflineUnspecified))
             .await?;
-        self.remove_session(content_store, full_logout).await
+        self.remove_session().await
     }
 
-    pub async fn remove_session(&self, content_store: &ContentStore, full_logout: bool) -> ClientResult<()> {
-        let latest_session = content_store.latest_session_file();
-        if full_logout {
-            let path = tokio::fs::read_link(latest_session).await?;
-            tokio::fs::remove_file(path).await?;
-        }
-        tokio::fs::remove_file(latest_session).await?;
+    pub async fn remove_session(&self) -> ClientResult<()> {
+        content::delete_latest_session();
         Ok(())
     }
 
-    pub async fn save_session_to(&self, content_store: &ContentStore) -> ClientResult<()> {
+    pub async fn save_session_to(&self) -> ClientResult<()> {
         if let AuthStatus::Complete(session) = self.inner.auth_status() {
             let homeserver = self.inner.homeserver_url().to_string();
-            let path = content_store.session_path(&homeserver, session.user_id);
             let session = Session {
                 session_token: session.session_token.into(),
                 homeserver: homeserver.into(),
                 user_id: format!("{}", session.user_id).into(),
                 user_name: SmolStr::new("a"),
             };
-            let serialized = toml::to_string_pretty(&session).unwrap();
-            tokio::fs::write(&path, serialized.into_bytes()).await?;
-            tokio::fs::remove_file(content_store.latest_session_file()).await?;
-            tokio::fs::symlink(&path, content_store.latest_session_file()).await?;
+            content::put_session(session);
         }
         Ok(())
     }

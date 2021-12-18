@@ -1,7 +1,6 @@
-use std::sync::{mpsc, Arc};
+use std::sync::mpsc;
 
 use client::{
-    content::ContentStore,
     harmony_rust_sdk::{
         api::chat::{Event, EventSource},
         client::{EventsReadSocket, EventsSocket, EventsWriteSocket},
@@ -28,7 +27,6 @@ pub struct State {
     pub client: Option<Client>,
     pub cache: Cache,
     pub futures: Futures,
-    pub content_store: Arc<ContentStore>,
     pub latest_error: Option<Error>,
     next_screen: Option<BoxedScreen>,
     prev_screen: bool,
@@ -67,7 +65,7 @@ pub struct App {
 impl App {
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
-    pub fn new(content_store: ContentStore) -> Self {
+    pub fn new() -> Self {
         let mut cache = Cache::default();
         let futures = Futures::new();
         let (socket_sub_tx, mut socket_sub_rx) = tokio_mpsc::unbounded_channel::<EventSource>();
@@ -86,7 +84,7 @@ impl App {
                             // reset socket
                         }
                     }
-                    else => tokio::task::yield_now().await,
+                    else => std::hint::spin_loop(),
                 }
             }
         });
@@ -106,7 +104,7 @@ impl App {
                             // reset socket
                         }
                     }
-                    else => tokio::task::yield_now().await,
+                    else => std::hint::spin_loop(),
                 }
             }
         });
@@ -119,7 +117,6 @@ impl App {
                 client: None,
                 cache,
                 futures,
-                content_store: Arc::new(content_store),
                 latest_error: None,
                 next_screen: None,
                 prev_screen: false,
@@ -136,14 +133,13 @@ impl epi::App for App {
 
     fn setup(&mut self, _ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
         self.state.futures.init(frame);
-        if self.state.content_store.latest_session_file().exists() {
-            let content_store = self.state.content_store.clone();
-            self.state.futures.spawn(async move {
-                let session = Client::read_latest_session(content_store.as_ref()).await?;
-                let client = Client::new(session.homeserver.parse().unwrap(), Some(session.into())).await?;
-                ClientResult::Ok(client)
-            });
-        }
+        self.state.futures.spawn(async move {
+            let session = Client::read_latest_session()
+                .await
+                .ok_or(ClientError::MissingLoginInfo)?;
+            let client = Client::new(session.homeserver.parse().unwrap(), Some(session.into())).await?;
+            ClientResult::Ok(client)
+        });
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {

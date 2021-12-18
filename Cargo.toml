@@ -42,27 +42,29 @@ client = { path = "./client" }
 
 hex_color = "1"
 
-open = "2.0.0"
 rfd = "0.6"
 image = "0.23.14"
 
+guard = "0.5"
+anyhow = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
 tokio = { version = "1.9", features = [
-    "rt-multi-thread",
+    "sync",
     "parking_lot",
-    "time",
-    "fs",
     "macros",
 ] }
 
-chrono = "0.4.19"
-fuzzy-matcher = "0.3.7"
-notify-rust = "4"
-notify = { git = "https://github.com/notify-rs/notify.git", tag = "5.0.0-pre.13" }
-
-guard = "0.5"
-anyhow = "1"
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
+tokio = { version = "1.9", features = [
+    "sync",
+    "rt-multi-thread",
+    "parking_lot",
+    "macros",
+] }
 
 [package.metadata.nix]
 longDescription = """
@@ -84,9 +86,8 @@ runtimeLibs = [
 ]
 
 [workspace.metadata.nix]
-cCompiler = "llvmPackages_12.clang"
 buildInputs = ["libxkbcommon"]
-devshell.packages = ["cargo-deny"]
+devshell.packages = ["cargo-deny", "wasm-bindgen-cli", "trunk"]
 devshell.name = "loqui-shell"
 devshell.commands = [{ package = "tagref" }]
 

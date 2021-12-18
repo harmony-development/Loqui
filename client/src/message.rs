@@ -9,7 +9,6 @@ use harmony_rust_sdk::{
     },
     client::api::rest::FileId,
 };
-use rand::Rng;
 use smol_str::SmolStr;
 use std::{str::FromStr, time::UNIX_EPOCH};
 
@@ -180,12 +179,6 @@ impl MessageId {
             MessageId::Ack(id) => Some(*id),
             _ => None,
         }
-    }
-}
-
-impl Default for MessageId {
-    fn default() -> Self {
-        MessageId::Unack(rand::thread_rng().gen())
     }
 }
 

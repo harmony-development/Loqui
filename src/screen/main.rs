@@ -186,8 +186,7 @@ impl Screen {
             ui.menu_button(username.as_str(), |ui| {
                 if ui.button("logout").clicked() {
                     let client = state.client().clone();
-                    let content_store = state.content_store.clone();
-                    spawn_future!(state, async move { client.logout(content_store.as_ref(), true).await });
+                    spawn_future!(state, async move { client.logout().await });
                     state.client = None;
                     state.pop_screen();
                 }

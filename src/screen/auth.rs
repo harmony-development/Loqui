@@ -82,11 +82,7 @@ impl Screen {
                         let client = state.client().clone();
                         spawn_future!(state, async move { client.connect_socket(Vec::new()).await });
                         let client = state.client().clone();
-                        let content_store = state.content_store.clone();
-                        spawn_future!(
-                            state,
-                            async move { client.save_session_to(content_store.as_ref()).await }
-                        );
+                        spawn_future!(state, async move { client.save_session_to().await });
                     }
                 }
                 Err(err) => {
@@ -126,7 +122,6 @@ impl Screen {
             .parse::<Uri>();
 
         state.run(maybe_homeserver_url, |state, homeserver_url| {
-            let content_store = state.content_store.clone();
             spawn_future!(state, async move {
                 let client = Client::new(homeserver_url, None).await?;
                 client.inner().begin_auth().await?;
