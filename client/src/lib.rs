@@ -19,12 +19,13 @@ pub use harmony_rust_sdk::{
 use harmony_rust_sdk::{
     api::{
         chat::{
-            color,
+            all_permissions, color,
             get_channel_messages_request::Direction,
             stream_event::{Event as ChatEvent, *},
-            ChannelKind, Content as HarmonyContent, Event, EventSource, GetGuildChannelsRequest, GetGuildListRequest,
-            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetUserRolesRequest,
-            Message as HarmonyMessage, Permission, QueryHasPermissionRequest, Role,
+            ChannelKind, Content as HarmonyContent, DeleteMessageRequest, Event, EventSource, FormattedText,
+            GetGuildChannelsRequest, GetGuildListRequest, GetGuildMembersRequest, GetGuildRequest,
+            GetGuildRolesRequest, GetUserRolesRequest, Message as HarmonyMessage, Permission,
+            QueryHasPermissionRequest, Role, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::fetch_link_metadata_response::Data as FetchLinkData,
@@ -791,6 +792,31 @@ impl Client {
         Ok(resp)
     }
 
+    pub async fn delete_message(&self, guild_id: u64, channel_id: u64, message_id: u64) -> ClientResult<()> {
+        self.inner
+            .call(DeleteMessageRequest::new(guild_id, channel_id, message_id))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn edit_message(
+        &self,
+        guild_id: u64,
+        channel_id: u64,
+        message_id: u64,
+        new_content: String,
+    ) -> ClientResult<()> {
+        self.inner
+            .call(UpdateMessageTextRequest::new(
+                guild_id,
+                channel_id,
+                message_id,
+                Some(FormattedText::new(new_content, Vec::new())),
+            ))
+            .await?;
+        Ok(())
+    }
+
     pub async fn send_message(
         &self,
         echo_id: u64,
@@ -1014,6 +1040,8 @@ impl Client {
                     "roles.user.get",
                     "permissions.manage.set",
                     "permissions.manage.get",
+                    all_permissions::MESSAGES_PINS_ADD,
+                    all_permissions::MESSAGES_PINS_REMOVE,
                 ];
                 let queries = IntoIter::new(perm_queries)
                     .map(|query| QueryHasPermissionRequest::new(guild_id, None, None, query.to_string()))

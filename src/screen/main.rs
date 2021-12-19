@@ -2,7 +2,7 @@ use std::{cmp::Ordering, ops::Not};
 
 use client::{
     guild::Guild,
-    harmony_rust_sdk::api::profile::UserStatus,
+    harmony_rust_sdk::api::{chat::all_permissions, profile::UserStatus},
     member::Member,
     message::{Content, Message},
     smol_str::SmolStr,
@@ -18,7 +18,9 @@ pub struct Screen {
     current_guild: Option<u64>,
     current_channel: Option<u64>,
     composer_text: String,
+    edit_message_text: String,
     scroll_to_bottom: bool,
+    editing_message: Option<u64>,
 }
 
 impl Screen {
@@ -88,34 +90,80 @@ impl Screen {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for (id, message) in channel.messages.iter() {
-                    ui.group(|ui| {
-                        let override_name = message
-                            .overrides
-                            .as_ref()
-                            .and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
-                        let sender_name = state
-                            .cache
-                            .get_user(message.sender)
-                            .map_or_else(|| "unknown", |u| u.username.as_str());
-                        let display_name = override_name.unwrap_or(sender_name);
+                    let msg = ui
+                        .group(|ui| {
+                            let override_name = message
+                                .overrides
+                                .as_ref()
+                                .and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
+                            let sender_name = state
+                                .cache
+                                .get_user(message.sender)
+                                .map_or_else(|| "unknown", |u| u.username.as_str());
+                            let display_name = override_name.unwrap_or(sender_name);
 
-                        let color = guild
-                            .highest_role_for_member(message.sender)
-                            .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
+                            let color = guild
+                                .highest_role_for_member(message.sender)
+                                .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
 
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(display_name).color(color).strong());
-                            if override_name.is_some() {
-                                ui.label(RichText::new(format!("({})", sender_name)).italics().small());
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new(display_name).color(color).strong());
+                                if override_name.is_some() {
+                                    ui.label(RichText::new(format!("({})", sender_name)).italics().small());
+                                }
+                            });
+
+                            match &message.content {
+                                client::message::Content::Text(text) => {
+                                    if id.is_ack() && id.id() == self.editing_message {
+                                        let edit = ui.add(
+                                            egui::TextEdit::multiline(&mut self.edit_message_text).desired_rows(2),
+                                        );
+                                        let is_pressed =
+                                            ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
+                                        if self.edit_message_text.trim().is_empty().not()
+                                            && edit.has_focus()
+                                            && is_pressed
+                                        {
+                                            let client = state.client().clone();
+                                            let text = self.edit_message_text.trim().to_string();
+                                            let message_id = id.id().unwrap();
+                                            self.editing_message = None;
+                                            spawn_future!(state, async move {
+                                                client.edit_message(guild_id, channel_id, message_id, text).await
+                                            });
+                                        }
+                                    } else {
+                                        ui.label(text);
+                                    }
+                                }
+                                client::message::Content::Files(_) => {}
+                                client::message::Content::Embeds(_) => {}
                             }
-                        });
-
-                        match &message.content {
-                            client::message::Content::Text(text) => {
-                                ui.label(text);
+                        })
+                        .response;
+                    msg.context_menu(|ui| {
+                        if let Some(message_id) = id.id() {
+                            if let client::message::Content::Text(text) = &message.content {
+                                if channel.has_perm(all_permissions::MESSAGES_SEND) && ui.button("edit").clicked() {
+                                    self.editing_message = id.id();
+                                    self.edit_message_text = text.clone();
+                                    ui.close_menu();
+                                }
+                                if ui.button("copy").clicked() {
+                                    ui.close_menu();
+                                }
                             }
-                            client::message::Content::Files(_) => {}
-                            client::message::Content::Embeds(_) => {}
+                            if message.sender == state.client().user_id() && ui.button("delete").clicked() {
+                                let client = state.client().clone();
+                                spawn_future!(state, async move {
+                                    client.delete_message(guild_id, channel_id, message_id).await
+                                });
+                                ui.close_menu();
+                            }
+                            if channel.has_perm(all_permissions::MESSAGES_PINS_ADD) && ui.button("pin").clicked() {
+                                ui.close_menu();
+                            }
                         }
                     });
                 }
@@ -221,6 +269,10 @@ impl Screen {
 
 impl AppScreen for Screen {
     fn update(&mut self, ctx: &egui::CtxRef, _: &mut epi::Frame, state: &mut State) {
+        if ctx.input().key_pressed(egui::Key::Escape) {
+            self.editing_message = None;
+        }
+
         egui::panel::SidePanel::left("guild_panel")
             .min_width(32.0)
             .max_width(32.0)
