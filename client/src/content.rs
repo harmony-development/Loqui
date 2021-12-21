@@ -100,11 +100,6 @@ pub mod native {
     }
 
     impl ContentStore {
-        pub fn session_path(&self, homeserver: &str, user_id: u64) -> PathBuf {
-            self.sessions_dir()
-                .join(format!("{}_{}", urlencoding::encode(homeserver), user_id))
-        }
-
         pub fn content_path(&self, id: &FileId) -> PathBuf {
             let id = id.to_string();
             let normalized_id = urlencoding::encode(id.as_str());

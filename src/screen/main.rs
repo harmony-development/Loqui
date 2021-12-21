@@ -143,9 +143,12 @@ impl Screen {
                                             maybe_url
                                                 .parse::<Uri>()
                                                 .ok()
-                                                .and_then(|url| state.cache.get_link_data(&url))
+                                                .and_then(|url| Some((
+                                                    state.cache.get_link_data(&url)?,
+                                                    maybe_url,
+                                                )))
                                         );
-                                    for data in urls {
+                                    for (data, url) in urls {
                                         match data {
                                             client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
                                                 let site_title_empty = data.site_title.is_empty().not();
@@ -169,12 +172,18 @@ impl Screen {
                                                 }
                                             },
                                             client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsMedia(data) => {
-                                                if ui.button(format!("open '{}'", data.filename)).clicked() { }
+                                                if ui.button(format!("open '{}' in browser", data.filename)).clicked() {
+                                                    let _ = webbrowser::open(url);
+                                                }
                                             },
                                         }
                                     }
                                 }
-                                client::message::Content::Files(_) => {}
+                                client::message::Content::Files(attachments) => {
+                                    for attachment in attachments {
+                                        if ui.button(format!("open '{}'", attachment.name)).clicked() {}
+                                    }
+                                }
                                 client::message::Content::Embeds(_) => {}
                             }
                         })
