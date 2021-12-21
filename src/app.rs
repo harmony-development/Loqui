@@ -5,7 +5,7 @@ use client::{
         api::chat::{Event, EventSource},
         client::{EventsReadSocket, EventsSocket, EventsWriteSocket},
     },
-    Cache, Client,
+    Cache, Client, FetchEvent,
 };
 use eframe::{
     egui::{self, RichText},
@@ -60,6 +60,7 @@ impl State {
 pub struct App {
     state: State,
     screens: ScreenStack,
+    last_error: bool,
 }
 
 impl App {
@@ -122,6 +123,7 @@ impl App {
                 prev_screen: false,
             },
             screens: ScreenStack::new(auth::Screen::new()),
+            last_error: false,
         }
     }
 }
@@ -146,7 +148,7 @@ impl epi::App for App {
         self.state.futures.run();
 
         let state = &mut self.state;
-        handle_future!(state, |res: ClientResult<Vec<Event>>| {
+        handle_future!(state, |res: ClientResult<Vec<FetchEvent>>| {
             state.run(res, |state, events| {
                 let mut posts = Vec::new();
                 for event in events {
@@ -168,40 +170,49 @@ impl epi::App for App {
         handle_future!(state, |res: ClientResult<EventsSocket>| {
             state.run(res, |state, sock| {
                 let (tx, rx) = sock.split();
-                state.socket_tx_tx.try_send(tx);
-                state.socket_rx_tx.try_send(rx);
+                let _ = state.socket_tx_tx.try_send(tx);
+                let _ = state.socket_rx_tx.try_send(rx);
             });
         });
 
         // handle socket events
         let mut evs = Vec::new();
         while let Ok(ev) = state.socket_event_rx.try_recv() {
-            evs.push(ev);
+            evs.push(FetchEvent::Harmony(ev));
         }
         if !evs.is_empty() {
             spawn_future!(state, std::future::ready(ClientResult::Ok(evs)));
         }
 
-        ctx.set_pixels_per_point(1.5);
+        ctx.set_pixels_per_point(1.35);
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Bottom, "bottom_panel")
             .max_height(25.0)
             .min_height(25.0)
             .show(ctx, |ui| {
-                let maybe_err_msg = self
-                    .state
-                    .latest_error
-                    .as_ref()
-                    .map(|err| format!("last error: {}", err));
-                ui.horizontal(|ui| match maybe_err_msg {
-                    Some(text) => {
+                ui.horizontal(|ui| {
+                    if self.state.latest_error.is_some() {
                         if ui.button("clear").clicked() {
                             self.state.latest_error = None;
                         }
-                        ui.label(RichText::new(text).color(egui::Color32::RED))
+                        if ui
+                            .button(RichText::new("new errors").color(egui::Color32::RED))
+                            .clicked()
+                        {
+                            self.last_error = true;
+                        }
+                    } else {
+                        ui.label("no errors");
                     }
-                    None => ui.label("no errors"),
                 });
             });
+
+        if let Some(err) = self.state.latest_error.as_ref() {
+            egui::Window::new("last error")
+                .open(&mut self.last_error)
+                .show(ctx, |ui| {
+                    ui.label(err.to_string());
+                });
+        }
 
         self.screens.current_mut().update(ctx, frame, &mut self.state);
         if let Some(screen) = self.state.next_screen.take() {

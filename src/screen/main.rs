@@ -6,7 +6,7 @@ use client::{
     member::Member,
     message::{Content, Message},
     smol_str::SmolStr,
-    AHashMap,
+    AHashMap, Uri,
 };
 use eframe::egui::{Color32, RichText};
 
@@ -135,6 +135,43 @@ impl Screen {
                                         }
                                     } else {
                                         ui.label(text);
+                                    }
+
+                                    let urls = text
+                                        .split_whitespace()
+                                        .filter_map(|maybe_url|
+                                            maybe_url
+                                                .parse::<Uri>()
+                                                .ok()
+                                                .and_then(|url| state.cache.get_link_data(&url))
+                                        );
+                                    for data in urls {
+                                        match data {
+                                            client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
+                                                let site_title_empty = data.site_title.is_empty().not();
+                                                let page_title_empty = data.page_title.is_empty().not();
+                                                let desc_empty = data.description.is_empty().not();
+                                                if site_title_empty && page_title_empty && desc_empty {
+                                                    ui.group(|ui| {
+                                                        if site_title_empty {
+                                                            ui.add(egui::Label::new(RichText::new(&data.site_title).small()));
+                                                        }
+                                                        if page_title_empty {
+                                                            ui.add(egui::Label::new(RichText::new(&data.page_title).strong()));
+                                                        }
+                                                        if site_title_empty && page_title_empty {
+                                                            ui.separator();
+                                                        }
+                                                        if desc_empty {
+                                                            ui.label(&data.description);
+                                                        }
+                                                    });
+                                                }
+                                            },
+                                            client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsMedia(data) => {
+                                                if ui.button(format!("open '{}'", data.filename)).clicked() { }
+                                            },
+                                        }
                                     }
                                 }
                                 client::message::Content::Files(_) => {}
