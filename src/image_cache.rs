@@ -73,6 +73,7 @@ impl LoadedImage {
 
         let modify = match kind.as_str() {
             "minithumbnail" => |image: DynamicImage| image.blur(4.0),
+            "guild" | "avatar" => |image: DynamicImage| image.resize(64, 64, image::imageops::FilterType::Lanczos3),
             _ => identity,
         };
         spawn_blocking(move || Self::load_inner(data, id, kind, modify))

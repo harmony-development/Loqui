@@ -5,7 +5,7 @@ use client::{
     guild::Guild,
     harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, profile::UserStatus},
     member::Member,
-    message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId},
+    message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override},
     smol_str::SmolStr,
     AHashMap, FetchEvent, Uri,
 };
@@ -35,7 +35,14 @@ impl Screen {
                 let is_enabled = self.current_guild != Some(guild_id);
 
                 let button = ui
-                    .add_enabled_ui(is_enabled, |ui| ui.add_sized([32.0, 32.0], egui::Button::new(icon)))
+                    .add_enabled_ui(is_enabled, |ui| {
+                        if let Some((texid, _)) = guild.picture.as_ref().and_then(|id| state.image_cache.get_avatar(id))
+                        {
+                            ui.add(egui::ImageButton::new(texid, [32.0, 32.0]))
+                        } else {
+                            ui.add_sized([32.0, 32.0], egui::Button::new(icon))
+                        }
+                    })
                     .inner
                     .on_hover_text(guild.name.as_str());
 
@@ -289,14 +296,10 @@ impl Screen {
                 for (id, message) in channel.messages.iter() {
                     let msg = ui
                         .group(|ui| {
-                            let override_name = message
-                                .overrides
-                                .as_ref()
-                                .and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
-                            let sender_name = state
-                                .cache
-                                .get_user(message.sender)
-                                .map_or_else(|| "unknown", |u| u.username.as_str());
+                            let overrides = message.overrides.as_ref();
+                            let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
+                            let user = state.cache.get_user(message.sender);
+                            let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
                             let display_name = override_name.unwrap_or(sender_name);
 
                             let color = guild
@@ -304,6 +307,7 @@ impl Screen {
                                 .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
 
                             ui.horizontal(|ui| {
+                                self.view_user_avatar(state, ui, user, overrides);
                                 ui.label(RichText::new(display_name).color(color).strong());
                                 if override_name.is_some() {
                                     ui.label(RichText::new(format!("({})", sender_name)).italics().small());
@@ -392,6 +396,32 @@ impl Screen {
         }
     }
 
+    fn view_user_avatar(&mut self, state: &State, ui: &mut Ui, user: Option<&Member>, overrides: Option<&Override>) {
+        if let Some((texid, _)) = overrides
+            .and_then(|ov| ov.avatar_url.as_ref())
+            .or_else(|| user.and_then(|u| u.avatar_url.as_ref()))
+            .as_ref()
+            .and_then(|id| state.image_cache.get_avatar(id))
+        {
+            ui.image(texid, [32.0, 32.0]);
+        } else {
+            ui.add_enabled_ui(false, |ui| {
+                ui.add_sized(
+                    [32.0, 32.0],
+                    egui::Button::new(
+                        overrides
+                            .and_then(|ov| ov.name.as_deref())
+                            .or_else(|| user.map(|u| u.username.as_str()))
+                            .unwrap_or("")
+                            .get(0..1)
+                            .unwrap_or("u")
+                            .to_ascii_uppercase(),
+                    ),
+                )
+            });
+        }
+    }
+
     fn view_members(&mut self, state: &State, ui: &mut Ui) {
         guard!(let Some(guild_id) = self.current_guild else { return });
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
@@ -405,8 +435,13 @@ impl Screen {
                 guard!(let Some(users) = sorted_members.get(range) else { return });
                 for (id, _) in users {
                     guard!(let Some(user) = state.cache.get_user(**id) else { continue });
-                    ui.label(user.username.as_str());
-                    ui.separator();
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            self.view_user_avatar(state, ui, Some(user), None);
+                            ui.label(user.username.as_str());
+                        });
+                    });
+                    ui.add_space(4.0);
                 }
             });
     }
@@ -455,7 +490,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::CtxRef, _: &mut epi::Frame, state: &mut State) {
         if ctx.input().key_pressed(egui::Key::Escape) {
             self.editing_message = None;
         }
