@@ -18,6 +18,14 @@ pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
     }
 }
 
+// scale down resolution while preserving ratio
+pub fn scale_down(w: f32, h: f32, max_size: f32) -> (f32, f32) {
+    let ratio = w / h;
+    let new_w = max_size;
+    let new_h = max_size / ratio;
+    (new_w, new_h)
+}
+
 pub trait TextInputExt {
     fn did_submit(&self, ui: &Ui) -> bool;
 }

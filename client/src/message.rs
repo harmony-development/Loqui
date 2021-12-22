@@ -5,7 +5,6 @@ use harmony_rust_sdk::{
             self, color, content, embed, overrides::Reason, FormattedText, Message as HarmonyMessage, Minithumbnail,
         },
         exports::hrpc::exports::http::Uri,
-        Hmc,
     },
     client::api::rest::FileId,
 };
@@ -129,7 +128,7 @@ impl Attachment {
 
     pub fn from_harmony_photo(photo: chat::Photo) -> Option<Self> {
         Some(Attachment {
-            id: FileId::Hmc(Hmc::from_str(&photo.hmc).ok()?),
+            id: FileId::from_str(&photo.hmc).ok()?,
             kind: "image/jpeg".into(),
             name: photo.name,
             size: photo.file_size,

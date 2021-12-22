@@ -1,8 +1,11 @@
-use std::sync::mpsc;
+use std::{cell::RefCell, sync::mpsc};
 
 use client::{
     harmony_rust_sdk::{
-        api::chat::{Event, EventSource},
+        api::{
+            chat::{Event, EventSource},
+            rest::FileId,
+        },
         client::{EventsReadSocket, EventsSocket, EventsWriteSocket},
     },
     Cache, Client, FetchEvent,
@@ -17,6 +20,7 @@ use super::utils::*;
 
 use crate::{
     futures::Futures,
+    image_cache::{ImageCache, LoadedImage},
     screen::{auth, BoxedScreen, Screen, ScreenStack},
 };
 
@@ -26,6 +30,8 @@ pub struct State {
     pub socket_event_rx: mpsc::Receiver<Event>,
     pub client: Option<Client>,
     pub cache: Cache,
+    pub image_cache: ImageCache,
+    pub loading_images: RefCell<Vec<FileId>>,
     pub futures: Futures,
     pub latest_error: Option<Error>,
     next_screen: Option<BoxedScreen>,
@@ -117,6 +123,8 @@ impl App {
                 socket_event_rx,
                 client: None,
                 cache,
+                image_cache: Default::default(),
+                loading_images: RefCell::new(Vec::new()),
                 futures,
                 latest_error: None,
                 next_screen: None,
@@ -152,7 +160,17 @@ impl epi::App for App {
             state.run(res, |state, events| {
                 let mut posts = Vec::new();
                 for event in events {
-                    state.cache.process_event(&mut posts, event);
+                    match event {
+                        FetchEvent::Attachment { attachment, file } => {
+                            if attachment.kind.starts_with("image") {
+                                spawn_future!(
+                                    state,
+                                    LoadedImage::load(file.data().clone(), attachment.id, attachment.name.into())
+                                );
+                            }
+                        }
+                        event => state.cache.process_event(&mut posts, event),
+                    }
                 }
                 spawn_future!(state, {
                     let client = state.client().clone();
@@ -173,6 +191,14 @@ impl epi::App for App {
                 let _ = state.socket_tx_tx.try_send(tx);
                 let _ = state.socket_rx_tx.try_send(rx);
             });
+        });
+
+        handle_future!(state, |image: LoadedImage| {
+            let maybe_pos = state.loading_images.borrow().iter().position(|id| image.id() == id);
+            if let Some(pos) = maybe_pos {
+                state.loading_images.borrow_mut().remove(pos);
+            }
+            state.image_cache.add(frame, image);
         });
 
         // handle socket events

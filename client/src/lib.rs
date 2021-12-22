@@ -35,7 +35,7 @@ use harmony_rust_sdk::{
         api::{
             chat::{channel::GetChannelMessages, message::SendMessage},
             profile::UpdateProfile,
-            rest::FileId,
+            rest::{DownloadedFile, FileId},
         },
         EventsSocket,
     },
@@ -119,7 +119,14 @@ pub enum PostProcessEvent {
 
 pub enum FetchEvent {
     Harmony(Event),
-    LinkMetadata { url: Uri, data: FetchLinkData },
+    LinkMetadata {
+        url: Uri,
+        data: FetchLinkData,
+    },
+    Attachment {
+        attachment: Attachment,
+        file: DownloadedFile,
+    },
 }
 
 #[derive(Default)]
@@ -213,6 +220,7 @@ impl Cache {
             FetchEvent::LinkMetadata { url, data } => {
                 self.link_embeds.insert(url, data);
             }
+            FetchEvent::Attachment { attachment, file } => {}
         }
     }
 
@@ -857,6 +865,11 @@ impl Client {
         Ok(message_id)
     }
 
+    pub async fn fetch_attachment(&self, id: FileId) -> ClientResult<(FileId, DownloadedFile)> {
+        let resp = harmony_rust_sdk::client::api::rest::download_extract_file(&self.inner, id.clone()).await?;
+        Ok((id, resp))
+    }
+
     pub async fn fetch_messages(
         &self,
         guild_id: u64,
@@ -1028,8 +1041,9 @@ impl Client {
 
                 Ok(())
             }
-            PostProcessEvent::FetchThumbnail(id) => {
-                tracing::debug!("TODO fetch thumbnail");
+            PostProcessEvent::FetchThumbnail(attachment) => {
+                let (_, resp) = self.fetch_attachment(attachment.id.clone()).await?;
+                events.push(FetchEvent::Attachment { attachment, file: resp });
                 Ok(())
             }
             PostProcessEvent::FetchProfile(user_id) => {

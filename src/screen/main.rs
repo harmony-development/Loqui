@@ -2,13 +2,15 @@ use std::{cmp::Ordering, ops::Not};
 
 use client::{
     guild::Guild,
-    harmony_rust_sdk::api::{chat::all_permissions, profile::UserStatus},
+    harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, profile::UserStatus},
     member::Member,
     message::{Content, Message},
     smol_str::SmolStr,
-    AHashMap, Uri,
+    AHashMap, FetchEvent, Uri,
 };
 use eframe::egui::{Color32, RichText};
+
+use crate::image_cache::LoadedImage;
 
 use super::prelude::*;
 
@@ -80,7 +82,7 @@ impl Screen {
         });
     }
 
-    fn view_messages(&mut self, state: &State, ui: &mut Ui) {
+    fn view_messages(&mut self, state: &mut State, ui: &mut Ui) {
         guard!(let Some((guild_id, channel_id)) = self.current_guild.zip(self.current_channel) else { return });
         guard!(let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return });
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
@@ -181,7 +183,63 @@ impl Screen {
                                 }
                                 client::message::Content::Files(attachments) => {
                                     for attachment in attachments {
-                                        if ui.button(format!("open '{}'", attachment.name)).clicked() {}
+                                        let mut handled = false;
+                                        let mut fetch = false;
+
+                                        if attachment.kind.starts_with("image") {
+                                            let mut no_thumbnail = false;
+
+                                            let available_width = ui.available_width() / 3_f32;
+                                            let downscale = |size: [f32; 2]| {
+                                                let [w, h] = size;
+                                                let max_size = (w < available_width).then(|| w).unwrap_or(available_width);
+                                                let (w, h) = scale_down(w, h, max_size);
+                                                [w as f32, h as f32]
+                                            };
+
+                                            let maybe_size = attachment.resolution.and_then(|(w, h)| {
+                                                if w == 0 || h == 0 { return None; }
+                                                Some(downscale([w as f32, h as f32]))
+                                            });
+
+                                            if let Some((texid, size)) = state.image_cache.get_image(&attachment.id) {
+                                                ui.add(egui::ImageButton::new(texid, maybe_size.unwrap_or_else(|| downscale(size))));
+                                                handled = true;
+                                            } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
+                                                let button = ui.add(egui::ImageButton::new(texid, maybe_size.unwrap_or_else(|| downscale(size))));
+                                                fetch = button.clicked();
+                                                handled = true;
+                                            } else if let Some(size) = maybe_size {
+                                                let button = ui.add_sized(size, egui::Button::new(format!("download '{}'", attachment.name)));
+                                                fetch = button.clicked();
+                                                handled = true;
+                                                no_thumbnail = true;
+                                            } else {
+                                                no_thumbnail = true;
+                                            }
+
+                                            let load_thumbnail = no_thumbnail && state.loading_images.borrow().iter().all(|id| id != &attachment.id);
+                                            if let (true, Some(minithumbnail)) = (load_thumbnail, &attachment.minithumbnail) {
+                                                state.loading_images.borrow_mut().push(attachment.id.clone());
+                                                let data = Bytes::copy_from_slice(minithumbnail.data.as_slice());
+                                                let id = attachment.id.clone();
+                                                let kind = SmolStr::new_inline("minithumbnail");
+                                                spawn_future!(state, LoadedImage::load(data, id, kind));
+                                            }
+                                        }
+
+                                        if !handled {
+                                            fetch = ui.button(format!("download '{}'", attachment.name)).clicked();
+                                        }
+
+                                        if fetch {
+                                            let client = state.client().clone();
+                                            let attachment = attachment.clone();
+                                            spawn_future!(state, async move {
+                                                let (_, file) = client.fetch_attachment(attachment.id.clone()).await?;
+                                                ClientResult::Ok(vec![FetchEvent::Attachment { attachment, file }])
+                                            });
+                                        }
                                     }
                                 }
                                 client::message::Content::Embeds(_) => {}
@@ -314,7 +372,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, _: &mut epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame, state: &mut State) {
         if ctx.input().key_pressed(egui::Key::Escape) {
             self.editing_message = None;
         }
