@@ -4,7 +4,7 @@ use super::message::Messages;
 use harmony_rust_sdk::api::chat::{permission::has_permission, Permission};
 use smol_str::SmolStr;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Channel {
     pub name: SmolStr,
     pub is_category: bool,

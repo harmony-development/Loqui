@@ -397,26 +397,24 @@ impl Screen {
     }
 
     fn view_user_avatar(&mut self, state: &State, ui: &mut Ui, user: Option<&Member>, overrides: Option<&Override>) {
-        if let Some((texid, _)) = overrides
+        let maybe_tex = overrides
             .and_then(|ov| ov.avatar_url.as_ref())
             .or_else(|| user.and_then(|u| u.avatar_url.as_ref()))
             .as_ref()
-            .and_then(|id| state.image_cache.get_avatar(id))
-        {
+            .and_then(|id| state.image_cache.get_avatar(id));
+
+        if let Some((texid, _)) = maybe_tex {
             ui.image(texid, [32.0, 32.0]);
         } else {
             ui.add_enabled_ui(false, |ui| {
+                let username = overrides
+                    .and_then(|ov| ov.name.as_deref())
+                    .or_else(|| user.map(|u| u.username.as_str()))
+                    .unwrap_or("");
+
                 ui.add_sized(
                     [32.0, 32.0],
-                    egui::Button::new(
-                        overrides
-                            .and_then(|ov| ov.name.as_deref())
-                            .or_else(|| user.map(|u| u.username.as_str()))
-                            .unwrap_or("")
-                            .get(0..1)
-                            .unwrap_or("u")
-                            .to_ascii_uppercase(),
-                    ),
+                    egui::Button::new(username.get(0..1).unwrap_or("u").to_ascii_uppercase()),
                 )
             });
         }

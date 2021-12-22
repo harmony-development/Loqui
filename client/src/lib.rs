@@ -144,20 +144,20 @@ impl Cache {
         self.sub_tx = Some(sub_tx)
     }
 
-    fn get_guild_mut(&mut self, guild_id: u64) -> Option<&mut Guild> {
-        self.guilds.get_mut(&guild_id)
+    fn get_guild_mut(&mut self, guild_id: u64) -> &mut Guild {
+        self.guilds.entry(guild_id).or_default()
     }
 
-    fn get_channel_mut(&mut self, guild_id: u64, channel_id: u64) -> Option<&mut Channel> {
-        self.channels.get_mut(&(guild_id, channel_id))
+    fn get_channel_mut(&mut self, guild_id: u64, channel_id: u64) -> &mut Channel {
+        self.channels.entry((guild_id, channel_id)).or_default()
     }
 
-    fn get_user_mut(&mut self, user_id: u64) -> Option<&mut Member> {
-        self.users.get_mut(&user_id)
+    fn get_user_mut(&mut self, user_id: u64) -> &mut Member {
+        self.users.entry(user_id).or_default()
     }
 
-    fn get_emote_pack_mut(&mut self, pack_id: u64) -> Option<&mut EmotePack> {
-        self.emote_packs.get_mut(&pack_id)
+    fn get_emote_pack_mut(&mut self, pack_id: u64) -> &mut EmotePack {
+        self.emote_packs.entry(pack_id).or_default()
     }
 
     pub fn get_guild(&self, guild_id: u64) -> Option<&Guild> {
@@ -237,11 +237,9 @@ impl Cache {
                     let perm = Permission { matches: query, ok };
 
                     if let Some(channel_id) = channel_id {
-                        if let Some(c) = self.get_channel_mut(guild_id, channel_id) {
-                            c.perms.push(perm);
-                        }
-                    } else if let Some(g) = self.get_guild_mut(guild_id) {
-                        g.perms.push(perm);
+                        self.get_channel_mut(guild_id, channel_id).perms.push(perm);
+                    } else {
+                        self.get_guild_mut(guild_id).perms.push(perm);
                     }
                 }
                 ChatEvent::SentMessage(message_sent) => {
@@ -254,24 +252,23 @@ impl Cache {
                     } = *message_sent;
 
                     if let Some(message) = message {
-                        if let Some(channel) = self.get_channel_mut(guild_id, channel_id) {
-                            let message = Message::from(message);
+                        let channel = self.get_channel_mut(guild_id, channel_id);
+                        let message = Message::from(message);
 
-                            message.post_process(post, guild_id, channel_id);
+                        message.post_process(post, guild_id, channel_id);
 
-                            if let Some(msg_index) = echo_id
-                                .map(|id| channel.messages.get_index_of(&MessageId::Unack(id)))
-                                .flatten()
-                            {
-                                channel.messages.insert(MessageId::Ack(message_id), message);
-                                let index = channel.messages.len().saturating_sub(1);
-                                channel.messages.swap_indices(msg_index, index);
-                                channel.messages.pop();
-                            } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
-                                *msg = message;
-                            } else {
-                                channel.messages.insert(MessageId::Ack(message_id), message);
-                            }
+                        if let Some(msg_index) = echo_id
+                            .map(|id| channel.messages.get_index_of(&MessageId::Unack(id)))
+                            .flatten()
+                        {
+                            channel.messages.insert(MessageId::Ack(message_id), message);
+                            let index = channel.messages.len().saturating_sub(1);
+                            channel.messages.swap_indices(msg_index, index);
+                            channel.messages.pop();
+                        } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
+                            *msg = message;
+                        } else {
+                            channel.messages.insert(MessageId::Ack(message_id), message);
                         }
                     }
                 }
@@ -280,28 +277,28 @@ impl Cache {
                     channel_id,
                     message_id,
                 }) => {
-                    if let Some(channel) = self.get_channel_mut(guild_id, channel_id) {
-                        channel.messages.remove(&MessageId::Ack(message_id));
-                    }
+                    self.get_channel_mut(guild_id, channel_id)
+                        .messages
+                        .remove(&MessageId::Ack(message_id));
                 }
                 ChatEvent::EditedMessage(message_updated) => {
                     let guild_id = message_updated.guild_id;
                     let channel_id = message_updated.channel_id;
 
-                    if let Some(channel) = self.get_channel_mut(guild_id, channel_id) {
-                        if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_updated.message_id)) {
-                            msg.content =
-                                Content::Text(message_updated.new_content.map_or_else(String::new, |f| f.text));
-                            msg.post_process(post, guild_id, channel_id);
-                        }
+                    if let Some(msg) = self
+                        .get_channel_mut(guild_id, channel_id)
+                        .messages
+                        .get_mut(&MessageId::Ack(message_updated.message_id))
+                    {
+                        msg.content = Content::Text(message_updated.new_content.map_or_else(String::new, |f| f.text));
+                        msg.post_process(post, guild_id, channel_id);
                     }
                 }
                 ChatEvent::DeletedChannel(ChannelDeleted { guild_id, channel_id }) => {
                     self.channels.remove(&(guild_id, channel_id));
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        if let Some(pos) = guild.channels.iter().position(|id| channel_id.eq(id)) {
-                            guild.channels.remove(pos);
-                        }
+                    let guild = self.get_guild_mut(guild_id);
+                    if let Some(pos) = guild.channels.iter().position(|id| channel_id.eq(id)) {
+                        guild.channels.remove(pos);
                     }
                 }
                 ChatEvent::EditedChannel(ChannelUpdated {
@@ -311,9 +308,7 @@ impl Cache {
                     new_metadata: _,
                 }) => {
                     if let Some(name) = new_name {
-                        if let Some(mut channel) = self.get_channel_mut(guild_id, channel_id) {
-                            channel.name = name.into();
-                        }
+                        self.get_channel_mut(guild_id, channel_id).name = name.into();
                     }
                 }
                 ChatEvent::EditedChannelPosition(ChannelPositionUpdated {
@@ -321,16 +316,12 @@ impl Cache {
                     channel_id,
                     new_position,
                 }) => {
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        if let Some(position) = new_position {
-                            guild.update_channel_order(position, channel_id);
-                        }
+                    if let Some(position) = new_position {
+                        self.get_guild_mut(guild_id).update_channel_order(position, channel_id);
                     }
                 }
                 ChatEvent::ChannelsReordered(ChannelsReordered { guild_id, channel_ids }) => {
-                    if let Some(mut guild) = self.get_guild_mut(guild_id) {
-                        guild.channels = channel_ids;
-                    }
+                    self.get_guild_mut(guild_id).channels = channel_ids;
                 }
                 ChatEvent::CreatedChannel(ChannelCreated {
                     guild_id,
@@ -340,43 +331,31 @@ impl Cache {
                     kind,
                     metadata: _,
                 }) => {
-                    self.channels.insert(
-                        (guild_id, channel_id),
-                        Channel {
-                            is_category: kind == i32::from(ChannelKind::Category),
-                            name: name.into(),
-                            messages: Default::default(),
-                            reached_top: false,
-                            perms: Vec::new(),
-                            role_perms: AHashMap::new(),
-                        },
-                    );
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        // [tag:channel_added_to_client]
-                        guild.channels.push(channel_id);
-                        if let Some(position) = position {
-                            guild.update_channel_order(position, channel_id);
-                        }
-                        post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
+                    let channel = self.get_channel_mut(guild_id, channel_id);
+                    channel.name = name.into();
+                    channel.is_category = kind == i32::from(ChannelKind::Category);
+
+                    let guild = self.get_guild_mut(guild_id);
+                    // [tag:channel_added_to_client]
+                    guild.channels.push(channel_id);
+                    if let Some(position) = position {
+                        guild.update_channel_order(position, channel_id);
                     }
+                    post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
                 }
                 ChatEvent::Typing(Typing {
                     guild_id,
                     channel_id,
                     user_id,
                 }) => {
-                    if let Some(mut member) = self.get_user_mut(user_id) {
-                        member.typing_in_channel = Some((guild_id, channel_id, Instant::now()));
-                    }
+                    self.get_user_mut(user_id).typing_in_channel = Some((guild_id, channel_id, Instant::now()));
                 }
                 ChatEvent::JoinedMember(MemberJoined { guild_id, member_id }) => {
                     if member_id == 0 {
                         return;
                     }
 
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        guild.members.insert(member_id, Vec::new());
-                    }
+                    self.get_guild_mut(guild_id).members.insert(member_id, Vec::new());
 
                     if !self.users.contains_key(&member_id) {
                         post.push(PostProcessEvent::FetchProfile(member_id));
@@ -387,18 +366,12 @@ impl Cache {
                     member_id,
                     leave_reason: _,
                 }) => {
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        guild.members.remove(&member_id);
-                    }
+                    self.get_guild_mut(guild_id).members.remove(&member_id);
                 }
                 ChatEvent::GuildAddedToList(GuildAddedToList { guild_id, homeserver }) => {
-                    self.guilds.insert(
-                        guild_id,
-                        Guild {
-                            homeserver: homeserver.into(),
-                            ..Default::default()
-                        },
-                    );
+                    let guild = self.get_guild_mut(guild_id);
+                    guild.homeserver = homeserver.into();
+
                     post.push(PostProcessEvent::FetchGuildData(guild_id));
                     if let Some(sub_tx) = self.sub_tx.as_ref() {
                         let _ = sub_tx.send(EventSource::Guild(guild_id));
@@ -419,7 +392,7 @@ impl Cache {
                     new_picture,
                     new_metadata: _,
                 }) => {
-                    let mut guild = self.guilds.entry(guild_id).or_default();
+                    let mut guild = self.get_guild_mut(guild_id);
 
                     if let Some(name) = new_name {
                         guild.name = name.into();
@@ -444,16 +417,12 @@ impl Cache {
                     name,
                     pingable,
                 }) => {
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        guild
-                            .roles
-                            .insert(role_id, Role::new(name, color, hoist, pingable).into());
-                    }
+                    self.get_guild_mut(guild_id)
+                        .roles
+                        .insert(role_id, Role::new(name, color, hoist, pingable).into());
                 }
                 ChatEvent::RoleDeleted(RoleDeleted { guild_id, role_id }) => {
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        guild.roles.remove(&role_id);
-                    }
+                    self.get_guild_mut(guild_id).roles.remove(&role_id);
                 }
                 ChatEvent::RoleUpdated(RoleUpdated {
                     guild_id,
@@ -463,20 +432,18 @@ impl Cache {
                     new_name,
                     new_pingable,
                 }) => {
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        if let Some(role) = guild.roles.get_mut(&role_id) {
-                            if let Some(pingable) = new_pingable {
-                                role.pingable = pingable;
-                            }
-                            if let Some(color) = new_color {
-                                role.color = color::decode_rgb(color);
-                            }
-                            if let Some(name) = new_name {
-                                role.name = name.into();
-                            }
-                            if let Some(hoist) = new_hoist {
-                                role.hoist = hoist;
-                            }
+                    if let Some(role) = self.get_guild_mut(guild_id).roles.get_mut(&role_id) {
+                        if let Some(pingable) = new_pingable {
+                            role.pingable = pingable;
+                        }
+                        if let Some(color) = new_color {
+                            role.color = color::decode_rgb(color);
+                        }
+                        if let Some(name) = new_name {
+                            role.name = name.into();
+                        }
+                        if let Some(hoist) = new_hoist {
+                            role.hoist = hoist;
                         }
                     }
                 }
@@ -486,9 +453,7 @@ impl Cache {
                     new_position,
                 }) => {
                     if let Some(position) = new_position {
-                        if let Some(guild) = self.get_guild_mut(guild_id) {
-                            guild.update_role_order(position, role_id);
-                        }
+                        self.get_guild_mut(guild_id).update_role_order(position, role_id);
                     }
                 }
                 ChatEvent::UserRolesUpdated(UserRolesUpdated {
@@ -496,9 +461,7 @@ impl Cache {
                     user_id,
                     new_role_ids,
                 }) => {
-                    if let Some(guild) = self.get_guild_mut(guild_id) {
-                        guild.members.insert(user_id, new_role_ids);
-                    }
+                    self.get_guild_mut(guild_id).members.insert(user_id, new_role_ids);
                 }
                 ChatEvent::RolePermsUpdated(RolePermissionsUpdated {
                     guild_id,
@@ -507,11 +470,11 @@ impl Cache {
                     new_perms,
                 }) => {
                     if let Some(channel_id) = channel_id {
-                        if let Some(c) = self.get_channel_mut(guild_id, channel_id) {
-                            c.role_perms.insert(role_id, new_perms);
-                        }
-                    } else if let Some(g) = self.get_guild_mut(guild_id) {
-                        g.role_perms.insert(role_id, new_perms);
+                        self.get_channel_mut(guild_id, channel_id)
+                            .role_perms
+                            .insert(role_id, new_perms);
+                    } else {
+                        self.get_guild_mut(guild_id).role_perms.insert(role_id, new_perms);
                     }
                 }
                 _ => panic!(),
@@ -524,7 +487,7 @@ impl Cache {
                     new_status,
                     new_is_bot,
                 }) => {
-                    let mut user = self.users.entry(user_id).or_default();
+                    let mut user = self.get_user_mut(user_id);
                     if let Some(new_username) = new_username {
                         user.username = new_username.into();
                     }
@@ -550,9 +513,7 @@ impl Cache {
             Event::Emote(ev) => match ev {
                 EmoteEvent::EmotePackUpdated(EmotePackUpdated { pack_id, new_pack_name }) => {
                     if let Some(pack_name) = new_pack_name {
-                        if let Some(mut pack) = self.get_emote_pack_mut(pack_id) {
-                            pack.pack_name = pack_name.into();
-                        }
+                        self.get_emote_pack_mut(pack_id).pack_name = pack_name.into();
                     }
                 }
                 EmoteEvent::EmotePackEmotesUpdated(EmotePackEmotesUpdated {
@@ -560,22 +521,22 @@ impl Cache {
                     added_emotes,
                     deleted_emotes,
                 }) => {
-                    if let Some(pack) = self.get_emote_pack_mut(pack_id) {
-                        post.extend(added_emotes.iter().map(|emote| {
-                            PostProcessEvent::FetchThumbnail(Attachment {
-                                kind: "image".to_string(),
-                                name: "emote".to_string(),
-                                ..Attachment::new_unknown(FileId::Id(emote.image_id.clone()))
-                            })
-                        }));
-                        pack.emotes.extend(
-                            added_emotes
-                                .into_iter()
-                                .map(|emote| (emote.image_id.into(), emote.name.into())),
-                        );
-                        for image_id in deleted_emotes {
-                            pack.emotes.remove(image_id.as_str());
-                        }
+                    let pack = self.get_emote_pack_mut(pack_id);
+
+                    post.extend(added_emotes.iter().map(|emote| {
+                        PostProcessEvent::FetchThumbnail(Attachment {
+                            kind: "image".to_string(),
+                            name: "emote".to_string(),
+                            ..Attachment::new_unknown(FileId::Id(emote.image_id.clone()))
+                        })
+                    }));
+                    pack.emotes.extend(
+                        added_emotes
+                            .into_iter()
+                            .map(|emote| (emote.image_id.into(), emote.name.into())),
+                    );
+                    for image_id in deleted_emotes {
+                        pack.emotes.remove(image_id.as_str());
                     }
                 }
                 EmoteEvent::EmotePackDeleted(EmotePackDeleted { pack_id }) => {
@@ -607,17 +568,16 @@ impl Cache {
     ) -> Vec<PostProcessEvent> {
         let mut post = Vec::new();
 
-        if let Some(channel) = self.get_channel_mut(guild_id, channel_id) {
-            let message: Message = message.into();
-            message.post_process(&mut post, guild_id, channel_id);
-            let message_id = MessageId::Ack(message_id);
-            if channel.messages.contains_key(&message_id) {
-                channel.messages.insert(message_id, message);
-            } else {
-                channel.messages.reverse();
-                channel.messages.insert(message_id, message);
-                channel.messages.reverse();
-            }
+        let channel = self.get_channel_mut(guild_id, channel_id);
+        let message: Message = message.into();
+        message.post_process(&mut post, guild_id, channel_id);
+        let message_id = MessageId::Ack(message_id);
+        if channel.messages.contains_key(&message_id) {
+            channel.messages.insert(message_id, message);
+        } else {
+            channel.messages.reverse();
+            channel.messages.insert(message_id, message);
+            channel.messages.reverse();
         }
 
         post
@@ -634,20 +594,19 @@ impl Cache {
     ) -> Vec<PostProcessEvent> {
         let mut post = Vec::new();
 
-        if let Some(channel) = self.get_channel_mut(guild_id, channel_id) {
-            let mut messages: IndexMap<_, _> = messages
-                .into_iter()
-                .map(|(id, msg)| (MessageId::Ack(id), Message::from(msg)))
-                .collect();
+        let channel = self.get_channel_mut(guild_id, channel_id);
+        let mut messages: IndexMap<_, _> = messages
+            .into_iter()
+            .map(|(id, msg)| (MessageId::Ack(id), Message::from(msg)))
+            .collect();
 
-            messages.values().for_each(|m| {
-                m.post_process(&mut post, guild_id, channel_id);
-            });
+        messages.values().for_each(|m| {
+            m.post_process(&mut post, guild_id, channel_id);
+        });
 
-            let msg_pos = channel.messages.get_index_of(&MessageId::Ack(message_id));
-            let process_before = |mut pos: usize,
-                                  messages: IndexMap<MessageId, Message>,
-                                  chan_messages: &mut Vec<(MessageId, Message)>| {
+        let msg_pos = channel.messages.get_index_of(&MessageId::Ack(message_id));
+        let process_before =
+            |mut pos: usize, messages: IndexMap<MessageId, Message>, chan_messages: &mut Vec<(MessageId, Message)>| {
                 for message in messages {
                     if chan_messages.get(pos).map_or(true, |(id, _)| message.0.eq(id)) {
                         continue;
@@ -661,9 +620,8 @@ impl Cache {
                     chan_messages.insert(pos, message);
                 }
             };
-            let process_after = |mut pos: usize,
-                                 messages: IndexMap<MessageId, Message>,
-                                 chan_messages: &mut Vec<(MessageId, Message)>| {
+        let process_after =
+            |mut pos: usize, messages: IndexMap<MessageId, Message>, chan_messages: &mut Vec<(MessageId, Message)>| {
                 pos += 1;
                 for message in messages {
                     if chan_messages.get(pos).map_or(true, |(id, _)| message.0.eq(id)) {
@@ -681,44 +639,43 @@ impl Cache {
                 }
             };
 
-            match direction {
-                Direction::BeforeUnspecified => match msg_pos {
-                    Some(pos) => {
-                        let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
-                        process_before(pos, messages, &mut chan_messages);
-                        channel.messages = chan_messages.into_iter().collect();
-                    }
-                    None => {
-                        messages.reverse();
-                        channel.messages.extend(messages);
-                    }
-                },
-                Direction::After => match msg_pos {
-                    Some(pos) => {
-                        let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
-                        process_after(pos, messages, &mut chan_messages);
-                        channel.messages = chan_messages.into_iter().collect();
-                    }
-                    None => {
-                        channel.messages.extend(messages);
-                    }
-                },
-                Direction::Around => match msg_pos {
-                    Some(pos) => {
-                        let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
-                        let message_pos = messages.get_index_of(&MessageId::Ack(message_id)).unwrap();
-                        process_after(pos, messages.drain(message_pos + 1..).collect(), &mut chan_messages);
-                        process_before(pos, messages.drain(..message_pos).collect(), &mut chan_messages);
-                        channel.messages = chan_messages.into_iter().collect();
-                    }
-                    None => {
-                        messages.extend(channel.messages.drain(..));
-                        channel.messages = messages;
-                    }
-                },
-            }
-            channel.reached_top = reached_top;
+        match direction {
+            Direction::BeforeUnspecified => match msg_pos {
+                Some(pos) => {
+                    let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
+                    process_before(pos, messages, &mut chan_messages);
+                    channel.messages = chan_messages.into_iter().collect();
+                }
+                None => {
+                    messages.reverse();
+                    channel.messages.extend(messages);
+                }
+            },
+            Direction::After => match msg_pos {
+                Some(pos) => {
+                    let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
+                    process_after(pos, messages, &mut chan_messages);
+                    channel.messages = chan_messages.into_iter().collect();
+                }
+                None => {
+                    channel.messages.extend(messages);
+                }
+            },
+            Direction::Around => match msg_pos {
+                Some(pos) => {
+                    let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
+                    let message_pos = messages.get_index_of(&MessageId::Ack(message_id)).unwrap();
+                    process_after(pos, messages.drain(message_pos + 1..).collect(), &mut chan_messages);
+                    process_before(pos, messages.drain(..message_pos).collect(), &mut chan_messages);
+                    channel.messages = chan_messages.into_iter().collect();
+                }
+                None => {
+                    messages.extend(channel.messages.drain(..));
+                    channel.messages = messages;
+                }
+            },
         }
+        channel.reached_top = reached_top;
 
         post
     }
@@ -727,9 +684,9 @@ impl Cache {
         let mut bytes = [0; 8];
         getrandom::getrandom(&mut bytes).expect("cant get random");
         let echo_id = u64::from_ne_bytes(bytes);
-        if let Some(channel) = self.get_channel_mut(guild_id, channel_id) {
-            channel.messages.insert(MessageId::Unack(echo_id), message);
-        }
+        self.get_channel_mut(guild_id, channel_id)
+            .messages
+            .insert(MessageId::Unack(echo_id), message);
         echo_id
     }
 }
