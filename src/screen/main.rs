@@ -1,10 +1,11 @@
 use std::{cmp::Ordering, ops::Not};
 
 use client::{
+    channel::Channel,
     guild::Guild,
     harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, profile::UserStatus},
     member::Member,
-    message::{Content, Message},
+    message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId},
     smol_str::SmolStr,
     AHashMap, FetchEvent, Uri,
 };
@@ -82,6 +83,200 @@ impl Screen {
         });
     }
 
+    fn view_message_text_content(
+        &mut self,
+        state: &State,
+        ui: &mut Ui,
+        id: &MessageId,
+        guild_id: u64,
+        channel_id: u64,
+        text: &str,
+    ) {
+        if id.is_ack() && id.id() == self.editing_message {
+            let edit = ui.add(egui::TextEdit::multiline(&mut self.edit_message_text).desired_rows(2));
+            let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
+            if self.edit_message_text.trim().is_empty().not() && edit.has_focus() && is_pressed {
+                let client = state.client().clone();
+                let text = self.edit_message_text.trim().to_string();
+                let message_id = id.id().unwrap();
+                self.editing_message = None;
+                spawn_future!(state, async move {
+                    client.edit_message(guild_id, channel_id, message_id, text).await
+                });
+            }
+        } else {
+            ui.label(text);
+        }
+    }
+
+    fn view_message_url_embeds(&mut self, state: &State, ui: &mut Ui, text: &str) {
+        let urls = text.split_whitespace().filter_map(|maybe_url| {
+            maybe_url
+                .parse::<Uri>()
+                .ok()
+                .and_then(|url| Some((state.cache.get_link_data(&url)?, maybe_url)))
+        });
+        for (data, url) in urls {
+            match data {
+                client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
+                    let site_title_empty = data.site_title.is_empty().not();
+                    let page_title_empty = data.page_title.is_empty().not();
+                    let desc_empty = data.description.is_empty().not();
+                    if site_title_empty && page_title_empty && desc_empty {
+                        ui.group(|ui| {
+                            if site_title_empty {
+                                ui.add(egui::Label::new(RichText::new(&data.site_title).small()));
+                            }
+                            if page_title_empty {
+                                ui.add(egui::Label::new(RichText::new(&data.page_title).strong()));
+                            }
+                            if site_title_empty && page_title_empty {
+                                ui.separator();
+                            }
+                            if desc_empty {
+                                ui.label(&data.description);
+                            }
+                        });
+                    }
+                }
+                client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsMedia(data) => {
+                    if ui.button(format!("open '{}' in browser", data.filename)).clicked() {
+                        let _ = webbrowser::open(url);
+                    }
+                }
+            }
+        }
+    }
+
+    fn view_message_attachment(&mut self, state: &State, ui: &mut Ui, attachment: &Attachment) {
+        let mut handled = false;
+        let mut fetch = false;
+
+        if attachment.kind.starts_with("image") {
+            let mut no_thumbnail = false;
+
+            let available_width = ui.available_width() / 3_f32;
+            let downscale = |size: [f32; 2]| {
+                let [w, h] = size;
+                let max_size = (w < available_width).then(|| w).unwrap_or(available_width);
+                let (w, h) = scale_down(w, h, max_size);
+                [w as f32, h as f32]
+            };
+
+            let maybe_size = attachment.resolution.and_then(|(w, h)| {
+                if w == 0 || h == 0 {
+                    return None;
+                }
+                Some(downscale([w as f32, h as f32]))
+            });
+
+            if let Some((texid, size)) = state.image_cache.get_image(&attachment.id) {
+                ui.add(egui::ImageButton::new(
+                    texid,
+                    maybe_size.unwrap_or_else(|| downscale(size)),
+                ));
+                handled = true;
+            } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
+                let button = ui.add(egui::ImageButton::new(
+                    texid,
+                    maybe_size.unwrap_or_else(|| downscale(size)),
+                ));
+                fetch = button.clicked();
+                handled = true;
+            } else if let Some(size) = maybe_size {
+                let button = ui.add_sized(size, egui::Button::new(format!("download '{}'", attachment.name)));
+                fetch = button.clicked();
+                handled = true;
+                no_thumbnail = true;
+            } else {
+                no_thumbnail = true;
+            }
+
+            let load_thumbnail = no_thumbnail && state.loading_images.borrow().iter().all(|id| id != &attachment.id);
+            if let (true, Some(minithumbnail)) = (load_thumbnail, &attachment.minithumbnail) {
+                state.loading_images.borrow_mut().push(attachment.id.clone());
+                let data = Bytes::copy_from_slice(minithumbnail.data.as_slice());
+                let id = attachment.id.clone();
+                let kind = SmolStr::new_inline("minithumbnail");
+                spawn_future!(state, LoadedImage::load(data, id, kind));
+            }
+        }
+
+        if !handled {
+            fetch = ui.button(format!("download '{}'", attachment.name)).clicked();
+        }
+
+        if fetch {
+            let client = state.client().clone();
+            let attachment = attachment.clone();
+            spawn_future!(state, async move {
+                let (_, file) = client.fetch_attachment(attachment.id.clone()).await?;
+                ClientResult::Ok(vec![FetchEvent::Attachment { attachment, file }])
+            });
+        }
+    }
+
+    fn view_message_embed(&mut self, ui: &mut Ui, embed: &Embed) {
+        fn filter_empty(val: &Option<String>) -> Option<&str> {
+            val.as_deref().map(str::trim).filter(|s| s.is_empty().not())
+        }
+
+        ui.group(|ui| {
+            let do_render_heading =
+                |heading: &&EmbedHeading| heading.text.is_empty().not() && filter_empty(&heading.subtext).is_some();
+            let render_header = |header: &EmbedHeading, ui: &mut Ui| {
+                // TODO: render icon
+                ui.horizontal(|ui| {
+                    let button = ui.add_enabled(
+                        header.url.as_ref().map_or(false, |s| s.is_empty().not()),
+                        egui::Button::new(RichText::new(&header.text).strong()),
+                    );
+                    if button.clicked() {
+                        if let Some(url) = header.url.as_deref() {
+                            let _ = webbrowser::open(url);
+                        }
+                    }
+                    if let Some(subtext) = filter_empty(&header.subtext) {
+                        ui.label(RichText::new(subtext).small());
+                    }
+                });
+            };
+
+            if let Some(heading) = embed.header.as_ref().filter(do_render_heading) {
+                render_header(heading, ui);
+                ui.add_space(8.0);
+            }
+
+            if embed.title.is_empty().not() {
+                ui.label(RichText::new(&embed.title).strong());
+            }
+
+            if let Some(body) = filter_empty(&embed.body) {
+                ui.label(body);
+            }
+
+            for field in &embed.fields {
+                ui.group(|ui| {
+                    if field.title.is_empty().not() {
+                        ui.label(RichText::new(&field.title).strong());
+                    }
+                    if let Some(subtitle) = filter_empty(&field.subtitle) {
+                        ui.label(RichText::new(subtitle).small());
+                    }
+                    ui.add_space(4.0);
+                    if let Some(body) = filter_empty(&field.body) {
+                        ui.label(body);
+                    }
+                });
+            }
+
+            if let Some(heading) = embed.footer.as_ref().filter(do_render_heading) {
+                ui.add_space(8.0);
+                render_header(heading, ui);
+            }
+        });
+    }
+
     fn view_messages(&mut self, state: &mut State, ui: &mut Ui) {
         guard!(let Some((guild_id, channel_id)) = self.current_guild.zip(self.current_channel) else { return });
         guard!(let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return });
@@ -117,135 +312,23 @@ impl Screen {
 
                             match &message.content {
                                 client::message::Content::Text(text) => {
-                                    if id.is_ack() && id.id() == self.editing_message {
-                                        let edit = ui.add(
-                                            egui::TextEdit::multiline(&mut self.edit_message_text).desired_rows(2),
-                                        );
-                                        let is_pressed =
-                                            ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
-                                        if self.edit_message_text.trim().is_empty().not()
-                                            && edit.has_focus()
-                                            && is_pressed
-                                        {
-                                            let client = state.client().clone();
-                                            let text = self.edit_message_text.trim().to_string();
-                                            let message_id = id.id().unwrap();
-                                            self.editing_message = None;
-                                            spawn_future!(state, async move {
-                                                client.edit_message(guild_id, channel_id, message_id, text).await
-                                            });
-                                        }
-                                    } else {
-                                        ui.label(text);
-                                    }
-
-                                    let urls = text
-                                        .split_whitespace()
-                                        .filter_map(|maybe_url|
-                                            maybe_url
-                                                .parse::<Uri>()
-                                                .ok()
-                                                .and_then(|url| Some((
-                                                    state.cache.get_link_data(&url)?,
-                                                    maybe_url,
-                                                )))
-                                        );
-                                    for (data, url) in urls {
-                                        match data {
-                                            client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
-                                                let site_title_empty = data.site_title.is_empty().not();
-                                                let page_title_empty = data.page_title.is_empty().not();
-                                                let desc_empty = data.description.is_empty().not();
-                                                if site_title_empty && page_title_empty && desc_empty {
-                                                    ui.group(|ui| {
-                                                        if site_title_empty {
-                                                            ui.add(egui::Label::new(RichText::new(&data.site_title).small()));
-                                                        }
-                                                        if page_title_empty {
-                                                            ui.add(egui::Label::new(RichText::new(&data.page_title).strong()));
-                                                        }
-                                                        if site_title_empty && page_title_empty {
-                                                            ui.separator();
-                                                        }
-                                                        if desc_empty {
-                                                            ui.label(&data.description);
-                                                        }
-                                                    });
-                                                }
-                                            },
-                                            client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsMedia(data) => {
-                                                if ui.button(format!("open '{}' in browser", data.filename)).clicked() {
-                                                    let _ = webbrowser::open(url);
-                                                }
-                                            },
-                                        }
-                                    }
+                                    self.view_message_text_content(state, ui, id, guild_id, channel_id, text);
+                                    self.view_message_url_embeds(state, ui, text);
                                 }
                                 client::message::Content::Files(attachments) => {
                                     for attachment in attachments {
-                                        let mut handled = false;
-                                        let mut fetch = false;
-
-                                        if attachment.kind.starts_with("image") {
-                                            let mut no_thumbnail = false;
-
-                                            let available_width = ui.available_width() / 3_f32;
-                                            let downscale = |size: [f32; 2]| {
-                                                let [w, h] = size;
-                                                let max_size = (w < available_width).then(|| w).unwrap_or(available_width);
-                                                let (w, h) = scale_down(w, h, max_size);
-                                                [w as f32, h as f32]
-                                            };
-
-                                            let maybe_size = attachment.resolution.and_then(|(w, h)| {
-                                                if w == 0 || h == 0 { return None; }
-                                                Some(downscale([w as f32, h as f32]))
-                                            });
-
-                                            if let Some((texid, size)) = state.image_cache.get_image(&attachment.id) {
-                                                ui.add(egui::ImageButton::new(texid, maybe_size.unwrap_or_else(|| downscale(size))));
-                                                handled = true;
-                                            } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
-                                                let button = ui.add(egui::ImageButton::new(texid, maybe_size.unwrap_or_else(|| downscale(size))));
-                                                fetch = button.clicked();
-                                                handled = true;
-                                            } else if let Some(size) = maybe_size {
-                                                let button = ui.add_sized(size, egui::Button::new(format!("download '{}'", attachment.name)));
-                                                fetch = button.clicked();
-                                                handled = true;
-                                                no_thumbnail = true;
-                                            } else {
-                                                no_thumbnail = true;
-                                            }
-
-                                            let load_thumbnail = no_thumbnail && state.loading_images.borrow().iter().all(|id| id != &attachment.id);
-                                            if let (true, Some(minithumbnail)) = (load_thumbnail, &attachment.minithumbnail) {
-                                                state.loading_images.borrow_mut().push(attachment.id.clone());
-                                                let data = Bytes::copy_from_slice(minithumbnail.data.as_slice());
-                                                let id = attachment.id.clone();
-                                                let kind = SmolStr::new_inline("minithumbnail");
-                                                spawn_future!(state, LoadedImage::load(data, id, kind));
-                                            }
-                                        }
-
-                                        if !handled {
-                                            fetch = ui.button(format!("download '{}'", attachment.name)).clicked();
-                                        }
-
-                                        if fetch {
-                                            let client = state.client().clone();
-                                            let attachment = attachment.clone();
-                                            spawn_future!(state, async move {
-                                                let (_, file) = client.fetch_attachment(attachment.id.clone()).await?;
-                                                ClientResult::Ok(vec![FetchEvent::Attachment { attachment, file }])
-                                            });
-                                        }
+                                        self.view_message_attachment(state, ui, attachment);
                                     }
                                 }
-                                client::message::Content::Embeds(_) => {}
+                                client::message::Content::Embeds(embeds) => {
+                                    for embed in embeds {
+                                        self.view_message_embed(ui, embed);
+                                    }
+                                }
                             }
                         })
                         .response;
+
                     msg.context_menu(|ui| {
                         if let Some(message_id) = id.id() {
                             if let client::message::Content::Text(text) = &message.content {
