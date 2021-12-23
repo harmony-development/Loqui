@@ -76,7 +76,7 @@ impl Screen {
     fn view_channels(&mut self, state: &mut State, ui: &mut Ui) {
         guard!(let Some(guild_id) = self.current_guild else { return });
 
-        if ui.add(egui::Button::new("⚙ - settings").frame(false)).clicked() {
+        if ui.text_button("⚙ - settings").clicked() {
             state.push_screen(guild_settings::Screen::new(guild_id));
         }
 
@@ -471,19 +471,19 @@ impl Screen {
         let title = format!("☰ - {}", username);
 
         ui.vertical_centered_justified(|ui| {
-            let response = ui.add(egui::Button::new(title).frame(false));
+            let response = ui.text_button(&title);
             let popup_id = ui.make_persistent_id("profile_menu");
             if response.clicked() {
                 ui.memory().toggle_popup(popup_id);
             }
             egui::popup_below_widget(ui, popup_id, &response, |ui| {
-                if ui.add(egui::Button::new("settings").frame(false)).clicked() {
+                if ui.text_button("settings").clicked() {
                     state.push_screen(settings::Screen::default());
                 }
 
                 ui.add(egui::Separator::default().spacing(0.0));
 
-                if ui.add(egui::Button::new("logout").frame(false)).clicked() {
+                if ui.text_button("logout").clicked() {
                     let client = state.client().clone();
                     spawn_future!(state, async move { client.logout().await });
                     state.client = None;
@@ -492,7 +492,7 @@ impl Screen {
 
                 ui.add(egui::Separator::default().spacing(0.0));
 
-                if ui.add(egui::Button::new("exit loqui").frame(false)).clicked() {
+                if ui.text_button("exit loqui").clicked() {
                     std::process::exit(0);
                 }
             });

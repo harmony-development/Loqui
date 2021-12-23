@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use eframe::egui::{Color32, Key, Response, Ui};
+use eframe::egui::{self, Color32, Key, Response, Ui};
 
 pub(crate) use crate::futures::{handle_future, spawn_evs, spawn_future};
 pub use anyhow::{anyhow, bail, ensure, Error};
@@ -34,6 +34,16 @@ pub trait TextInputExt {
 impl TextInputExt for Response {
     fn did_submit(&self, ui: &Ui) -> bool {
         self.lost_focus() && ui.input().key_pressed(Key::Enter)
+    }
+}
+
+pub trait UiExt {
+    fn text_button(&mut self, text: &str) -> Response;
+}
+
+impl UiExt for Ui {
+    fn text_button(&mut self, text: &str) -> Response {
+        self.add(egui::Button::new(text).frame(false))
     }
 }
 
