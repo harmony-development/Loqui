@@ -1,7 +1,6 @@
 use std::{cmp::Ordering, ops::Not};
 
 use client::{
-    channel::Channel,
     guild::Guild,
     harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, profile::UserStatus},
     member::Member,
@@ -11,9 +10,9 @@ use client::{
 };
 use eframe::egui::{Color32, Event, RichText};
 
-use crate::image_cache::LoadedImage;
+use crate::{image_cache::LoadedImage, screen::guild_settings};
 
-use super::prelude::*;
+use super::{guild_discovery, prelude::*, settings};
 
 #[derive(Default)]
 pub struct Screen {
@@ -64,18 +63,35 @@ impl Screen {
 
                 ui.separator();
             }
+
+            let discovery_but = ui
+                .add_sized([32.0, 32.0], egui::Button::new(RichText::new("+").strong()))
+                .on_hover_text("join / create guild");
+            if discovery_but.clicked() {
+                state.push_screen(guild_discovery::Screen::default());
+            }
         });
+        let settings_but = ui.add_sized([32.0, 32.0], egui::Button::new(RichText::new("⚙").strong()));
+        if settings_but.clicked() {
+            state.push_screen(settings::Screen::default());
+        }
     }
 
     fn view_channels(&mut self, state: &mut State, ui: &mut Ui) {
         guard!(let Some(guild_id) = self.current_guild else { return });
+
+        if ui.add(egui::Button::new("⚙ - settings").frame(false)).clicked() {
+            state.push_screen(guild_settings::Screen::new(guild_id));
+        }
+
+        ui.separator();
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             for (channel_id, channel) in state.cache.get_channels(guild_id) {
                 let text = RichText::new(format!("#{}", channel.name));
 
                 let is_enabled = !channel.is_category && (self.current_channel != Some(channel_id));
-                let button = ui.add_enabled(is_enabled, egui::Button::new(text));
+                let button = ui.add_enabled(is_enabled, egui::Button::new(text).frame(false));
                 if button.clicked() {
                     self.current_channel = Some(channel_id);
                     self.last_channel_id.insert(guild_id, channel_id);
@@ -442,13 +458,11 @@ impl Screen {
                 guard!(let Some(users) = sorted_members.get(range) else { return });
                 for (id, _) in users {
                     guard!(let Some(user) = state.cache.get_user(**id) else { continue });
-                    ui.group(|ui| {
-                        ui.horizontal(|ui| {
-                            self.view_user_avatar(state, ui, Some(user), None);
-                            ui.label(user.username.as_str());
-                        });
+                    ui.horizontal(|ui| {
+                        self.view_user_avatar(state, ui, Some(user), None);
+                        ui.label(user.username.as_str());
                     });
-                    ui.add_space(4.0);
+                    ui.separator();
                 }
             });
     }

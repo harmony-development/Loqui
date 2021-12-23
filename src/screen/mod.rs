@@ -10,7 +10,10 @@ mod prelude {
 }
 
 pub mod auth;
+pub mod guild_discovery;
+pub mod guild_settings;
 pub mod main;
+pub mod settings;
 
 pub trait Screen: 'static {
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, app: &mut State);
@@ -31,6 +34,7 @@ impl ScreenStack {
     }
 
     #[inline(always)]
+    #[allow(dead_code)]
     pub fn current(&self) -> &dyn Screen {
         self.stack.last().unwrap().as_ref() // this is safe cause of [ref:screenstack_cant_become_empty] [ref:screenstack_cant_start_empty]
     }
@@ -40,11 +44,13 @@ impl ScreenStack {
         self.stack.last_mut().unwrap().as_mut() // this is safe cause of [ref:screenstack_cant_become_empty] [ref:screenstack_cant_start_empty]
     }
 
+    #[allow(dead_code)]
     pub fn clear<S: Screen>(&mut self, screen: S) {
         self.stack.clear();
         self.stack.push(Box::new(screen));
     }
 
+    #[allow(dead_code)]
     pub fn push<S: Screen>(&mut self, screen: S) {
         self.stack.push(Box::new(screen));
     }

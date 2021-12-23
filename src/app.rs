@@ -72,6 +72,7 @@ pub struct App {
 impl App {
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let mut cache = Cache::default();
         let futures = Futures::new();

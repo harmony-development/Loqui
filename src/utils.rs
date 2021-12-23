@@ -7,6 +7,7 @@ pub use anyhow::{anyhow, bail, ensure, Error};
 pub use client::error::{ClientError, ClientResult};
 pub use guard::guard;
 
+#[allow(dead_code)]
 pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
     if value.chars().count() > new_len {
         let mut value = value.to_string();
