@@ -9,7 +9,7 @@ use client::{
     smol_str::SmolStr,
     AHashMap, FetchEvent, Uri,
 };
-use eframe::egui::{Color32, RichText};
+use eframe::egui::{Color32, Event, RichText};
 
 use crate::image_cache::LoadedImage;
 
@@ -24,6 +24,7 @@ pub struct Screen {
     edit_message_text: String,
     scroll_to_bottom: bool,
     editing_message: Option<u64>,
+    prev_editing_message: Option<u64>,
 }
 
 impl Screen {
@@ -102,6 +103,9 @@ impl Screen {
         if id.is_ack() && id.id() == self.editing_message {
             let edit = ui.add(egui::TextEdit::multiline(&mut self.edit_message_text).desired_rows(2));
             let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
+            if self.prev_editing_message.is_none() {
+                edit.request_focus();
+            }
             if self.edit_message_text.trim().is_empty().not() && edit.has_focus() && is_pressed {
                 let client = state.client().clone();
                 let text = self.edit_message_text.trim().to_string();
@@ -365,7 +369,7 @@ impl Screen {
             });
     }
 
-    fn view_composer(&mut self, state: &mut State, ui: &mut Ui) {
+    fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::CtxRef) {
         guard!(let Some((guild_id, channel_id)) = self.current_guild.zip(self.current_channel) else { return });
 
         let text_edit = ui.add(
@@ -374,6 +378,11 @@ impl Screen {
                 .desired_width(f32::INFINITY)
                 .hint_text("Enter message..."),
         );
+
+        if self.editing_message.is_none() && ctx.input().events.iter().any(|ev| matches!(ev, Event::Text(_))) {
+            text_edit.request_focus();
+        }
+
         let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
         if self.composer_text.trim().is_empty().not() && text_edit.has_focus() && is_pressed {
             let message = Message {
@@ -493,6 +502,35 @@ impl AppScreen for Screen {
             self.editing_message = None;
         }
 
+        if ctx.input().key_pressed(egui::Key::ArrowUp) {
+            let maybe_channel = self
+                .current_guild
+                .zip(self.current_channel)
+                .and_then(|(gid, cid)| state.cache.get_channel(gid, cid));
+
+            if let Some(chan) = maybe_channel {
+                let user_id = state.client().user_id();
+                let maybe_msg = chan
+                    .messages
+                    .iter()
+                    .rev()
+                    .filter_map(|(id, msg)| id.is_ack().then(|| (id.id().unwrap(), msg)))
+                    .filter_map(|(id, msg)| {
+                        if let Content::Text(text) = &msg.content {
+                            Some((id, text, msg.sender))
+                        } else {
+                            None
+                        }
+                    })
+                    .find(|(_, _, sender)| *sender == user_id);
+
+                if let Some((id, text, _)) = maybe_msg {
+                    self.editing_message = Some(id);
+                    self.edit_message_text = text.to_string();
+                }
+            }
+        }
+
         egui::panel::SidePanel::left("guild_panel")
             .min_width(32.0)
             .max_width(32.0)
@@ -521,10 +559,12 @@ impl AppScreen for Screen {
                     ui.vertical(|ui| {
                         self.view_messages(state, ui);
                         ui.separator();
-                        self.view_composer(state, ui);
+                        self.view_composer(state, ui, ctx);
                     });
                 },
             );
         });
+
+        self.prev_editing_message = self.editing_message;
     }
 }
