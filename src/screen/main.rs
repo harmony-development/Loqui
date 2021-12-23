@@ -71,10 +71,6 @@ impl Screen {
                 state.push_screen(guild_discovery::Screen::default());
             }
         });
-        let settings_but = ui.add_sized([32.0, 32.0], egui::Button::new(RichText::new("⚙").strong()));
-        if settings_but.clicked() {
-            state.push_screen(settings::Screen::default());
-        }
     }
 
     fn view_channels(&mut self, state: &mut State, ui: &mut Ui) {
@@ -471,18 +467,32 @@ impl Screen {
         let username = state
             .cache
             .get_user(state.client().user_id())
-            .map_or_else(|| SmolStr::new_inline("loading..."), |u| u.username.clone());
+            .map_or_else(|| "loading...", |u| u.username.as_str());
+        let title = format!("☰ - {}", username);
 
         ui.vertical_centered_justified(|ui| {
-            ui.menu_button(username.as_str(), |ui| {
-                if ui.button("logout").clicked() {
+            let response = ui.add(egui::Button::new(title).frame(false));
+            let popup_id = ui.make_persistent_id("profile_menu");
+            if response.clicked() {
+                ui.memory().toggle_popup(popup_id);
+            }
+            egui::popup_below_widget(ui, popup_id, &response, |ui| {
+                if ui.add(egui::Button::new("settings").frame(false)).clicked() {
+                    state.push_screen(settings::Screen::default());
+                }
+
+                ui.add(egui::Separator::default().spacing(0.0));
+
+                if ui.add(egui::Button::new("logout").frame(false)).clicked() {
                     let client = state.client().clone();
                     spawn_future!(state, async move { client.logout().await });
                     state.client = None;
                     state.pop_screen();
                 }
 
-                if ui.button("exit loqui").clicked() {
+                ui.add(egui::Separator::default().spacing(0.0));
+
+                if ui.add(egui::Button::new("exit loqui").frame(false)).clicked() {
                     std::process::exit(0);
                 }
             });
