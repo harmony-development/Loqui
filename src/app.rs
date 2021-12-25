@@ -11,7 +11,7 @@ use client::{
     Cache, Client, FetchEvent,
 };
 use eframe::{
-    egui::{self, RichText},
+    egui::{self, FontData, FontDefinitions, RichText},
     epi,
 };
 use tokio::sync::mpsc as tokio_mpsc;
@@ -142,7 +142,7 @@ impl epi::App for App {
         "loqui"
     }
 
-    fn setup(&mut self, _ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
+    fn setup(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
         self.state.futures.init(frame);
         self.state.futures.spawn(async move {
             let session = Client::read_latest_session()
@@ -151,6 +151,28 @@ impl epi::App for App {
             let client = Client::new(session.homeserver.parse().unwrap(), Some(session.into())).await?;
             ClientResult::Ok(client)
         });
+
+        let mut font_defs = FontDefinitions::default();
+        font_defs.font_data.insert(
+            "inter".to_string(),
+            FontData::from_static(include_bytes!("fonts/Inter.otf")),
+        );
+        font_defs.font_data.insert(
+            "iosevka".to_string(),
+            FontData::from_static(include_bytes!("fonts/Iosevka.ttf")),
+        );
+        font_defs
+            .fonts_for_family
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .insert(0, "inter".to_string());
+        font_defs
+            .fonts_for_family
+            .entry(egui::FontFamily::Monospace)
+            .or_default()
+            .insert(0, "iosevka".to_string());
+
+        ctx.set_fonts(font_defs);
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
