@@ -35,7 +35,7 @@ fn main() {
         eframe::epi::IconData {
             width: image.width(),
             height: image.height(),
-            rgba: image.to_vec(),
+            rgba: image.into_vec(),
         }
     };
 
