@@ -1,4 +1,4 @@
-use std::{cell::RefCell, sync::mpsc, ops::Not};
+use std::{cell::RefCell, ops::Not, sync::mpsc};
 
 use client::{
     harmony_rust_sdk::{

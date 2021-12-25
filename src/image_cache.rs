@@ -84,13 +84,7 @@ impl LoadedImage {
     fn load_inner(data: Bytes, id: FileId, kind: SmolStr, modify: fn(DynamicImage) -> DynamicImage) -> Self {
         let image = image::load_from_memory(data.as_ref()).unwrap();
         let image = modify(image);
-        let buf = image.to_rgba8();
-        let dimensions = (buf.width() as usize, buf.height() as usize);
-        let pixels = buf.into_vec();
-        let pixels = pixels
-            .chunks(4)
-            .map(|p| egui::Color32::from_rgba_unmultiplied(p[0], p[1], p[2], p[3]))
-            .collect::<Vec<_>>();
+        let (pixels, dimensions) = image_to_egui(image);
 
         Self {
             pixels,
@@ -99,4 +93,15 @@ impl LoadedImage {
             kind,
         }
     }
+}
+
+fn image_to_egui(image: DynamicImage) -> (Vec<Color32>, (usize, usize)) {
+    let buf = image.to_rgba8();
+    let dimensions = (buf.width() as usize, buf.height() as usize);
+    let pixels = buf.into_vec();
+    let pixels = pixels
+        .chunks(4)
+        .map(|p| egui::Color32::from_rgba_unmultiplied(p[0], p[1], p[2], p[3]))
+        .collect::<Vec<_>>();
+    (pixels, dimensions)
 }

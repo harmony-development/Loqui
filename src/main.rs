@@ -28,8 +28,24 @@ fn main() {
         .with(file_logger)
         .init();
 
+    let icon_data = {
+        let icon_raw = include_bytes!("../resources/loqui.ico");
+        let image = image::load_from_memory(icon_raw).expect("icon must be valid");
+        let image = image.to_rgba8();
+        eframe::epi::IconData {
+            width: image.width(),
+            height: image.height(),
+            rgba: image.to_vec(),
+        }
+    };
+
     let app = loqui::App::new();
-    let native_options = eframe::NativeOptions::default();
+    let native_options = eframe::NativeOptions {
+        initial_window_size: Some([1200.0, 700.0].into()),
+        drag_and_drop_support: true,
+        icon_data: Some(icon_data),
+        ..Default::default()
+    };
     eframe::run_native(Box::new(app), native_options);
 }
 
