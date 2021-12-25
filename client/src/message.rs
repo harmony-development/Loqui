@@ -9,7 +9,7 @@ use harmony_rust_sdk::{
     client::api::rest::FileId,
 };
 use smol_str::SmolStr;
-use std::{str::FromStr, time::UNIX_EPOCH};
+use std::{ops::Not, str::FromStr, time::UNIX_EPOCH};
 
 use crate::IndexMap;
 
@@ -112,7 +112,7 @@ impl Attachment {
     }
 
     pub fn is_thumbnail(&self) -> bool {
-        matches!(self.kind.split('/').next(), Some("image")) && (self.size as u64) < MAX_THUMB_SIZE
+        self.kind.starts_with("image") && self.kind.ends_with("svg+xml").not() && (self.size as u64) < MAX_THUMB_SIZE
     }
 
     pub fn from_harmony_attachment(attachment: chat::Attachment) -> Option<Self> {

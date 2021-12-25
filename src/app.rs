@@ -1,4 +1,4 @@
-use std::{cell::RefCell, sync::mpsc};
+use std::{cell::RefCell, sync::mpsc, ops::Not};
 
 use client::{
     harmony_rust_sdk::{
@@ -185,7 +185,7 @@ impl epi::App for App {
                 for event in events {
                     match event {
                         FetchEvent::Attachment { attachment, file } => {
-                            if attachment.kind.starts_with("image") {
+                            if attachment.kind.starts_with("image") && attachment.kind.ends_with("svg+xml").not() {
                                 spawn_future!(
                                     state,
                                     LoadedImage::load(file.data().clone(), attachment.id, attachment.name.into())
