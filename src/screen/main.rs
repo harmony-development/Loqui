@@ -304,6 +304,7 @@ impl Screen {
         guard!(let Some((guild_id, channel_id)) = self.current_guild.zip(self.current_channel) else { return });
         guard!(let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return });
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+        let user_id = state.client().user_id();
 
         egui::ScrollArea::vertical()
             .stick_to_bottom()
@@ -352,7 +353,10 @@ impl Screen {
                     msg.context_menu(|ui| {
                         if let Some(message_id) = id.id() {
                             if let client::message::Content::Text(text) = &message.content {
-                                if channel.has_perm(all_permissions::MESSAGES_SEND) && ui.button("edit").clicked() {
+                                if channel.has_perm(all_permissions::MESSAGES_SEND)
+                                    && message.sender == user_id
+                                    && ui.button("edit").clicked()
+                                {
                                     self.editing_message = id.id();
                                     self.edit_message_text = text.clone();
                                     ui.close_menu();
