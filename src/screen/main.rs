@@ -77,11 +77,20 @@ impl Screen {
     fn view_channels(&mut self, state: &mut State, ui: &mut Ui) {
         guard!(let Some(guild_id) = self.current_guild else { return });
 
-        if ui.text_button("⚙ - settings").clicked() {
+        let guild_name = state
+            .cache
+            .get_guild(guild_id)
+            .map_or_else(|| "unknown", |g| g.name.as_str());
+
+        let but = ui
+            .add(egui::Button::new(format!("⚙ {}", guild_name)).small().frame(false))
+            .on_hover_text("open guild settings");
+
+        if but.clicked() {
             state.push_screen(guild_settings::Screen::new(guild_id));
         }
 
-        ui.separator();
+        ui.add(egui::Separator::default().spacing(3.0));
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             for (channel_id, channel) in state.cache.get_channels(guild_id) {
@@ -475,47 +484,34 @@ impl Screen {
             .map_or_else(|| "loading...", |u| u.username.as_str());
         let title = format!("☰ - {}", username);
 
-        ui.vertical_centered_justified(|ui| {
-            let response = ui.text_button(&title);
-            let popup_id = ui.make_persistent_id("profile_menu");
-            if response.clicked() {
-                ui.memory().toggle_popup(popup_id);
-            }
-            egui::popup_below_widget(ui, popup_id, &response, |ui| {
-                if ui.text_button("settings").clicked() {
-                    state.push_screen(settings::Screen::default());
-                }
-
-                ui.add(egui::Separator::default().spacing(0.0));
-
-                if ui.text_button("logout").clicked() {
-                    let client = state.client().clone();
-                    spawn_future!(state, async move { client.logout().await });
-                    state.client = None;
-                    state.pop_screen();
-                }
-
-                ui.add(egui::Separator::default().spacing(0.0));
-
-                if ui.text_button("exit loqui").clicked() {
-                    std::process::exit(0);
-                }
-            });
-        });
-    }
-
-    fn view_members_hidden(&mut self, ui: &mut Ui) {
-        let but = ui
-            .add_sized(
-                [20.0, ui.available_height()],
-                egui::Button::new("<<<<<<<<<<<<<<<<<<<<<").frame(false).small(),
-            )
-            .on_hover_ui_at_pointer(|ui| {
-                ui.label("click to enlarge\nmembers list");
-            });
-        if but.clicked() {
-            self.disable_users_bar = false;
+        let response = ui.add_sized(
+            [ui.available_width(), 12.0],
+            egui::Button::new(title).small().frame(false),
+        );
+        let popup_id = ui.make_persistent_id("profile_menu");
+        if response.clicked() {
+            ui.memory().toggle_popup(popup_id);
         }
+        egui::popup_below_widget(ui, popup_id, &response, |ui| {
+            if ui.text_button("settings").clicked() {
+                state.push_screen(settings::Screen::default());
+            }
+
+            ui.add(egui::Separator::default().spacing(0.0));
+
+            if ui.text_button("logout").clicked() {
+                let client = state.client().clone();
+                spawn_future!(state, async move { client.logout().await });
+                state.client = None;
+                state.pop_screen();
+            }
+
+            ui.add(egui::Separator::default().spacing(0.0));
+
+            if ui.text_button("exit loqui").clicked() {
+                std::process::exit(0);
+            }
+        });
     }
 
     fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
@@ -585,7 +581,9 @@ impl AppScreen for Screen {
                 .min_width(100.0)
                 .max_width(300.0)
                 .resizable(true)
-                .show(ctx, |ui| self.view_channels(state, ui));
+                .show(ctx, |ui| {
+                    self.view_channels(state, ui);
+                });
 
             if !self.disable_users_bar {
                 egui::panel::SidePanel::right("member_panel")
@@ -594,26 +592,28 @@ impl AppScreen for Screen {
                     .resizable(true)
                     .show(ctx, |ui| {
                         self.view_profile_menu(state, ui);
-                        ui.separator();
-                        ui.add_space(4.0);
+                        ui.add(egui::Separator::default().spacing(3.0));
                         self.view_members(state, ui);
                     });
             }
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            let maybe_guild_name = self
+            let chan_name = self
                 .current_guild
-                .map(|id| state.cache.get_guild(id).map_or("unknown", |g| g.name.as_str()));
+                .zip(self.current_channel)
+                .and_then(|(gid, cid)| state.cache.get_channel(gid, cid))
+                .map_or_else(|| "select a channel".to_string(), |c| format!("#{}", c.name));
 
-            if let Some(guild_name) = maybe_guild_name {
+            if self.current_guild.is_some() {
                 egui::TopBottomPanel::top("central_top_panel")
                     .resizable(false)
                     .min_height(12.0)
                     .max_height(12.0)
                     .show_inside(ui, |ui| {
                         ui.horizontal_top(|ui| {
-                            ui.label(guild_name);
+                            ui.label(chan_name);
+                            ui.separator();
                             ui.add_space(ui.available_width() - 12.0);
                             let show_members_but = ui
                                 .add_sized([12.0, 12.0], egui::Button::new("👤").frame(false).small())
