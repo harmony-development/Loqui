@@ -24,6 +24,7 @@ pub struct Screen {
     scroll_to_bottom: bool,
     editing_message: Option<u64>,
     prev_editing_message: Option<u64>,
+    disable_users_bar: bool,
 }
 
 impl Screen {
@@ -474,7 +475,11 @@ impl Screen {
             .map_or_else(|| "loading...", |u| u.username.as_str());
         let title = format!("☰ - {}", username);
 
-        ui.vertical_centered_justified(|ui| {
+        ui.horizontal(|ui| {
+            if ui.text_button("->").clicked() {
+                self.disable_users_bar = true;
+            }
+            ui.separator();
             let response = ui.text_button(&title);
             let popup_id = ui.make_persistent_id("profile_menu");
             if response.clicked() {
@@ -501,6 +506,20 @@ impl Screen {
                 }
             });
         });
+    }
+
+    fn view_members_hidden(&mut self, ui: &mut Ui) {
+        let but = ui
+            .add_sized(
+                [20.0, ui.available_height()],
+                egui::Button::new("<<<<<<<<<<<<<<<<<<<<<").frame(false).small(),
+            )
+            .on_hover_ui_at_pointer(|ui| {
+                ui.label("click to enlarge\nmembers list");
+            });
+        if but.clicked() {
+            self.disable_users_bar = false;
+        }
     }
 
     fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
@@ -564,31 +583,43 @@ impl AppScreen for Screen {
             .max_width(32.0)
             .resizable(false)
             .show(ctx, |ui| self.view_guilds(state, ui));
-        egui::panel::SidePanel::left("channel_panel")
-            .min_width(100.0)
-            .max_width(400.0)
-            .resizable(true)
-            .show(ctx, |ui| self.view_channels(state, ui));
-        egui::panel::SidePanel::right("member_panel")
-            .min_width(100.0)
-            .max_width(400.0)
-            .resizable(true)
-            .show(ctx, |ui| {
-                self.view_profile_menu(state, ui);
-                ui.separator();
-                ui.add_space(4.0);
-                self.view_members(state, ui);
-            });
+
+        if self.current_guild.is_some() {
+            egui::panel::SidePanel::left("channel_panel")
+                .min_width(100.0)
+                .max_width(300.0)
+                .resizable(true)
+                .show(ctx, |ui| self.view_channels(state, ui));
+
+            let (member_min_width, member_max_width) =
+                self.disable_users_bar.then(|| (20.0, 20.0)).unwrap_or((100.0, 300.0));
+            egui::panel::SidePanel::right("member_panel")
+                .min_width(member_min_width)
+                .max_width(member_max_width)
+                .resizable(!self.disable_users_bar)
+                .show(ctx, |ui| {
+                    if !self.disable_users_bar {
+                        self.view_profile_menu(state, ui);
+                        ui.separator();
+                        ui.add_space(4.0);
+                        self.view_members(state, ui);
+                    } else {
+                        self.view_members_hidden(ui);
+                    }
+                });
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.with_layout(
                 Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
                 |ui| {
-                    ui.vertical(|ui| {
-                        self.view_messages(state, ui);
-                        ui.separator();
-                        self.view_composer(state, ui, ctx);
-                    });
+                    if self.current_guild.is_some() && self.current_channel.is_some() {
+                        ui.vertical(|ui| {
+                            self.view_messages(state, ui);
+                            ui.separator();
+                            self.view_composer(state, ui, ctx);
+                        });
+                    }
                 },
             );
         });

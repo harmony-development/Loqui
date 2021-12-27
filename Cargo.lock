@@ -193,9 +193,9 @@ dependencies = [
 
 [[package]]
 name = "calloop"
-version = "0.9.1"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42dcfbd723aa6eff9f024cfd5ad08b11144d79b2d8d37b4a31a006ceab255c77"
+checksum = "bf2eec61efe56aa1e813f5126959296933cf0700030e4314786c48779a66ab82"
 dependencies = [
  "log",
  "nix",
@@ -1202,9 +1202,9 @@ dependencies = [
 
 [[package]]
 name = "hrpc"
-version = "0.33.11"
+version = "0.33.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2c7902e5c28d7be186e12b3ef6d07346c2fa753b36e67ebde31ff554f39a595"
+checksum = "d17ffc119f718728c89504b4baf3e5a3bac35a658b846fea0ad5e6711c74b7d6"
 dependencies = [
  "bytes",
  "futures-util",
