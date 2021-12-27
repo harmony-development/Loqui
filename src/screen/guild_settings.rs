@@ -11,7 +11,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, app: &mut State) {
+    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, app: &mut State) {
         todo!()
     }
 }

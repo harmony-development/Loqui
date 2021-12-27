@@ -16,7 +16,7 @@ pub struct ImageCache {
 }
 
 impl ImageCache {
-    pub fn add(&mut self, frame: &mut eframe::epi::Frame<'_>, image: LoadedImage) {
+    pub fn add(&mut self, frame: &eframe::epi::Frame, image: LoadedImage) {
         match image.kind.as_str() {
             "guild" | "avatar" => add_generic(&mut self.avatar, frame, image),
             "minithumbnail" => add_generic(&mut self.minithumbnail, frame, image),
@@ -37,24 +37,21 @@ impl ImageCache {
     }
 }
 
-fn add_generic(
-    map: &mut AHashMap<FileId, (TextureId, [f32; 2])>,
-    frame: &mut eframe::epi::Frame<'_>,
-    image: LoadedImage,
-) {
+fn add_generic(map: &mut AHashMap<FileId, (TextureId, [f32; 2])>, frame: &eframe::epi::Frame, image: LoadedImage) {
     if let Some((id, _)) = map.remove(&image.id) {
-        frame.tex_allocator().free(id);
+        frame.free_texture(id);
     }
 
-    let id = frame
-        .tex_allocator()
-        .alloc_srgba_premultiplied(image.dimensions, &image.pixels);
-    map.insert(image.id, (id, [image.dimensions.0 as f32, image.dimensions.1 as f32]));
+    let id = frame.alloc_texture(eframe::epi::Image {
+        size: image.dimensions,
+        pixels: image.pixels,
+    });
+    map.insert(image.id, (id, [image.dimensions[0] as f32, image.dimensions[1] as f32]));
 }
 
 pub struct LoadedImage {
     pixels: Vec<Color32>,
-    dimensions: (usize, usize),
+    dimensions: [usize; 2],
     id: FileId,
     kind: SmolStr,
 }
@@ -66,19 +63,19 @@ impl LoadedImage {
     }
 
     pub async fn load(data: Bytes, id: FileId, kind: SmolStr) -> Self {
-        #[cfg(not(target_arch = "wasm32"))]
-        use tokio::task::spawn_blocking;
-        #[cfg(target_arch = "wasm32")]
-        let spawn_blocking = |f| wasm_bindgen_futures::spawn_local(async move { f() });
-
         let modify = match kind.as_str() {
             "minithumbnail" => |image: DynamicImage| image.blur(4.0),
             "guild" | "avatar" => |image: DynamicImage| image.resize(64, 64, image::imageops::FilterType::Lanczos3),
             _ => identity,
         };
-        spawn_blocking(move || Self::load_inner(data, id, kind, modify))
+
+        #[cfg(not(target_arch = "wasm32"))]
+        return tokio::task::spawn_blocking(move || Self::load_inner(data, id, kind, modify))
             .await
-            .unwrap()
+            .unwrap();
+
+        #[cfg(target_arch = "wasm32")]
+        return Self::load_inner(data, id, kind, modify);
     }
 
     fn load_inner(data: Bytes, id: FileId, kind: SmolStr, modify: fn(DynamicImage) -> DynamicImage) -> Self {
@@ -95,9 +92,9 @@ impl LoadedImage {
     }
 }
 
-fn image_to_egui(image: DynamicImage) -> (Vec<Color32>, (usize, usize)) {
+fn image_to_egui(image: DynamicImage) -> (Vec<Color32>, [usize; 2]) {
     let buf = image.to_rgba8();
-    let dimensions = (buf.width() as usize, buf.height() as usize);
+    let dimensions = [buf.width() as usize, buf.height() as usize];
     let pixels = buf.into_vec();
     let pixels = pixels
         .chunks(4)

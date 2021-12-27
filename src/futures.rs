@@ -1,5 +1,5 @@
 use client::{error::ClientResult, tracing};
-use eframe::epi::RepaintSignal;
+use eframe::epi::backend::RepaintSignal;
 use std::{
     any::Any,
     future::Future,
@@ -32,7 +32,7 @@ impl Futures {
     }
 
     pub fn init(&mut self, frame: &eframe::epi::Frame) {
-        self.rr = Some(frame.repaint_signal());
+        self.rr = Some(frame.lock().repaint_signal.clone());
     }
 
     #[cfg(not(target_arch = "wasm32"))]

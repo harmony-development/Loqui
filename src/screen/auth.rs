@@ -220,7 +220,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, _: &mut epi::Frame<'_>, state: &mut State) {
+    fn update(&mut self, ctx: &egui::CtxRef, _: &epi::Frame, state: &mut State) {
         self.handle_connect(state);
         self.handle_step(state);
 

@@ -142,7 +142,7 @@ impl epi::App for App {
         "loqui"
     }
 
-    fn setup(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>, _storage: Option<&dyn epi::Storage>) {
+    fn setup(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         self.state.futures.init(frame);
         self.state.futures.spawn(async move {
             let session = Client::read_latest_session()
@@ -175,7 +175,11 @@ impl epi::App for App {
         ctx.set_fonts(font_defs);
     }
 
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &mut epi::Frame<'_>) {
+    fn max_size_points(&self) -> egui::Vec2 {
+        [f32::INFINITY, f32::INFINITY].into()
+    }
+
+    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
         self.state.futures.run();
 
         let state = &mut self.state;

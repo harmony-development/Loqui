@@ -58,6 +58,9 @@ use eframe::wasm_bindgen::{self, prelude::*};
 /// You can add more callbacks like this if you want to call in to your code.
 #[cfg(target_arch = "wasm32")]
 fn main() -> Result<(), eframe::wasm_bindgen::JsValue> {
+    console_error_panic_hook::set_once();
+    tracing_wasm::set_as_global_default();
+
     let app = loqui::App::new();
     eframe::start_web("egui_canvas", Box::new(app))
 }
