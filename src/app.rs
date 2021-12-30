@@ -237,7 +237,7 @@ impl epi::App for App {
             spawn_future!(state, std::future::ready(ClientResult::Ok(evs)));
         }
 
-        ctx.set_pixels_per_point(1.35);
+        ctx.set_pixels_per_point(1.45);
         egui::TopBottomPanel::new(egui::panel::TopBottomSide::Bottom, "bottom_panel")
             .max_height(25.0)
             .min_height(25.0)
