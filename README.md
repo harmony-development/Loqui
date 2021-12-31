@@ -3,7 +3,7 @@
 
 [<img src="https://gist.githubusercontent.com/hecrj/ad7ecd38f6e47ff3688a38c79fd108f0/raw/74384875ecbad02ae2a926425e9bcafd0695bade/color.svg" align="right" width="224"/>](https://github.com/hecrj/iced)
 
-Loqui is a [Harmony] client written in Rust using the [iced] GUI library.
+Loqui is a [Harmony] client written in Rust using the [egui] GUI library.
 It uses [harmony-rust-sdk] to communicate with Harmony servers.
 
 ![Loqui](resources/main.png)
@@ -32,8 +32,6 @@ It uses [harmony-rust-sdk] to communicate with Harmony servers.
     - [For Windows systems](https://github.com/harmony-development/Loqui/releases/download/continuous/loqui-windows.exe)
     - [For macOS systems](https://github.com/harmony-development/Loqui/releases/download/continuous/loqui-macos)
 - Note: you might need to **mark the binary as executable** on macOS and Linux systems.
-- Note: **Loqui will not work if your system does not support Vulkan / DX12 (on Windows) / Metal (on MacOS)**.
-Make sure your system has Vulkan setup if you are on Linux.
 
 ## Building
 
@@ -60,4 +58,4 @@ Make sure your system has Vulkan setup if you are on Linux.
 
 [Harmony]: https://github.com/harmony-development
 [harmony-rust-sdk]: https://github.com/harmony-development/harmony_rust_sdk
-[iced]: https://github.com/hecrj/iced
+[egui]: https://github.com/emilk/egui
