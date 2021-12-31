@@ -15,6 +15,7 @@
     let
       outputs = inputs.nixCargoIntegration.lib.makeOutputs {
         root = ./.;
+        buildPlatform = "crate2nix";
         overrides = {
           shell = common: prev: {
             env = prev.env ++ [
