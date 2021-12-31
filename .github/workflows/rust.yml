@@ -18,8 +18,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTC_FORCE_INCREMENTAL: 1
-  CARGO_INCREMENTAL: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CI: 1
+  RUST_BACKTRACE: short
+  RUSTFLAGS: "-W unreachable-pub"
 
 jobs:
   tagref:
@@ -68,7 +71,7 @@ jobs:
         name: 'clippy (${{ matrix.os }})'
 
     - name: Build
-      run: cargo build --release 
+      run: cargo build --locked --release
 
     - name: UPX windows
       if: ${{ matrix.os == 'windows-latest' }}
