@@ -3,6 +3,8 @@ use std::ops::Not;
 use client::harmony_rust_sdk::api::rest::About;
 use eframe::egui::{self, RichText, Ui, WidgetText};
 
+pub mod easy_mark;
+
 pub fn menu_text_button<R>(
     id: impl AsRef<str>,
     title: impl Into<WidgetText>,

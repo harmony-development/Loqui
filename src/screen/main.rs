@@ -10,7 +10,7 @@ use client::{
 };
 use eframe::egui::{Color32, Event, RichText};
 
-use crate::{image_cache::LoadedImage, screen::guild_settings};
+use crate::{image_cache::LoadedImage, screen::guild_settings, widgets::easy_mark};
 
 use super::prelude::*;
 
@@ -67,6 +67,7 @@ impl CurrentIds {
 pub struct Screen {
     // guild id -> channel id
     last_channel_id: AHashMap<u64, u64>,
+    highlight_message: AHashMap<(u64, u64, MessageId), bool>,
     current: CurrentIds,
     composer_text: String,
     edit_message_text: String,
@@ -240,8 +241,16 @@ impl Screen {
         channel_id: u64,
         text: &str,
     ) {
+        let highlight_message = self
+            .highlight_message
+            .get(&(guild_id, channel_id, *id))
+            .copied()
+            .unwrap_or(true);
+
         if id.is_ack() && id.id() == self.editing_message {
-            let edit = ui.add(egui::TextEdit::multiline(&mut self.edit_message_text).desired_rows(2));
+            let edit = easy_mark::EasyMarkEditor::new(&mut self.edit_message_text)
+                .highlight(highlight_message)
+                .editor_ui(ui);
             let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
             if self.prev_editing_message.is_none() {
                 edit.request_focus();
@@ -254,6 +263,9 @@ impl Screen {
                     client.edit_message(guild_id, channel_id, message_id, text).await?;
                 });
             }
+        } else if highlight_message {
+            // TODO: search for "plain" URLs and add `<>` around them
+            easy_mark::easy_mark(ui, text);
         } else {
             ui.label(text);
         }
@@ -272,7 +284,7 @@ impl Screen {
                     let site_title_empty = data.site_title.is_empty().not();
                     let page_title_empty = data.page_title.is_empty().not();
                     let desc_empty = data.description.is_empty().not();
-                    if site_title_empty && page_title_empty && desc_empty {
+                    if site_title_empty || page_title_empty || desc_empty {
                         ui.group(|ui| {
                             if site_title_empty {
                                 ui.add(egui::Label::new(RichText::new(&data.site_title).small()));
@@ -507,6 +519,12 @@ impl Screen {
                             if channel.has_perm(all_permissions::MESSAGES_PINS_ADD) && ui.button("pin").clicked() {
                                 ui.close_menu();
                             }
+                            if ui.button("toggle highlighting").clicked() {
+                                let key = (guild_id, channel_id, *id);
+                                let is_highlighted = self.highlight_message.get(&key).copied().unwrap_or(true);
+                                self.highlight_message.insert(key, is_highlighted.not());
+                                ui.close_menu();
+                            }
                         }
                     });
                 }
@@ -701,7 +719,7 @@ impl AppScreen for Screen {
             self.editing_message = None;
         }
 
-        if ctx.input().key_pressed(egui::Key::ArrowUp) {
+        if self.editing_message.is_none() && ctx.input().key_pressed(egui::Key::ArrowUp) {
             let maybe_channel = self
                 .current
                 .channel()
