@@ -128,6 +128,7 @@ pub enum FetchEvent {
         attachment: Attachment,
         file: DownloadedFile,
     },
+    InitialSyncComplete,
 }
 
 #[derive(Default)]
@@ -138,6 +139,7 @@ pub struct Cache {
     link_embeds: AHashMap<Uri, FetchLinkData>,
     emote_packs: AHashMap<u64, EmotePack>,
     sub_tx: Option<UnboundedSender<EventSource>>,
+    initial_sync_complete: bool,
 }
 
 impl Cache {
@@ -159,6 +161,10 @@ impl Cache {
 
     fn get_emote_pack_mut(&mut self, pack_id: u64) -> &mut EmotePack {
         self.emote_packs.entry(pack_id).or_default()
+    }
+
+    pub fn is_initial_sync_complete(&self) -> bool {
+        self.initial_sync_complete
     }
 
     pub fn get_guild(&self, guild_id: u64) -> Option<&Guild> {
@@ -222,6 +228,9 @@ impl Cache {
                 self.link_embeds.insert(url, data);
             }
             FetchEvent::Attachment { attachment, file } => {}
+            FetchEvent::InitialSyncComplete => {
+                self.initial_sync_complete = true;
+            }
         }
     }
 
@@ -335,6 +344,7 @@ impl Cache {
                     let channel = self.get_channel_mut(guild_id, channel_id);
                     channel.name = name.into();
                     channel.is_category = kind == i32::from(ChannelKind::Category);
+                    channel.fetched = true;
 
                     let guild = self.get_guild_mut(guild_id);
                     // [tag:channel_added_to_client]
@@ -342,6 +352,7 @@ impl Cache {
                     if let Some(position) = position {
                         guild.update_channel_order(position, channel_id);
                     }
+
                     post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
                 }
                 ChatEvent::Typing(Typing {
@@ -409,6 +420,8 @@ impl Cache {
                             }));
                         }
                     }
+
+                    guild.fetched = true;
                 }
                 ChatEvent::RoleCreated(RoleCreated {
                     guild_id,
@@ -509,6 +522,7 @@ impl Cache {
                             }));
                         }
                     }
+                    user.fetched = true;
                 }
             },
             Event::Emote(ev) => match ev {
@@ -985,6 +999,8 @@ impl Client {
                 user_id: self_id,
             },
         ))));
+
+        events.push(FetchEvent::InitialSyncComplete);
 
         Ok(())
     }

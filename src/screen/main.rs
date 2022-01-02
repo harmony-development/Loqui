@@ -114,18 +114,27 @@ impl Screen {
 
     fn view_guilds(&mut self, state: &mut State, ui: &mut Ui) {
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            if state.cache.is_initial_sync_complete().not() {
+                ui.add(egui::Spinner::new().size(32.0)).on_hover_text("loading guilds");
+            }
+
             for (guild_id, guild) in state.cache.get_guilds() {
                 let icon = RichText::new(guild.name.get(0..1).unwrap_or("u").to_ascii_uppercase()).strong();
 
-                let is_enabled = self.current.guild() != Some(guild_id);
+                let is_enabled = guild.fetched && self.current.guild() != Some(guild_id);
 
                 let button = ui
                     .add_enabled_ui(is_enabled, |ui| {
-                        if let Some((texid, _)) = guild.picture.as_ref().and_then(|id| state.image_cache.get_avatar(id))
-                        {
-                            ui.add(egui::ImageButton::new(texid, [32.0, 32.0]).frame(false))
+                        if guild.fetched {
+                            if let Some((texid, _)) =
+                                guild.picture.as_ref().and_then(|id| state.image_cache.get_avatar(id))
+                            {
+                                ui.add(egui::ImageButton::new(texid, [32.0, 32.0]).frame(false))
+                            } else {
+                                ui.add_sized([32.0, 32.0], egui::Button::new(icon))
+                            }
                         } else {
-                            ui.add_sized([32.0, 32.0], egui::Button::new(icon))
+                            ui.add(egui::Spinner::new().size(32.0))
                         }
                     })
                     .inner
@@ -188,21 +197,32 @@ impl Screen {
         }
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-            for (channel_id, channel) in state.cache.get_channels(guild_id) {
-                let text = RichText::new(format!("#{}", channel.name));
+            let channels = state.cache.get_channels(guild_id);
 
-                let is_enabled = (channel.is_category || self.current.is_channel(guild_id, channel_id)).not();
-                let button = ui.add_enabled(is_enabled, egui::Button::new(text).frame(false));
-                if button.clicked() {
-                    self.current.set_channel(channel_id);
-                    self.last_channel_id.insert(guild_id, channel_id);
-                    if !channel.reached_top && channel.messages.is_empty() {
-                        spawn_evs!(state, |events, c| {
-                            c.fetch_messages(guild_id, channel_id, events).await?;
-                        });
+            if channels.is_empty().not() {
+                for (channel_id, channel) in channels {
+                    if channel.fetched {
+                        let text = RichText::new(format!("#{}", channel.name));
+
+                        let is_enabled = (channel.is_category || self.current.is_channel(guild_id, channel_id)).not();
+                        let button = ui.add_enabled(is_enabled, egui::Button::new(text).frame(false));
+                        if button.clicked() {
+                            self.current.set_channel(channel_id);
+                            self.last_channel_id.insert(guild_id, channel_id);
+                            if !channel.reached_top && channel.messages.is_empty() {
+                                spawn_evs!(state, |events, c| {
+                                    c.fetch_messages(guild_id, channel_id, events).await?;
+                                });
+                            }
+                            self.scroll_to_bottom = true;
+                        }
+                    } else {
+                        ui.add(egui::Spinner::new());
                     }
-                    self.scroll_to_bottom = true;
                 }
+            } else {
+                ui.add_sized(ui.available_size(), egui::Spinner::new().size(32.0))
+                    .on_hover_text_at_pointer("loading channels");
             }
         });
     }
@@ -559,13 +579,22 @@ impl Screen {
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             let sorted_members = Self::sort_members(state, guild);
-            for (id, _) in sorted_members {
-                guard!(let Some(user) = state.cache.get_user(*id) else { continue });
-                ui.horizontal(|ui| {
-                    self.view_user_avatar(state, ui, Some(user), None);
-                    ui.label(user.username.as_str());
-                });
-                ui.separator();
+            if sorted_members.is_empty().not() {
+                for (id, _) in sorted_members {
+                    guard!(let Some(user) = state.cache.get_user(*id) else { continue });
+                    ui.horizontal(|ui| {
+                        if user.fetched {
+                            self.view_user_avatar(state, ui, Some(user), None);
+                            ui.label(user.username.as_str());
+                        } else {
+                            ui.add(egui::Spinner::new().size(32.0));
+                        }
+                    });
+                    ui.separator();
+                }
+            } else {
+                ui.add_sized(ui.available_size(), egui::Spinner::new().size(32.0))
+                    .on_hover_text_at_pointer("loading members");
             }
         });
     }

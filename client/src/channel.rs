@@ -12,6 +12,7 @@ pub struct Channel {
     pub reached_top: bool,
     pub perms: Vec<Permission>,
     pub role_perms: RolePerms,
+    pub fetched: bool,
 }
 
 impl Channel {

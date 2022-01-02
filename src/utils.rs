@@ -28,13 +28,19 @@ pub fn scale_down(w: f32, h: f32, max_size: f32) -> (f32, f32) {
     (new_w, new_h)
 }
 
-pub trait TextInputExt {
+pub trait ResponseExt {
     fn did_submit(&self, ui: &Ui) -> bool;
+    fn on_hover_text_at_pointer(self, text: &str) -> Self;
 }
 
-impl TextInputExt for Response {
+impl ResponseExt for Response {
     fn did_submit(&self, ui: &Ui) -> bool {
         self.lost_focus() && ui.input().key_pressed(Key::Enter)
+    }
+    fn on_hover_text_at_pointer(self, text: &str) -> Self {
+        self.on_hover_ui_at_pointer(|ui| {
+            ui.label(text);
+        })
     }
 }
 

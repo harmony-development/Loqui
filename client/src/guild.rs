@@ -20,6 +20,7 @@ pub struct Guild {
     pub members: AHashMap<u64, Vec<u64>>,
     pub homeserver: SmolStr,
     pub perms: Vec<Permission>,
+    pub fetched: bool,
 }
 
 impl Guild {

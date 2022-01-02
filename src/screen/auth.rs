@@ -207,7 +207,13 @@ impl Screen {
 
     fn view_main(&mut self, state: &mut State, ui: &mut Ui) -> Response {
         if self.waiting {
-            return ui.label(RichText::new("please wait...").heading());
+            let wait = ui
+                .horizontal(|ui| {
+                    ui.label(RichText::new("please wait...").heading());
+                    ui.add(egui::Spinner::new());
+                })
+                .response;
+            return wait;
         }
 
         egui::Grid::new("auth_grid")

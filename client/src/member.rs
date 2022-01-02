@@ -11,6 +11,7 @@ pub struct Member {
     pub typing_in_channel: Option<(u64, u64, Instant)>,
     pub status: UserStatus,
     pub is_bot: bool,
+    pub fetched: bool,
 }
 
 impl Default for Member {
@@ -22,6 +23,7 @@ impl Default for Member {
             typing_in_channel: None,
             status: UserStatus::OfflineUnspecified,
             is_bot: false,
+            fetched: false,
         }
     }
 }
