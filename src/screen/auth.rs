@@ -75,14 +75,11 @@ impl Screen {
                     } else {
                         self.reset();
                         state.push_screen(main::Screen::default());
-                        spawn_evs!(state, |events, client| async move {
+                        spawn_evs!(state, |events, client| {
                             client.initial_sync(events).await?;
-                            Ok(())
                         });
-                        let client = state.client().clone();
-                        spawn_future!(state, async move { client.connect_socket(Vec::new()).await });
-                        let client = state.client().clone();
-                        spawn_future!(state, async move { client.save_session_to().await });
+                        spawn_client_fut!(state, |client| { client.connect_socket(Vec::new()).await? });
+                        spawn_client_fut!(state, |client| { client.save_session_to().await? });
                     }
                 }
                 Err(err) => {

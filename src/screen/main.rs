@@ -90,8 +90,9 @@ impl Screen {
 
             if ui.button("join").clicked() {
                 let invite_id = self.invite_text.borrow().clone();
-                let client = state.client().clone();
-                spawn_future!(state, async move { client.join_guild(invite_id).await });
+                spawn_client_fut!(state, |client| {
+                    client.join_guild(invite_id).await?;
+                });
             }
         });
     }
@@ -104,8 +105,9 @@ impl Screen {
             ui.add_space(6.0);
             if ui.button("create").clicked() {
                 let guild_name = self.guild_name_text.borrow().clone();
-                let client = state.client().clone();
-                spawn_future!(state, async move { client.create_guild(guild_name).await });
+                spawn_client_fut!(state, |client| {
+                    client.create_guild(guild_name).await?;
+                });
             }
         });
     }
@@ -135,10 +137,9 @@ impl Screen {
                         self.current.set_channel(*channel_id);
                     }
                     if guild.channels.is_empty() && guild.members.is_empty() {
-                        spawn_evs!(state, |events, c| async move {
+                        spawn_evs!(state, |events, c| {
                             c.fetch_channels(guild_id, events).await?;
                             c.fetch_members(guild_id, events).await?;
-                            Ok(())
                         });
                     }
                     self.scroll_to_bottom = true;
@@ -196,9 +197,8 @@ impl Screen {
                     self.current.set_channel(channel_id);
                     self.last_channel_id.insert(guild_id, channel_id);
                     if !channel.reached_top && channel.messages.is_empty() {
-                        spawn_evs!(state, |events, c| async move {
+                        spawn_evs!(state, |events, c| {
                             c.fetch_messages(guild_id, channel_id, events).await?;
-                            Ok(())
                         });
                     }
                     self.scroll_to_bottom = true;
@@ -223,12 +223,11 @@ impl Screen {
                 edit.request_focus();
             }
             if self.edit_message_text.trim().is_empty().not() && edit.has_focus() && is_pressed {
-                let client = state.client().clone();
                 let text = self.edit_message_text.trim().to_string();
                 let message_id = id.id().unwrap();
                 self.editing_message = None;
-                spawn_future!(state, async move {
-                    client.edit_message(guild_id, channel_id, message_id, text).await
+                spawn_client_fut!(state, |client| {
+                    client.edit_message(guild_id, channel_id, message_id, text).await?;
                 });
             }
         } else {
@@ -275,7 +274,7 @@ impl Screen {
         }
     }
 
-    fn view_message_attachment(&mut self, state: &State, ui: &mut Ui, attachment: &Attachment) {
+    fn view_message_attachment(&mut self, state: &State, ui: &mut Ui, frame: &epi::Frame, attachment: &Attachment) {
         let mut handled = false;
         let mut fetch = false;
 
@@ -325,7 +324,7 @@ impl Screen {
                 let data = Bytes::copy_from_slice(minithumbnail.data.as_slice());
                 let id = attachment.id.clone();
                 let kind = SmolStr::new_inline("minithumbnail");
-                spawn_future!(state, LoadedImage::load(data, id, kind));
+                spawn_future!(state, LoadedImage::load(frame.clone(), data, id, kind));
             }
         }
 
@@ -404,7 +403,7 @@ impl Screen {
         });
     }
 
-    fn view_messages(&mut self, state: &mut State, ui: &mut Ui) {
+    fn view_messages(&mut self, state: &mut State, ui: &mut Ui, frame: &epi::Frame) {
         guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
         guard!(let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return });
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
@@ -442,7 +441,7 @@ impl Screen {
                                 }
                                 client::message::Content::Files(attachments) => {
                                     for attachment in attachments {
-                                        self.view_message_attachment(state, ui, attachment);
+                                        self.view_message_attachment(state, ui, frame, attachment);
                                     }
                                 }
                                 client::message::Content::Embeds(embeds) => {
@@ -470,9 +469,8 @@ impl Screen {
                                 }
                             }
                             if message.sender == state.client().user_id() && ui.button("delete").clicked() {
-                                let client = state.client().clone();
-                                spawn_future!(state, async move {
-                                    client.delete_message(guild_id, channel_id, message_id).await
+                                spawn_client_fut!(state, |client| {
+                                    client.delete_message(guild_id, channel_id, message_id).await?;
                                 });
                                 ui.close_menu();
                             }
@@ -593,7 +591,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, _: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, state: &mut State) {
         if ctx.input().key_pressed(egui::Key::Escape) {
             self.editing_message = None;
         }
@@ -697,7 +695,7 @@ impl AppScreen for Screen {
                         |ui| {
                             ui.vertical(|ui| {
                                 ui.allocate_ui([ui.available_width(), ui.available_height() - 32.0].into(), |ui| {
-                                    self.view_messages(state, ui);
+                                    self.view_messages(state, ui, frame);
                                 });
                                 ui.group(|ui| {
                                     self.view_composer(state, ui, ctx);

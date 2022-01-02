@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use eframe::egui::{self, Align, Color32, Key, Layout, Response, Ui};
 
-pub(crate) use crate::futures::{handle_future, spawn_evs, spawn_future};
+pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
 pub use anyhow::{anyhow, bail, ensure, Error};
 pub use client::error::{ClientError, ClientResult};
 pub use guard::guard;

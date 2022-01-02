@@ -1,4 +1,4 @@
-use client::{error::ClientResult, tracing};
+use client::tracing;
 use eframe::epi::backend::RepaintSignal;
 use std::{
     any::Any,
@@ -113,25 +113,30 @@ macro_rules! handle_future {
 }
 
 macro_rules! spawn_evs {
-    ($state:ident, |$ev:ident, $client:ident| $fut:expr) => {{
+    ($state:ident, |$ev:ident, $client:ident| $fut:tt) => {{
         let $client = $state.client().clone();
         $state.futures.spawn(async move {
             let mut _evs = Vec::new();
             let $ev = &mut _evs;
-            let fut = $crate::futures::check_fut_output($fut);
-            fut.await?;
+            {
+                $fut
+            }
             ClientResult::Ok(_evs)
         });
     }};
 }
 
-pub fn check_fut_output<Fut>(fut: Fut) -> Fut
-where
-    Fut: Future<Output = ClientResult<()>>,
-{
-    fut
+macro_rules! spawn_client_fut {
+    ($state:ident, |$client:ident| $fut:tt) => {{
+        let $client = $state.client().clone();
+        $state.futures.spawn(async move {
+            let res = $fut;
+            ClientResult::Ok(res)
+        });
+    }};
 }
 
 pub(crate) use handle_future;
+pub(crate) use spawn_client_fut;
 pub(crate) use spawn_evs;
 pub(crate) use spawn_future;

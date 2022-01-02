@@ -5,7 +5,10 @@ use client::{
     smol_str::SmolStr,
     AHashMap,
 };
-use eframe::egui::{self, Color32, TextureId};
+use eframe::{
+    egui::{self, Color32, TextureId},
+    epi::{self, Image},
+};
 use image::DynamicImage;
 
 #[derive(Default)]
@@ -37,20 +40,18 @@ impl ImageCache {
     }
 }
 
-fn add_generic(map: &mut AHashMap<FileId, (TextureId, [f32; 2])>, frame: &eframe::epi::Frame, image: LoadedImage) {
-    if let Some((id, _)) = map.remove(&image.id) {
-        frame.free_texture(id);
+fn add_generic(map: &mut AHashMap<FileId, (TextureId, [f32; 2])>, frame: &epi::Frame, image: LoadedImage) {
+    if let Some((tex_id, _)) = map.remove(&image.id) {
+        frame.free_texture(tex_id);
     }
-
-    let id = frame.alloc_texture(eframe::epi::Image {
-        size: image.dimensions,
-        pixels: image.pixels,
-    });
-    map.insert(image.id, (id, [image.dimensions[0] as f32, image.dimensions[1] as f32]));
+    map.insert(
+        image.id,
+        (image.tex_id, [image.dimensions[0] as f32, image.dimensions[1] as f32]),
+    );
 }
 
 pub struct LoadedImage {
-    pixels: Vec<Color32>,
+    tex_id: TextureId,
     dimensions: [usize; 2],
     id: FileId,
     kind: SmolStr,
@@ -62,7 +63,7 @@ impl LoadedImage {
         &self.id
     }
 
-    pub async fn load(data: Bytes, id: FileId, kind: SmolStr) -> Self {
+    pub async fn load(frame: epi::Frame, data: Bytes, id: FileId, kind: SmolStr) -> Self {
         let modify = match kind.as_str() {
             "minithumbnail" => |image: DynamicImage| image.blur(4.0),
             "guild" | "avatar" => |image: DynamicImage| image.resize(64, 64, image::imageops::FilterType::Lanczos3),
@@ -70,21 +71,31 @@ impl LoadedImage {
         };
 
         #[cfg(not(target_arch = "wasm32"))]
-        return tokio::task::spawn_blocking(move || Self::load_inner(data, id, kind, modify))
+        return tokio::task::spawn_blocking(move || Self::load_inner(frame, data, id, kind, modify))
             .await
             .unwrap();
 
         #[cfg(target_arch = "wasm32")]
-        return Self::load_inner(data, id, kind, modify);
+        return Self::load_inner(frame, data, id, kind, modify);
     }
 
-    fn load_inner(data: Bytes, id: FileId, kind: SmolStr, modify: fn(DynamicImage) -> DynamicImage) -> Self {
+    fn load_inner(
+        frame: epi::Frame,
+        data: Bytes,
+        id: FileId,
+        kind: SmolStr,
+        modify: fn(DynamicImage) -> DynamicImage,
+    ) -> Self {
         let image = image::load_from_memory(data.as_ref()).unwrap();
         let image = modify(image);
         let (pixels, dimensions) = image_to_egui(image);
+        let tex_id = frame.alloc_texture(Image {
+            pixels,
+            size: dimensions,
+        });
 
         Self {
-            pixels,
+            tex_id,
             dimensions,
             id,
             kind,

@@ -11,7 +11,7 @@ use client::{
     Cache, Client, FetchEvent,
 };
 use eframe::{
-    egui::{self, FontData, FontDefinitions, RichText},
+    egui::{self, FontData, FontDefinitions, RichText, Ui},
     epi,
 };
 use tokio::sync::mpsc as tokio_mpsc;
@@ -68,6 +68,79 @@ impl State {
                 self.latest_errors.push(msg);
                 exit
             }
+        }
+    }
+
+    fn handle_sockets(&mut self) {
+        handle_future!(self, |res: ClientResult<EventsSocket>| {
+            self.run(res, |state, sock| {
+                let (tx, rx) = sock.split();
+                let _ = state.socket_tx_tx.try_send(tx);
+                let _ = state.socket_rx_tx.try_send(rx);
+            });
+        });
+    }
+
+    fn handle_errors(&mut self) {
+        handle_future!(self, |res: ClientResult<()>| {
+            self.run(res, |_, _| {});
+        });
+    }
+
+    fn handle_events(&mut self, frame: &epi::Frame) {
+        handle_future!(self, |res: ClientResult<Vec<FetchEvent>>| {
+            self.run(res, |state, events| {
+                let mut posts = Vec::new();
+                for event in events {
+                    match event {
+                        FetchEvent::Attachment { attachment, file } => {
+                            if attachment.kind.starts_with("image") && attachment.kind.ends_with("svg+xml").not() {
+                                spawn_future!(
+                                    state,
+                                    LoadedImage::load(
+                                        frame.clone(),
+                                        file.data().clone(),
+                                        attachment.id,
+                                        attachment.name.into()
+                                    )
+                                );
+                            }
+                        }
+                        event => state.cache.process_event(&mut posts, event),
+                    }
+                }
+                if let Some(client) = state.client.as_ref().cloned() {
+                    spawn_future!(state, {
+                        async move {
+                            let mut events = Vec::with_capacity(posts.len());
+                            for post in posts {
+                                client.process_post(&mut events, post).await?;
+                            }
+                            ClientResult::Ok(events)
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    fn handle_images(&mut self, frame: &epi::Frame) {
+        handle_future!(self, |image: LoadedImage| {
+            let maybe_pos = self.loading_images.borrow().iter().position(|id| image.id() == id);
+            if let Some(pos) = maybe_pos {
+                self.loading_images.borrow_mut().remove(pos);
+            }
+            self.image_cache.add(frame, image);
+        });
+    }
+
+    fn handle_socket_events(&mut self) {
+        let mut evs = Vec::new();
+        while let Ok(ev) = self.socket_event_rx.try_recv() {
+            evs.push(FetchEvent::Harmony(ev));
+        }
+        if !evs.is_empty() {
+            spawn_future!(self, std::future::ready(ClientResult::Ok(evs)));
         }
     }
 }
@@ -144,6 +217,67 @@ impl App {
             last_error: false,
         }
     }
+
+    fn view_bottom_panel(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            if self.state.latest_errors.is_empty().not() {
+                if ui.button("clear").clicked() {
+                    self.state.latest_errors.clear();
+                }
+                if ui
+                    .button(RichText::new("new errors").color(egui::Color32::RED))
+                    .clicked()
+                {
+                    self.last_error = true;
+                }
+            } else {
+                ui.label("no errors");
+            }
+
+            ui.add_space(ui.available_width() - 100.0);
+
+            egui::Frame::group(ui.style()).margin([0.0, 0.0]).show(ui, |ui| {
+                menu_text_button("top_panel_menu", "menu", ui, |ui| {
+                    if ui.text_button("settings").clicked() {
+                        self.state.push_screen(super::screen::settings::Screen::default());
+                    }
+
+                    ui.add(egui::Separator::default().spacing(0.0));
+
+                    if ui.text_button("logout").clicked() {
+                        self.screens.clear(super::screen::auth::Screen::new());
+                        let client = self.state.client().clone();
+                        self.state.client = None;
+                        let state = &self.state;
+                        spawn_future!(state, async move { client.logout().await });
+                    }
+
+                    ui.add(egui::Separator::default().spacing(0.0));
+
+                    if ui.text_button("exit loqui").clicked() {
+                        std::process::exit(0);
+                    }
+                });
+            });
+        });
+    }
+
+    fn view_errors_window(&mut self, ctx: &egui::CtxRef) {
+        let latest_errors = &self.state.latest_errors;
+        egui::Window::new("last error")
+            .open(&mut self.last_error)
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    let errors_len = latest_errors.len();
+                    for (index, error) in latest_errors.iter().enumerate() {
+                        ui.label(error);
+                        if index != errors_len - 1 {
+                            ui.separator();
+                        }
+                    }
+                });
+            });
+    }
 }
 
 impl epi::App for App {
@@ -189,131 +323,29 @@ impl epi::App for App {
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
-        self.state.futures.run();
-
         let state = &mut self.state;
-        handle_future!(state, |res: ClientResult<()>| {
-            state.run(res, |_, _| {});
-        });
 
-        handle_future!(state, |res: ClientResult<Vec<FetchEvent>>| {
-            state.run(res, |state, events| {
-                let mut posts = Vec::new();
-                for event in events {
-                    match event {
-                        FetchEvent::Attachment { attachment, file } => {
-                            if attachment.kind.starts_with("image") && attachment.kind.ends_with("svg+xml").not() {
-                                spawn_future!(
-                                    state,
-                                    LoadedImage::load(file.data().clone(), attachment.id, attachment.name.into())
-                                );
-                            }
-                        }
-                        event => state.cache.process_event(&mut posts, event),
-                    }
-                }
-                if let Some(client) = state.client.as_ref().cloned() {
-                    spawn_future!(state, {
-                        async move {
-                            let mut events = Vec::with_capacity(posts.len());
-                            for post in posts {
-                                client.process_post(&mut events, post).await?;
-                            }
-                            ClientResult::Ok(events)
-                        }
-                    });
-                }
-            });
-        });
+        state.futures.run();
 
-        handle_future!(state, |res: ClientResult<EventsSocket>| {
-            state.run(res, |state, sock| {
-                let (tx, rx) = sock.split();
-                let _ = state.socket_tx_tx.try_send(tx);
-                let _ = state.socket_rx_tx.try_send(rx);
-            });
-        });
+        state.handle_errors();
+        state.handle_events(frame);
+        state.handle_sockets();
+        state.handle_images(frame);
 
-        handle_future!(state, |image: LoadedImage| {
-            let maybe_pos = state.loading_images.borrow().iter().position(|id| image.id() == id);
-            if let Some(pos) = maybe_pos {
-                state.loading_images.borrow_mut().remove(pos);
-            }
-            state.image_cache.add(frame, image);
-        });
-
-        // handle socket events
-        let mut evs = Vec::new();
-        while let Ok(ev) = state.socket_event_rx.try_recv() {
-            evs.push(FetchEvent::Harmony(ev));
-        }
-        if !evs.is_empty() {
-            spawn_future!(state, std::future::ready(ClientResult::Ok(evs)));
-        }
+        state.handle_socket_events();
 
         ctx.set_pixels_per_point(1.45);
         {
-            let last_error = &mut self.last_error;
-            let screens = &mut self.screens;
             egui::TopBottomPanel::top("bottom_panel")
                 .max_height(12.0)
                 .min_height(12.0)
                 .show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        if state.latest_errors.is_empty().not() {
-                            if ui.button("clear").clicked() {
-                                state.latest_errors.clear();
-                            }
-                            if ui
-                                .button(RichText::new("new errors").color(egui::Color32::RED))
-                                .clicked()
-                            {
-                                *last_error = true;
-                            }
-                        } else {
-                            ui.label("no errors");
-                        }
-
-                        ui.add_space(ui.available_width() - 100.0);
-
-                        egui::Frame::group(ui.style()).margin([0.0, 0.0]).show(ui, |ui| {
-                            menu_text_button("top_panel_menu", "menu", ui, |ui| {
-                                if ui.text_button("settings").clicked() {
-                                    state.push_screen(super::screen::settings::Screen::default());
-                                }
-
-                                ui.add(egui::Separator::default().spacing(0.0));
-
-                                if ui.text_button("logout").clicked() {
-                                    screens.clear(super::screen::auth::Screen::new());
-                                    let client = state.client().clone();
-                                    state.client = None;
-                                    spawn_future!(state, async move { client.logout().await });
-                                }
-
-                                ui.add(egui::Separator::default().spacing(0.0));
-
-                                if ui.text_button("exit loqui").clicked() {
-                                    std::process::exit(0);
-                                }
-                            });
-                        });
-                    });
+                    self.view_bottom_panel(ui);
                 });
         }
 
         if self.state.latest_errors.is_empty().not() {
-            let latest_errors = &self.state.latest_errors;
-            egui::Window::new("last error")
-                .open(&mut self.last_error)
-                .show(ctx, |ui| {
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        for error in latest_errors.iter() {
-                            ui.label(error);
-                            ui.separator();
-                        }
-                    });
-                });
+            self.view_errors_window(ctx);
         }
 
         self.screens.current_mut().update(ctx, frame, &mut self.state);
