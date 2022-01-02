@@ -274,20 +274,28 @@ impl Screen {
                 });
             }
         } else if highlight_message {
-            // TODO: search for "plain" URLs and add `<>` around them
-            easy_mark::easy_mark(ui, text);
+            let urls = text
+                .split_whitespace()
+                .filter(|s| s.starts_with("http://") || s.starts_with("https://"))
+                .filter_map(|maybe_url| Some((maybe_url, maybe_url.parse::<Uri>().ok()?)))
+                .filter(|(_, url)| matches!(url.scheme_str(), Some("http" | "https")));
+            let mut text = text.to_string();
+            for (source, _) in urls {
+                text = text.replace(source, &format!("<{}>", source));
+            }
+            easy_mark::easy_mark(ui, &text);
         } else {
             ui.label(text);
         }
     }
 
     fn view_message_url_embeds(&mut self, state: &State, ui: &mut Ui, text: &str) {
-        let urls = text.split_whitespace().filter_map(|maybe_url| {
-            maybe_url
-                .parse::<Uri>()
-                .ok()
-                .and_then(|url| Some((state.cache.get_link_data(&url)?, maybe_url)))
-        });
+        let urls = text
+            .split_whitespace()
+            .filter(|s| s.starts_with("http://") || s.starts_with("https://"))
+            .filter_map(|maybe_url| Some((maybe_url, maybe_url.parse::<Uri>().ok()?)))
+            .filter(|(_, url)| matches!(url.scheme_str(), Some("http" | "https")))
+            .filter_map(|(maybe_url, url)| Some((state.cache.get_link_data(&url)?, maybe_url)));
         for (data, url) in urls {
             match data {
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
