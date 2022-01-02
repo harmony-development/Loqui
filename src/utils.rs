@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use client::{harmony_rust_sdk::api::rest::FileId, Client};
 use eframe::egui::{self, Align, Color32, Key, Layout, Response, Ui};
 
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
@@ -55,4 +56,27 @@ pub fn horizontal_centered_justified() -> Layout {
     Layout::left_to_right()
         .with_cross_align(Align::Center)
         .with_cross_justify(true)
+}
+
+pub fn make_url_from_file_id(client: &Client, id: &FileId) -> String {
+    match id {
+        FileId::Hmc(hmc) => format!(
+            "https://{}:{}/_harmony/media/download/{}",
+            hmc.server(),
+            hmc.port(),
+            hmc.id(),
+        ),
+        FileId::Id(id) => {
+            let homeserver = client.inner().homeserver_url();
+            format!("{}_harmony/media/download/{}", homeserver, id)
+        }
+        FileId::External(ext) => {
+            let homeserver = client.inner().homeserver_url();
+            format!(
+                "{}_harmony/media/download/{}",
+                homeserver,
+                urlencoding::encode(&ext.to_string())
+            )
+        }
+    }
 }

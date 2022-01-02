@@ -277,6 +277,7 @@ impl Screen {
     fn view_message_attachment(&mut self, state: &State, ui: &mut Ui, frame: &epi::Frame, attachment: &Attachment) {
         let mut handled = false;
         let mut fetch = false;
+        let mut open = false;
 
         if attachment.kind.starts_with("image") {
             let mut no_thumbnail = false;
@@ -297,10 +298,11 @@ impl Screen {
             });
 
             if let Some((texid, size)) = state.image_cache.get_image(&attachment.id) {
-                ui.add(egui::ImageButton::new(
+                let open_but = ui.add(egui::ImageButton::new(
                     texid,
                     maybe_size.unwrap_or_else(|| downscale(size)),
                 ));
+                open = open_but.clicked();
                 handled = true;
             } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
                 let button = ui.add(egui::ImageButton::new(
@@ -329,7 +331,7 @@ impl Screen {
         }
 
         if !handled {
-            fetch = ui.button(format!("download '{}'", attachment.name)).clicked();
+            open = ui.button(format!("open '{}'", attachment.name)).clicked();
         }
 
         if fetch {
@@ -339,6 +341,10 @@ impl Screen {
                 let (_, file) = client.fetch_attachment(attachment.id.clone()).await?;
                 ClientResult::Ok(vec![FetchEvent::Attachment { attachment, file }])
             });
+        }
+
+        if open {
+            let _ = webbrowser::open(&make_url_from_file_id(state.client(), &attachment.id));
         }
     }
 

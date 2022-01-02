@@ -1457,6 +1457,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "tracing-wasm",
+ "urlencoding",
  "wasm-bindgen-futures",
  "webbrowser",
 ]

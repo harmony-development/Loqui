@@ -334,21 +334,25 @@ impl epi::App for App {
 
         state.handle_socket_events();
 
+        // ui drawing starts here
+
         ctx.set_pixels_per_point(1.45);
-        {
-            egui::TopBottomPanel::top("bottom_panel")
-                .max_height(12.0)
-                .min_height(12.0)
-                .show(ctx, |ui| {
-                    self.view_bottom_panel(ui);
-                });
-        }
+
+        egui::TopBottomPanel::top("bottom_panel")
+            .max_height(12.0)
+            .min_height(12.0)
+            .show(ctx, |ui| {
+                self.view_bottom_panel(ui);
+            });
 
         if self.state.latest_errors.is_empty().not() {
             self.view_errors_window(ctx);
         }
 
         self.screens.current_mut().update(ctx, frame, &mut self.state);
+
+        // post ui update handling
+
         if let Some(screen) = self.state.next_screen.take() {
             self.screens.push_boxed(screen);
         } else if self.state.prev_screen {
