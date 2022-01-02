@@ -557,22 +557,17 @@ impl Screen {
         guard!(let Some(guild_id) = self.current.guild() else { return });
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
 
-        let row_height = ui.spacing().interact_size.y;
-        let row_number = guild.members.len();
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, false])
-            .show_rows(ui, row_height, row_number, |ui, range| {
-                let sorted_members = Self::sort_members(state, guild);
-                guard!(let Some(users) = sorted_members.get(range) else { return });
-                for (id, _) in users {
-                    guard!(let Some(user) = state.cache.get_user(**id) else { continue });
-                    ui.horizontal(|ui| {
-                        self.view_user_avatar(state, ui, Some(user), None);
-                        ui.label(user.username.as_str());
-                    });
-                    ui.separator();
-                }
-            });
+        egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            let sorted_members = Self::sort_members(state, guild);
+            for (id, _) in sorted_members {
+                guard!(let Some(user) = state.cache.get_user(*id) else { continue });
+                ui.horizontal(|ui| {
+                    self.view_user_avatar(state, ui, Some(user), None);
+                    ui.label(user.username.as_str());
+                });
+                ui.separator();
+            }
+        });
     }
 
     fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
