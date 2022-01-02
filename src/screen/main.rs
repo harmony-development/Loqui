@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, cell::RefCell, cmp::Ordering, ops::Not};
+use std::{cell::RefCell, cmp::Ordering, ops::Not};
 
 use client::{
     guild::Guild,
@@ -14,11 +14,60 @@ use crate::{image_cache::LoadedImage, screen::guild_settings};
 
 use super::prelude::*;
 
+#[derive(Debug, Default)]
+struct CurrentIds {
+    guild: Option<u64>,
+    channel: Option<u64>,
+}
+
+impl CurrentIds {
+    #[inline(always)]
+    fn guild(&self) -> Option<u64> {
+        self.guild
+    }
+
+    #[inline(always)]
+    fn set_guild(&mut self, id: u64) {
+        self.guild = Some(id);
+        self.channel = None;
+    }
+
+    #[inline(always)]
+    fn is_guild(&self, id: u64) -> bool {
+        self.guild().map_or(false, |oid| oid == id)
+    }
+
+    #[inline(always)]
+    fn has_guild(&self) -> bool {
+        self.guild().is_some()
+    }
+
+    #[inline(always)]
+    fn channel(&self) -> Option<(u64, u64)> {
+        self.guild().zip(self.channel)
+    }
+
+    #[inline(always)]
+    fn set_channel(&mut self, id: u64) {
+        self.channel = Some(id);
+    }
+
+    #[inline(always)]
+    fn is_channel(&self, gid: u64, cid: u64) -> bool {
+        self.channel().map_or(false, |oid| oid == (gid, cid))
+    }
+
+    #[inline(always)]
+    fn has_channel(&self) -> bool {
+        self.channel().is_some()
+    }
+}
+
 #[derive(Default)]
 pub struct Screen {
+    // guild id -> channel id
     last_channel_id: AHashMap<u64, u64>,
-    current_guild: Option<u64>,
-    current_channel: Option<u64>,
+    current: CurrentIds,
     composer_text: String,
     edit_message_text: String,
     scroll_to_bottom: bool,
@@ -66,7 +115,7 @@ impl Screen {
             for (guild_id, guild) in state.cache.get_guilds() {
                 let icon = RichText::new(guild.name.get(0..1).unwrap_or("u").to_ascii_uppercase()).strong();
 
-                let is_enabled = self.current_guild != Some(guild_id);
+                let is_enabled = self.current.guild() != Some(guild_id);
 
                 let button = ui
                     .add_enabled_ui(is_enabled, |ui| {
@@ -81,9 +130,9 @@ impl Screen {
                     .on_hover_text(guild.name.as_str());
 
                 if button.clicked() {
-                    self.current_guild = Some(guild_id);
+                    self.current.set_guild(guild_id);
                     if let Some(channel_id) = self.last_channel_id.get(&guild_id) {
-                        self.current_channel = Some(*channel_id);
+                        self.current.set_channel(*channel_id);
                     }
                     if guild.channels.is_empty() && guild.members.is_empty() {
                         spawn_evs!(state, |events, c| async move {
@@ -115,7 +164,7 @@ impl Screen {
     }
 
     fn view_channels(&mut self, state: &mut State, ui: &mut Ui) {
-        guard!(let Some(guild_id) = self.current_guild else { return });
+        guard!(let Some(guild_id) = self.current.guild() else { return });
 
         let guild_name = state
             .cache
@@ -141,10 +190,10 @@ impl Screen {
             for (channel_id, channel) in state.cache.get_channels(guild_id) {
                 let text = RichText::new(format!("#{}", channel.name));
 
-                let is_enabled = !channel.is_category && (self.current_channel != Some(channel_id));
+                let is_enabled = (channel.is_category || self.current.is_channel(guild_id, channel_id)).not();
                 let button = ui.add_enabled(is_enabled, egui::Button::new(text).frame(false));
                 if button.clicked() {
-                    self.current_channel = Some(channel_id);
+                    self.current.set_channel(channel_id);
                     self.last_channel_id.insert(guild_id, channel_id);
                     if !channel.reached_top && channel.messages.is_empty() {
                         spawn_evs!(state, |events, c| async move {
@@ -356,7 +405,7 @@ impl Screen {
     }
 
     fn view_messages(&mut self, state: &mut State, ui: &mut Ui) {
-        guard!(let Some((guild_id, channel_id)) = self.current_guild.zip(self.current_channel) else { return });
+        guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
         guard!(let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return });
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
         let user_id = state.client().user_id();
@@ -441,7 +490,7 @@ impl Screen {
     }
 
     fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::CtxRef) {
-        guard!(let Some((guild_id, channel_id)) = self.current_guild.zip(self.current_channel) else { return });
+        guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
 
         let text_edit = ui.add(
             egui::TextEdit::multiline(&mut self.composer_text)
@@ -501,7 +550,7 @@ impl Screen {
     }
 
     fn view_members(&mut self, state: &State, ui: &mut Ui) {
-        guard!(let Some(guild_id) = self.current_guild else { return });
+        guard!(let Some(guild_id) = self.current.guild() else { return });
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
 
         let row_height = ui.spacing().interact_size.y;
@@ -551,8 +600,8 @@ impl AppScreen for Screen {
 
         if ctx.input().key_pressed(egui::Key::ArrowUp) {
             let maybe_channel = self
-                .current_guild
-                .zip(self.current_channel)
+                .current
+                .channel()
                 .and_then(|(gid, cid)| state.cache.get_channel(gid, cid));
 
             if let Some(chan) = maybe_channel {
@@ -596,7 +645,7 @@ impl AppScreen for Screen {
             .resizable(false)
             .show(ctx, |ui| self.view_guilds(state, ui));
 
-        if self.current_guild.is_some() {
+        if self.current.has_guild() {
             egui::panel::SidePanel::left("channel_panel")
                 .min_width(100.0)
                 .max_width(300.0)
@@ -618,12 +667,12 @@ impl AppScreen for Screen {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let chan_name = self
-                .current_guild
-                .zip(self.current_channel)
+                .current
+                .channel()
                 .and_then(|(gid, cid)| state.cache.get_channel(gid, cid))
                 .map_or_else(|| "select a channel".to_string(), |c| format!("#{}", c.name));
 
-            if self.current_guild.is_some() {
+            if self.current.has_guild() {
                 egui::TopBottomPanel::top("central_top_panel")
                     .resizable(false)
                     .min_height(12.0)
@@ -642,7 +691,7 @@ impl AppScreen for Screen {
                         });
                     });
 
-                if self.current_channel.is_some() {
+                if self.current.has_channel() {
                     ui.with_layout(
                         Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
                         |ui| {
