@@ -749,6 +749,7 @@ impl AppScreen for Screen {
             egui::panel::SidePanel::left("channel_panel")
                 .min_width(100.0)
                 .max_width(300.0)
+                .default_width(150.0)
                 .resizable(true)
                 .show(ctx, |ui| {
                     self.view_channels(state, ui);
@@ -758,6 +759,7 @@ impl AppScreen for Screen {
                 egui::panel::SidePanel::right("member_panel")
                     .min_width(100.0)
                     .max_width(300.0)
+                    .default_width(150.0)
                     .resizable(true)
                     .show(ctx, |ui| {
                         self.view_members(state, ui);
