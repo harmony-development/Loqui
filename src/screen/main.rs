@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::Ordering, ops::Not};
+use std::{cmp::Ordering, ops::Not};
 
 use client::{
     guild::Guild,
@@ -76,45 +76,55 @@ pub struct Screen {
     prev_editing_message: Option<u64>,
     disable_users_bar: bool,
     typing_animating: bool,
-    invite_text: RefCell<String>,
-    guild_name_text: RefCell<String>,
-    show_join_guild: RefCell<bool>,
-    show_create_guild: RefCell<bool>,
+    invite_text: String,
+    guild_name_text: String,
+    show_join_guild: bool,
+    show_create_guild: bool,
 }
 
 impl Screen {
-    fn view_join_guild(&self, state: &mut State, ui: &mut Ui) {
-        ui.vertical(|ui| {
-            ui.label(RichText::new("join guild").heading().strong());
-            ui.add_space(12.0);
-            ui.text_edit_singleline(&mut *self.invite_text.borrow_mut());
-            ui.add_space(6.0);
+    fn view_join_guild(&mut self, state: &mut State, ctx: &egui::CtxRef) {
+        let invite_text = &mut self.invite_text;
+        egui::Window::new("join guild")
+            .open(&mut self.show_join_guild)
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("join guild").heading().strong());
+                    ui.add_space(12.0);
+                    ui.text_edit_singleline(invite_text);
+                    ui.add_space(6.0);
 
-            let enabled = self.invite_text.borrow().is_empty().not();
-            if ui.add_enabled(enabled, egui::Button::new("join")).clicked() {
-                let invite_id = self.invite_text.borrow().clone();
-                spawn_client_fut!(state, |client| {
-                    client.join_guild(invite_id).await?;
+                    let enabled = invite_text.is_empty().not();
+                    if ui.add_enabled(enabled, egui::Button::new("join")).clicked() {
+                        let invite_id = invite_text.clone();
+                        spawn_client_fut!(state, |client| {
+                            client.join_guild(invite_id).await?;
+                        });
+                    }
                 });
-            }
-        });
+            });
     }
 
-    fn view_create_guild(&self, state: &mut State, ui: &mut Ui) {
-        ui.vertical(|ui| {
-            ui.label(RichText::new("create guild").heading().strong());
-            ui.add_space(12.0);
-            ui.text_edit_singleline(&mut *self.guild_name_text.borrow_mut());
-            ui.add_space(6.0);
+    fn view_create_guild(&mut self, state: &mut State, ctx: &egui::CtxRef) {
+        let guild_name_text = &mut self.guild_name_text;
+        egui::Window::new("create guild")
+            .open(&mut self.show_create_guild)
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("create guild").heading().strong());
+                    ui.add_space(12.0);
+                    ui.text_edit_singleline(guild_name_text);
+                    ui.add_space(6.0);
 
-            let enabled = self.guild_name_text.borrow().is_empty().not();
-            if ui.add_enabled(enabled, egui::Button::new("create")).clicked() {
-                let guild_name = self.guild_name_text.borrow().clone();
-                spawn_client_fut!(state, |client| {
-                    client.create_guild(guild_name).await?;
+                    let enabled = guild_name_text.is_empty().not();
+                    if ui.add_enabled(enabled, egui::Button::new("create")).clicked() {
+                        let guild_name = guild_name_text.clone();
+                        spawn_client_fut!(state, |client| {
+                            client.create_guild(guild_name).await?;
+                        });
+                    }
                 });
-            }
-        });
+            });
     }
 
     fn view_guilds(&mut self, state: &mut State, ui: &mut Ui) {
@@ -166,14 +176,14 @@ impl Screen {
                 .add_sized([32.0, 32.0], egui::Button::new(RichText::new("j+").strong()))
                 .on_hover_text("join guild");
             if join_but.clicked() {
-                *self.show_join_guild.borrow_mut() = true;
+                self.show_join_guild = true;
             }
 
             let create_but = ui
                 .add_sized([32.0, 32.0], egui::Button::new(RichText::new("c+").strong()))
                 .on_hover_text("create guild");
             if create_but.clicked() {
-                *self.show_create_guild.borrow_mut() = true;
+                self.show_create_guild = true;
             }
         });
     }
@@ -748,17 +758,8 @@ impl AppScreen for Screen {
             }
         }
 
-        egui::Window::new("join guild")
-            .open(&mut self.show_join_guild.borrow_mut())
-            .show(ctx, |ui| {
-                self.view_join_guild(state, ui);
-            });
-
-        egui::Window::new("create guild")
-            .open(&mut self.show_create_guild.borrow_mut())
-            .show(ctx, |ui| {
-                self.view_create_guild(state, ui);
-            });
+        self.view_join_guild(state, ctx);
+        self.view_create_guild(state, ctx);
 
         egui::panel::SidePanel::left("guild_panel")
             .min_width(32.0)
