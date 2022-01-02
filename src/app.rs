@@ -4,7 +4,7 @@ use client::{
     harmony_rust_sdk::{
         api::{
             chat::{Event, EventSource},
-            rest::FileId,
+            rest::{About, FileId},
         },
         client::{EventsReadSocket, EventsSocket, EventsWriteSocket},
     },
@@ -22,7 +22,7 @@ use crate::{
     futures::Futures,
     image_cache::{ImageCache, LoadedImage},
     screen::{auth, BoxedScreen, Screen, ScreenStack},
-    widgets::menu_text_button,
+    widgets::{menu_text_button, view_about},
 };
 
 pub struct State {
@@ -35,6 +35,7 @@ pub struct State {
     pub loading_images: RefCell<Vec<FileId>>,
     pub futures: Futures,
     pub latest_errors: Vec<String>,
+    pub about: Option<About>,
     next_screen: Option<BoxedScreen>,
     prev_screen: bool,
 }
@@ -71,6 +72,7 @@ impl State {
         }
     }
 
+    #[inline(always)]
     fn handle_sockets(&mut self) {
         handle_future!(self, |res: ClientResult<EventsSocket>| {
             self.run(res, |state, sock| {
@@ -81,12 +83,14 @@ impl State {
         });
     }
 
+    #[inline(always)]
     fn handle_errors(&mut self) {
         handle_future!(self, |res: ClientResult<()>| {
             self.run(res, |_, _| {});
         });
     }
 
+    #[inline(always)]
     fn handle_events(&mut self, frame: &epi::Frame) {
         handle_future!(self, |res: ClientResult<Vec<FetchEvent>>| {
             self.run(res, |state, events| {
@@ -124,6 +128,7 @@ impl State {
         });
     }
 
+    #[inline(always)]
     fn handle_images(&mut self, frame: &epi::Frame) {
         handle_future!(self, |image: LoadedImage| {
             let maybe_pos = self.loading_images.borrow().iter().position(|id| image.id() == id);
@@ -134,6 +139,7 @@ impl State {
         });
     }
 
+    #[inline(always)]
     fn handle_socket_events(&mut self) {
         let mut evs = Vec::new();
         while let Ok(ev) = self.socket_event_rx.try_recv() {
@@ -143,12 +149,22 @@ impl State {
             spawn_future!(self, std::future::ready(ClientResult::Ok(evs)));
         }
     }
+
+    #[inline(always)]
+    fn handle_about(&mut self) {
+        handle_future!(self, |res: ClientResult<About>| {
+            self.run(res, |state, about| {
+                state.about = Some(about);
+            });
+        });
+    }
 }
 
 pub struct App {
     state: State,
     screens: ScreenStack,
-    last_error: bool,
+    show_errors_window: bool,
+    show_about_window: bool,
 }
 
 impl App {
@@ -210,14 +226,17 @@ impl App {
                 loading_images: RefCell::new(Vec::new()),
                 futures,
                 latest_errors: Vec::new(),
+                about: None,
                 next_screen: None,
                 prev_screen: false,
             },
             screens: ScreenStack::new(auth::Screen::new()),
-            last_error: false,
+            show_errors_window: false,
+            show_about_window: false,
         }
     }
 
+    #[inline(always)]
     fn view_bottom_panel(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
             if self.state.latest_errors.is_empty().not() {
@@ -228,7 +247,7 @@ impl App {
                     .button(RichText::new("new errors").color(egui::Color32::RED))
                     .clicked()
                 {
-                    self.last_error = true;
+                    self.show_errors_window = true;
                 }
             } else {
                 ui.label("no errors");
@@ -238,11 +257,13 @@ impl App {
 
             egui::Frame::group(ui.style()).margin([0.0, 0.0]).show(ui, |ui| {
                 menu_text_button("top_panel_menu", "menu", ui, |ui| {
+                    if ui.text_button("about server").clicked() {
+                        self.show_about_window = true;
+                    }
+
                     if ui.text_button("settings").clicked() {
                         self.state.push_screen(super::screen::settings::Screen::default());
                     }
-
-                    ui.add(egui::Separator::default().spacing(0.0));
 
                     if ui.text_button("logout").clicked() {
                         self.screens.clear(super::screen::auth::Screen::new());
@@ -252,8 +273,6 @@ impl App {
                         spawn_future!(state, async move { client.logout().await });
                     }
 
-                    ui.add(egui::Separator::default().spacing(0.0));
-
                     if ui.text_button("exit loqui").clicked() {
                         std::process::exit(0);
                     }
@@ -262,10 +281,11 @@ impl App {
         });
     }
 
+    #[inline(always)]
     fn view_errors_window(&mut self, ctx: &egui::CtxRef) {
         let latest_errors = &self.state.latest_errors;
         egui::Window::new("last error")
-            .open(&mut self.last_error)
+            .open(&mut self.show_errors_window)
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let errors_len = latest_errors.len();
@@ -275,6 +295,19 @@ impl App {
                             ui.separator();
                         }
                     }
+                });
+            });
+    }
+
+    #[inline(always)]
+    fn view_about_window(&mut self, ctx: &egui::CtxRef) {
+        guard!(let Some(about) = self.state.about.as_ref() else { return });
+
+        egui::Window::new("about server")
+            .open(&mut self.show_about_window)
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    view_about(ui, about);
                 });
             });
     }
@@ -327,6 +360,7 @@ impl epi::App for App {
 
         state.futures.run();
 
+        state.handle_about();
         state.handle_errors();
         state.handle_events(frame);
         state.handle_sockets();
@@ -348,6 +382,8 @@ impl epi::App for App {
         if self.state.latest_errors.is_empty().not() {
             self.view_errors_window(ctx);
         }
+
+        self.view_about_window(ctx);
 
         self.screens.current_mut().update(ctx, frame, &mut self.state);
 

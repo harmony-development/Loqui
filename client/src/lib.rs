@@ -30,6 +30,7 @@ use harmony_rust_sdk::{
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
         profile::{stream_event::Event as ProfileEvent, UserStatus, *},
+        rest::About,
     },
     client::{
         api::{
@@ -773,6 +774,11 @@ impl Client {
         subs.extend(guild_ids.into_iter().map(EventSource::Guild));
         let resp = self.inner.subscribe_events(subs).await?;
         Ok(resp)
+    }
+
+    pub async fn fetch_about(&self) -> ClientResult<About> {
+        let about = harmony_rust_sdk::client::api::rest::about(&self.inner).await?;
+        Ok(about)
     }
 
     pub async fn delete_message(&self, guild_id: u64, channel_id: u64, message_id: u64) -> ClientResult<()> {

@@ -11,9 +11,9 @@ use client::{
     smol_str::SmolStr,
     Client, IndexMap, Uri,
 };
-use eframe::egui::RichText;
+use eframe::egui::{Response, RichText};
 
-use crate::screen::main;
+use crate::{screen::main, widgets::view_about};
 
 use super::prelude::*;
 
@@ -97,6 +97,8 @@ impl Screen {
                 Ok(maybe_client) => {
                     if let Some(client) = maybe_client {
                         state.client = Some(client);
+
+                        spawn_client_fut!(state, |client| { client.fetch_about().await? });
                         if state.client().auth_status().is_authenticated() {
                             spawn_future!(state, std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
                         } else {
@@ -203,10 +205,9 @@ impl Screen {
         }
     }
 
-    fn view_main(&mut self, state: &mut State, ui: &mut Ui) {
+    fn view_main(&mut self, state: &mut State, ui: &mut Ui) -> Response {
         if self.waiting {
-            ui.label(RichText::new("please wait...").heading());
-            return;
+            return ui.label(RichText::new("please wait...").heading());
         }
 
         egui::Grid::new("auth_grid")
@@ -214,7 +215,8 @@ impl Screen {
             .min_col_width(300.0)
             .show(ui, |ui| {
                 self.view_grid(state, ui);
-            });
+            })
+            .response
     }
 }
 
@@ -233,6 +235,15 @@ impl AppScreen for Screen {
                 |ui| {
                     ui.add_space(50.0);
                     self.view_main(state, ui);
+                    if let Some(about) = state.about.as_ref() {
+                        let desired_width = 250.0;
+                        ui.add_space(ui.available_width() - desired_width);
+                        ui.allocate_ui([desired_width, ui.available_height()].into(), |ui| {
+                            ui.group(|ui| {
+                                view_about(ui, about);
+                            });
+                        });
+                    }
                 },
             )
         });
