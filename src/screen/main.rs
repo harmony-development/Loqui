@@ -517,6 +517,7 @@ impl Screen {
                                     ui.close_menu();
                                 }
                                 if ui.button("copy").clicked() {
+                                    ui.output().copied_text = text.clone();
                                     ui.close_menu();
                                 }
                             }
