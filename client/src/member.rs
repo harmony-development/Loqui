@@ -1,10 +1,7 @@
 use std::time::Instant;
 
-use ahash::AHashMap;
 use harmony_rust_sdk::{api::profile::UserStatus, client::api::rest::FileId};
 use smol_str::SmolStr;
-
-pub type Members = AHashMap<u64, Member>;
 
 #[derive(Debug, Clone)]
 pub struct Member {
@@ -14,6 +11,7 @@ pub struct Member {
     pub typing_in_channel: Option<(u64, u64, Instant)>,
     pub status: UserStatus,
     pub is_bot: bool,
+    pub fetched: bool,
 }
 
 impl Default for Member {
@@ -25,6 +23,7 @@ impl Default for Member {
             typing_in_channel: None,
             status: UserStatus::OfflineUnspecified,
             is_bot: false,
+            fetched: false,
         }
     }
 }

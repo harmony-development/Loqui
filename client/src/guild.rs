@@ -6,27 +6,21 @@ use harmony_rust_sdk::{
     },
     client::api::rest::FileId,
 };
+use smol_str::SmolStr;
 
-use crate::{
-    role::{Role, RolePerms, Roles},
-    IndexMap,
-};
-
-use super::channel::Channels;
-
-pub type Guilds = IndexMap<u64, Guild>;
+use crate::role::{Role, RolePerms, Roles};
 
 #[derive(Debug, Clone, Default)]
 pub struct Guild {
-    pub name: String,
+    pub name: SmolStr,
     pub picture: Option<FileId>,
-    pub channels: Channels,
+    pub channels: Vec<u64>,
     pub roles: Roles,
     pub role_perms: RolePerms,
     pub members: AHashMap<u64, Vec<u64>>,
-    pub homeserver: String,
+    pub homeserver: SmolStr,
     pub perms: Vec<Permission>,
-    pub init_fetching: bool,
+    pub fetched: bool,
 }
 
 impl Guild {
@@ -34,40 +28,60 @@ impl Guild {
         has_permission(self.perms.iter().map(|p| (p.matches.as_str(), p.ok)), query).unwrap_or(false)
     }
 
-    pub fn update_channel_order(&mut self, pos: ItemPosition, channel_id: u64) {
-        update_order(&mut self.channels, pos, channel_id)
+    pub fn update_channel_order(&mut self, position: ItemPosition, id: u64) {
+        let ordering = &mut self.channels;
+
+        let maybe_ord_index = |id: u64| ordering.iter().position(|oid| id.eq(oid));
+        let maybe_replace_with = |ordering: &mut Vec<u64>, index| {
+            ordering.insert(index, 0);
+            if let Some(channel_index) = ordering.iter().position(|oid| id.eq(oid)) {
+                ordering.remove(channel_index);
+            }
+            *ordering.iter_mut().find(|oid| 0.eq(*oid)).unwrap() = id;
+        };
+
+        let item_id = position.item_id;
+        match position.position() {
+            Position::After => {
+                if let Some(index) = maybe_ord_index(item_id) {
+                    maybe_replace_with(ordering, index.saturating_add(1));
+                }
+            }
+            Position::BeforeUnspecified => {
+                if let Some(index) = maybe_ord_index(item_id) {
+                    maybe_replace_with(ordering, index);
+                }
+            }
+        }
     }
 
-    pub fn update_role_order(&mut self, pos: ItemPosition, role_id: u64) {
-        update_order(&mut self.roles, pos, role_id)
+    pub fn update_role_order(&mut self, position: ItemPosition, role_id: u64) {
+        let map = &mut self.roles;
+        if let (Some(item_pos), Some(pos)) = (map.get_index_of(&role_id), map.get_index_of(&position.item_id)) {
+            match position.position() {
+                Position::BeforeUnspecified => {
+                    let pos = pos + 1;
+                    if pos != item_pos && pos < map.len() {
+                        map.swap_indices(pos, item_pos);
+                    }
+                }
+                Position::After => {
+                    if pos != 0 {
+                        map.swap_indices(pos - 1, item_pos);
+                    } else {
+                        let (k, v) = map.pop().unwrap();
+                        map.reverse();
+                        map.insert(k, v);
+                        map.reverse();
+                    }
+                }
+            }
+        }
     }
 
     pub fn highest_role_for_member(&self, user_id: u64) -> Option<(&u64, &Role)> {
         self.members
             .get(&user_id)
             .and_then(|role_ids| self.roles.iter().find(|(id, role)| role.hoist && role_ids.contains(id)))
-    }
-}
-
-fn update_order<V>(map: &mut IndexMap<u64, V>, position: ItemPosition, id: u64) {
-    if let (Some(item_pos), Some(pos)) = (map.get_index_of(&id), map.get_index_of(&position.item_id)) {
-        match position.position() {
-            Position::BeforeUnspecified => {
-                let pos = pos + 1;
-                if pos != item_pos && pos < map.len() {
-                    map.swap_indices(pos, item_pos);
-                }
-            }
-            Position::After => {
-                if pos != 0 {
-                    map.swap_indices(pos - 1, item_pos);
-                } else {
-                    let (k, v) = map.pop().unwrap();
-                    map.reverse();
-                    map.insert(k, v);
-                    map.reverse();
-                }
-            }
-        }
     }
 }

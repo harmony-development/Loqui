@@ -1,53 +1,66 @@
 #![windows_subsystem = "windows"]
+#![forbid(unsafe_code)]
 
+#[cfg(not(target_arch = "wasm32"))]
 use client::content::ContentStore;
-use screen::ScreenManager;
-use style::DEF_SIZE;
-
-use iced::{Application, Font, Settings};
+#[cfg(not(target_arch = "wasm32"))]
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-pub use client;
-pub mod component;
-pub mod screen;
-pub mod style;
-
-const IOSEVKA_BYTES: &[u8] = include_bytes!("fonts/Iosevka.ttf");
-const IOSEVKA: Font = Font::External {
-    name: "Iosevka Fixed Regular",
-    bytes: IOSEVKA_BYTES,
-};
-
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
+    let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
+    let _guard = rt.enter();
+
     // Create the content store
     let content_store = ContentStore::default();
     content_store.create_req_dirs().unwrap();
-    let term_logger = fmt::layer();
+
     let log_file = content_store.log_file();
+
+    let term_logger = fmt::layer();
     let file_appender = tracing_appender::rolling::never(log_file.parent().unwrap(), log_file.file_name().unwrap());
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     let file_logger = fmt::layer().with_ansi(false).with_writer(non_blocking);
 
     tracing_subscriber::registry()
-        .with(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::from("info"))
-                .add_directive("wgpu_core=error".parse().unwrap())
-                .add_directive("iced_wgpu=error".parse().unwrap())
-                .add_directive("gfx_memory=error".parse().unwrap())
-                .add_directive("gfx_descriptor".parse().unwrap())
-                .add_directive("gfx_backend_vulkan=error".parse().unwrap()),
-        )
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::from("info")))
         .with(term_logger)
         .with(file_logger)
         .init();
 
-    let mut settings = Settings::with_flags(content_store);
-    settings.window.size = (1280, 720);
-    settings.antialiasing = false;
-    settings.default_font = Some(include_bytes!("fonts/Inter.otf"));
-    settings.default_text_size = DEF_SIZE;
-    settings.text_multithreading = true;
+    let icon_data = {
+        let icon_raw = include_bytes!("../resources/loqui.ico");
+        let image = image::load_from_memory(icon_raw).expect("icon must be valid");
+        let image = image.to_rgba8();
+        eframe::epi::IconData {
+            width: image.width(),
+            height: image.height(),
+            rgba: image.into_vec(),
+        }
+    };
 
-    ScreenManager::run(settings).unwrap();
+    let app = loqui::App::new();
+    let native_options = eframe::NativeOptions {
+        initial_window_size: Some([1200.0, 700.0].into()),
+        drag_and_drop_support: true,
+        icon_data: Some(icon_data),
+        ..Default::default()
+    };
+    eframe::run_native(Box::new(app), native_options);
+}
+
+#[cfg(target_arch = "wasm32")]
+use eframe::wasm_bindgen::{self, prelude::*};
+
+/// This is the entry-point for all the web-assembly.
+/// This is called once from the HTML.
+/// It loads the app, installs some callbacks, then returns.
+/// You can add more callbacks like this if you want to call in to your code.
+#[cfg(target_arch = "wasm32")]
+fn main() -> Result<(), eframe::wasm_bindgen::JsValue> {
+    console_error_panic_hook::set_once();
+    tracing_wasm::set_as_global_default();
+
+    let app = loqui::App::new();
+    eframe::start_web("egui_canvas", Box::new(app))
 }

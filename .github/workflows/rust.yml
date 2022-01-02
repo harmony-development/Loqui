@@ -18,8 +18,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTC_FORCE_INCREMENTAL: 1
-  CARGO_INCREMENTAL: 1
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
 
 jobs:
   tagref:
@@ -34,7 +34,7 @@ jobs:
     - name: Check tagref
       run: ./tagref && ./tagref list-unused
 
-  build:
+  check:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -48,7 +48,7 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt update -yy
-        sudo apt install -yy --no-install-recommends clang libgtk-3-0 libgtk-3-dev protobuf-compiler libpango1.0-0 libpango1.0-dev libglib2.0-0 libglib2.0-dev python3 pkg-config cmake openssl libx11-dev libxcb1-dev libfreetype6 libfreetype6-dev fontconfig libfontconfig-dev expat libcairo2-dev libcairo2 libatk1.0-0 libatk1.0-dev libgdk-pixbuf2.0-0 libgdk-pixbuf2.0-dev clang lld unzip
+        sudo apt install -yy --no-install-recommends clang libgtk-3-0 libgtk-3-dev protobuf-compiler libpango1.0-0 libpango1.0-dev libglib2.0-0 libglib2.0-dev python3 pkg-config cmake openssl libx11-dev libxcb1-dev libfreetype6 libfreetype6-dev fontconfig libfontconfig-dev expat libcairo2-dev libcairo2 libatk1.0-0 libatk1.0-dev libgdk-pixbuf2.0-0 libgdk-pixbuf2.0-dev libxcb-shape0 libxcb-shape0-dev libxcb-xfixes0 libxcb-xfixes0-dev clang lld unzip
   
     - name: Install rust
       uses: actions-rs/toolchain@v1.0.7
@@ -60,6 +60,8 @@ jobs:
 
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
+      with:
+        key: cache-debug
 
     - name: Clippy
       uses: actions-rs/clippy-check@v1
@@ -67,8 +69,38 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         name: 'clippy (${{ matrix.os }})'
 
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    needs: check
+    if: github.event_name == 'push'
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt update -yy
+        sudo apt install -yy --no-install-recommends clang libgtk-3-0 libgtk-3-dev protobuf-compiler libpango1.0-0 libpango1.0-dev libglib2.0-0 libglib2.0-dev python3 pkg-config cmake openssl libx11-dev libxcb1-dev libfreetype6 libfreetype6-dev fontconfig libfontconfig-dev expat libcairo2-dev libcairo2 libatk1.0-0 libatk1.0-dev libgdk-pixbuf2.0-0 libgdk-pixbuf2.0-dev libxcb-shape0 libxcb-shape0-dev libxcb-xfixes0 libxcb-xfixes0-dev clang lld unzip
+  
+    - name: Install rust
+      uses: actions-rs/toolchain@v1.0.7
+      with:
+        toolchain: stable
+        default: true
+        override: true
+        components: rustfmt,clippy
+
+    - name: Cache rust
+      uses: Swatinem/rust-cache@v1
+      with:
+        key: cache-release
+
     - name: Build
-      run: cargo build --release 
+      run: cargo build --locked --release
 
     - name: UPX windows
       if: ${{ matrix.os == 'windows-latest' }}
