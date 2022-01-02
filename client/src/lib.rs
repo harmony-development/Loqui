@@ -22,9 +22,9 @@ use harmony_rust_sdk::{
             all_permissions, color,
             get_channel_messages_request::Direction,
             stream_event::{Event as ChatEvent, *},
-            ChannelKind, Content as HarmonyContent, DeleteMessageRequest, Event, EventSource, FormattedText,
-            GetGuildChannelsRequest, GetGuildListRequest, GetGuildMembersRequest, GetGuildRequest,
-            GetGuildRolesRequest, GetUserRolesRequest, Message as HarmonyMessage, Permission,
+            ChannelKind, Content as HarmonyContent, CreateGuildRequest, DeleteMessageRequest, Event, EventSource,
+            FormattedText, GetGuildChannelsRequest, GetGuildListRequest, GetGuildMembersRequest, GetGuildRequest,
+            GetGuildRolesRequest, GetUserRolesRequest, JoinGuildRequest, Message as HarmonyMessage, Permission,
             QueryHasPermissionRequest, Role, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
@@ -779,6 +779,16 @@ impl Client {
         self.inner
             .call(DeleteMessageRequest::new(guild_id, channel_id, message_id))
             .await?;
+        Ok(())
+    }
+
+    pub async fn join_guild(&self, invite_id: String) -> ClientResult<()> {
+        self.inner.call(JoinGuildRequest::new(invite_id)).await?;
+        Ok(())
+    }
+
+    pub async fn create_guild(&self, name: String) -> ClientResult<()> {
+        self.inner.call(CreateGuildRequest::default().with_name(name)).await?;
         Ok(())
     }
 

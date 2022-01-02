@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use eframe::egui::{self, Color32, Key, Response, Ui};
+use eframe::egui::{self, Align, Color32, Key, Layout, Response, Ui};
 
 pub(crate) use crate::futures::{handle_future, spawn_evs, spawn_future};
 pub use anyhow::{anyhow, bail, ensure, Error};
@@ -49,4 +49,10 @@ impl UiExt for Ui {
 
 pub fn rgb_color(color: [u8; 3]) -> Color32 {
     Color32::from_rgb(color[0], color[1], color[2])
+}
+
+pub fn horizontal_centered_justified() -> Layout {
+    Layout::left_to_right()
+        .with_cross_align(Align::Center)
+        .with_cross_justify(true)
 }

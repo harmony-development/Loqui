@@ -10,7 +10,6 @@ mod prelude {
 }
 
 pub mod auth;
-pub mod guild_discovery;
 pub mod guild_settings;
 pub mod main;
 pub mod settings;

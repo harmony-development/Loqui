@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, ops::Not};
+use std::{borrow::BorrowMut, cell::RefCell, cmp::Ordering, ops::Not};
 
 use client::{
     guild::Guild,
@@ -12,7 +12,7 @@ use eframe::egui::{Color32, Event, RichText};
 
 use crate::{image_cache::LoadedImage, screen::guild_settings};
 
-use super::{guild_discovery, prelude::*};
+use super::prelude::*;
 
 #[derive(Default)]
 pub struct Screen {
@@ -25,9 +25,42 @@ pub struct Screen {
     editing_message: Option<u64>,
     prev_editing_message: Option<u64>,
     disable_users_bar: bool,
+    invite_text: RefCell<String>,
+    guild_name_text: RefCell<String>,
+    show_join_guild: RefCell<bool>,
+    show_create_guild: RefCell<bool>,
 }
 
 impl Screen {
+    fn view_join_guild(&self, state: &mut State, ui: &mut Ui) {
+        ui.vertical(|ui| {
+            ui.label(RichText::new("join guild").heading().strong());
+            ui.add_space(12.0);
+            ui.text_edit_singleline(&mut *self.invite_text.borrow_mut());
+            ui.add_space(6.0);
+
+            if ui.button("join").clicked() {
+                let invite_id = self.invite_text.borrow().clone();
+                let client = state.client().clone();
+                spawn_future!(state, async move { client.join_guild(invite_id).await });
+            }
+        });
+    }
+
+    fn view_create_guild(&self, state: &mut State, ui: &mut Ui) {
+        ui.vertical(|ui| {
+            ui.label(RichText::new("create guild").heading().strong());
+            ui.add_space(12.0);
+            ui.text_edit_singleline(&mut *self.guild_name_text.borrow_mut());
+            ui.add_space(6.0);
+            if ui.button("create").clicked() {
+                let guild_name = self.guild_name_text.borrow().clone();
+                let client = state.client().clone();
+                spawn_future!(state, async move { client.create_guild(guild_name).await });
+            }
+        });
+    }
+
     fn view_guilds(&mut self, state: &mut State, ui: &mut Ui) {
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             for (guild_id, guild) in state.cache.get_guilds() {
@@ -39,7 +72,7 @@ impl Screen {
                     .add_enabled_ui(is_enabled, |ui| {
                         if let Some((texid, _)) = guild.picture.as_ref().and_then(|id| state.image_cache.get_avatar(id))
                         {
-                            ui.add(egui::ImageButton::new(texid, [32.0, 32.0]))
+                            ui.add(egui::ImageButton::new(texid, [32.0, 32.0]).frame(false))
                         } else {
                             ui.add_sized([32.0, 32.0], egui::Button::new(icon))
                         }
@@ -65,11 +98,18 @@ impl Screen {
                 ui.separator();
             }
 
-            let discovery_but = ui
-                .add_sized([32.0, 32.0], egui::Button::new(RichText::new("+").strong()))
-                .on_hover_text("join / create guild");
-            if discovery_but.clicked() {
-                state.push_screen(guild_discovery::Screen::default());
+            let join_but = ui
+                .add_sized([32.0, 32.0], egui::Button::new(RichText::new("j+").strong()))
+                .on_hover_text("join guild");
+            if join_but.clicked() {
+                *self.show_join_guild.borrow_mut() = true;
+            }
+
+            let create_but = ui
+                .add_sized([32.0, 32.0], egui::Button::new(RichText::new("c+").strong()))
+                .on_hover_text("create guild");
+            if create_but.clicked() {
+                *self.show_create_guild.borrow_mut() = true;
             }
         });
     }
@@ -537,6 +577,18 @@ impl AppScreen for Screen {
                 }
             }
         }
+
+        egui::Window::new("join guild")
+            .open(&mut self.show_join_guild.borrow_mut())
+            .show(ctx, |ui| {
+                self.view_join_guild(state, ui);
+            });
+
+        egui::Window::new("create guild")
+            .open(&mut self.show_create_guild.borrow_mut())
+            .show(ctx, |ui| {
+                self.view_create_guild(state, ui);
+            });
 
         egui::panel::SidePanel::left("guild_panel")
             .min_width(32.0)

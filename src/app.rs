@@ -192,6 +192,10 @@ impl epi::App for App {
         self.state.futures.run();
 
         let state = &mut self.state;
+        handle_future!(state, |res: ClientResult<()>| {
+            state.run(res, |_, _| {});
+        });
+
         handle_future!(state, |res: ClientResult<Vec<FetchEvent>>| {
             state.run(res, |state, events| {
                 let mut posts = Vec::new();
@@ -317,6 +321,7 @@ impl epi::App for App {
             self.screens.push_boxed(screen);
         } else if self.state.prev_screen {
             self.screens.pop();
+            self.state.prev_screen = false;
         }
     }
 }
