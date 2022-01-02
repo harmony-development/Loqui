@@ -647,9 +647,12 @@ impl AppScreen for Screen {
                         Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
                         |ui| {
                             ui.vertical(|ui| {
-                                self.view_messages(state, ui);
-                                ui.separator();
-                                self.view_composer(state, ui, ctx);
+                                ui.allocate_ui([ui.available_width(), ui.available_height() - 32.0].into(), |ui| {
+                                    self.view_messages(state, ui);
+                                });
+                                ui.group(|ui| {
+                                    self.view_composer(state, ui, ctx);
+                                });
                             });
                         },
                     );
