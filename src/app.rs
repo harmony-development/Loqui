@@ -359,6 +359,7 @@ impl epi::App for App {
         let state = &mut self.state;
 
         state.futures.run();
+        state.cache.maintain();
 
         state.handle_about();
         state.handle_errors();

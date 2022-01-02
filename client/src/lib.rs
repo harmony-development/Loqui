@@ -25,7 +25,7 @@ use harmony_rust_sdk::{
             ChannelKind, Content as HarmonyContent, CreateGuildRequest, DeleteMessageRequest, Event, EventSource,
             FormattedText, GetGuildChannelsRequest, GetGuildListRequest, GetGuildMembersRequest, GetGuildRequest,
             GetGuildRolesRequest, GetUserRolesRequest, JoinGuildRequest, Message as HarmonyMessage, Permission,
-            QueryHasPermissionRequest, Role, UpdateMessageTextRequest,
+            QueryHasPermissionRequest, Role, TypingRequest, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -143,6 +143,16 @@ pub struct Cache {
 }
 
 impl Cache {
+    pub fn maintain(&mut self) {
+        for member in self.users.values_mut() {
+            if let Some((_, _, time)) = member.typing_in_channel {
+                if time.elapsed().as_secs() > 5 {
+                    member.typing_in_channel = None;
+                }
+            }
+        }
+    }
+
     pub fn set_sub_tx(&mut self, sub_tx: UnboundedSender<EventSource>) {
         self.sub_tx = Some(sub_tx)
     }
@@ -809,6 +819,11 @@ impl Client {
 
     pub async fn create_guild(&self, name: String) -> ClientResult<()> {
         self.inner.call(CreateGuildRequest::default().with_name(name)).await?;
+        Ok(())
+    }
+
+    pub async fn send_typing(&self, guild_id: u64, channel_id: u64) -> ClientResult<()> {
+        self.inner.call(TypingRequest::new(guild_id, channel_id)).await?;
         Ok(())
     }
 

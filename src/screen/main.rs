@@ -74,6 +74,7 @@ pub struct Screen {
     editing_message: Option<u64>,
     prev_editing_message: Option<u64>,
     disable_users_bar: bool,
+    typing_animating: bool,
     invite_text: RefCell<String>,
     guild_name_text: RefCell<String>,
     show_join_guild: RefCell<bool>,
@@ -513,6 +514,50 @@ impl Screen {
             });
     }
 
+    fn view_typing_members(&mut self, state: &State, ui: &mut Ui) {
+        guard!(let Some(guild_id) = self.current.guild() else { return });
+        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+
+        let current_user_id = state.client().user_id();
+        let typing_members = self
+            .get_typing_members(state, guild)
+            .filter(|(id, _)| current_user_id.ne(id))
+            .collect::<Vec<_>>();
+        let typing_members_len = typing_members.len();
+
+        if typing_members_len > 0 {
+            let mut typing_animating = self.typing_animating;
+
+            ui.horizontal(|ui| {
+                let mut names = String::new();
+
+                for (index, (_, member)) in typing_members.iter().enumerate() {
+                    names.push_str(member.username.as_str());
+                    if index != typing_members_len - 1 {
+                        names.push_str(", ");
+                    } else {
+                        names.push(' ');
+                    }
+                }
+
+                let typing_animate_value =
+                    ui.animate_bool_with_time_alternate("typing animation", &mut typing_animating, 1.0);
+
+                names.push_str((typing_members_len > 1).then(|| "are").unwrap_or("is"));
+                names.push_str(" typing");
+                for index in 1..=3 {
+                    let dot_index = (typing_animate_value * 5.0) as usize;
+                    let ch = (dot_index == index).then(|| '·').unwrap_or('.');
+                    names.push(ch);
+                }
+
+                ui.label(RichText::new(names).small().strong());
+            });
+
+            self.typing_animating = typing_animating;
+        }
+    }
+
     fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::CtxRef) {
         guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
 
@@ -523,7 +568,9 @@ impl Screen {
                 .hint_text("Enter message..."),
         );
 
-        if self.editing_message.is_none() && ctx.input().events.iter().any(|ev| matches!(ev, Event::Text(_))) {
+        let user_inputted_text = ctx.input().events.iter().any(|ev| matches!(ev, Event::Text(_)));
+
+        if text_edit.has_focus().not() && self.editing_message.is_none() && user_inputted_text {
             text_edit.request_focus();
         }
 
@@ -546,6 +593,18 @@ impl Screen {
                 client.send_message(echo_id, guild_id, channel_id, message).await
             });
             self.scroll_to_bottom = true;
+        } else if user_inputted_text {
+            let current_user_id = state.client().user_id();
+            let should_send_typing = state.cache.get_guild(guild_id).map_or(false, |guild| {
+                self.get_typing_members(state, guild)
+                    .any(|(id, _)| id == current_user_id)
+                    .not()
+            });
+            if should_send_typing {
+                spawn_client_fut!(state, |client| {
+                    client.send_typing(guild_id, channel_id).await?;
+                });
+            }
         }
     }
 
@@ -617,6 +676,19 @@ impl Screen {
             }
         });
         sorted_members
+    }
+
+    fn get_typing_members<'a>(
+        &'a self,
+        state: &'a State,
+        guild: &'a Guild,
+    ) -> impl Iterator<Item = (u64, &'a Member)> + 'a {
+        guild
+            .members
+            .keys()
+            .filter_map(move |uid| Some((*uid, state.cache.get_user(*uid)?)))
+            .filter_map(|member| Some((member, member.1.typing_in_channel?)))
+            .filter_map(move |(member, (gid, cid, _))| self.current.is_channel(gid, cid).then(|| member))
     }
 }
 
@@ -724,10 +796,11 @@ impl AppScreen for Screen {
                         Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
                         |ui| {
                             ui.vertical(|ui| {
-                                ui.allocate_ui([ui.available_width(), ui.available_height() - 32.0].into(), |ui| {
+                                ui.allocate_ui([ui.available_width(), ui.available_height() - 38.0].into(), |ui| {
                                     self.view_messages(state, ui, frame);
                                 });
                                 ui.group(|ui| {
+                                    self.view_typing_members(state, ui);
                                     self.view_composer(state, ui, ctx);
                                 });
                             });

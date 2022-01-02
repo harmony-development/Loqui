@@ -46,11 +46,22 @@ impl ResponseExt for Response {
 
 pub trait UiExt {
     fn text_button(&mut self, text: &str) -> Response;
+    fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32;
 }
 
 impl UiExt for Ui {
     fn text_button(&mut self, text: &str) -> Response {
         self.add(egui::Button::new(text).frame(false))
+    }
+
+    fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32 {
+        let anim_val = self.ctx().animate_bool_with_time(egui::Id::new(id), *b, time);
+        if anim_val == 1.0 {
+            *b = false;
+        } else if anim_val == 0.0 {
+            *b = true;
+        }
+        anim_val
     }
 }
 
