@@ -1,6 +1,6 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Deref};
 
-use client::{harmony_rust_sdk::api::rest::FileId, Client};
+use client::{harmony_rust_sdk::api::rest::FileId, tracing, Client};
 use eframe::egui::{self, Align, Color32, Key, Layout, Response, Ui};
 
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
@@ -77,6 +77,31 @@ pub fn make_url_from_file_id(client: &Client, id: &FileId) -> String {
                 homeserver,
                 urlencoding::encode(&ext.to_string())
             )
+        }
+    }
+}
+
+// opens a URL in background
+pub fn open_url(url: impl Deref<Target = str> + Send + 'static) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::thread::spawn(move || {
+            let url = url.deref();
+
+            if let Err(err) = open::that(url) {
+                tracing::error!("error opening URL, falling back to browser: {}", err);
+                if let Err(err) = webbrowser::open(url) {
+                    tracing::error!("error opening URL: {}", err);
+                }
+            }
+        });
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let url = url.deref();
+        if let Err(err) = webbrowser::open(url) {
+            tracing::error!("error opening URL: {}", err);
         }
     }
 }

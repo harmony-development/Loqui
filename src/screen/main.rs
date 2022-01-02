@@ -267,7 +267,7 @@ impl Screen {
                 }
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsMedia(data) => {
                     if ui.button(format!("open '{}' in browser", data.filename)).clicked() {
-                        let _ = webbrowser::open(url);
+                        open_url(url.to_string());
                     }
                 }
             }
@@ -344,7 +344,7 @@ impl Screen {
         }
 
         if open {
-            let _ = webbrowser::open(&make_url_from_file_id(state.client(), &attachment.id));
+            open_url(make_url_from_file_id(state.client(), &attachment.id));
         }
     }
 
@@ -364,8 +364,8 @@ impl Screen {
                         egui::Button::new(RichText::new(&header.text).strong()),
                     );
                     if button.clicked() {
-                        if let Some(url) = header.url.as_deref() {
-                            let _ = webbrowser::open(url);
+                        if let Some(url) = header.url.clone() {
+                            open_url(url);
                         }
                     }
                     if let Some(subtext) = filter_empty(&header.subtext) {

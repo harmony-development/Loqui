@@ -67,6 +67,7 @@ tokio = { version = "1.9", features = [
     "rt-multi-thread",
     "macros",
 ] }
+open = "2.0"
 
 [package.metadata.nix]
 longDescription = """
