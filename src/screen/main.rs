@@ -12,7 +12,7 @@ use eframe::egui::{Color32, Event, RichText};
 
 use crate::{image_cache::LoadedImage, screen::guild_settings};
 
-use super::{guild_discovery, prelude::*, settings};
+use super::{guild_discovery, prelude::*};
 
 #[derive(Default)]
 pub struct Screen {
@@ -82,15 +82,20 @@ impl Screen {
             .get_guild(guild_id)
             .map_or_else(|| "unknown", |g| g.name.as_str());
 
-        let but = ui
-            .add(egui::Button::new(format!("⚙ {}", guild_name)).small().frame(false))
-            .on_hover_text("open guild settings");
+        let menu_but_clicked = egui::Frame::group(ui.style())
+            .margin([0.0, 1.5])
+            .show(ui, |ui| {
+                let but = ui
+                    .add(egui::Button::new(format!("⚙ {}", guild_name)).small().frame(false))
+                    .on_hover_text("open guild settings");
 
-        if but.clicked() {
+                but.clicked()
+            })
+            .inner;
+
+        if menu_but_clicked {
             state.push_screen(guild_settings::Screen::new(guild_id));
         }
-
-        ui.add(egui::Separator::default().spacing(3.0));
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             for (channel_id, channel) in state.cache.get_channels(guild_id) {
@@ -477,43 +482,6 @@ impl Screen {
             });
     }
 
-    fn view_profile_menu(&mut self, state: &mut State, ui: &mut Ui) {
-        let username = state
-            .cache
-            .get_user(state.client().user_id())
-            .map_or_else(|| "loading...", |u| u.username.as_str());
-        let title = format!("☰ - {}", username);
-
-        let response = ui.add_sized(
-            [ui.available_width(), 12.0],
-            egui::Button::new(title).small().frame(false),
-        );
-        let popup_id = ui.make_persistent_id("profile_menu");
-        if response.clicked() {
-            ui.memory().toggle_popup(popup_id);
-        }
-        egui::popup_below_widget(ui, popup_id, &response, |ui| {
-            if ui.text_button("settings").clicked() {
-                state.push_screen(settings::Screen::default());
-            }
-
-            ui.add(egui::Separator::default().spacing(0.0));
-
-            if ui.text_button("logout").clicked() {
-                let client = state.client().clone();
-                spawn_future!(state, async move { client.logout().await });
-                state.client = None;
-                state.pop_screen();
-            }
-
-            ui.add(egui::Separator::default().spacing(0.0));
-
-            if ui.text_button("exit loqui").clicked() {
-                std::process::exit(0);
-            }
-        });
-    }
-
     fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
         let mut sorted_members = guild
             .members
@@ -591,8 +559,6 @@ impl AppScreen for Screen {
                     .max_width(300.0)
                     .resizable(true)
                     .show(ctx, |ui| {
-                        self.view_profile_menu(state, ui);
-                        ui.add(egui::Separator::default().spacing(3.0));
                         self.view_members(state, ui);
                     });
             }

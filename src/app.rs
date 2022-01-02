@@ -22,6 +22,7 @@ use crate::{
     futures::Futures,
     image_cache::{ImageCache, LoadedImage},
     screen::{auth, BoxedScreen, Screen, ScreenStack},
+    widgets::menu_text_button,
 };
 
 pub struct State {
@@ -33,7 +34,7 @@ pub struct State {
     pub image_cache: ImageCache,
     pub loading_images: RefCell<Vec<FileId>>,
     pub futures: Futures,
-    pub latest_error: Option<Error>,
+    pub latest_errors: Vec<String>,
     next_screen: Option<BoxedScreen>,
     prev_screen: bool,
 }
@@ -51,14 +52,22 @@ impl State {
         self.prev_screen = true;
     }
 
-    pub fn run<F, E, O>(&mut self, res: Result<O, E>, f: F)
+    pub fn run<F, E, O>(&mut self, res: Result<O, E>, f: F) -> bool
     where
         F: FnOnce(&mut Self, O),
         E: std::error::Error + Send + Sync + 'static,
     {
         match res {
-            Ok(val) => f(self, val),
-            Err(err) => self.latest_error = Some(anyhow::Error::new(err)),
+            Ok(val) => {
+                f(self, val);
+                false
+            }
+            Err(err) => {
+                let msg = err.to_string();
+                let exit = msg.contains("h.bad-session");
+                self.latest_errors.push(msg);
+                exit
+            }
         }
     }
 }
@@ -127,7 +136,7 @@ impl App {
                 image_cache: Default::default(),
                 loading_images: RefCell::new(Vec::new()),
                 futures,
-                latest_error: None,
+                latest_errors: Vec::new(),
                 next_screen: None,
                 prev_screen: false,
             },
@@ -145,11 +154,11 @@ impl epi::App for App {
     fn setup(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         self.state.futures.init(frame);
         self.state.futures.spawn(async move {
-            let session = Client::read_latest_session()
+            guard!(let Some(session) = Client::read_latest_session().await else { return Ok(None); });
+
+            Client::new(session.homeserver.parse().unwrap(), Some(session.into()))
                 .await
-                .ok_or(ClientError::MissingLoginInfo)?;
-            let client = Client::new(session.homeserver.parse().unwrap(), Some(session.into())).await?;
-            ClientResult::Ok(client)
+                .map(Some)
         });
 
         let mut font_defs = FontDefinitions::default();
@@ -199,16 +208,17 @@ impl epi::App for App {
                         event => state.cache.process_event(&mut posts, event),
                     }
                 }
-                spawn_future!(state, {
-                    let client = state.client().clone();
-                    async move {
-                        let mut events = Vec::with_capacity(posts.len());
-                        for post in posts {
-                            client.process_post(&mut events, post).await?;
+                if let Some(client) = state.client.as_ref().cloned() {
+                    spawn_future!(state, {
+                        async move {
+                            let mut events = Vec::with_capacity(posts.len());
+                            for post in posts {
+                                client.process_post(&mut events, post).await?;
+                            }
+                            ClientResult::Ok(events)
                         }
-                        ClientResult::Ok(events)
-                    }
-                });
+                    });
+                }
             });
         });
 
@@ -238,32 +248,67 @@ impl epi::App for App {
         }
 
         ctx.set_pixels_per_point(1.45);
-        egui::TopBottomPanel::new(egui::panel::TopBottomSide::Bottom, "bottom_panel")
-            .max_height(25.0)
-            .min_height(25.0)
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    if self.state.latest_error.is_some() {
-                        if ui.button("clear").clicked() {
-                            self.state.latest_error = None;
+        {
+            let last_error = &mut self.last_error;
+            let screens = &mut self.screens;
+            egui::TopBottomPanel::top("bottom_panel")
+                .max_height(12.0)
+                .min_height(12.0)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        if state.latest_errors.is_empty().not() {
+                            if ui.button("clear").clicked() {
+                                state.latest_errors.clear();
+                            }
+                            if ui
+                                .button(RichText::new("new errors").color(egui::Color32::RED))
+                                .clicked()
+                            {
+                                *last_error = true;
+                            }
+                        } else {
+                            ui.label("no errors");
                         }
-                        if ui
-                            .button(RichText::new("new errors").color(egui::Color32::RED))
-                            .clicked()
-                        {
-                            self.last_error = true;
-                        }
-                    } else {
-                        ui.label("no errors");
-                    }
-                });
-            });
 
-        if let Some(err) = self.state.latest_error.as_ref() {
+                        ui.add_space(ui.available_width() - 100.0);
+
+                        egui::Frame::group(ui.style()).margin([0.0, 0.0]).show(ui, |ui| {
+                            menu_text_button("top_panel_menu", "menu", ui, |ui| {
+                                if ui.text_button("settings").clicked() {
+                                    state.push_screen(super::screen::settings::Screen::default());
+                                }
+
+                                ui.add(egui::Separator::default().spacing(0.0));
+
+                                if ui.text_button("logout").clicked() {
+                                    screens.clear(super::screen::auth::Screen::new());
+                                    let client = state.client().clone();
+                                    state.client = None;
+                                    spawn_future!(state, async move { client.logout().await });
+                                }
+
+                                ui.add(egui::Separator::default().spacing(0.0));
+
+                                if ui.text_button("exit loqui").clicked() {
+                                    std::process::exit(0);
+                                }
+                            });
+                        });
+                    });
+                });
+        }
+
+        if self.state.latest_errors.is_empty().not() {
+            let latest_errors = &self.state.latest_errors;
             egui::Window::new("last error")
                 .open(&mut self.last_error)
                 .show(ctx, |ui| {
-                    ui.label(err.to_string());
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        for error in latest_errors.iter() {
+                            ui.label(error);
+                            ui.separator();
+                        }
+                    });
                 });
         }
 

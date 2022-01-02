@@ -86,7 +86,7 @@ impl Screen {
                     }
                 }
                 Err(err) => {
-                    state.latest_error = Some(anyhow!(err));
+                    state.latest_errors.push(err.to_string());
                     state.client = None;
                     self.reset();
                 }
@@ -95,18 +95,20 @@ impl Screen {
     }
 
     fn handle_connect(&mut self, state: &mut State) {
-        handle_future!(state, |res: ClientResult<Client>| {
+        handle_future!(state, |res: ClientResult<Option<Client>>| {
             match res {
-                Ok(client) => {
-                    state.client = Some(client);
-                    if state.client().auth_status().is_authenticated() {
-                        spawn_future!(state, std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
-                    } else {
-                        self.next_step(state, AuthStepResponse::Initial);
+                Ok(maybe_client) => {
+                    if let Some(client) = maybe_client {
+                        state.client = Some(client);
+                        if state.client().auth_status().is_authenticated() {
+                            spawn_future!(state, std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
+                        } else {
+                            self.next_step(state, AuthStepResponse::Initial);
+                        }
                     }
                 }
                 Err(err) => {
-                    state.latest_error = Some(anyhow!(err));
+                    state.latest_errors.push(err.to_string());
                     self.reset();
                 }
             }
@@ -125,7 +127,7 @@ impl Screen {
             spawn_future!(state, async move {
                 let client = Client::new(homeserver_url, None).await?;
                 client.inner().begin_auth().await?;
-                ClientResult::Ok(client)
+                ClientResult::Ok(Some(client))
             });
             self.waiting = true;
         });
