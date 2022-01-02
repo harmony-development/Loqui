@@ -89,7 +89,8 @@ impl Screen {
             ui.text_edit_singleline(&mut *self.invite_text.borrow_mut());
             ui.add_space(6.0);
 
-            if ui.button("join").clicked() {
+            let enabled = self.invite_text.borrow().is_empty().not();
+            if ui.add_enabled(enabled, egui::Button::new("join")).clicked() {
                 let invite_id = self.invite_text.borrow().clone();
                 spawn_client_fut!(state, |client| {
                     client.join_guild(invite_id).await?;
@@ -104,7 +105,9 @@ impl Screen {
             ui.add_space(12.0);
             ui.text_edit_singleline(&mut *self.guild_name_text.borrow_mut());
             ui.add_space(6.0);
-            if ui.button("create").clicked() {
+
+            let enabled = self.guild_name_text.borrow().is_empty().not();
+            if ui.add_enabled(enabled, egui::Button::new("create")).clicked() {
                 let guild_name = self.guild_name_text.borrow().clone();
                 spawn_client_fut!(state, |client| {
                     client.create_guild(guild_name).await?;
