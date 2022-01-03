@@ -239,6 +239,8 @@ impl App {
     #[inline(always)]
     fn view_bottom_panel(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
+            egui::warn_if_debug_build(ui);
+
             let is_main_or_auth = matches!(self.screens.current().id(), "main" | "auth");
             if is_main_or_auth.not() && ui.button("<- back").on_hover_text("go back").clicked() {
                 self.state.pop_screen();
@@ -388,7 +390,6 @@ impl epi::App for App {
         if self.state.latest_errors.is_empty().not() {
             self.view_errors_window(ctx);
         }
-
         self.view_about_window(ctx);
 
         self.screens.current_mut().update(ctx, frame, &mut self.state);

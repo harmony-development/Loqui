@@ -23,7 +23,12 @@ fn main() {
     let file_logger = fmt::layer().with_ansi(false).with_writer(non_blocking);
 
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::from("info")))
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::from("info"))
+                .add_directive("h2::codec::framed_read=error".parse().unwrap())
+                .add_directive("h2::codec::framed_write=error".parse().unwrap()),
+        )
         .with(term_logger)
         .with(file_logger)
         .init();
