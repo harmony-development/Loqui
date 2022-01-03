@@ -22,7 +22,7 @@ use crate::{
     futures::Futures,
     image_cache::{ImageCache, LoadedImage},
     screen::{auth, BoxedScreen, Screen, ScreenStack},
-    widgets::{menu_text_button, view_about},
+    widgets::{easy_mark, menu_text_button, view_about},
 };
 
 pub struct State {
@@ -297,7 +297,7 @@ impl App {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let errors_len = latest_errors.len();
                     for (index, error) in latest_errors.iter().enumerate() {
-                        ui.label(error);
+                        easy_mark::easy_mark(ui, error);
                         if index != errors_len - 1 {
                             ui.separator();
                         }
