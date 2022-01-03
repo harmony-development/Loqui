@@ -1,8 +1,8 @@
-use std::{cmp::Ordering, ops::Not};
+use std::ops::Not;
 
 use client::{
     guild::Guild,
-    harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, profile::UserStatus},
+    harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes},
     member::Member,
     message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override},
     smol_str::SmolStr,
@@ -204,7 +204,7 @@ impl Screen {
             .inner;
 
         if menu_but_clicked {
-            state.push_screen(guild_settings::Screen::new(guild_id));
+            state.push_screen(guild_settings::Screen::new(guild_id, state));
         }
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
@@ -673,7 +673,7 @@ impl Screen {
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-            let sorted_members = Self::sort_members(state, guild);
+            let sorted_members = sort_members(state, guild);
             if sorted_members.is_empty().not() {
                 for (id, _) in sorted_members {
                     guard!(let Some(user) = state.cache.get_user(*id) else { continue });
@@ -692,26 +692,6 @@ impl Screen {
                     .on_hover_text_at_pointer("loading members");
             }
         });
-    }
-
-    fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
-        let mut sorted_members = guild
-            .members
-            .keys()
-            .flat_map(|id| state.cache.get_user(*id).map(|m| (id, m)))
-            .collect::<Vec<_>>();
-        sorted_members.sort_unstable_by(|(_, member), (_, other_member)| {
-            let name = member.username.as_str().cmp(other_member.username.as_str());
-            let offline = matches!(member.status, UserStatus::OfflineUnspecified);
-            let other_offline = matches!(other_member.status, UserStatus::OfflineUnspecified);
-
-            match (offline, other_offline) {
-                (false, true) => Ordering::Less,
-                (true, false) => Ordering::Greater,
-                _ => name,
-            }
-        });
-        sorted_members
     }
 
     fn get_typing_members<'a>(

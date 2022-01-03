@@ -22,10 +22,12 @@ use harmony_rust_sdk::{
             all_permissions, color,
             get_channel_messages_request::Direction,
             stream_event::{Event as ChatEvent, *},
-            ChannelKind, Content as HarmonyContent, CreateGuildRequest, DeleteMessageRequest, Event, EventSource,
-            FormattedText, GetGuildChannelsRequest, GetGuildListRequest, GetGuildMembersRequest, GetGuildRequest,
-            GetGuildRolesRequest, GetUserRolesRequest, JoinGuildRequest, Message as HarmonyMessage, Permission,
-            QueryHasPermissionRequest, Role, TypingRequest, UpdateMessageTextRequest,
+            BanUserRequest, ChannelKind, Content as HarmonyContent, CreateChannelRequest, CreateGuildRequest,
+            CreateInviteRequest, DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Event, EventSource,
+            FormattedText, GetGuildChannelsRequest, GetGuildInvitesRequest, GetGuildListRequest,
+            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetUserRolesRequest, Invite,
+            JoinGuildRequest, KickUserRequest, Message as HarmonyMessage, Permission, QueryHasPermissionRequest, Role,
+            TypingRequest, UnbanUserRequest, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -34,7 +36,11 @@ use harmony_rust_sdk::{
     },
     client::{
         api::{
-            chat::{channel::GetChannelMessages, message::SendMessage},
+            chat::{
+                channel::{GetChannelMessages, UpdateChannelInformation},
+                guild::UpdateGuildInformation,
+                message::SendMessage,
+            },
             profile::UpdateProfile,
             rest::{DownloadedFile, FileId},
         },
@@ -120,6 +126,12 @@ pub enum PostProcessEvent {
 
 pub enum FetchEvent {
     Harmony(Event),
+    AddInvite {
+        guild_id: u64,
+        id: String,
+        invite: Invite,
+    },
+    FetchedInvites(u64),
     LinkMetadata {
         url: Uri,
         data: FetchLinkData,
@@ -234,6 +246,12 @@ impl Cache {
     pub fn process_event(&mut self, post: &mut Vec<PostProcessEvent>, event: FetchEvent) {
         match event {
             FetchEvent::Harmony(event) => self.process_harmony_event(post, event),
+            FetchEvent::AddInvite { guild_id, id, invite } => {
+                self.get_guild_mut(guild_id).invites.insert(id, invite);
+            }
+            FetchEvent::FetchedInvites(guild_id) => {
+                self.get_guild_mut(guild_id).fetched_invites = true;
+            }
             FetchEvent::LinkMetadata { url, data } => {
                 self.link_embeds.insert(url, data);
             }
@@ -800,6 +818,72 @@ impl Client {
         Ok(resp)
     }
 
+    pub async fn ban_member(&self, guild_id: u64, user_id: u64) -> ClientResult<()> {
+        self.inner.call(BanUserRequest::new(guild_id, user_id)).await?;
+        Ok(())
+    }
+
+    pub async fn kick_member(&self, guild_id: u64, user_id: u64) -> ClientResult<()> {
+        self.inner.call(KickUserRequest::new(guild_id, user_id)).await?;
+        Ok(())
+    }
+
+    pub async fn unban_member(&self, guild_id: u64, user_id: u64) -> ClientResult<()> {
+        self.inner.call(UnbanUserRequest::new(guild_id, user_id)).await?;
+        Ok(())
+    }
+
+    pub async fn edit_channel(&self, guild_id: u64, channel_id: u64, new_name: impl Into<String>) -> ClientResult<()> {
+        self.inner
+            .call(UpdateChannelInformation::new(guild_id, channel_id).with_new_name(Some(new_name.into())))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn edit_guild(
+        &self,
+        guild_id: u64,
+        new_name: Option<String>,
+        new_picture: Option<FileId>,
+    ) -> ClientResult<()> {
+        self.inner
+            .call(
+                UpdateGuildInformation::new(guild_id)
+                    .with_new_guild_name(new_name)
+                    .with_new_guild_picture(new_picture),
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn create_channel(&self, guild_id: u64, name: impl Into<String>) -> ClientResult<()> {
+        self.inner
+            .call(
+                CreateChannelRequest::default()
+                    .with_guild_id(guild_id)
+                    .with_channel_name(name),
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete_channel(&self, guild_id: u64, channel_id: u64) -> ClientResult<()> {
+        self.inner.call(DeleteChannelRequest::new(guild_id, channel_id)).await?;
+        Ok(())
+    }
+
+    pub async fn create_invite(&self, guild_id: u64, name: impl Into<String>, uses: u32) -> ClientResult<()> {
+        self.inner
+            .call(CreateInviteRequest::new(guild_id, name.into(), uses))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete_invite(&self, guild_id: u64, name: impl Into<String>) -> ClientResult<()> {
+        self.inner.call(DeleteInviteRequest::new(guild_id, name.into())).await?;
+        Ok(())
+    }
+
     pub async fn fetch_about(&self) -> ClientResult<About> {
         let about = harmony_rust_sdk::client::api::rest::about(&self.inner).await?;
         Ok(about)
@@ -865,6 +949,24 @@ impl Client {
             .message_id;
 
         Ok(message_id)
+    }
+
+    pub async fn fetch_invites(&self, guild_id: u64, events: &mut Vec<FetchEvent>) -> ClientResult<()> {
+        let invites = self.inner.call(GetGuildInvitesRequest::new(guild_id)).await?;
+        events.extend(invites.invites.into_iter().filter_map(|invite| {
+            Some(FetchEvent::AddInvite {
+                guild_id,
+                id: invite.invite_id,
+                invite: invite.invite?,
+            })
+        }));
+        events.push(FetchEvent::FetchedInvites(guild_id));
+        Ok(())
+    }
+
+    pub async fn upload_file(&self, name: String, mimetype: String, data: Vec<u8>) -> ClientResult<FileId> {
+        let id = harmony_rust_sdk::client::api::rest::upload_extract_id(&self.inner, name, mimetype, data).await?;
+        Ok(FileId::Id(id))
     }
 
     pub async fn fetch_attachment(&self, id: FileId) -> ClientResult<(FileId, DownloadedFile)> {

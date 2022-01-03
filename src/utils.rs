@@ -1,12 +1,44 @@
-use std::{borrow::Cow, ops::Deref};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    ops::Deref,
+    sync::{atomic::AtomicBool, Arc},
+};
 
-use client::{harmony_rust_sdk::api::rest::FileId, tracing, Client};
-use eframe::egui::{self, Align, Color32, Key, Layout, Response, Ui};
+use client::{
+    guild::Guild,
+    harmony_rust_sdk::api::{profile::UserStatus, rest::FileId},
+    member::Member,
+    tracing, Client,
+};
+use eframe::egui::{self, Align, Color32, Key, Layout, Response, Ui, Widget};
 
+use crate::app::State;
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
 pub use anyhow::{anyhow, bail, ensure, Error};
 pub use client::error::{ClientError, ClientResult};
 pub use guard::guard;
+
+#[derive(Default, Clone)]
+pub struct AtomBool {
+    inner: Arc<AtomicBool>,
+}
+
+impl AtomBool {
+    pub fn new(val: bool) -> Self {
+        Self {
+            inner: Arc::new(AtomicBool::new(val)),
+        }
+    }
+
+    pub fn get(&self) -> bool {
+        self.inner.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn set(&self, val: bool) {
+        self.inner.store(val, std::sync::atomic::Ordering::Relaxed);
+    }
+}
 
 #[allow(dead_code)]
 pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
@@ -18,6 +50,26 @@ pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(value)
     }
+}
+
+pub fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
+    let mut sorted_members = guild
+        .members
+        .keys()
+        .flat_map(|id| state.cache.get_user(*id).map(|m| (id, m)))
+        .collect::<Vec<_>>();
+    sorted_members.sort_unstable_by(|(_, member), (_, other_member)| {
+        let name = member.username.as_str().cmp(other_member.username.as_str());
+        let offline = matches!(member.status, UserStatus::OfflineUnspecified);
+        let other_offline = matches!(other_member.status, UserStatus::OfflineUnspecified);
+
+        match (offline, other_offline) {
+            (false, true) => Ordering::Less,
+            (true, false) => Ordering::Greater,
+            _ => name,
+        }
+    });
+    sorted_members
 }
 
 // scale down resolution while preserving ratio
@@ -47,6 +99,7 @@ impl ResponseExt for Response {
 pub trait UiExt {
     fn text_button(&mut self, text: &str) -> Response;
     fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32;
+    fn add_hovered<W: Widget>(&mut self, widget: W) -> Response;
 }
 
 impl UiExt for Ui {
@@ -62,6 +115,10 @@ impl UiExt for Ui {
             *b = true;
         }
         anim_val
+    }
+
+    fn add_hovered<W: Widget>(&mut self, widget: W) -> Response {
+        self.add_visible(self.ui_contains_pointer(), widget)
     }
 }
 

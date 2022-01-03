@@ -22,6 +22,7 @@ pub struct Guild {
     pub perms: Vec<Permission>,
     pub invites: AHashMap<String, Invite>,
     pub fetched: bool,
+    pub fetched_invites: bool,
 }
 
 impl Guild {
