@@ -71,13 +71,14 @@ impl Display for ClientError {
                 if let InnerClientError::Internal(
                     harmony_rust_sdk::api::exports::hrpc::client::error::ClientError::EndpointError {
                         hrpc_error: err,
-                        ..
+                        endpoint,
                     },
                 ) = err
                 {
                     write!(
                         fmt,
-                        "API error: {} | {}",
+                        "(`{}`) API error: {} | {}",
+                        endpoint,
                         err.identifier.replace('\n', " "),
                         err.human_message.replace('\n', " ")
                     )
