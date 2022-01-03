@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ops::Not, sync::mpsc};
+use std::{any::Any, cell::RefCell, ops::Not, sync::mpsc};
 
 use client::{
     harmony_rust_sdk::{
@@ -239,14 +239,16 @@ impl App {
     #[inline(always)]
     fn view_bottom_panel(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
+            let is_main_or_auth = matches!(self.screens.current().id(), "main" | "auth");
+            if is_main_or_auth.not() && ui.button("<- back").on_hover_text("go back").clicked() {
+                self.state.pop_screen();
+            }
+
             if self.state.latest_errors.is_empty().not() {
-                if ui.button("clear").clicked() {
-                    self.state.latest_errors.clear();
-                }
-                if ui
-                    .button(RichText::new("new errors").color(egui::Color32::RED))
-                    .clicked()
-                {
+                let new_errors_but = ui
+                    .add(egui::Button::new(RichText::new("new errors").color(egui::Color32::RED)).small())
+                    .on_hover_text("show errors");
+                if new_errors_but.clicked() {
                     self.show_errors_window = true;
                 }
             } else {
@@ -283,10 +285,13 @@ impl App {
 
     #[inline(always)]
     fn view_errors_window(&mut self, ctx: &egui::CtxRef) {
-        let latest_errors = &self.state.latest_errors;
+        let latest_errors = &mut self.state.latest_errors;
         egui::Window::new("last error")
             .open(&mut self.show_errors_window)
             .show(ctx, |ui| {
+                if ui.button("clear").clicked() {
+                    latest_errors.clear();
+                }
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let errors_len = latest_errors.len();
                     for (index, error) in latest_errors.iter().enumerate() {

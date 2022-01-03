@@ -1,7 +1,7 @@
 use ahash::AHashMap;
 use harmony_rust_sdk::{
     api::{
-        chat::{permission::has_permission, Permission},
+        chat::{permission::has_permission, Invite, Permission},
         harmonytypes::{item_position::Position, ItemPosition},
     },
     client::api::rest::FileId,
@@ -20,6 +20,7 @@ pub struct Guild {
     pub members: AHashMap<u64, Vec<u64>>,
     pub homeserver: SmolStr,
     pub perms: Vec<Permission>,
+    pub invites: AHashMap<String, Invite>,
     pub fetched: bool,
 }
 

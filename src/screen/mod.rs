@@ -16,6 +16,9 @@ pub mod settings;
 
 pub trait Screen: 'static {
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, app: &mut State);
+    fn id(&self) -> &'static str {
+        ""
+    }
 }
 
 pub type BoxedScreen = Box<dyn Screen>;

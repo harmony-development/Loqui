@@ -10,7 +10,11 @@ use client::{
 };
 use eframe::egui::{Color32, Event, RichText};
 
-use crate::{image_cache::LoadedImage, screen::guild_settings, widgets::easy_mark};
+use crate::{
+    image_cache::LoadedImage,
+    screen::guild_settings,
+    widgets::{easy_mark, view_avatar},
+};
 
 use super::prelude::*;
 
@@ -89,8 +93,6 @@ impl Screen {
             .open(&mut self.show_join_guild)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("join guild").heading().strong());
-                    ui.add_space(12.0);
                     ui.text_edit_singleline(invite_text);
                     ui.add_space(6.0);
 
@@ -111,8 +113,6 @@ impl Screen {
             .open(&mut self.show_create_guild)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("create guild").heading().strong());
-                    ui.add_space(12.0);
                     ui.text_edit_singleline(guild_name_text);
                     ui.add_space(6.0);
 
@@ -131,28 +131,22 @@ impl Screen {
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             if state.cache.is_initial_sync_complete().not() {
                 ui.add(egui::Spinner::new().size(32.0)).on_hover_text("loading guilds");
+                ui.separator();
             }
 
             for (guild_id, guild) in state.cache.get_guilds() {
-                let icon = RichText::new(guild.name.get(0..1).unwrap_or("u").to_ascii_uppercase()).strong();
-
                 let is_enabled = guild.fetched && self.current.guild() != Some(guild_id);
 
                 let button = ui
                     .add_enabled_ui(is_enabled, |ui| {
                         if guild.fetched {
-                            if let Some((texid, _)) =
-                                guild.picture.as_ref().and_then(|id| state.image_cache.get_avatar(id))
-                            {
-                                ui.add(egui::ImageButton::new(texid, [32.0, 32.0]).frame(false))
-                            } else {
-                                ui.add_sized([32.0, 32.0], egui::Button::new(icon))
-                            }
+                            view_avatar(ui, state, guild.picture.as_ref(), guild.name.as_str(), 32.0)
                         } else {
                             ui.add(egui::Spinner::new().size(32.0))
                         }
                     })
                     .inner
+                    .on_disabled_hover_text("loading guild")
                     .on_hover_text(guild.name.as_str());
 
                 if button.clicked() {
@@ -178,6 +172,8 @@ impl Screen {
             if join_but.clicked() {
                 self.show_join_guild = true;
             }
+
+            ui.separator();
 
             let create_but = ui
                 .add_sized([32.0, 32.0], egui::Button::new(RichText::new("c+").strong()))
@@ -733,6 +729,10 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
+    fn id(&self) -> &'static str {
+        "main"
+    }
+
     fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, state: &mut State) {
         if ctx.input().key_pressed(egui::Key::Escape) {
             self.editing_message = None;
@@ -770,35 +770,35 @@ impl AppScreen for Screen {
         self.view_join_guild(state, ctx);
         self.view_create_guild(state, ctx);
 
-        egui::panel::SidePanel::left("guild_panel")
-            .min_width(32.0)
-            .max_width(32.0)
-            .resizable(false)
-            .show(ctx, |ui| self.view_guilds(state, ui));
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::panel::SidePanel::left("guild_panel")
+                .min_width(32.0)
+                .max_width(32.0)
+                .resizable(false)
+                .show_inside(ui, |ui| self.view_guilds(state, ui));
 
-        if self.current.has_guild() {
-            egui::panel::SidePanel::left("channel_panel")
-                .min_width(100.0)
-                .max_width(300.0)
-                .default_width(150.0)
-                .resizable(true)
-                .show(ctx, |ui| {
-                    self.view_channels(state, ui);
-                });
-
-            if !self.disable_users_bar {
-                egui::panel::SidePanel::right("member_panel")
+            if self.current.has_guild() {
+                egui::panel::SidePanel::left("channel_panel")
                     .min_width(100.0)
                     .max_width(300.0)
-                    .default_width(150.0)
+                    .default_width(175.0)
                     .resizable(true)
-                    .show(ctx, |ui| {
-                        self.view_members(state, ui);
+                    .show_inside(ui, |ui| {
+                        self.view_channels(state, ui);
                     });
-            }
-        }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+                if !self.disable_users_bar {
+                    egui::panel::SidePanel::right("member_panel")
+                        .min_width(100.0)
+                        .max_width(300.0)
+                        .default_width(150.0)
+                        .resizable(true)
+                        .show_inside(ui, |ui| {
+                            self.view_members(state, ui);
+                        });
+                }
+            }
+
             let chan_name = self
                 .current
                 .channel()

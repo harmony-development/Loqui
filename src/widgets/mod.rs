@@ -1,7 +1,9 @@
 use std::ops::Not;
 
-use client::harmony_rust_sdk::api::rest::About;
-use eframe::egui::{self, RichText, Ui, WidgetText};
+use client::harmony_rust_sdk::api::rest::{About, FileId};
+use eframe::egui::{self, CollapsingResponse, Response, RichText, Ui, WidgetText};
+
+use crate::{app::State, utils::UiExt};
 
 pub mod easy_mark;
 
@@ -40,4 +42,46 @@ pub fn view_about(ui: &mut Ui, about: &About) {
             ui.label("no motd");
         }
     });
+}
+
+pub fn view_panel_chooser<P>(ui: &mut Ui, panels: &[P], chosen_panel: &mut P)
+where
+    P: AsRef<str> + Clone,
+{
+    for panel in panels {
+        let panel_name = panel.as_ref();
+
+        let enabled = panel_name != chosen_panel.as_ref();
+        let but = ui.add_enabled_ui(enabled, |ui| ui.text_button(panel_name)).inner;
+        if but.clicked() {
+            *chosen_panel = panel.clone();
+        }
+
+        ui.add(egui::Separator::default().spacing(0.0));
+    }
+}
+
+pub fn view_avatar(ui: &mut Ui, state: &State, maybe_id: Option<&FileId>, text: &str, size: f32) -> Response {
+    if let Some((texid, _)) = maybe_id.and_then(|id| state.image_cache.get_avatar(id)) {
+        ui.add(egui::ImageButton::new(texid, [size, size]).frame(false))
+    } else {
+        let icon = RichText::new(text.get(0..1).unwrap_or("u").to_ascii_uppercase()).strong();
+        ui.add_sized([size, size], egui::Button::new(icon))
+    }
+}
+
+pub fn seperated_collapsing<R>(
+    ui: &mut Ui,
+    title: &str,
+    show_default: bool,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+) -> CollapsingResponse<R> {
+    ui.horizontal_top(|ui| {
+        let resp = egui::CollapsingHeader::new(title)
+            .default_open(show_default)
+            .show(ui, add_contents);
+        ui.add(egui::Separator::default().horizontal());
+        resp
+    })
+    .inner
 }

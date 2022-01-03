@@ -227,6 +227,10 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
+    fn id(&self) -> &'static str {
+        "auth"
+    }
+
     fn update(&mut self, ctx: &egui::CtxRef, _: &epi::Frame, state: &mut State) {
         self.handle_connect(state);
         self.handle_step(state);
