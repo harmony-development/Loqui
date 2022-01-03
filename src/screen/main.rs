@@ -520,6 +520,13 @@ impl Screen {
                                     self.edit_message_text = text.clone();
                                     ui.close_menu();
                                 }
+                                if ui.button("reply").clicked() {
+                                    self.composer_text.clear();
+                                    self.composer_text.push_str("> ");
+                                    self.composer_text.push_str(text);
+                                    self.composer_text.push('\n');
+                                    ui.close_menu();
+                                }
                                 if ui.button("copy").clicked() {
                                     ui.output().copied_text = text.clone();
                                     ui.close_menu();
@@ -718,7 +725,10 @@ impl AppScreen for Screen {
             self.editing_message = None;
         }
 
-        if self.editing_message.is_none() && ctx.input().key_pressed(egui::Key::ArrowUp) {
+        if self.composer_text.is_empty()
+            && self.editing_message.is_none()
+            && ctx.input().key_pressed(egui::Key::ArrowUp)
+        {
             let maybe_channel = self
                 .current
                 .channel()
