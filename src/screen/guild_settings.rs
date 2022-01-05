@@ -206,8 +206,9 @@ impl Screen {
             self.fetching_invites.set(true);
             let fetching_invites = self.fetching_invites.clone();
             spawn_evs!(state, |events, client| {
-                client.fetch_invites(guild_id, events).await?;
+                let res = client.fetch_invites(guild_id, events).await;
                 fetching_invites.set(false);
+                res?;
             });
         } else {
             ui.add(egui::Spinner::new().size(32.0))

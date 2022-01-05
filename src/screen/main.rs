@@ -397,16 +397,9 @@ impl Screen {
             let client = state.client().clone();
             let attachment = attachment.clone();
             spawn_future!(state, async move {
-                let (_, file) = match client.fetch_attachment(attachment.id.clone()).await {
-                    Ok(res) => {
-                        image_load_bool.set(false);
-                        res
-                    }
-                    Err(err) => {
-                        image_load_bool.set(false);
-                        return Err(err);
-                    }
-                };
+                let res = client.fetch_attachment(attachment.id.clone()).await;
+                image_load_bool.set(false);
+                let (_, file) = res?;
                 ClientResult::Ok(vec![FetchEvent::Attachment { attachment, file }])
             });
         }
