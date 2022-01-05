@@ -291,9 +291,19 @@ impl App {
         egui::Window::new("last error")
             .open(&mut self.show_errors_window)
             .show(ctx, |ui| {
-                if ui.button("clear").clicked() {
-                    latest_errors.clear();
-                }
+                ui.horizontal(|ui| {
+                    if ui.button("clear").clicked() {
+                        latest_errors.clear();
+                    }
+                    if ui.button("copy all").clicked() {
+                        let errors_concatted = latest_errors.iter().fold(String::new(), |mut all, error| {
+                            all.push('\n');
+                            all.push_str(error);
+                            all
+                        });
+                        ui.output().copied_text = errors_concatted;
+                    }
+                });
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let errors_len = latest_errors.len();
                     for (index, error) in latest_errors.iter().enumerate() {
