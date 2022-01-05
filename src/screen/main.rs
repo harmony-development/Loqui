@@ -2,11 +2,11 @@ use std::ops::Not;
 
 use client::{
     guild::Guild,
-    harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes},
+    harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, rest::FileId},
     member::Member,
     message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override},
     smol_str::SmolStr,
-    AHashMap, FetchEvent, Uri,
+    AHashMap, AHashSet, FetchEvent, Uri,
 };
 use eframe::egui::{Color32, Event, RichText};
 
@@ -71,7 +71,8 @@ impl CurrentIds {
 pub struct Screen {
     // guild id -> channel id
     last_channel_id: AHashMap<u64, u64>,
-    highlight_message: AHashMap<(u64, u64, MessageId), bool>,
+    dont_highlight_message: AHashSet<(u64, u64, MessageId)>,
+    loading_attachment: AHashMap<FileId, AtomBool>,
     current: CurrentIds,
     composer_text: String,
     edit_message_text: String,
@@ -247,11 +248,7 @@ impl Screen {
         channel_id: u64,
         text: &str,
     ) {
-        let highlight_message = self
-            .highlight_message
-            .get(&(guild_id, channel_id, *id))
-            .copied()
-            .unwrap_or(true);
+        let highlight_message = self.dont_highlight_message.contains(&(guild_id, channel_id, *id)).not();
 
         if id.is_ack() && id.id() == self.editing_message {
             let edit = easy_mark::EasyMarkEditor::new(&mut self.edit_message_text)
@@ -340,29 +337,37 @@ impl Screen {
                 [w as f32, h as f32]
             };
 
-            let maybe_size = attachment.resolution.and_then(|(w, h)| {
-                if w == 0 || h == 0 {
-                    return None;
-                }
-                Some(downscale([w as f32, h as f32]))
-            });
+            let maybe_size = attachment
+                .resolution
+                .and_then(|(w, h)| (w == 0 || h == 0).not().then(|| downscale([w as f32, h as f32])));
+
+            let is_fetching = self
+                .loading_attachment
+                .get(&attachment.id)
+                .map_or_else(|| attachment.is_thumbnail(), AtomBool::get);
 
             if let Some((texid, size)) = state.image_cache.get_image(&attachment.id) {
-                let open_but = ui.add(egui::ImageButton::new(
-                    texid,
-                    maybe_size.unwrap_or_else(|| downscale(size)),
-                ));
+                let size = maybe_size.unwrap_or_else(|| downscale(size));
+                let open_but = ui.add(egui::ImageButton::new(texid, size));
                 open = open_but.clicked();
                 handled = true;
             } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
-                let button = ui.add(egui::ImageButton::new(
-                    texid,
-                    maybe_size.unwrap_or_else(|| downscale(size)),
-                ));
+                let size = maybe_size.unwrap_or_else(|| downscale(size));
+                let button = if is_fetching {
+                    ui.add_sized(size, egui::Spinner::new().size(32.0))
+                        .on_hover_text("loading image")
+                } else {
+                    ui.add(egui::ImageButton::new(texid, size))
+                };
                 fetch = button.clicked();
                 handled = true;
             } else if let Some(size) = maybe_size {
-                let button = ui.add_sized(size, egui::Button::new(format!("download '{}'", attachment.name)));
+                let button = if is_fetching {
+                    ui.add_sized(size, egui::Spinner::new().size(32.0))
+                        .on_hover_text("loading image")
+                } else {
+                    ui.add_sized(size, egui::Button::new(format!("download '{}'", attachment.name)))
+                };
                 fetch = button.clicked();
                 handled = true;
                 no_thumbnail = true;
@@ -385,10 +390,23 @@ impl Screen {
         }
 
         if fetch {
+            let image_load_bool = AtomBool::new(true);
+            self.loading_attachment
+                .insert(attachment.id.clone(), image_load_bool.clone());
+
             let client = state.client().clone();
             let attachment = attachment.clone();
             spawn_future!(state, async move {
-                let (_, file) = client.fetch_attachment(attachment.id.clone()).await?;
+                let (_, file) = match client.fetch_attachment(attachment.id.clone()).await {
+                    Ok(res) => {
+                        image_load_bool.set(false);
+                        res
+                    }
+                    Err(err) => {
+                        image_load_bool.set(false);
+                        return Err(err);
+                    }
+                };
                 ClientResult::Ok(vec![FetchEvent::Attachment { attachment, file }])
             });
         }
@@ -543,8 +561,12 @@ impl Screen {
                             }
                             if ui.button("toggle highlighting").clicked() {
                                 let key = (guild_id, channel_id, *id);
-                                let is_highlighted = self.highlight_message.get(&key).copied().unwrap_or(true);
-                                self.highlight_message.insert(key, is_highlighted.not());
+                                let is_highlighted = self.dont_highlight_message.contains(&key).not();
+                                if is_highlighted {
+                                    self.dont_highlight_message.insert(key);
+                                } else {
+                                    self.dont_highlight_message.remove(&key);
+                                }
                                 ui.close_menu();
                             }
                         }

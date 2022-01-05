@@ -66,7 +66,7 @@ use crate::emotes::EmotePack;
 use self::message::{EmbedHeading, Message};
 
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
-pub use ahash::{AHashMap, AHasher};
+pub use ahash::{AHashMap, AHashSet, AHasher};
 pub use smol_str;
 pub use tracing;
 pub use urlencoding;
