@@ -1,4 +1,4 @@
-use std::{any::Any, cell::RefCell, ops::Not, sync::mpsc};
+use std::{cell::RefCell, ops::Not, sync::mpsc};
 
 use client::{
     harmony_rust_sdk::{
@@ -248,7 +248,7 @@ impl App {
 
             if self.state.latest_errors.is_empty().not() {
                 let new_errors_but = ui
-                    .add(egui::Button::new(RichText::new("new errors").color(egui::Color32::RED)).small())
+                    .add(egui::Button::new(dangerous_text("new errors")).small())
                     .on_hover_text("show errors");
                 if new_errors_but.clicked() {
                     self.show_errors_window = true;

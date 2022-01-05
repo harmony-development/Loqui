@@ -26,8 +26,8 @@ use harmony_rust_sdk::{
             CreateInviteRequest, DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Event, EventSource,
             FormattedText, GetGuildChannelsRequest, GetGuildInvitesRequest, GetGuildListRequest,
             GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetUserRolesRequest, Invite,
-            JoinGuildRequest, KickUserRequest, Message as HarmonyMessage, Permission, QueryHasPermissionRequest, Role,
-            TypingRequest, UnbanUserRequest, UpdateMessageTextRequest,
+            JoinGuildRequest, KickUserRequest, LeaveGuildRequest, Message as HarmonyMessage, Permission,
+            QueryHasPermissionRequest, Role, TypingRequest, UnbanUserRequest, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -893,6 +893,11 @@ impl Client {
         self.inner
             .call(DeleteMessageRequest::new(guild_id, channel_id, message_id))
             .await?;
+        Ok(())
+    }
+
+    pub async fn leave_guild(&self, guild_id: u64) -> ClientResult<()> {
+        self.inner.call(LeaveGuildRequest::new(guild_id)).await?;
         Ok(())
     }
 

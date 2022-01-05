@@ -78,8 +78,7 @@ impl Screen {
                 ui.output().copied_text = channel.name.to_string();
                 ui.close_menu();
             }
-            if guild.has_perm(all_permissions::CHANNELS_MANAGE_DELETE)
-                && ui.button(RichText::new("delete").color(Color32::RED)).clicked()
+            if guild.has_perm(all_permissions::CHANNELS_MANAGE_DELETE) && ui.button(dangerous_text("delete")).clicked()
             {
                 let guild_id = self.guild_id;
                 spawn_client_fut!(state, |client| {
@@ -189,7 +188,7 @@ impl Screen {
                             ui.close_menu();
                         }
                         if guild.has_perm(all_permissions::INVITES_MANAGE_DELETE)
-                            && ui.button(RichText::new("delete").color(Color32::RED)).clicked()
+                            && ui.button(dangerous_text("delete")).clicked()
                         {
                             let name = id.clone();
                             spawn_client_fut!(state, |client| {
@@ -251,15 +250,13 @@ impl Screen {
                 ui.output().copied_text = member.username.to_string();
                 ui.close_menu();
             }
-            if guild.has_perm(all_permissions::USER_MANAGE_BAN)
-                && ui.button(RichText::new("ban").color(Color32::RED)).clicked()
-            {
+            if guild.has_perm(all_permissions::USER_MANAGE_BAN) && ui.button(dangerous_text("ban")).clicked() {
                 spawn_client_fut!(state, |client| {
                     client.ban_member(guild_id, user_id).await?;
                 });
                 ui.close_menu();
             }
-            if guild.has_perm(all_permissions::USER_MANAGE_KICK) && ui.button("kick").clicked() {
+            if guild.has_perm(all_permissions::USER_MANAGE_KICK) && ui.button(dangerous_text("kick")).clicked() {
                 spawn_client_fut!(state, |client| {
                     client.kick_member(guild_id, user_id).await?;
                 });

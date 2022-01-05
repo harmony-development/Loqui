@@ -147,8 +147,16 @@ impl Screen {
                         }
                     })
                     .inner
-                    .on_disabled_hover_text("loading guild")
-                    .on_hover_text(guild.name.as_str());
+                    .on_disabled_hover_text(guild.fetched.then(|| guild.name.as_str()).unwrap_or("loading guild"))
+                    .on_hover_text(guild.name.as_str())
+                    .context_menu(|ui| {
+                        if ui.button(dangerous_text("leave guild")).clicked() {
+                            spawn_client_fut!(state, |client| {
+                                client.leave_guild(guild_id).await?;
+                            });
+                            ui.close_menu();
+                        }
+                    });
 
                 if button.clicked() {
                     self.current.set_guild(guild_id);

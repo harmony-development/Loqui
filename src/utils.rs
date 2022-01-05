@@ -11,7 +11,7 @@ use client::{
     member::Member,
     tracing, Client,
 };
-use eframe::egui::{self, Align, Color32, Key, Layout, Response, Ui, Widget};
+use eframe::egui::{self, Align, Color32, Key, Layout, Response, RichText, Ui, Widget, WidgetText};
 
 use crate::app::State;
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
@@ -130,6 +130,10 @@ pub fn horizontal_centered_justified() -> Layout {
     Layout::left_to_right()
         .with_cross_align(Align::Center)
         .with_cross_justify(true)
+}
+
+pub fn dangerous_text(text: impl Into<String>) -> RichText {
+    RichText::new(text).color(Color32::RED)
 }
 
 pub fn make_url_from_file_id(client: &Client, id: &FileId) -> String {
