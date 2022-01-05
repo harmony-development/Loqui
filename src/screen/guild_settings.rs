@@ -216,7 +216,8 @@ impl Screen {
     }
 
     fn view_members(&mut self, state: &State, ui: &mut Ui) {
-        guard!(let Some(guild) = state.cache.get_guild(self.guild_id) else { return });
+        let guild_id = self.guild_id;
+        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
 
         let sorted_members = sort_members(state, guild);
         let chunk_size = (ui.available_width() / 300.0).ceil() as usize;
@@ -224,14 +225,14 @@ impl Screen {
         for chunk in sorted_members.chunks(chunk_size) {
             ui.columns(chunk_size, |ui| {
                 for ((id, member), ui) in chunk.iter().zip(ui) {
-                    self.view_member(ui, **id, member, guild);
+                    self.view_member(state, ui, guild_id, **id, member, guild);
                 }
             });
         }
     }
 
-    fn view_member(&mut self, ui: &mut Ui, id: u64, member: &Member, guild: &Guild) {
-        let id_string = id.to_string();
+    fn view_member(&mut self, state: &State, ui: &mut Ui, guild_id: u64, user_id: u64, member: &Member, guild: &Guild) {
+        let id_string = user_id.to_string();
         let resp = ui
             .group(|ui| {
                 ui.horizontal(|ui| {
@@ -252,15 +253,19 @@ impl Screen {
             if guild.has_perm(all_permissions::USER_MANAGE_BAN)
                 && ui.button(RichText::new("ban").color(Color32::RED)).clicked()
             {
-                // TODO
+                spawn_client_fut!(state, |client| {
+                    client.ban_member(guild_id, user_id).await?;
+                });
                 ui.close_menu();
             }
             if guild.has_perm(all_permissions::USER_MANAGE_KICK) && ui.button("kick").clicked() {
-                // TODO
+                spawn_client_fut!(state, |client| {
+                    client.kick_member(guild_id, user_id).await?;
+                });
                 ui.close_menu();
             }
             if guild.has_perm(all_permissions::ROLES_USER_MANAGE) && ui.button("manage roles").clicked() {
-                // TODO: user roles manage window
+                // TODO
                 ui.close_menu();
             }
         });
