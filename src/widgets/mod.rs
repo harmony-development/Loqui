@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 use client::harmony_rust_sdk::api::rest::{About, FileId};
-use eframe::egui::{self, CollapsingResponse, Response, RichText, Ui, WidgetText};
+use eframe::egui::{self, CollapsingHeader, CollapsingResponse, Response, RichText, Ui, WidgetText};
 
 use crate::{app::State, utils::UiExt};
 
@@ -84,4 +84,14 @@ pub fn seperated_collapsing<R>(
         resp
     })
     .inner
+}
+
+pub fn view_egui_settings(ctx: &egui::CtxRef, ui: &mut Ui) {
+    ctx.settings_ui(ui);
+    CollapsingHeader::new("Inspection")
+        .default_open(false)
+        .show(ui, |ui| ctx.inspection_ui(ui));
+    CollapsingHeader::new("Memory")
+        .default_open(false)
+        .show(ui, |ui| ctx.memory_ui(ui));
 }

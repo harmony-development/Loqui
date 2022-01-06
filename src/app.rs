@@ -11,7 +11,7 @@ use client::{
     Cache, Client, FetchEvent,
 };
 use eframe::{
-    egui::{self, FontData, FontDefinitions, RichText, Ui},
+    egui::{self, FontData, FontDefinitions, Ui},
     epi,
 };
 use tokio::sync::mpsc as tokio_mpsc;
@@ -22,7 +22,7 @@ use crate::{
     futures::Futures,
     image_cache::{ImageCache, LoadedImage},
     screen::{auth, BoxedScreen, Screen, ScreenStack},
-    widgets::{menu_text_button, view_about},
+    widgets::{menu_text_button, view_about, view_egui_settings},
 };
 
 pub struct State {
@@ -165,6 +165,7 @@ pub struct App {
     screens: ScreenStack,
     show_errors_window: bool,
     show_about_window: bool,
+    show_egui_debug: bool,
 }
 
 impl App {
@@ -233,6 +234,7 @@ impl App {
             screens: ScreenStack::new(auth::Screen::new()),
             show_errors_window: false,
             show_about_window: false,
+            show_egui_debug: false,
         }
     }
 
@@ -280,6 +282,10 @@ impl App {
                     if ui.text_button("exit loqui").clicked() {
                         std::process::exit(0);
                     }
+
+                    if ui.text_button("egui debug").clicked() {
+                        self.show_egui_debug = true;
+                    }
                 });
             });
         });
@@ -325,6 +331,17 @@ impl App {
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     view_about(ui, about);
+                });
+            });
+    }
+
+    #[inline(always)]
+    fn view_egui_debug_window(&mut self, ctx: &egui::CtxRef) {
+        egui::Window::new("egui debug")
+            .open(&mut self.show_egui_debug)
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    view_egui_settings(ctx, ui);
                 });
             });
     }
@@ -401,6 +418,7 @@ impl epi::App for App {
             self.view_errors_window(ctx);
         }
         self.view_about_window(ctx);
+        self.view_egui_debug_window(ctx);
 
         self.screens.current_mut().update(ctx, frame, &mut self.state);
 
