@@ -4,7 +4,7 @@ use client::{
     guild::Guild,
     harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, rest::FileId},
     member::Member,
-    message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override},
+    message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override, ReadMessagesView},
     smol_str::SmolStr,
     AHashMap, AHashSet, FetchEvent, Uri,
 };
@@ -229,7 +229,7 @@ impl Screen {
                         if button.clicked() {
                             self.current.set_channel(channel_id);
                             self.last_channel_id.insert(guild_id, channel_id);
-                            if !channel.reached_top && channel.messages.is_empty() {
+                            if !channel.reached_top && channel.messages.continuous_view().is_empty() {
                                 spawn_evs!(state, |events, c| {
                                     c.fetch_messages(guild_id, channel_id, events).await?;
                                 });
@@ -488,7 +488,7 @@ impl Screen {
             .stick_to_bottom()
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                for (id, message) in channel.messages.iter() {
+                for (id, message) in channel.messages.continuous_view().all_messages() {
                     let msg = ui
                         .group(|ui| {
                             let overrides = message.overrides.as_ref();
@@ -761,7 +761,9 @@ impl AppScreen for Screen {
                 let user_id = state.client().user_id();
                 let maybe_msg = chan
                     .messages
-                    .iter()
+                    .continuous_view()
+                    .all_messages()
+                    .into_iter()
                     .rev()
                     .filter_map(|(id, msg)| id.is_ack().then(|| (id.id().unwrap(), msg)))
                     .filter_map(|(id, msg)| {

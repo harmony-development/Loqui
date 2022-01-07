@@ -1,5 +1,3 @@
-use eframe::egui::CollapsingHeader;
-
 use crate::widgets::{seperated_collapsing, view_egui_settings};
 
 use super::prelude::*;

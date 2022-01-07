@@ -50,7 +50,7 @@ use harmony_rust_sdk::{
 
 use error::ClientResult;
 use member::Member;
-use message::{Attachment, Content, Embed, MessageId};
+use message::{Attachment, Content, Embed, MessageId, WriteMessagesView};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::{
@@ -295,18 +295,11 @@ impl Cache {
 
                         message.post_process(post, guild_id, channel_id);
 
-                        if let Some(msg_index) = echo_id
-                            .map(|id| channel.messages.get_index_of(&MessageId::Unack(id)))
-                            .flatten()
-                        {
-                            channel.messages.insert(MessageId::Ack(message_id), message);
-                            let index = channel.messages.len().saturating_sub(1);
-                            channel.messages.swap_indices(msg_index, index);
-                            channel.messages.pop();
-                        } else if let Some(msg) = channel.messages.get_mut(&MessageId::Ack(message_id)) {
-                            *msg = message;
+                        let message_view = channel.messages.continuous_view_mut();
+                        if let Some(echo_id) = echo_id {
+                            message_view.ack_message(MessageId::Unack(echo_id), MessageId::Ack(message_id), message);
                         } else {
-                            channel.messages.insert(MessageId::Ack(message_id), message);
+                            message_view.insert_message(MessageId::Ack(message_id), message);
                         }
                     }
                 }
@@ -317,7 +310,8 @@ impl Cache {
                 }) => {
                     self.get_channel_mut(guild_id, channel_id)
                         .messages
-                        .remove(&MessageId::Ack(message_id));
+                        .continuous_view_mut()
+                        .remove_message(&MessageId::Ack(message_id));
                 }
                 ChatEvent::EditedMessage(message_updated) => {
                     let guild_id = message_updated.guild_id;
@@ -326,7 +320,8 @@ impl Cache {
                     if let Some(msg) = self
                         .get_channel_mut(guild_id, channel_id)
                         .messages
-                        .get_mut(&MessageId::Ack(message_updated.message_id))
+                        .view_mut()
+                        .get_message_mut(&MessageId::Ack(message_updated.message_id))
                     {
                         msg.content = Content::Text(message_updated.new_content.map_or_else(String::new, |f| f.text));
                         msg.post_process(post, guild_id, channel_id);
@@ -613,15 +608,10 @@ impl Cache {
 
         let channel = self.get_channel_mut(guild_id, channel_id);
         let message: Message = message.into();
+        let id = MessageId::Ack(message_id);
         message.post_process(&mut post, guild_id, channel_id);
-        let message_id = MessageId::Ack(message_id);
-        if channel.messages.contains_key(&message_id) {
-            channel.messages.insert(message_id, message);
-        } else {
-            channel.messages.reverse();
-            channel.messages.insert(message_id, message);
-            channel.messages.reverse();
-        }
+
+        channel.messages.create_reply_view(id).insert_message(id, message);
 
         post
     }
@@ -630,95 +620,29 @@ impl Cache {
         &mut self,
         guild_id: u64,
         channel_id: u64,
-        message_id: u64,
+        message_id: Option<u64>,
         messages: Vec<(u64, HarmonyMessage)>,
         reached_top: bool,
         direction: Direction,
     ) -> Vec<PostProcessEvent> {
         let mut post = Vec::new();
 
-        let channel = self.get_channel_mut(guild_id, channel_id);
-        let mut messages: IndexMap<_, _> = messages
+        let anchor_id = message_id.map(MessageId::Ack);
+        let messages = messages
             .into_iter()
             .map(|(id, msg)| (MessageId::Ack(id), Message::from(msg)))
-            .collect();
+            .collect::<Vec<_>>();
 
-        messages.values().for_each(|m| {
+        messages.iter().for_each(|(_, m)| {
             m.post_process(&mut post, guild_id, channel_id);
         });
 
-        let msg_pos = channel.messages.get_index_of(&MessageId::Ack(message_id));
-        let process_before =
-            |mut pos: usize, messages: IndexMap<MessageId, Message>, chan_messages: &mut Vec<(MessageId, Message)>| {
-                for message in messages {
-                    if chan_messages.get(pos).map_or(true, |(id, _)| message.0.eq(id)) {
-                        continue;
-                    }
-                    if let Some(at) = chan_messages.iter().position(|(id, _)| message.0.eq(id)) {
-                        if at < pos {
-                            pos -= 1;
-                        }
-                        chan_messages.remove(at);
-                    }
-                    chan_messages.insert(pos, message);
-                }
-            };
-        let process_after =
-            |mut pos: usize, messages: IndexMap<MessageId, Message>, chan_messages: &mut Vec<(MessageId, Message)>| {
-                pos += 1;
-                for message in messages {
-                    if chan_messages.get(pos).map_or(true, |(id, _)| message.0.eq(id)) {
-                        pos += 1;
-                        continue;
-                    }
-                    if let Some(at) = chan_messages.iter().position(|(id, _)| message.0.eq(id)) {
-                        if at < pos {
-                            pos -= 1;
-                        }
-                        chan_messages.remove(at);
-                    }
-                    chan_messages.insert(pos, message);
-                    pos += 1;
-                }
-            };
-
-        match direction {
-            Direction::BeforeUnspecified => match msg_pos {
-                Some(pos) => {
-                    let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
-                    process_before(pos, messages, &mut chan_messages);
-                    channel.messages = chan_messages.into_iter().collect();
-                }
-                None => {
-                    messages.reverse();
-                    channel.messages.extend(messages);
-                }
-            },
-            Direction::After => match msg_pos {
-                Some(pos) => {
-                    let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
-                    process_after(pos, messages, &mut chan_messages);
-                    channel.messages = chan_messages.into_iter().collect();
-                }
-                None => {
-                    channel.messages.extend(messages);
-                }
-            },
-            Direction::Around => match msg_pos {
-                Some(pos) => {
-                    let mut chan_messages = channel.messages.drain(..).collect::<Vec<_>>();
-                    let message_pos = messages.get_index_of(&MessageId::Ack(message_id)).unwrap();
-                    process_after(pos, messages.drain(message_pos + 1..).collect(), &mut chan_messages);
-                    process_before(pos, messages.drain(..message_pos).collect(), &mut chan_messages);
-                    channel.messages = chan_messages.into_iter().collect();
-                }
-                None => {
-                    messages.extend(channel.messages.drain(..));
-                    channel.messages = messages;
-                }
-            },
-        }
+        let channel = self.get_channel_mut(guild_id, channel_id);
         channel.reached_top = reached_top;
+        channel
+            .messages
+            .continuous_view_mut()
+            .append_messages(anchor_id.as_ref(), direction, messages);
 
         post
     }
@@ -729,7 +653,8 @@ impl Cache {
         let echo_id = u64::from_ne_bytes(bytes);
         self.get_channel_mut(guild_id, channel_id)
             .messages
-            .insert(MessageId::Unack(echo_id), message);
+            .continuous_view_mut()
+            .insert_message(MessageId::Unack(echo_id), message);
         echo_id
     }
 }
