@@ -13,7 +13,10 @@ use eframe::egui::{Color32, Event, RichText};
 use crate::{
     image_cache::LoadedImage,
     screen::guild_settings,
-    widgets::{easy_mark, view_avatar},
+    widgets::{
+        easy_mark::{self, EasyMarkEditor},
+        view_avatar,
+    },
 };
 
 use super::prelude::*;
@@ -74,8 +77,8 @@ pub struct Screen {
     dont_highlight_message: AHashSet<(u64, u64, MessageId)>,
     loading_attachment: AHashMap<FileId, AtomBool>,
     current: CurrentIds,
-    composer_text: String,
-    edit_message_text: String,
+    composer: EasyMarkEditor,
+    edit_message_composer: EasyMarkEditor,
     scroll_to_bottom: bool,
     editing_message: Option<u64>,
     prev_editing_message: Option<u64>,
@@ -259,15 +262,14 @@ impl Screen {
         let highlight_message = self.dont_highlight_message.contains(&(guild_id, channel_id, *id)).not();
 
         if id.is_ack() && id.id() == self.editing_message {
-            let edit = easy_mark::EasyMarkEditor::new(&mut self.edit_message_text)
-                .highlight(highlight_message)
-                .editor_ui(ui);
+            let edit = self.edit_message_composer.highlight(highlight_message).editor_ui(ui);
             let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
             if self.prev_editing_message.is_none() {
                 edit.request_focus();
             }
-            if self.edit_message_text.trim().is_empty().not() && edit.has_focus() && is_pressed {
-                let text = self.edit_message_text.trim().to_string();
+            let trimmed_edit_msg = self.edit_message_composer.text().trim();
+            if trimmed_edit_msg.is_empty().not() && edit.has_focus() && is_pressed {
+                let text = trimmed_edit_msg.to_string();
                 let message_id = id.id().unwrap();
                 self.editing_message = None;
                 spawn_client_fut!(state, |client| {
@@ -536,14 +538,17 @@ impl Screen {
                                     && ui.button("edit").clicked()
                                 {
                                     self.editing_message = id.id();
-                                    self.edit_message_text = text.clone();
+                                    let edit_text = self.edit_message_composer.text_mut();
+                                    edit_text.clear();
+                                    edit_text.push_str(text);
                                     ui.close_menu();
                                 }
                                 if ui.button("reply").clicked() {
-                                    self.composer_text.clear();
-                                    self.composer_text.push_str("> ");
-                                    self.composer_text.push_str(text);
-                                    self.composer_text.push('\n');
+                                    let composer_text = self.composer.text_mut();
+                                    composer_text.clear();
+                                    composer_text.push_str("> ");
+                                    composer_text.push_str(text);
+                                    composer_text.push('\n');
                                     ui.close_menu();
                                 }
                                 if ui.button("copy").clicked() {
@@ -627,12 +632,11 @@ impl Screen {
     fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::CtxRef) {
         guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
 
-        let text_edit = ui.add(
-            egui::TextEdit::multiline(&mut self.composer_text)
-                .desired_rows(1)
-                .desired_width(f32::INFINITY)
-                .hint_text("Enter message..."),
-        );
+        let text_edit = self
+            .composer
+            .desired_rows(1)
+            .hint_text("Enter message...")
+            .editor_ui(ui);
 
         let user_inputted_text = ctx.input().events.iter().any(|ev| matches!(ev, Event::Text(_)));
 
@@ -641,15 +645,11 @@ impl Screen {
         }
 
         let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
-        if self.composer_text.trim().is_empty().not() && text_edit.has_focus() && is_pressed {
+        if self.composer.text().trim().is_empty().not() && text_edit.has_focus() && is_pressed {
+            let text_string = self.composer.text().trim().to_string();
+            self.composer.text_mut().clear();
             let message = Message {
-                content: Content::Text(
-                    self.composer_text
-                        .drain(..self.composer_text.len())
-                        .collect::<String>()
-                        .trim()
-                        .to_string(),
-                ),
+                content: Content::Text(text_string),
                 sender: state.client().user_id(),
                 ..Default::default()
             };
@@ -748,7 +748,7 @@ impl AppScreen for Screen {
             self.editing_message = None;
         }
 
-        if self.composer_text.is_empty()
+        if self.composer.text().is_empty()
             && self.editing_message.is_none()
             && ctx.input().key_pressed(egui::Key::ArrowUp)
         {
@@ -777,7 +777,9 @@ impl AppScreen for Screen {
 
                 if let Some((id, text, _)) = maybe_msg {
                     self.editing_message = Some(id);
-                    self.edit_message_text = text.to_string();
+                    let edit_text = self.edit_message_composer.text_mut();
+                    edit_text.clear();
+                    edit_text.push_str(text);
                 }
             }
         }

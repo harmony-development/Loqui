@@ -2,24 +2,57 @@ use eframe::egui;
 
 use egui::{text_edit::CCursorRange, *};
 
-pub struct EasyMarkEditor<'a> {
-    code: &'a mut String,
+pub struct EasyMarkEditor {
+    code: String,
     highlight_editor: bool,
+    desired_rows: usize,
+    hint_text: String,
 
     highlighter: super::MemoizedEasymarkHighlighter,
 }
 
-impl<'a> EasyMarkEditor<'a> {
-    pub fn new(code: &'a mut String) -> Self {
+impl Default for EasyMarkEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EasyMarkEditor {
+    pub fn new() -> Self {
         Self {
-            code,
+            code: String::new(),
             highlight_editor: true,
+            desired_rows: 2,
+            hint_text: String::new(),
             highlighter: Default::default(),
         }
     }
 
-    pub fn highlight(mut self, highlight: bool) -> Self {
+    #[inline(always)]
+    pub fn text(&self) -> &String {
+        &self.code
+    }
+
+    #[inline(always)]
+    pub fn text_mut(&mut self) -> &mut String {
+        &mut self.code
+    }
+
+    #[inline(always)]
+    pub fn highlight(&mut self, highlight: bool) -> &mut Self {
         self.highlight_editor = highlight;
+        self
+    }
+
+    #[inline(always)]
+    pub fn desired_rows(&mut self, rows: usize) -> &mut Self {
+        self.desired_rows = rows;
+        self
+    }
+
+    #[inline(always)]
+    pub fn hint_text(&mut self, text: impl Into<String>) -> &mut Self {
+        self.hint_text = text.into();
         self
     }
 
@@ -34,18 +67,25 @@ impl<'a> EasyMarkEditor<'a> {
             };
 
             ui.add(
-                egui::TextEdit::multiline(*code)
+                egui::TextEdit::multiline(&mut self.code)
+                    .desired_rows(self.desired_rows)
+                    .hint_text(&self.hint_text)
                     .desired_width(f32::INFINITY)
                     .text_style(egui::TextStyle::Monospace) // for cursor height
                     .layouter(&mut layouter),
             )
         } else {
-            ui.add(egui::TextEdit::multiline(*code).desired_width(f32::INFINITY))
+            ui.add(
+                egui::TextEdit::multiline(&mut self.code)
+                    .desired_rows(self.desired_rows)
+                    .hint_text(&self.hint_text)
+                    .desired_width(f32::INFINITY),
+            )
         };
 
         if let Some(mut state) = TextEdit::load_state(ui.ctx(), response.id) {
             if let Some(mut ccursor_range) = state.ccursor_range() {
-                let any_change = shortcuts(ui, *code, &mut ccursor_range);
+                let any_change = shortcuts(ui, &mut self.code, &mut ccursor_range);
                 if any_change {
                     state.set_ccursor_range(Some(ccursor_range));
                     state.store(ui.ctx(), response.id);
