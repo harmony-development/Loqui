@@ -182,21 +182,25 @@ impl Screen {
 
         if let Some(choice) = selected_choice {
             self.next_step(state, AuthStepResponse::Choice(choice.into()));
-        } else if self.fields.is_empty().not() && (did_submit || ui.button("continue").clicked()) {
-            if self.title == "homeserver" {
-                self.homeserver(state);
-            } else {
-                let response = AuthStepResponse::form(
-                    self.fields
-                        .iter()
-                        .map(|((_, r#type), value)| match r#type.as_str() {
-                            "number" => Field::Number(value.parse().unwrap()),
-                            "new-password" | "password" => Field::Bytes(value.as_bytes().to_vec()),
-                            _ => Field::String(value.clone()),
-                        })
-                        .collect(),
-                );
-                self.next_step(state, response);
+        } else if self.fields.is_empty().not() {
+            let are_fields_filled = self.fields.iter().all(|(_, text)| text.is_empty().not());
+            let continue_resp = ui.add_enabled(are_fields_filled, egui::Button::new("continue"));
+            if are_fields_filled && (did_submit || continue_resp.clicked()) {
+                if self.title == "homeserver" {
+                    self.homeserver(state);
+                } else {
+                    let response = AuthStepResponse::form(
+                        self.fields
+                            .iter()
+                            .map(|((_, r#type), value)| match r#type.as_str() {
+                                "number" => Field::Number(value.parse().unwrap()),
+                                "new-password" | "password" => Field::Bytes(value.as_bytes().to_vec()),
+                                _ => Field::String(value.clone()),
+                            })
+                            .collect(),
+                    );
+                    self.next_step(state, response);
+                }
             }
         }
 

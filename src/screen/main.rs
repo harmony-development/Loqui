@@ -816,13 +816,13 @@ impl AppScreen for Screen {
                 }
             }
 
-            let chan_name = self
-                .current
-                .channel()
-                .and_then(|(gid, cid)| state.cache.get_channel(gid, cid))
-                .map_or_else(|| "select a channel".to_string(), |c| format!("#{}", c.name));
-
             if self.current.has_guild() {
+                let chan_name = self
+                    .current
+                    .channel()
+                    .and_then(|(gid, cid)| state.cache.get_channel(gid, cid))
+                    .map_or_else(|| "select a channel".to_string(), |c| format!("#{}", c.name));
+
                 egui::TopBottomPanel::top("central_top_panel")
                     .resizable(false)
                     .min_height(12.0)
