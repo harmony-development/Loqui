@@ -845,7 +845,7 @@ impl AppScreen for Screen {
                                 })
                                 .min_width(100.0)
                                 .max_width(300.0)
-                                .default_width(175.0)
+                                .default_width(125.0)
                                 .resizable(true)
                                 .show_inside(ui, |ui| {
                                     self.view_channels(state, ui);
@@ -862,7 +862,7 @@ impl AppScreen for Screen {
                                     })
                                     .min_width(100.0)
                                     .max_width(300.0)
-                                    .default_width(150.0)
+                                    .default_width(125.0)
                                     .resizable(true)
                                     .show_inside(ui, |ui| {
                                         self.view_members(state, ui);
@@ -892,7 +892,7 @@ impl AppScreen for Screen {
                                         ui.add_sized([12.0, 12.0], egui::Separator::default());
                                         ui.add_space(ui.available_width() - 12.0);
                                         let show_members_but = ui
-                                            .add_sized([12.0, 12.0], egui::Button::new("👤").frame(false).small())
+                                            .add_sized([12.0, 12.0], TextButton::text("👤").small())
                                             .on_hover_text("toggle member list");
                                         if show_members_but.clicked() {
                                             self.disable_users_bar = !self.disable_users_bar;
