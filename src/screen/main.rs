@@ -17,7 +17,7 @@ use crate::{
     widgets::{
         bg_image::ImageBg,
         easy_mark::{self, EasyMarkEditor},
-        Avatar,
+        Avatar, TextButton,
     },
 };
 
@@ -162,7 +162,7 @@ impl Screen {
                     .inner
                     .on_disabled_hover_text(guild.fetched.then(|| guild.name.as_str()).unwrap_or("loading guild"))
                     .on_hover_text(guild.name.as_str())
-                    .context_menu(|ui| {
+                    .context_menu_styled(|ui| {
                         if ui.button(dangerous_text("leave guild")).clicked() {
                             spawn_client_fut!(state, |client| {
                                 client.leave_guild(guild_id).await?;
@@ -218,7 +218,7 @@ impl Screen {
             .margin([0.0, 1.5])
             .show(ui, |ui| {
                 let but = ui
-                    .add(egui::Button::new(format!("⚙ {}", guild_name)).small().frame(false))
+                    .add(TextButton::text(format!("⚙ {}", guild_name)).small())
                     .on_hover_text("open guild settings");
 
                 but.clicked()
@@ -238,7 +238,7 @@ impl Screen {
                         let text = RichText::new(format!("#{}", channel.name));
 
                         let is_enabled = (channel.is_category || self.current.is_channel(guild_id, channel_id)).not();
-                        let button = ui.add_enabled(is_enabled, egui::Button::new(text).frame(false));
+                        let button = ui.add_enabled(is_enabled, TextButton::text(text));
                         if button.clicked() {
                             self.current.set_channel(channel_id);
                             self.last_channel_id.insert(guild_id, channel_id);
@@ -544,7 +544,7 @@ impl Screen {
                         })
                         .response;
 
-                    msg.context_menu(|ui| {
+                    msg.context_menu_styled(|ui| {
                         if let Some(message_id) = id.id() {
                             if let client::message::Content::Text(text) = &message.content {
                                 if channel.has_perm(all_permissions::MESSAGES_SEND)
@@ -570,7 +570,9 @@ impl Screen {
                                     ui.close_menu();
                                 }
                             }
-                            if message.sender == state.client().user_id() && ui.button("delete").clicked() {
+                            if message.sender == state.client().user_id()
+                                && ui.button(dangerous_text("delete")).clicked()
+                            {
                                 spawn_client_fut!(state, |client| {
                                     client.delete_message(guild_id, channel_id, message_id).await?;
                                 });

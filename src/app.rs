@@ -404,7 +404,6 @@ impl epi::App for App {
         let mut style = ctx.style().as_ref().clone();
         style.visuals.widgets.hovered.bg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;
         style.visuals.widgets.hovered.bg_fill = loqui_style::HARMONY_LOTUS_ORANGE;
-        style.visuals.widgets.hovered.fg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;
         style.visuals.selection.bg_fill = loqui_style::HARMONY_LOTUS_GREEN;
         style.visuals.widgets.noninteractive.bg_fill = loqui_style::BG_NORMAL;
         style.visuals.extreme_bg_color = loqui_style::BG_EXTREME;

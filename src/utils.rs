@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    ops::Deref,
+    ops::{Add, Deref},
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -15,8 +15,8 @@ use eframe::egui::{
     self, Align, Color32, CtxRef, Frame, Key, Layout, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText,
 };
 
-use crate::app::State;
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
+use crate::{app::State, style, widgets::TextButton};
 pub use anyhow::{anyhow, bail, ensure, Error};
 pub use client::error::{ClientError, ClientResult};
 pub use guard::guard;
@@ -85,31 +85,41 @@ pub fn scale_down(w: f32, h: f32, max_size: f32) -> (f32, f32) {
 pub trait ResponseExt {
     fn did_submit(&self, ui: &Ui) -> bool;
     fn on_hover_text_at_pointer(self, text: &str) -> Self;
+    fn context_menu_styled(self, add_contents: impl FnOnce(&mut Ui)) -> Self;
 }
 
 impl ResponseExt for Response {
     fn did_submit(&self, ui: &Ui) -> bool {
         self.lost_focus() && ui.input().key_pressed(Key::Enter)
     }
+
     fn on_hover_text_at_pointer(self, text: &str) -> Self {
         self.on_hover_ui_at_pointer(|ui| {
             ui.label(text);
         })
     }
+
+    fn context_menu_styled(self, add_contents: impl FnOnce(&mut Ui)) -> Self {
+        self.context_menu(move |ui| {
+            ui.style_mut().visuals.widgets.hovered.fg_stroke.color = style::HARMONY_LOTUS_ORANGE;
+            ui.style_mut().visuals.widgets.hovered.bg_fill = Color32::TRANSPARENT;
+            add_contents(ui);
+        })
+    }
 }
 
 pub trait UiExt {
-    fn text_button(&mut self, text: &str) -> Response;
+    fn text_button(&mut self, text: impl Into<WidgetText>) -> Response;
     fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32;
-    fn add_hovered<W: Widget>(&mut self, widget: W) -> Response;
+    fn add_hovered(&mut self, widget: impl Widget) -> Response;
     fn group_filled_with(&self, color: Color32) -> Frame;
     fn group_filled(&self) -> Frame;
 }
 
 impl UiExt for Ui {
     #[inline(always)]
-    fn text_button(&mut self, text: &str) -> Response {
-        self.add(egui::Button::new(text).frame(false))
+    fn text_button(&mut self, text: impl Into<WidgetText>) -> Response {
+        self.add(TextButton::text(text))
     }
 
     fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32 {
@@ -123,7 +133,7 @@ impl UiExt for Ui {
     }
 
     #[inline(always)]
-    fn add_hovered<W: Widget>(&mut self, widget: W) -> Response {
+    fn add_hovered(&mut self, widget: impl Widget) -> Response {
         self.add_visible(self.ui_contains_pointer(), widget)
     }
 

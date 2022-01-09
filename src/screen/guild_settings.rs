@@ -69,7 +69,7 @@ impl Screen {
                 });
             })
             .response;
-        resp.on_hover_text("right click to manage").context_menu(|ui| {
+        resp.on_hover_text("right click to manage").context_menu_styled(|ui| {
             if ui.button("copy id").clicked() {
                 ui.output().copied_text = id_string;
                 ui.close_menu();
@@ -178,7 +178,7 @@ impl Screen {
                             });
                         })
                         .response;
-                    resp.on_hover_text("right click to manage").context_menu(|ui| {
+                    resp.on_hover_text("right click to manage").context_menu_styled(|ui| {
                         if ui.button("copy invite").clicked() {
                             let homeserver = guild
                                 .homeserver
@@ -242,7 +242,7 @@ impl Screen {
                 });
             })
             .response;
-        resp.on_hover_text("right click to manage").context_menu(|ui| {
+        resp.on_hover_text("right click to manage").context_menu_styled(|ui| {
             if ui.button("copy id").clicked() {
                 ui.output().copied_text = id_string;
                 ui.close_menu();

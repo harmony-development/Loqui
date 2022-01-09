@@ -1,12 +1,47 @@
 use std::ops::Not;
 
 use client::harmony_rust_sdk::api::rest::{About, FileId};
-use eframe::egui::{self, CollapsingHeader, CollapsingResponse, Color32, Response, RichText, Ui, Widget, WidgetText};
+use eframe::egui::{
+    self, Button, CollapsingHeader, CollapsingResponse, Color32, Response, RichText, Ui, Widget, WidgetText,
+};
 
-use crate::{app::State, utils::UiExt};
+use crate::{app::State, style, utils::UiExt};
 
 pub mod bg_image;
 pub mod easy_mark;
+
+pub struct TextButton {
+    inner: Button,
+}
+
+impl TextButton {
+    #[inline(always)]
+    pub fn text(text: impl Into<WidgetText>) -> Self {
+        Self::new(Button::new(text))
+    }
+
+    #[inline(always)]
+    pub fn new(button: Button) -> Self {
+        Self {
+            inner: button.frame(false),
+        }
+    }
+
+    #[inline(always)]
+    pub fn small(mut self) -> Self {
+        self.inner = self.inner.small();
+        self
+    }
+}
+
+impl Widget for TextButton {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let text_color = ui.style().visuals.widgets.hovered.bg_fill;
+        ui.style_mut().visuals.widgets.hovered.fg_stroke.color = text_color;
+
+        ui.add(self.inner)
+    }
+}
 
 pub fn menu_text_button<R>(
     id: impl AsRef<str>,
@@ -14,10 +49,7 @@ pub fn menu_text_button<R>(
     ui: &mut Ui,
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> Option<R> {
-    let response = ui.add_sized(
-        [ui.available_width(), 12.0],
-        egui::Button::new(title).small().frame(false),
-    );
+    let response = ui.add_sized([ui.available_width(), 12.0], TextButton::text(title).small());
     let popup_id = ui.make_persistent_id(id.as_ref());
     if response.clicked() {
         ui.memory().toggle_popup(popup_id);
@@ -43,23 +75,6 @@ pub fn view_about(ui: &mut Ui, about: &About) {
             ui.label("no motd");
         }
     });
-}
-
-pub fn view_panel_chooser<P>(ui: &mut Ui, panels: &[P], chosen_panel: &mut P)
-where
-    P: AsRef<str> + Clone,
-{
-    for panel in panels {
-        let panel_name = panel.as_ref();
-
-        let enabled = panel_name != chosen_panel.as_ref();
-        let but = ui.add_enabled_ui(enabled, |ui| ui.text_button(panel_name)).inner;
-        if but.clicked() {
-            *chosen_panel = panel.clone();
-        }
-
-        ui.add(egui::Separator::default().spacing(0.0));
-    }
 }
 
 pub struct Avatar<'a> {
