@@ -17,7 +17,7 @@ use crate::{
     widgets::{
         bg_image::ImageBg,
         easy_mark::{self, EasyMarkEditor},
-        view_avatar,
+        Avatar,
     },
 };
 
@@ -150,7 +150,11 @@ impl Screen {
                 let button = ui
                     .add_enabled_ui(is_enabled, |ui| {
                         if guild.fetched {
-                            view_avatar(ui, state, guild.picture.as_ref(), guild.name.as_str(), 32.0)
+                            let mut avatar = Avatar::new(guild.picture.as_ref(), guild.name.as_str(), state);
+                            if !is_enabled {
+                                avatar = avatar.fill_bg(loqui_style::BG_LIGHT);
+                            }
+                            ui.add(avatar)
                         } else {
                             ui.add(egui::Spinner::new().size(32.0))
                         }

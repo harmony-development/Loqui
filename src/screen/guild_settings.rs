@@ -3,7 +3,7 @@ use std::ops::Not;
 use client::{channel::Channel, content, guild::Guild, harmony_rust_sdk::api::chat::all_permissions, member::Member};
 use eframe::egui::{Color32, RichText};
 
-use crate::widgets::{seperated_collapsing, view_avatar};
+use crate::widgets::{seperated_collapsing, Avatar};
 
 use super::prelude::*;
 
@@ -113,8 +113,9 @@ impl Screen {
         }
 
         if self.uploading_guild_pic.get().not() {
-            let avatar_but =
-                view_avatar(ui, state, guild.picture.as_ref(), guild.name.as_str(), 64.0).on_hover_text("set picture");
+            let avatar_but = ui
+                .add(Avatar::new(guild.picture.as_ref(), guild.name.as_str(), state).size(64.0))
+                .on_hover_text("set picture");
             if avatar_but.clicked() {
                 let uploading_guild_pic = self.uploading_guild_pic.clone();
                 spawn_client_fut!(state, |client| {

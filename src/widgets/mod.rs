@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 use client::harmony_rust_sdk::api::rest::{About, FileId};
-use eframe::egui::{self, CollapsingHeader, CollapsingResponse, Response, RichText, Ui, WidgetText};
+use eframe::egui::{self, CollapsingHeader, CollapsingResponse, Color32, Response, RichText, Ui, Widget, WidgetText};
 
 use crate::{app::State, utils::UiExt};
 
@@ -62,12 +62,49 @@ where
     }
 }
 
-pub fn view_avatar(ui: &mut Ui, state: &State, maybe_id: Option<&FileId>, text: &str, size: f32) -> Response {
-    if let Some((texid, _)) = maybe_id.and_then(|id| state.image_cache.get_avatar(id)) {
-        ui.add(egui::ImageButton::new(texid, [size, size]).frame(false))
-    } else {
-        let icon = RichText::new(text.get(0..1).unwrap_or("u").to_ascii_uppercase()).strong();
-        ui.add_sized([size, size], egui::Button::new(icon))
+pub struct Avatar<'a> {
+    state: &'a State,
+    maybe_id: Option<&'a FileId>,
+    text: &'a str,
+    size: f32,
+    fill_bg: Option<Color32>,
+}
+
+impl<'a> Avatar<'a> {
+    pub fn new(maybe_id: Option<&'a FileId>, text: &'a str, state: &'a State) -> Self {
+        Self {
+            state,
+            maybe_id,
+            text,
+            size: 32.0,
+            fill_bg: None,
+        }
+    }
+
+    pub fn size(mut self, size: f32) -> Self {
+        self.size = size;
+        self
+    }
+
+    pub fn fill_bg(mut self, color: Color32) -> Self {
+        self.fill_bg = Some(color);
+        self
+    }
+}
+
+impl<'a> Widget for Avatar<'a> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        if let Some((texid, _)) = self.maybe_id.and_then(|id| self.state.image_cache.get_avatar(id)) {
+            ui.add(egui::ImageButton::new(texid, [self.size; 2]).frame(false))
+        } else {
+            let icon = RichText::new(self.text.get(0..1).unwrap_or("u").to_ascii_uppercase()).strong();
+            let mut button = egui::Button::new(icon);
+            if let Some(color) = self.fill_bg {
+                button = button.fill(color);
+            }
+
+            ui.add_sized([self.size; 2], button)
+        }
     }
 }
 
