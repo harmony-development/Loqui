@@ -4,7 +4,7 @@
 Loqui is a [Harmony] client written in Rust using the [egui] GUI library.
 It uses [harmony-rust-sdk] to communicate with Harmony servers.
 
-![Loqui](resources/main.png)
+![Loqui](resources/main.jpg)
 
 [See more screenshots](./resources)
 
