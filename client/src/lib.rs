@@ -25,8 +25,8 @@ use harmony_rust_sdk::{
             BanUserRequest, ChannelKind, Content as HarmonyContent, CreateChannelRequest, CreateGuildRequest,
             CreateInviteRequest, DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Event, EventSource,
             FormattedText, GetGuildChannelsRequest, GetGuildInvitesRequest, GetGuildListRequest,
-            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetUserRolesRequest, Invite,
-            JoinGuildRequest, KickUserRequest, LeaveGuildRequest, Message as HarmonyMessage, Permission,
+            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetUserRolesRequest,
+            Invite, JoinGuildRequest, KickUserRequest, LeaveGuildRequest, Message as HarmonyMessage, Permission,
             QueryHasPermissionRequest, Role, TypingRequest, UnbanUserRequest, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
@@ -139,6 +139,12 @@ pub enum FetchEvent {
     Attachment {
         attachment: Attachment,
         file: DownloadedFile,
+    },
+    FetchedReply {
+        guild_id: u64,
+        channel_id: u64,
+        message_id: u64,
+        message: HarmonyMessage,
     },
     InitialSyncComplete,
 }
@@ -255,7 +261,20 @@ impl Cache {
             FetchEvent::LinkMetadata { url, data } => {
                 self.link_embeds.insert(url, data);
             }
-            FetchEvent::Attachment { attachment, file } => {}
+            FetchEvent::FetchedReply {
+                guild_id,
+                channel_id,
+                message_id,
+                message,
+            } => {
+                let channel = self.get_channel_mut(guild_id, channel_id);
+                let message: Message = message.into();
+                let id = MessageId::Ack(message_id);
+                message.post_process(post, guild_id, channel_id);
+
+                channel.messages.create_reply_view(id).insert_message(id, message);
+            }
+            FetchEvent::Attachment { .. } => {}
             FetchEvent::InitialSyncComplete => {
                 self.initial_sync_complete = true;
             }
@@ -595,25 +614,6 @@ impl Cache {
                 }
             },
         }
-    }
-
-    pub fn process_reply_message(
-        &mut self,
-        guild_id: u64,
-        channel_id: u64,
-        message_id: u64,
-        message: HarmonyMessage,
-    ) -> Vec<PostProcessEvent> {
-        let mut post = Vec::new();
-
-        let channel = self.get_channel_mut(guild_id, channel_id);
-        let message: Message = message.into();
-        let id = MessageId::Ack(message_id);
-        message.post_process(&mut post, guild_id, channel_id);
-
-        channel.messages.create_reply_view(id).insert_message(id, message);
-
-        post
     }
 
     pub fn process_get_message_history_response(
@@ -1149,7 +1149,19 @@ impl Client {
                 channel_id,
                 message_id,
             } => {
-                tracing::debug!("TODO fetch message");
+                let message = self
+                    .inner
+                    .call(GetMessageRequest::new(guild_id, channel_id, message_id))
+                    .await?
+                    .message;
+                if let Some(message) = message {
+                    events.push(FetchEvent::FetchedReply {
+                        guild_id,
+                        channel_id,
+                        message_id,
+                        message,
+                    });
+                }
                 Ok(())
             }
             PostProcessEvent::FetchLinkMetadata(url) => {
