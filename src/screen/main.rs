@@ -502,9 +502,6 @@ impl Screen {
                         .stroke((0.0, Color32::WHITE).into())
                         .margin([5.0, 5.0])
                         .show(ui, |ui| {
-                            let text_strong = ui.style().visuals.strong_text_color();
-                            ui.style_mut().visuals.override_text_color = Some(text_strong);
-
                             let overrides = message.overrides.as_ref();
                             let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
                             let user = state.cache.get_user(message.sender);
@@ -516,7 +513,8 @@ impl Screen {
                                 .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
 
                             ui.horizontal(|ui| {
-                                self.view_user_avatar(state, ui, user, overrides);
+                                let extreme_bg_color = ui.style().visuals.extreme_bg_color;
+                                self.view_user_avatar(state, ui, user, overrides, extreme_bg_color);
                                 ui.label(RichText::new(display_name).color(color).strong());
                                 if override_name.is_some() {
                                     ui.label(RichText::new(format!("({})", sender_name)).italics().small());
@@ -686,7 +684,14 @@ impl Screen {
         }
     }
 
-    fn view_user_avatar(&mut self, state: &State, ui: &mut Ui, user: Option<&Member>, overrides: Option<&Override>) {
+    fn view_user_avatar(
+        &mut self,
+        state: &State,
+        ui: &mut Ui,
+        user: Option<&Member>,
+        overrides: Option<&Override>,
+        fill_bg: Color32,
+    ) {
         let maybe_tex = overrides
             .and_then(|ov| ov.avatar_url.as_ref())
             .or_else(|| user.and_then(|u| u.avatar_url.as_ref()))
@@ -701,11 +706,9 @@ impl Screen {
                     .and_then(|ov| ov.name.as_deref())
                     .or_else(|| user.map(|u| u.username.as_str()))
                     .unwrap_or("");
+                let letter = username.get(0..1).unwrap_or("u").to_ascii_uppercase();
 
-                ui.add_sized(
-                    [32.0, 32.0],
-                    egui::Button::new(username.get(0..1).unwrap_or("u").to_ascii_uppercase()),
-                )
+                ui.add_sized([32.0, 32.0], egui::Button::new(letter).fill(fill_bg));
             });
         }
     }
@@ -721,7 +724,7 @@ impl Screen {
                     guard!(let Some(user) = state.cache.get_user(*id) else { continue });
                     ui.horizontal(|ui| {
                         if user.fetched {
-                            self.view_user_avatar(state, ui, Some(user), None);
+                            self.view_user_avatar(state, ui, Some(user), None, loqui_style::BG_LIGHT);
                             ui.label(user.username.as_str());
                         } else {
                             ui.add(egui::Spinner::new().size(32.0));
