@@ -11,7 +11,7 @@ use client::{
     Cache, Client, FetchEvent,
 };
 use eframe::{
-    egui::{self, Color32, FontData, FontDefinitions, TextureId, Ui, Vec2},
+    egui::{self, FontData, FontDefinitions, TextureId, Ui, Vec2},
     epi,
 };
 use tokio::sync::mpsc as tokio_mpsc;

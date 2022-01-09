@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    ops::{Add, Deref},
+    ops::Deref,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -9,11 +9,9 @@ use client::{
     guild::Guild,
     harmony_rust_sdk::api::{profile::UserStatus, rest::FileId},
     member::Member,
-    tracing, Client,
+    tracing, Client, Uri,
 };
-use eframe::egui::{
-    self, Align, Color32, CtxRef, Frame, Key, Layout, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText,
-};
+use eframe::egui::{self, Color32, CtxRef, Frame, Key, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText};
 
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
 use crate::{app::State, style, widgets::TextButton};
@@ -165,12 +163,6 @@ pub fn rgb_color(color: [u8; 3]) -> Color32 {
     Color32::from_rgb(color[0], color[1], color[2])
 }
 
-pub fn horizontal_centered_justified() -> Layout {
-    Layout::left_to_right()
-        .with_cross_align(Align::Center)
-        .with_cross_justify(true)
-}
-
 #[inline(always)]
 pub fn dangerous_text(text: impl Into<String>) -> RichText {
     RichText::new(text).color(Color32::RED)
@@ -222,4 +214,11 @@ pub fn open_url(url: impl Deref<Target = str> + Send + 'static) {
             tracing::error!("error opening URL: {}", err);
         }
     }
+}
+
+pub fn parse_urls(text: &str) -> impl Iterator<Item = (&str, Uri)> {
+    text.split_whitespace()
+        .filter(|s| s.starts_with("http://") || s.starts_with("https://"))
+        .filter_map(|maybe_url| Some((maybe_url, maybe_url.parse::<Uri>().ok()?)))
+        .filter(|(_, url)| matches!(url.scheme_str(), Some("http" | "https")))
 }

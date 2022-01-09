@@ -5,7 +5,7 @@ use eframe::egui::{
     self, Button, CollapsingHeader, CollapsingResponse, Color32, Response, RichText, Ui, Widget, WidgetText,
 };
 
-use crate::{app::State, style, utils::UiExt};
+use crate::app::State;
 
 pub mod bg_image;
 pub mod easy_mark;

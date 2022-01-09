@@ -29,12 +29,14 @@ impl ImageBg {
     }
 
     /// Select UV range. Default is (0,0) in top-left, (1,1) bottom right.
+    #[allow(dead_code)]
     pub fn uv(mut self, uv: impl Into<Rect>) -> Self {
         self.uv = uv.into();
         self
     }
 
     /// A solid color to put behind the image. Useful for transparent images.
+    #[allow(dead_code)]
     pub fn bg_fill(mut self, bg_fill: impl Into<Color32>) -> Self {
         self.bg_fill = bg_fill.into();
         self

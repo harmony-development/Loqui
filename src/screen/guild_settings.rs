@@ -270,11 +270,12 @@ impl Screen {
         });
     }
 
+    #[allow(unused_variables)]
     fn view_roles(&mut self, state: &mut State, ui: &mut Ui) {}
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::CtxRef, _: &epi::Frame, state: &mut State) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {

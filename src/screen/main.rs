@@ -6,7 +6,7 @@ use client::{
     member::Member,
     message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override, ReadMessagesView},
     smol_str::SmolStr,
-    AHashMap, AHashSet, FetchEvent, Uri,
+    AHashMap, AHashSet, FetchEvent,
 };
 use eframe::egui::{Color32, Event, RichText, Vec2};
 
@@ -42,6 +42,7 @@ impl CurrentIds {
     }
 
     #[inline(always)]
+    #[allow(dead_code)]
     fn is_guild(&self, id: u64) -> bool {
         self.guild().map_or(false, |oid| oid == id)
     }
@@ -287,11 +288,7 @@ impl Screen {
                 });
             }
         } else if highlight_message {
-            let urls = text
-                .split_whitespace()
-                .filter(|s| s.starts_with("http://") || s.starts_with("https://"))
-                .filter_map(|maybe_url| Some((maybe_url, maybe_url.parse::<Uri>().ok()?)))
-                .filter(|(_, url)| matches!(url.scheme_str(), Some("http" | "https")));
+            let urls = parse_urls(text);
             let mut text = text.to_string();
             for (source, _) in urls {
                 text = text.replace(source, &format!("<{}>", source));
@@ -303,12 +300,7 @@ impl Screen {
     }
 
     fn view_message_url_embeds(&mut self, state: &State, ui: &mut Ui, text: &str) {
-        let urls = text
-            .split_whitespace()
-            .filter(|s| s.starts_with("http://") || s.starts_with("https://"))
-            .filter_map(|maybe_url| Some((maybe_url, maybe_url.parse::<Uri>().ok()?)))
-            .filter(|(_, url)| matches!(url.scheme_str(), Some("http" | "https")))
-            .filter_map(|(maybe_url, url)| Some((state.cache.get_link_data(&url)?, maybe_url)));
+        let urls = parse_urls(text).filter_map(|(og, url)| Some((state.cache.get_link_data(&url)?, og)));
         for (data, url) in urls {
             match data {
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
