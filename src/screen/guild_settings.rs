@@ -1,6 +1,9 @@
-use std::ops::Not;
+use std::{fmt::Write, ops::Not};
 
-use client::{channel::Channel, content, guild::Guild, harmony_rust_sdk::api::chat::all_permissions, member::Member};
+use client::{
+    channel::Channel, content, get_random_u64, guild::Guild, harmony_rust_sdk::api::chat::all_permissions,
+    member::Member,
+};
 use eframe::egui::{Color32, RichText};
 
 use crate::widgets::{seperated_collapsing, view_channel_context_menu_items, view_member_context_menu_items, Avatar};
@@ -139,13 +142,18 @@ impl Screen {
                     egui::TextEdit::singleline(&mut self.possible_uses_text).hint_text("uses"),
                 );
 
-                if ui.button("create invite").clicked() {
+                if ui.button("create").clicked() {
                     if let Ok(uses) = self.possible_uses_text.parse::<u64>() {
                         let name = self.id_edit_text.drain(..).collect::<String>();
                         spawn_client_fut!(state, |client| {
                             client.create_invite(guild_id, name, uses as u32).await?;
                         });
                     }
+                }
+
+                if ui.button("generate").clicked() {
+                    self.id_edit_text.clear();
+                    write!(&mut self.id_edit_text, "{}", get_random_u64()).unwrap();
                 }
             });
 

@@ -648,9 +648,7 @@ impl Cache {
     }
 
     pub fn prepare_send_message(&mut self, guild_id: u64, channel_id: u64, message: Message) -> u64 {
-        let mut bytes = [0; 8];
-        getrandom::getrandom(&mut bytes).expect("cant get random");
-        let echo_id = u64::from_ne_bytes(bytes);
+        let echo_id = get_random_u64();
         self.get_channel_mut(guild_id, channel_id)
             .messages
             .continuous_view_mut()
@@ -1205,4 +1203,10 @@ fn post_heading(post: &mut Vec<PostProcessEvent>, embeds: &[Embed]) {
         inner(embed.header.as_ref());
         inner(embed.footer.as_ref());
     }
+}
+
+pub fn get_random_u64() -> u64 {
+    let mut bytes = [0; 8];
+    getrandom::getrandom(&mut bytes).expect("cant get random");
+    u64::from_ne_bytes(bytes)
 }

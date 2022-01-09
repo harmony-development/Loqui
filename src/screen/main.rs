@@ -238,7 +238,8 @@ impl Screen {
             if channels.is_empty().not() {
                 for (channel_id, channel) in channels {
                     if channel.fetched {
-                        let text = RichText::new(format!("#{}", channel.name));
+                        let symbol = channel.is_category.then(|| "☰ ").unwrap_or("#");
+                        let text = format!("{}{}", symbol, channel.name);
 
                         let is_enabled = (channel.is_category || self.current.is_channel(guild_id, channel_id)).not();
                         let mut button = ui.add_enabled(is_enabled, TextButton::text(text));
@@ -745,8 +746,11 @@ impl Screen {
                         .scope(|ui| {
                             ui.horizontal(|ui| {
                                 if user.fetched {
+                                    let role_color = guild
+                                        .highest_role_for_member(*id)
+                                        .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
                                     self.view_user_avatar(state, ui, Some(user), None, loqui_style::BG_LIGHT);
-                                    ui.label(user.username.as_str());
+                                    ui.colored_label(role_color, user.username.as_str());
                                 } else {
                                     ui.add(egui::Spinner::new().size(32.0));
                                 }
