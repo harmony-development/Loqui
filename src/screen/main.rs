@@ -216,7 +216,7 @@ impl Screen {
             .map_or_else(|| "unknown", |g| g.name.as_str());
 
         let menu_but_clicked = egui::Frame::group(ui.style())
-            .margin([0.0, 1.5])
+            .margin([2.0, 2.0])
             .show(ui, |ui| {
                 let but = ui
                     .add(TextButton::text(format!("⚙ {}", guild_name)).small())
