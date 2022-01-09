@@ -11,7 +11,7 @@ use client::{
     Cache, Client, FetchEvent,
 };
 use eframe::{
-    egui::{self, FontData, FontDefinitions, Ui},
+    egui::{self, FontData, FontDefinitions, TextureId, Ui, Vec2},
     epi,
 };
 use tokio::sync::mpsc as tokio_mpsc;
@@ -36,6 +36,7 @@ pub struct State {
     pub futures: Futures,
     pub latest_errors: Vec<String>,
     pub about: Option<About>,
+    pub harmony_lotus: (TextureId, Vec2),
     next_screen: Option<BoxedScreen>,
     prev_screen: bool,
 }
@@ -228,6 +229,7 @@ impl App {
                 futures,
                 latest_errors: Vec::new(),
                 about: None,
+                harmony_lotus: (TextureId::Egui, Vec2::ZERO),
                 next_screen: None,
                 prev_screen: false,
             },
@@ -345,6 +347,17 @@ impl App {
                 });
             });
     }
+
+    fn load_harmony_lotus(&self, frame: &epi::Frame) -> (TextureId, Vec2) {
+        const HARMONY_LOTUS: &[u8] = include_bytes!("../resources/lotus.png");
+        let image = image::load_from_memory(HARMONY_LOTUS).expect("harmony lotus must be fine");
+        let image = image.into_rgba8();
+        let (w, h) = image.dimensions();
+        let size = [w as usize, h as usize];
+        let rgba = image.into_raw();
+        let texid = frame.alloc_texture(epi::Image::from_rgba_unmultiplied(size, &rgba));
+        (texid, [w as f32, h as f32].into())
+    }
 }
 
 impl epi::App for App {
@@ -383,6 +396,9 @@ impl epi::App for App {
             .insert(0, "iosevka".to_string());
 
         ctx.set_fonts(font_defs);
+
+        // load harmony lotus
+        self.state.harmony_lotus = self.load_harmony_lotus(frame);
     }
 
     fn max_size_points(&self) -> egui::Vec2 {

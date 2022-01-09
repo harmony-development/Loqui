@@ -11,7 +11,9 @@ use client::{
     member::Member,
     tracing, Client,
 };
-use eframe::egui::{self, Align, Color32, Key, Layout, Response, RichText, Ui, Widget, WidgetText};
+use eframe::egui::{
+    self, Align, Color32, CtxRef, Frame, Key, Layout, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText,
+};
 
 use crate::app::State;
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
@@ -100,9 +102,11 @@ pub trait UiExt {
     fn text_button(&mut self, text: &str) -> Response;
     fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32;
     fn add_hovered<W: Widget>(&mut self, widget: W) -> Response;
+    fn group_filled(&self) -> Frame;
 }
 
 impl UiExt for Ui {
+    #[inline(always)]
     fn text_button(&mut self, text: &str) -> Response {
         self.add(egui::Button::new(text).frame(false))
     }
@@ -119,6 +123,23 @@ impl UiExt for Ui {
 
     fn add_hovered<W: Widget>(&mut self, widget: W) -> Response {
         self.add_visible(self.ui_contains_pointer(), widget)
+    }
+
+    fn group_filled(&self) -> Frame {
+        let style = self.style();
+        egui::Frame::group(style).fill(style.visuals.window_fill())
+    }
+}
+
+pub trait CtxExt {
+    fn available_center_pos(&self, offset_size: Vec2) -> Pos2;
+}
+
+impl CtxExt for CtxRef {
+    #[inline(always)]
+    fn available_center_pos(&self, offset_size: Vec2) -> Pos2 {
+        let center = self.available_rect().center();
+        center - (offset_size * 0.5)
     }
 }
 

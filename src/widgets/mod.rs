@@ -5,6 +5,7 @@ use eframe::egui::{self, CollapsingHeader, CollapsingResponse, Response, RichTex
 
 use crate::{app::State, utils::UiExt};
 
+pub mod bg_image;
 pub mod easy_mark;
 
 pub fn menu_text_button<R>(
