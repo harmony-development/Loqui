@@ -3,7 +3,7 @@ use std::ops::Not;
 use client::{channel::Channel, content, guild::Guild, harmony_rust_sdk::api::chat::all_permissions, member::Member};
 use eframe::egui::{Color32, RichText};
 
-use crate::widgets::{seperated_collapsing, Avatar};
+use crate::widgets::{seperated_collapsing, view_channel_context_menu_items, view_member_context_menu_items, Avatar};
 
 use super::prelude::*;
 
@@ -70,22 +70,7 @@ impl Screen {
             })
             .response;
         resp.on_hover_text("right click to manage").context_menu_styled(|ui| {
-            if ui.button("copy id").clicked() {
-                ui.output().copied_text = id_string;
-                ui.close_menu();
-            }
-            if ui.button("copy name").clicked() {
-                ui.output().copied_text = channel.name.to_string();
-                ui.close_menu();
-            }
-            if guild.has_perm(all_permissions::CHANNELS_MANAGE_DELETE) && ui.button(dangerous_text("delete")).clicked()
-            {
-                let guild_id = self.guild_id;
-                spawn_client_fut!(state, |client| {
-                    client.delete_channel(guild_id, channel_id).await?;
-                });
-                ui.close_menu();
-            }
+            view_channel_context_menu_items(ui, state, self.guild_id, channel_id, guild, channel);
             if guild.has_perm(all_permissions::CHANNELS_MANAGE_CHANGE_INFORMATION) && ui.button("edit").clicked() {
                 // TODO
                 ui.close_menu();
@@ -243,26 +228,7 @@ impl Screen {
             })
             .response;
         resp.on_hover_text("right click to manage").context_menu_styled(|ui| {
-            if ui.button("copy id").clicked() {
-                ui.output().copied_text = id_string;
-                ui.close_menu();
-            }
-            if ui.button("copy username").clicked() {
-                ui.output().copied_text = member.username.to_string();
-                ui.close_menu();
-            }
-            if guild.has_perm(all_permissions::USER_MANAGE_BAN) && ui.button(dangerous_text("ban")).clicked() {
-                spawn_client_fut!(state, |client| {
-                    client.ban_member(guild_id, user_id).await?;
-                });
-                ui.close_menu();
-            }
-            if guild.has_perm(all_permissions::USER_MANAGE_KICK) && ui.button(dangerous_text("kick")).clicked() {
-                spawn_client_fut!(state, |client| {
-                    client.kick_member(guild_id, user_id).await?;
-                });
-                ui.close_menu();
-            }
+            view_member_context_menu_items(ui, state, guild_id, user_id, guild, member);
             if guild.has_perm(all_permissions::ROLES_USER_MANAGE) && ui.button("manage roles").clicked() {
                 // TODO
                 ui.close_menu();

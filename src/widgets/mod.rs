@@ -1,11 +1,22 @@
 use std::ops::Not;
 
-use client::harmony_rust_sdk::api::rest::{About, FileId};
+use client::{
+    channel::Channel,
+    guild::Guild,
+    harmony_rust_sdk::api::{
+        chat::all_permissions,
+        rest::{About, FileId},
+    },
+    member::Member,
+};
 use eframe::egui::{
     self, Button, CollapsingHeader, CollapsingResponse, Color32, Response, RichText, Ui, Widget, WidgetText,
 };
 
-use crate::app::State;
+use crate::{
+    app::State,
+    utils::{dangerous_text, spawn_client_fut},
+};
 
 pub mod bg_image;
 pub mod easy_mark;
@@ -147,4 +158,58 @@ pub fn view_egui_settings(ctx: &egui::CtxRef, ui: &mut Ui) {
     CollapsingHeader::new("Memory")
         .default_open(false)
         .show(ui, |ui| ctx.memory_ui(ui));
+}
+
+pub fn view_member_context_menu_items(
+    ui: &mut Ui,
+    state: &State,
+    guild_id: u64,
+    member_id: u64,
+    guild: &Guild,
+    member: &Member,
+) {
+    if ui.button("copy id").clicked() {
+        ui.output().copied_text = member_id.to_string();
+        ui.close_menu();
+    }
+    if ui.button("copy username").clicked() {
+        ui.output().copied_text = member.username.to_string();
+        ui.close_menu();
+    }
+    if guild.has_perm(all_permissions::USER_MANAGE_BAN) && ui.button(dangerous_text("ban")).clicked() {
+        spawn_client_fut!(state, |client| {
+            client.ban_member(guild_id, member_id).await?;
+        });
+        ui.close_menu();
+    }
+    if guild.has_perm(all_permissions::USER_MANAGE_KICK) && ui.button(dangerous_text("kick")).clicked() {
+        spawn_client_fut!(state, |client| {
+            client.kick_member(guild_id, member_id).await?;
+        });
+        ui.close_menu();
+    }
+}
+
+pub fn view_channel_context_menu_items(
+    ui: &mut Ui,
+    state: &State,
+    guild_id: u64,
+    channel_id: u64,
+    guild: &Guild,
+    channel: &Channel,
+) {
+    if ui.button("copy id").clicked() {
+        ui.output().copied_text = channel_id.to_string();
+        ui.close_menu();
+    }
+    if ui.button("copy name").clicked() {
+        ui.output().copied_text = channel.name.to_string();
+        ui.close_menu();
+    }
+    if guild.has_perm(all_permissions::CHANNELS_MANAGE_DELETE) && ui.button(dangerous_text("delete")).clicked() {
+        spawn_client_fut!(state, |client| {
+            client.delete_channel(guild_id, channel_id).await?;
+        });
+        ui.close_menu();
+    }
 }

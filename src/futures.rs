@@ -121,7 +121,7 @@ macro_rules! spawn_evs {
             {
                 $fut
             }
-            ClientResult::Ok(_evs)
+            $crate::utils::ClientResult::Ok(_evs)
         });
     }};
 }
@@ -131,7 +131,7 @@ macro_rules! spawn_client_fut {
         let $client = $state.client().clone();
         $state.futures.spawn(async move {
             let res = $fut;
-            ClientResult::Ok(res)
+            $crate::utils::ClientResult::Ok(res)
         });
     }};
 }

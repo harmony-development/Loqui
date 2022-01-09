@@ -17,7 +17,7 @@ use crate::{
     widgets::{
         bg_image::ImageBg,
         easy_mark::{self, EasyMarkEditor},
-        Avatar, TextButton,
+        view_channel_context_menu_items, view_member_context_menu_items, Avatar, TextButton,
     },
 };
 
@@ -230,6 +230,8 @@ impl Screen {
             state.push_screen(guild_settings::Screen::new(guild_id, state));
         }
 
+        let maybe_guild = state.cache.get_guild(guild_id);
+
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             let channels = state.cache.get_channels(guild_id);
 
@@ -239,7 +241,12 @@ impl Screen {
                         let text = RichText::new(format!("#{}", channel.name));
 
                         let is_enabled = (channel.is_category || self.current.is_channel(guild_id, channel_id)).not();
-                        let button = ui.add_enabled(is_enabled, TextButton::text(text));
+                        let mut button = ui.add_enabled(is_enabled, TextButton::text(text));
+                        if let Some(guild) = maybe_guild {
+                            button = button.context_menu_styled(|ui| {
+                                view_channel_context_menu_items(ui, state, guild_id, channel_id, guild, channel);
+                            });
+                        }
                         if button.clicked() {
                             self.current.set_channel(channel_id);
                             self.last_channel_id.insert(guild_id, channel_id);
@@ -508,14 +515,24 @@ impl Screen {
                                 .highest_role_for_member(message.sender)
                                 .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
 
-                            ui.horizontal(|ui| {
-                                let extreme_bg_color = ui.style().visuals.extreme_bg_color;
-                                self.view_user_avatar(state, ui, user, overrides, extreme_bg_color);
-                                ui.label(RichText::new(display_name).color(color).strong());
-                                if override_name.is_some() {
-                                    ui.label(RichText::new(format!("({})", sender_name)).italics().small());
-                                }
-                            });
+                            let user_resp = ui
+                                .scope(|ui| {
+                                    ui.horizontal(|ui| {
+                                        let extreme_bg_color = ui.style().visuals.extreme_bg_color;
+                                        self.view_user_avatar(state, ui, user, overrides, extreme_bg_color);
+                                        ui.label(RichText::new(display_name).color(color).strong());
+                                        if override_name.is_some() {
+                                            ui.label(RichText::new(format!("({})", sender_name)).italics().small());
+                                        }
+                                    });
+                                })
+                                .response;
+
+                            if let Some(user) = user {
+                                user_resp.context_menu_styled(|ui| {
+                                    view_member_context_menu_items(ui, state, guild_id, message.sender, guild, user);
+                                });
+                            }
 
                             match &message.content {
                                 client::message::Content::Text(text) => {
@@ -724,13 +741,20 @@ impl Screen {
             if sorted_members.is_empty().not() {
                 for (id, _) in sorted_members {
                     guard!(let Some(user) = state.cache.get_user(*id) else { continue });
-                    ui.horizontal(|ui| {
-                        if user.fetched {
-                            self.view_user_avatar(state, ui, Some(user), None, loqui_style::BG_LIGHT);
-                            ui.label(user.username.as_str());
-                        } else {
-                            ui.add(egui::Spinner::new().size(32.0));
-                        }
+                    let frame_resp = ui
+                        .scope(|ui| {
+                            ui.horizontal(|ui| {
+                                if user.fetched {
+                                    self.view_user_avatar(state, ui, Some(user), None, loqui_style::BG_LIGHT);
+                                    ui.label(user.username.as_str());
+                                } else {
+                                    ui.add(egui::Spinner::new().size(32.0));
+                                }
+                            });
+                        })
+                        .response;
+                    frame_resp.context_menu_styled(|ui| {
+                        view_member_context_menu_items(ui, state, guild_id, *id, guild, user);
                     });
                     ui.separator();
                 }

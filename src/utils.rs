@@ -100,7 +100,7 @@ impl ResponseExt for Response {
     fn context_menu_styled(self, add_contents: impl FnOnce(&mut Ui)) -> Self {
         self.context_menu(move |ui| {
             ui.style_mut().visuals.widgets.hovered.fg_stroke.color = style::HARMONY_LOTUS_ORANGE;
-            ui.style_mut().visuals.widgets.hovered.bg_fill = Color32::TRANSPARENT;
+            //ui.style_mut().visuals.widgets.hovered.bg_fill = Color32::TRANSPARENT;
             add_contents(ui);
         })
     }
