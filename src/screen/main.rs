@@ -647,8 +647,12 @@ impl Screen {
             .editor_ui(ui);
 
         let user_inputted_text = ctx.input().events.iter().any(|ev| matches!(ev, Event::Text(_)));
+        let should_focus_composer = (self.show_create_guild || self.show_join_guild).not()
+            && text_edit.has_focus().not()
+            && self.editing_message.is_none()
+            && user_inputted_text;
 
-        if text_edit.has_focus().not() && self.editing_message.is_none() && user_inputted_text {
+        if should_focus_composer {
             text_edit.request_focus();
         }
 
@@ -749,18 +753,9 @@ impl Screen {
             .filter_map(|member| Some((member, member.1.typing_in_channel?)))
             .filter_map(move |(member, (gid, cid, _))| self.current.is_channel(gid, cid).then(|| member))
     }
-}
 
-impl AppScreen for Screen {
-    fn id(&self) -> &'static str {
-        "main"
-    }
-
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, state: &mut State) {
-        if ctx.input().key_pressed(egui::Key::Escape) {
-            self.editing_message = None;
-        }
-
+    #[inline(always)]
+    fn handle_arrow_up_edit(&mut self, ctx: &egui::CtxRef, state: &State) {
         if self.composer.text().is_empty()
             && self.editing_message.is_none()
             && ctx.input().key_pressed(egui::Key::ArrowUp)
@@ -796,128 +791,164 @@ impl AppScreen for Screen {
                 }
             }
         }
+    }
+
+    #[inline(always)]
+    fn show_guild_panel(&mut self, ui: &mut Ui, state: &mut State) {
+        let panel_frame = egui::Frame {
+            margin: Vec2::new(8.0, 5.0),
+            fill: ui.style().visuals.extreme_bg_color,
+            stroke: ui.style().visuals.window_stroke(),
+            corner_radius: 4.0,
+            ..Default::default()
+        };
+
+        egui::panel::SidePanel::left("guild_panel")
+            .frame(panel_frame)
+            .min_width(32.0)
+            .max_width(32.0)
+            .resizable(false)
+            .show_inside(ui, |ui| self.view_guilds(state, ui));
+    }
+
+    #[inline(always)]
+    fn show_channel_panel(&mut self, ui: &mut Ui, state: &mut State) {
+        let panel_frame = egui::Frame {
+            margin: Vec2::new(8.0, 5.0),
+            fill: ui.style().visuals.window_fill(),
+            stroke: ui.style().visuals.window_stroke(),
+            corner_radius: 4.0,
+            ..Default::default()
+        };
+
+        egui::panel::SidePanel::left("channel_panel")
+            .frame(panel_frame)
+            .min_width(100.0)
+            .max_width(300.0)
+            .default_width(125.0)
+            .resizable(true)
+            .show_inside(ui, |ui| {
+                self.view_channels(state, ui);
+            });
+    }
+
+    #[inline(always)]
+    fn show_member_panel(&mut self, ui: &mut Ui, state: &mut State) {
+        let panel_frame = egui::Frame {
+            margin: Vec2::new(8.0, 5.0),
+            fill: ui.style().visuals.extreme_bg_color,
+            stroke: ui.style().visuals.window_stroke(),
+            corner_radius: 4.0,
+            ..Default::default()
+        };
+
+        egui::panel::SidePanel::right("member_panel")
+            .frame(panel_frame)
+            .min_width(100.0)
+            .max_width(300.0)
+            .default_width(125.0)
+            .resizable(true)
+            .show_inside(ui, |ui| {
+                self.view_members(state, ui);
+            });
+    }
+
+    #[inline(always)]
+    fn show_channel_bar(&mut self, ui: &mut Ui, state: &mut State) {
+        let top_channel_bar_width = ui.available_width() - 8.0;
+        ui.allocate_ui([top_channel_bar_width, 12.0].into(), |ui| {
+            let frame = egui::Frame {
+                margin: [4.0, 2.0].into(),
+                fill: ui.style().visuals.window_fill(),
+                stroke: ui.style().visuals.window_stroke(),
+                corner_radius: 2.0,
+                ..Default::default()
+            };
+            frame.show(ui, |ui| {
+                ui.horizontal_top(|ui| {
+                    let chan_name = self
+                        .current
+                        .channel()
+                        .and_then(|(gid, cid)| state.cache.get_channel(gid, cid))
+                        .map_or_else(|| "select a channel".to_string(), |c| format!("#{}", c.name));
+
+                    ui.label(chan_name);
+                    ui.add_sized([12.0, 12.0], egui::Separator::default());
+                    ui.add_space(ui.available_width() - 12.0);
+                    let show_members_but = ui
+                        .add_sized([12.0, 12.0], TextButton::text("👤").small())
+                        .on_hover_text("toggle member list");
+                    if show_members_but.clicked() {
+                        self.disable_users_bar = !self.disable_users_bar;
+                    }
+                });
+            });
+        });
+    }
+
+    #[inline(always)]
+    fn show_main_area(&mut self, ui: &mut Ui, state: &mut State, frame: &epi::Frame, ctx: &egui::CtxRef) {
+        ui.with_layout(
+            Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
+            |ui| {
+                ui.vertical(|ui| {
+                    ui.allocate_ui([ui.available_width(), ui.available_height() - 38.0].into(), |ui| {
+                        self.view_messages(state, ui, frame);
+                    });
+                    ui.group_filled().show(ui, |ui| {
+                        self.view_typing_members(state, ui);
+                        self.view_composer(state, ui, ctx);
+                    });
+                });
+            },
+        );
+    }
+}
+
+impl AppScreen for Screen {
+    fn id(&self) -> &'static str {
+        "main"
+    }
+
+    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, state: &mut State) {
+        if ctx.input().key_pressed(egui::Key::Escape) {
+            self.editing_message = None;
+        }
+
+        self.handle_arrow_up_edit(ctx, state);
 
         self.view_join_guild(state, ctx);
         self.view_create_guild(state, ctx);
 
-        egui::CentralPanel::default()
-            .frame(egui::Frame {
-                margin: Vec2::new(8.0, 8.0),
-                fill: loqui_style::BG_LIGHT,
-                ..Default::default()
-            })
-            .show(ctx, |ui| {
-                let (texid, size) = state.harmony_lotus;
-                let offset = ui.available_size() - (size * 0.16) - egui::vec2(75.0, 0.0);
-                ImageBg::new(texid, size * 0.2)
-                    .tint(Color32::WHITE.linear_multiply(0.05))
-                    .offset(offset)
-                    .show(ui, |ui| {
-                        egui::panel::SidePanel::left("guild_panel")
-                            .frame(egui::Frame {
-                                margin: Vec2::new(8.0, 5.0),
-                                fill: ui.style().visuals.extreme_bg_color,
-                                stroke: ui.style().visuals.window_stroke(),
-                                corner_radius: 4.0,
-                                ..Default::default()
-                            })
-                            .min_width(32.0)
-                            .max_width(32.0)
-                            .resizable(false)
-                            .show_inside(ui, |ui| self.view_guilds(state, ui));
+        let panel_frame = egui::Frame {
+            margin: Vec2::new(8.0, 8.0),
+            fill: loqui_style::BG_LIGHT,
+            ..Default::default()
+        };
+        egui::CentralPanel::default().frame(panel_frame).show(ctx, |ui| {
+            let (texid, size) = state.harmony_lotus;
+            let size = size * 0.2;
+            ImageBg::new(texid, size)
+                .tint(Color32::WHITE.linear_multiply(0.05))
+                .offset(ui.available_size() - (size * 0.8) - egui::vec2(75.0, 0.0))
+                .show(ui, |ui| {
+                    self.show_guild_panel(ui, state);
 
-                        if self.current.has_guild() {
-                            egui::panel::SidePanel::left("channel_panel")
-                                .frame(egui::Frame {
-                                    margin: Vec2::new(8.0, 5.0),
-                                    fill: ui.style().visuals.window_fill(),
-                                    stroke: ui.style().visuals.window_stroke(),
-                                    corner_radius: 4.0,
-                                    ..Default::default()
-                                })
-                                .min_width(100.0)
-                                .max_width(300.0)
-                                .default_width(125.0)
-                                .resizable(true)
-                                .show_inside(ui, |ui| {
-                                    self.view_channels(state, ui);
-                                });
+                    if self.current.has_guild() {
+                        self.show_channel_panel(ui, state);
 
-                            if !self.disable_users_bar {
-                                egui::panel::SidePanel::right("member_panel")
-                                    .frame(egui::Frame {
-                                        margin: Vec2::new(8.0, 5.0),
-                                        fill: ui.style().visuals.extreme_bg_color,
-                                        stroke: ui.style().visuals.window_stroke(),
-                                        corner_radius: 4.0,
-                                        ..Default::default()
-                                    })
-                                    .min_width(100.0)
-                                    .max_width(300.0)
-                                    .default_width(125.0)
-                                    .resizable(true)
-                                    .show_inside(ui, |ui| {
-                                        self.view_members(state, ui);
-                                    });
-                            }
+                        if !self.disable_users_bar {
+                            self.show_member_panel(ui, state);
                         }
 
-                        if self.current.has_guild() {
-                            let chan_name = self
-                                .current
-                                .channel()
-                                .and_then(|(gid, cid)| state.cache.get_channel(gid, cid))
-                                .map_or_else(|| "select a channel".to_string(), |c| format!("#{}", c.name));
+                        self.show_channel_bar(ui, state);
 
-                            let top_channel_bar_width = ui.available_width() - 8.0;
-                            ui.allocate_ui([top_channel_bar_width, 12.0].into(), |ui| {
-                                (egui::Frame {
-                                    margin: [4.0, 2.0].into(),
-                                    fill: ui.style().visuals.window_fill(),
-                                    stroke: ui.style().visuals.window_stroke(),
-                                    corner_radius: 2.0,
-                                    ..Default::default()
-                                })
-                                .show(ui, |ui| {
-                                    ui.horizontal_top(|ui| {
-                                        ui.label(chan_name);
-                                        ui.add_sized([12.0, 12.0], egui::Separator::default());
-                                        ui.add_space(ui.available_width() - 12.0);
-                                        let show_members_but = ui
-                                            .add_sized([12.0, 12.0], TextButton::text("👤").small())
-                                            .on_hover_text("toggle member list");
-                                        if show_members_but.clicked() {
-                                            self.disable_users_bar = !self.disable_users_bar;
-                                        }
-                                    });
-                                });
-                            });
-
-                            if self.current.has_channel() {
-                                ui.with_layout(
-                                    Layout::from_main_dir_and_cross_align(
-                                        egui::Direction::LeftToRight,
-                                        egui::Align::Center,
-                                    ),
-                                    |ui| {
-                                        ui.vertical(|ui| {
-                                            ui.allocate_ui(
-                                                [ui.available_width(), ui.available_height() - 38.0].into(),
-                                                |ui| {
-                                                    self.view_messages(state, ui, frame);
-                                                },
-                                            );
-                                            ui.group_filled().show(ui, |ui| {
-                                                self.view_typing_members(state, ui);
-                                                self.view_composer(state, ui, ctx);
-                                            });
-                                        });
-                                    },
-                                );
-                            }
+                        if self.current.has_channel() {
+                            self.show_main_area(ui, state, frame, ctx);
                         }
-                    });
-            });
+                    }
+                });
+        });
 
         self.prev_editing_message = self.editing_message;
     }
