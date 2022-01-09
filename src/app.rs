@@ -11,7 +11,7 @@ use client::{
     Cache, Client, FetchEvent,
 };
 use eframe::{
-    egui::{self, FontData, FontDefinitions, TextureId, Ui, Vec2},
+    egui::{self, Color32, FontData, FontDefinitions, TextureId, Ui, Vec2},
     epi,
 };
 use tokio::sync::mpsc as tokio_mpsc;
@@ -22,6 +22,7 @@ use crate::{
     futures::Futures,
     image_cache::{ImageCache, LoadedImage},
     screen::{auth, BoxedScreen, Screen, ScreenStack},
+    style as loqui_style,
     widgets::{menu_text_button, view_about, view_egui_settings},
 };
 
@@ -399,6 +400,15 @@ impl epi::App for App {
 
         // load harmony lotus
         self.state.harmony_lotus = self.load_harmony_lotus(frame);
+
+        let mut style = ctx.style().as_ref().clone();
+        style.visuals.widgets.hovered.bg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;
+        style.visuals.widgets.hovered.bg_fill = loqui_style::HARMONY_LOTUS_ORANGE;
+        style.visuals.widgets.hovered.fg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;
+        style.visuals.selection.bg_fill = loqui_style::HARMONY_LOTUS_GREEN;
+        style.visuals.widgets.noninteractive.bg_fill = loqui_style::BG_NORMAL;
+        style.visuals.extreme_bg_color = loqui_style::BG_EXTREME;
+        ctx.set_style(style);
     }
 
     fn max_size_points(&self) -> egui::Vec2 {
@@ -423,7 +433,13 @@ impl epi::App for App {
 
         ctx.set_pixels_per_point(1.45);
 
-        egui::TopBottomPanel::top("bottom_panel")
+        egui::TopBottomPanel::top("top_status_panel")
+            .frame(egui::Frame {
+                margin: [4.0, 2.0].into(),
+                fill: ctx.style().visuals.extreme_bg_color,
+                stroke: ctx.style().visuals.window_stroke(),
+                ..Default::default()
+            })
             .max_height(12.0)
             .min_height(12.0)
             .show(ctx, |ui| {

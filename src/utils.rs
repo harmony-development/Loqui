@@ -102,6 +102,7 @@ pub trait UiExt {
     fn text_button(&mut self, text: &str) -> Response;
     fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32;
     fn add_hovered<W: Widget>(&mut self, widget: W) -> Response;
+    fn group_filled_with(&self, color: Color32) -> Frame;
     fn group_filled(&self) -> Frame;
 }
 
@@ -121,13 +122,19 @@ impl UiExt for Ui {
         anim_val
     }
 
+    #[inline(always)]
     fn add_hovered<W: Widget>(&mut self, widget: W) -> Response {
         self.add_visible(self.ui_contains_pointer(), widget)
     }
 
+    #[inline(always)]
     fn group_filled(&self) -> Frame {
-        let style = self.style();
-        egui::Frame::group(style).fill(style.visuals.window_fill())
+        self.group_filled_with(self.style().visuals.window_fill())
+    }
+
+    #[inline(always)]
+    fn group_filled_with(&self, color: Color32) -> Frame {
+        egui::Frame::group(self.style()).fill(color)
     }
 }
 
@@ -143,6 +150,7 @@ impl CtxExt for CtxRef {
     }
 }
 
+#[inline(always)]
 pub fn rgb_color(color: [u8; 3]) -> Color32 {
     Color32::from_rgb(color[0], color[1], color[2])
 }
@@ -153,6 +161,7 @@ pub fn horizontal_centered_justified() -> Layout {
         .with_cross_justify(true)
 }
 
+#[inline(always)]
 pub fn dangerous_text(text: impl Into<String>) -> RichText {
     RichText::new(text).color(Color32::RED)
 }
