@@ -54,9 +54,6 @@ fn main() {
     eframe::run_native(Box::new(app), native_options);
 }
 
-#[cfg(target_arch = "wasm32")]
-use eframe::wasm_bindgen::{self, prelude::*};
-
 /// This is the entry-point for all the web-assembly.
 /// This is called once from the HTML.
 /// It loads the app, installs some callbacks, then returns.

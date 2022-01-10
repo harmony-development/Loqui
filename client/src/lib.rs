@@ -59,7 +59,6 @@ use std::{
     str::FromStr,
     time::Instant,
 };
-use tokio::sync::mpsc::UnboundedSender;
 
 use crate::emotes::EmotePack;
 
@@ -156,7 +155,6 @@ pub struct Cache {
     channels: AHashMap<(u64, u64), Channel>,
     link_embeds: AHashMap<Uri, FetchLinkData>,
     emote_packs: AHashMap<u64, EmotePack>,
-    sub_tx: Option<UnboundedSender<EventSource>>,
     initial_sync_complete: bool,
 }
 
@@ -169,10 +167,6 @@ impl Cache {
                 }
             }
         }
-    }
-
-    pub fn set_sub_tx(&mut self, sub_tx: UnboundedSender<EventSource>) {
-        self.sub_tx = Some(sub_tx)
     }
 
     fn get_guild_mut(&mut self, guild_id: u64) -> &mut Guild {
@@ -427,9 +421,6 @@ impl Cache {
                     guild.homeserver = homeserver.into();
 
                     post.push(PostProcessEvent::FetchGuildData(guild_id));
-                    if let Some(sub_tx) = self.sub_tx.as_ref() {
-                        let _ = sub_tx.send(EventSource::Guild(guild_id));
-                    }
                 }
                 ChatEvent::GuildRemovedFromList(GuildRemovedFromList {
                     guild_id,

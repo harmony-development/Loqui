@@ -3,12 +3,12 @@ use std::{cell::RefCell, ops::Not, sync::mpsc};
 use client::{
     harmony_rust_sdk::{
         api::{
-            chat::{Event, EventSource},
+            chat::Event,
             rest::{About, FileId},
         },
-        client::{EventsReadSocket, EventsSocket, EventsWriteSocket},
+        client::{EventsReadSocket, EventsSocket},
     },
-    Cache, Client, FetchEvent,
+    tracing, Cache, Client, FetchEvent,
 };
 use eframe::{
     egui::{self, FontData, FontDefinitions, TextureId, Ui, Vec2},
@@ -27,7 +27,6 @@ use crate::{
 };
 
 pub struct State {
-    pub socket_tx_tx: tokio_mpsc::Sender<EventsWriteSocket>,
     pub socket_rx_tx: tokio_mpsc::Sender<EventsReadSocket>,
     pub socket_event_rx: mpsc::Receiver<Event>,
     pub client: Option<Client>,
@@ -38,6 +37,8 @@ pub struct State {
     pub latest_errors: Vec<String>,
     pub about: Option<About>,
     pub harmony_lotus: (TextureId, Vec2),
+    pub reset_socket: AtomBool,
+    pub connecting_socket: AtomBool,
     next_screen: Option<BoxedScreen>,
     prev_screen: bool,
 }
@@ -76,11 +77,21 @@ impl State {
 
     #[inline(always)]
     fn handle_sockets(&mut self) {
+        if self.connecting_socket.get().not() && self.reset_socket.get() {
+            let connecting_socket = self.connecting_socket.clone();
+            spawn_client_fut!(self, |client| {
+                connecting_socket.set(true);
+                let sock = client.connect_socket(Vec::new()).await;
+                connecting_socket.set(false);
+                sock?
+            });
+        }
+
         handle_future!(self, |res: ClientResult<EventsSocket>| {
             self.run(res, |state, sock| {
-                let (tx, rx) = sock.split();
-                let _ = state.socket_tx_tx.try_send(tx);
+                let (_, rx) = sock.split();
                 let _ = state.socket_rx_tx.try_send(rx);
+                state.reset_socket.set(false);
             });
         });
     }
@@ -175,54 +186,49 @@ impl App {
     #[allow(clippy::missing_panics_doc)]
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let mut cache = Cache::default();
+        let cache = Cache::default();
         let futures = Futures::new();
-        let (socket_sub_tx, mut socket_sub_rx) = tokio_mpsc::unbounded_channel::<EventSource>();
-        cache.set_sub_tx(socket_sub_tx);
-        let (socket_tx_tx, mut socket_tx_rx) = tokio_mpsc::channel::<EventsWriteSocket>(2);
-        futures.spawn(async move {
-            let mut tx = socket_tx_rx.recv().await.expect("closed");
 
-            loop {
-                tokio::select! {
-                    Some(sock) = socket_tx_rx.recv() => {
-                        tx = sock;
-                    }
-                    Some(sub) = socket_sub_rx.recv() => {
-                        if tx.add_source(sub).await.is_err() {
-                            // reset socket
-                        }
-                    }
-                    else => std::hint::spin_loop(),
-                }
-            }
-        });
+        let reset_socket = AtomBool::new(false);
 
         let (socket_rx_tx, mut socket_rx_rx) = tokio_mpsc::channel::<EventsReadSocket>(2);
         let (socket_event_tx, socket_event_rx) = mpsc::channel::<Event>();
-        futures.spawn(async move {
-            let mut rx = socket_rx_rx.recv().await.expect("closed");
+        {
+            let reset_socket = reset_socket.clone();
+            futures.spawn(async move {
+                let mut rx = socket_rx_rx.recv().await.expect("closed");
 
-            loop {
-                tokio::select! {
-                    Some(sock) = socket_rx_rx.recv() => {
-                        rx = sock;
-                    }
-                    Ok(Some(ev)) = rx.get_event() => {
-                        if socket_event_tx.send(ev).is_err() {
-                            // reset socket
+                loop {
+                    tokio::select! {
+                        Some(sock) = socket_rx_rx.recv() => {
+                            rx = sock;
                         }
+                        res = rx.get_event(), if reset_socket.get().not() => {
+                            match res {
+                                Ok(Some(ev)) => {
+                                    if socket_event_tx.send(ev).is_err() {
+                                        reset_socket.set(true);
+                                    }
+                                }
+                                Err(err) => {
+                                    tracing::error!("socket recv error: {}", err);
+                                    reset_socket.set(true);
+                                }
+                                _ => {}
+                            }
+                        }
+                        else => std::hint::spin_loop(),
                     }
-                    else => std::hint::spin_loop(),
                 }
-            }
-        });
+            });
+        }
 
         Self {
             state: State {
                 socket_rx_tx,
-                socket_tx_tx,
                 socket_event_rx,
+                reset_socket,
+                connecting_socket: AtomBool::new(false),
                 client: None,
                 cache,
                 image_cache: Default::default(),
@@ -245,6 +251,11 @@ impl App {
     fn view_bottom_panel(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
             egui::warn_if_debug_build(ui);
+
+            if self.state.reset_socket.get() {
+                ui.add(egui::Spinner::new());
+                ui.label("reconnecting");
+            }
 
             let is_main_or_auth = matches!(self.screens.current().id(), "main" | "auth");
             if is_main_or_auth.not() && ui.button("<- back").on_hover_text("go back").clicked() {
