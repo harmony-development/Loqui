@@ -31,6 +31,12 @@ pub enum Item<'a> {
     Separator,
     /// language, code
     CodeBlock(&'a str, &'a str),
+    /// :emote:
+    /// emote name
+    Emote(&'a str),
+    /// @username or @"username"
+    /// username
+    Mention(&'a str),
 }
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
@@ -82,6 +88,47 @@ impl<'a> Parser<'a> {
             start_of_line: true,
             style: Style::default(),
         }
+    }
+
+    fn emote(&mut self) -> Option<Item<'a>> {
+        if let Some(emote_start) = self.s.strip_prefix(':') {
+            if let Some(end) = emote_start.find(|ch| matches!(ch, ':' | '\n')) {
+                if &emote_start[end..end] == "\n" {
+                    return None;
+                }
+
+                let emote_name = &emote_start[..end];
+                self.s = &emote_start[end.saturating_add(1).min(emote_start.len())..];
+                return Some(Item::Emote(emote_name));
+            }
+        }
+
+        None
+    }
+
+    fn mention(&mut self) -> Option<Item<'a>> {
+        let stripped = self
+            .s
+            .strip_prefix("@\"")
+            .map(|s| (s, true))
+            .or_else(|| Some((self.s.strip_prefix('@')?, false)));
+
+        if let Some((mention_start, with_quotes)) = stripped {
+            let find_end = with_quotes
+                .then(|| (|ch: char| ch == '"') as fn(char) -> bool)
+                .unwrap_or(char::is_whitespace);
+
+            let len = mention_start.len();
+            let end = mention_start.find(find_end).unwrap_or(len);
+
+            let username = &mention_start[..end];
+
+            let end = with_quotes.then(|| end.saturating_add(1).min(len)).unwrap_or(end);
+            self.s = &mention_start[end..];
+            return Some(Item::Mention(username));
+        }
+
+        None
     }
 
     /// `1. `, `42. ` etc.
@@ -273,6 +320,14 @@ impl<'a> Iterator for Parser<'a> {
                 return Some(item);
             }
 
+            if let Some(emote) = self.emote() {
+                return Some(emote);
+            }
+
+            if let Some(mention) = self.mention() {
+                return Some(mention);
+            }
+
             if let Some(rest) = self.s.strip_prefix('*') {
                 self.s = rest;
                 self.start_of_line = false;
@@ -318,7 +373,7 @@ impl<'a> Iterator for Parser<'a> {
             // Swallow everything up to the next special character:
             let end = self
                 .s
-                .find(&['*', '`', '~', '_', '/', '$', '^', '\\', '<', '[', '\n'][..])
+                .find(&[':', '@', '*', '`', '~', '_', '/', '$', '^', '\\', '<', '[', '\n'][..])
                 .map_or_else(|| self.s.len(), |special| special.max(1));
 
             let item = Item::Text(self.style, &self.s[..end]);

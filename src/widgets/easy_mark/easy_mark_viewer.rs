@@ -40,6 +40,22 @@ pub fn item_ui(ui: &mut Ui, item: easy_mark::Item<'_>) {
             ui.set_row_height(row_height);
         }
 
+        easy_mark::Item::Emote(emotename) => {
+            // TODO
+            ui.label(emotename);
+        }
+        easy_mark::Item::Mention(username) => {
+            let frame = egui::Frame::none().fill(ui.visuals().extreme_bg_color);
+            let resp = frame
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(username).sense(egui::Sense::click()))
+                        .on_hover_cursor(CursorIcon::PointingHand)
+                })
+                .inner;
+            if resp.clicked() {
+                // TODO
+            }
+        }
         easy_mark::Item::Text(style, text) => {
             ui.label(rich_text_from_style(text, &style));
         }

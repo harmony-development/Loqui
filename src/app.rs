@@ -289,7 +289,7 @@ impl App {
             if is_connected {
                 ui.label("✓ connected");
             } else if is_reconnecting {
-                ui.add(egui::Spinner::new());
+                ui.add(egui::Spinner::new().size(12.0));
                 ui.label("reconnecting");
             } else {
                 let resp = ui.label("❌ disconnected");
