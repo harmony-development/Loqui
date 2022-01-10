@@ -79,6 +79,14 @@ impl State {
         }
     }
 
+    pub fn reset_socket_state(&mut self) {
+        self.socket_retry_count = 0;
+        self.last_socket_retry = None;
+        self.is_connected = false;
+        self.connecting_socket = false;
+        self.reset_socket.set(false);
+    }
+
     #[inline(always)]
     fn handle_sockets(&mut self) {
         let last_retry_period_passed = self.last_socket_retry.map_or(true, |ins| ins.elapsed().as_secs() > 5);
@@ -284,9 +292,14 @@ impl App {
                 ui.add(egui::Spinner::new());
                 ui.label("reconnecting");
             } else {
-                let last_retry_passed = self.state.last_socket_retry.map_or(5, |ins| ins.elapsed().as_secs());
-                ui.label("❌ disconnected")
-                    .on_hover_text(format!("retrying in {}", 5 - last_retry_passed));
+                let resp = ui.label("❌ disconnected");
+                let last_retry_passed = self
+                    .state
+                    .last_socket_retry
+                    .map(|ins| format!("retrying in {}", ins.elapsed().as_secs()));
+                if let Some(text) = last_retry_passed {
+                    resp.on_hover_text(text);
+                }
             }
         });
     }
@@ -335,6 +348,7 @@ impl App {
                         self.screens.clear(super::screen::auth::Screen::new());
                         let client = self.state.client().clone();
                         self.state.client = None;
+                        self.state.reset_socket_state();
                         let state = &self.state;
                         spawn_future!(state, async move { client.logout().await });
                     }
@@ -491,7 +505,7 @@ impl epi::App for App {
 
         egui::TopBottomPanel::top("top_status_panel")
             .frame(egui::Frame {
-                margin: [4.0, 2.0].into(),
+                margin: Vec2::ZERO,
                 fill: ctx.style().visuals.extreme_bg_color,
                 stroke: ctx.style().visuals.window_stroke(),
                 ..Default::default()
