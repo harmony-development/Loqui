@@ -1476,6 +1476,7 @@ dependencies = [
  "guard",
  "hex_color",
  "image",
+ "instant",
  "open",
  "rfd",
  "tokio",

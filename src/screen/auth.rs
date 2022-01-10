@@ -75,10 +75,10 @@ impl Screen {
                     } else {
                         self.reset();
                         state.push_screen(main::Screen::default());
+                        state.reset_socket.set(true);
                         spawn_evs!(state, |events, client| {
                             client.initial_sync(events).await?;
                         });
-                        spawn_client_fut!(state, |client| { client.connect_socket(Vec::new()).await? });
                         spawn_client_fut!(state, |client| { client.save_session_to().await? });
                     }
                 }

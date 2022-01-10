@@ -50,6 +50,8 @@ image = "0.23.14"
 guard = "0.5"
 anyhow = "1"
 
+instant = { version = "0.1", features = ["wasm-bindgen"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
 tokio = { version = "1.9", features = [

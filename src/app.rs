@@ -11,9 +11,10 @@ use client::{
     tracing, Cache, Client, FetchEvent,
 };
 use eframe::{
-    egui::{self, FontData, FontDefinitions, TextureId, Ui, Vec2},
+    egui::{self, Color32, FontData, FontDefinitions, TextureId, Ui, Vec2},
     epi,
 };
+use instant::Instant;
 use tokio::sync::mpsc as tokio_mpsc;
 
 use super::utils::*;
@@ -38,7 +39,10 @@ pub struct State {
     pub about: Option<About>,
     pub harmony_lotus: (TextureId, Vec2),
     pub reset_socket: AtomBool,
-    pub connecting_socket: AtomBool,
+    pub connecting_socket: bool,
+    pub is_connected: bool,
+    pub socket_retry_count: u8,
+    pub last_socket_retry: Option<Instant>,
     next_screen: Option<BoxedScreen>,
     prev_screen: bool,
 }
@@ -77,21 +81,29 @@ impl State {
 
     #[inline(always)]
     fn handle_sockets(&mut self) {
-        if self.connecting_socket.get().not() && self.reset_socket.get() {
-            let connecting_socket = self.connecting_socket.clone();
-            spawn_client_fut!(self, |client| {
-                connecting_socket.set(true);
-                let sock = client.connect_socket(Vec::new()).await;
-                connecting_socket.set(false);
-                sock?
-            });
+        let last_retry_period_passed = self.last_socket_retry.map_or(true, |ins| ins.elapsed().as_secs() > 5);
+        let retry_socket = last_retry_period_passed
+            && self.connecting_socket.not()
+            && self.socket_retry_count < 5
+            && self.reset_socket.get();
+
+        if retry_socket {
+            self.is_connected = false;
+            self.connecting_socket = true;
+            self.socket_retry_count += 1;
+            self.last_socket_retry = Some(Instant::now());
+            spawn_client_fut!(self, |client| { client.connect_socket(Vec::new()).await? });
         }
 
         handle_future!(self, |res: ClientResult<EventsSocket>| {
+            self.connecting_socket = false;
             self.run(res, |state, sock| {
                 let (_, rx) = sock.split();
-                let _ = state.socket_rx_tx.try_send(rx);
+                state.socket_rx_tx.try_send(rx).expect("socket task panicked");
                 state.reset_socket.set(false);
+                state.is_connected = true;
+                state.socket_retry_count = 0;
+                state.last_socket_retry = None;
             });
         });
     }
@@ -228,7 +240,10 @@ impl App {
                 socket_rx_tx,
                 socket_event_rx,
                 reset_socket,
-                connecting_socket: AtomBool::new(false),
+                connecting_socket: false,
+                is_connected: false,
+                socket_retry_count: 0,
+                last_socket_retry: None,
                 client: None,
                 cache,
                 image_cache: Default::default(),
@@ -247,15 +262,46 @@ impl App {
         }
     }
 
-    #[inline(always)]
-    fn view_bottom_panel(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            egui::warn_if_debug_build(ui);
+    fn view_connection_status(&mut self, ui: &mut Ui) {
+        let is_connected = self.state.is_connected;
+        let is_reconnecting = self.state.connecting_socket;
 
-            if self.state.reset_socket.get() {
+        let (connection_status_color, text_color) = if is_connected {
+            (Color32::GREEN, Color32::BLACK)
+        } else if is_reconnecting {
+            (Color32::YELLOW, Color32::BLACK)
+        } else {
+            (Color32::RED, Color32::WHITE)
+        };
+
+        egui::Frame::none().fill(connection_status_color).show(ui, |ui| {
+            ui.style_mut().visuals.override_text_color = Some(text_color);
+            ui.style_mut().visuals.widgets.active.fg_stroke.color = text_color;
+
+            if is_connected {
+                ui.label("✓ connected");
+            } else if is_reconnecting {
                 ui.add(egui::Spinner::new());
                 ui.label("reconnecting");
+            } else {
+                let last_retry_passed = self.state.last_socket_retry.map_or(5, |ins| ins.elapsed().as_secs());
+                ui.label("❌ disconnected")
+                    .on_hover_text(format!("retrying in {}", 5 - last_retry_passed));
             }
+        });
+    }
+
+    #[inline(always)]
+    fn view_bottom_panel(&mut self, ui: &mut Ui) {
+        ui.horizontal_top(|ui| {
+            if cfg!(debug_assertions) {
+                egui::Frame::none().fill(Color32::RED).show(ui, |ui| {
+                    ui.colored_label(Color32::BLACK, "⚠ Debug build ⚠")
+                        .on_hover_text("egui was compiled with debug assertions enabled.");
+                });
+            }
+
+            self.view_connection_status(ui);
 
             let is_main_or_auth = matches!(self.screens.current().id(), "main" | "auth");
             if is_main_or_auth.not() && ui.button("<- back").on_hover_text("go back").clicked() {

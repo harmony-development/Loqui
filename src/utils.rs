@@ -31,10 +31,12 @@ impl AtomBool {
         }
     }
 
+    #[inline(always)]
     pub fn get(&self) -> bool {
         self.inner.load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    #[inline(always)]
     pub fn set(&self, val: bool) {
         self.inner.store(val, std::sync::atomic::Ordering::Relaxed);
     }
