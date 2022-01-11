@@ -6,7 +6,7 @@ use super::prelude::*;
 pub struct Screen {}
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, _frame: &epi::Frame, _state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame, _state: &mut State) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {

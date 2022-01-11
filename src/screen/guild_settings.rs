@@ -249,7 +249,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::CtxRef, _: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _: &epi::Frame, state: &mut State) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {

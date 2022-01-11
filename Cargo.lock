@@ -607,7 +607,7 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 [[package]]
 name = "eframe"
 version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=testing#f502285e87223236a8d72905966cdc794c6604b3"
+source = "git+https://github.com/emilk/egui.git?branch=master#205e04aa18f4610e85fe5dbd8fed63245b0a82f0"
 dependencies = [
  "egui",
  "egui-winit",
@@ -619,7 +619,7 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.16.1"
-source = "git+https://github.com/yusdacra/egui.git?branch=testing#f502285e87223236a8d72905966cdc794c6604b3"
+source = "git+https://github.com/emilk/egui.git?branch=master#205e04aa18f4610e85fe5dbd8fed63245b0a82f0"
 dependencies = [
  "ahash",
  "epaint",
@@ -629,7 +629,7 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=testing#f502285e87223236a8d72905966cdc794c6604b3"
+source = "git+https://github.com/emilk/egui.git?branch=master#205e04aa18f4610e85fe5dbd8fed63245b0a82f0"
 dependencies = [
  "copypasta",
  "egui",
@@ -642,7 +642,7 @@ dependencies = [
 [[package]]
 name = "egui_glow"
 version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=testing#f502285e87223236a8d72905966cdc794c6604b3"
+source = "git+https://github.com/emilk/egui.git?branch=master#205e04aa18f4610e85fe5dbd8fed63245b0a82f0"
 dependencies = [
  "egui",
  "egui-winit",
@@ -657,7 +657,7 @@ dependencies = [
 [[package]]
 name = "egui_web"
 version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=testing#f502285e87223236a8d72905966cdc794c6604b3"
+source = "git+https://github.com/emilk/egui.git?branch=master#205e04aa18f4610e85fe5dbd8fed63245b0a82f0"
 dependencies = [
  "egui",
  "egui_glow",
@@ -677,7 +677,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=testing#f502285e87223236a8d72905966cdc794c6604b3"
+source = "git+https://github.com/emilk/egui.git?branch=master#205e04aa18f4610e85fe5dbd8fed63245b0a82f0"
 
 [[package]]
 name = "encoding_rs"
@@ -691,7 +691,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=testing#f502285e87223236a8d72905966cdc794c6604b3"
+source = "git+https://github.com/emilk/egui.git?branch=master#205e04aa18f4610e85fe5dbd8fed63245b0a82f0"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -703,7 +703,7 @@ dependencies = [
 [[package]]
 name = "epi"
 version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=testing#f502285e87223236a8d72905966cdc794c6604b3"
+source = "git+https://github.com/emilk/egui.git?branch=master#205e04aa18f4610e85fe5dbd8fed63245b0a82f0"
 dependencies = [
  "egui",
 ]

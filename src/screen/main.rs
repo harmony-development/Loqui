@@ -94,7 +94,7 @@ pub struct Screen {
 }
 
 impl Screen {
-    fn view_join_guild(&mut self, state: &mut State, ctx: &egui::CtxRef) {
+    fn view_join_guild(&mut self, state: &mut State, ctx: &egui::Context) {
         let invite_text = &mut self.invite_text;
         egui::Window::new("join guild")
             .auto_sized()
@@ -116,7 +116,7 @@ impl Screen {
             });
     }
 
-    fn view_create_guild(&mut self, state: &mut State, ctx: &egui::CtxRef) {
+    fn view_create_guild(&mut self, state: &mut State, ctx: &egui::Context) {
         let guild_name_text = &mut self.guild_name_text;
         egui::Window::new("create guild")
             .auto_sized()
@@ -655,7 +655,7 @@ impl Screen {
         }
     }
 
-    fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::CtxRef) {
+    fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::Context) {
         guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
 
         let text_edit = self
@@ -783,7 +783,7 @@ impl Screen {
     }
 
     #[inline(always)]
-    fn handle_arrow_up_edit(&mut self, ctx: &egui::CtxRef, state: &State) {
+    fn handle_arrow_up_edit(&mut self, ctx: &egui::Context, state: &State) {
         if self.composer.text().is_empty()
             && self.editing_message.is_none()
             && ctx.input().key_pressed(egui::Key::ArrowUp)
@@ -915,7 +915,7 @@ impl Screen {
     }
 
     #[inline(always)]
-    fn show_main_area(&mut self, ui: &mut Ui, state: &mut State, frame: &epi::Frame, ctx: &egui::CtxRef) {
+    fn show_main_area(&mut self, ui: &mut Ui, state: &mut State, frame: &epi::Frame, ctx: &egui::Context) {
         ui.with_layout(
             Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
             |ui| {
@@ -938,7 +938,7 @@ impl AppScreen for Screen {
         "main"
     }
 
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame, state: &mut State) {
         if ctx.input().key_pressed(egui::Key::Escape) {
             self.editing_message = None;
         }

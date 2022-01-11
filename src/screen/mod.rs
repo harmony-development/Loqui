@@ -15,7 +15,7 @@ pub mod main;
 pub mod settings;
 
 pub trait Screen: 'static {
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, app: &mut State);
+    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame, app: &mut State);
     fn id(&self) -> &'static str {
         ""
     }

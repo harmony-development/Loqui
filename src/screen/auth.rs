@@ -235,7 +235,7 @@ impl AppScreen for Screen {
         "auth"
     }
 
-    fn update(&mut self, ctx: &egui::CtxRef, _: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _: &epi::Frame, state: &mut State) {
         self.handle_connect(state);
         self.handle_step(state);
 

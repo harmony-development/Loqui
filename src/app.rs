@@ -366,7 +366,7 @@ impl App {
     }
 
     #[inline(always)]
-    fn view_errors_window(&mut self, ctx: &egui::CtxRef) {
+    fn view_errors_window(&mut self, ctx: &egui::Context) {
         let latest_errors = &mut self.state.latest_errors;
         egui::Window::new("last error")
             .open(&mut self.show_errors_window)
@@ -397,7 +397,7 @@ impl App {
     }
 
     #[inline(always)]
-    fn view_about_window(&mut self, ctx: &egui::CtxRef) {
+    fn view_about_window(&mut self, ctx: &egui::Context) {
         guard!(let Some(about) = self.state.about.as_ref() else { return });
 
         egui::Window::new("about server")
@@ -410,7 +410,7 @@ impl App {
     }
 
     #[inline(always)]
-    fn view_egui_debug_window(&mut self, ctx: &egui::CtxRef) {
+    fn view_egui_debug_window(&mut self, ctx: &egui::Context) {
         egui::Window::new("egui debug")
             .open(&mut self.show_egui_debug)
             .show(ctx, |ui| {
@@ -437,7 +437,7 @@ impl epi::App for App {
         "loqui"
     }
 
-    fn setup(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
+    fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         self.state.futures.init(frame);
         self.state.futures.spawn(async move {
             guard!(let Some(session) = Client::read_latest_session().await else { return Ok(None); });
@@ -485,7 +485,7 @@ impl epi::App for App {
         [f32::INFINITY, f32::INFINITY].into()
     }
 
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &epi::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame) {
         let state = &mut self.state;
 
         state.futures.run();

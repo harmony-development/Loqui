@@ -150,7 +150,7 @@ pub fn seperated_collapsing<R>(
     .inner
 }
 
-pub fn view_egui_settings(ctx: &egui::CtxRef, ui: &mut Ui) {
+pub fn view_egui_settings(ctx: &egui::Context, ui: &mut Ui) {
     ctx.settings_ui(ui);
     CollapsingHeader::new("Inspection")
         .default_open(false)

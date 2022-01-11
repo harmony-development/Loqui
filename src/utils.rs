@@ -11,7 +11,7 @@ use client::{
     member::Member,
     tracing, Client, Uri,
 };
-use eframe::egui::{self, Color32, CtxRef, Frame, Key, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText};
+use eframe::egui::{self, Color32, Context, Frame, Key, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText};
 
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
 use crate::{app::State, style, widgets::TextButton};
@@ -152,7 +152,7 @@ pub trait CtxExt {
     fn available_center_pos(&self, offset_size: Vec2) -> Pos2;
 }
 
-impl CtxExt for CtxRef {
+impl CtxExt for Context {
     #[inline(always)]
     fn available_center_pos(&self, offset_size: Vec2) -> Pos2 {
         let center = self.available_rect().center();

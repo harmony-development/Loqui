@@ -37,7 +37,7 @@ codegen-units = 1
 panic = 'abort'
 
 [dependencies]
-eframe = { git = "https://github.com/yusdacra/egui.git", branch = "testing" }
+eframe = { git = "https://github.com/emilk/egui.git", branch = "master" }
 client = { path = "./client" }
 
 hex_color = "1"
