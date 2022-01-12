@@ -45,7 +45,6 @@ hex_color = "1"
 urlencoding = "2"
 webbrowser = "0.5"
 rfd = "0.6"
-image = "0.23.14"
 
 guard = "0.5"
 anyhow = "1"
@@ -54,22 +53,46 @@ instant = { version = "0.1", features = ["wasm-bindgen"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
-tokio = { version = "1.9", features = [
-    "sync",
-    "macros",
-] }
+tokio = { version = "1.9", features = ["sync", "macros"] }
 tracing-wasm = "0.2"
 console_error_panic_hook = "0.1"
+image = { version = "0.23.14", default-features = false, features = [
+    "gif",
+    "jpeg",
+    "ico",
+    "png",
+    "pnm",
+    "tga",
+    "tiff",
+    "webp",
+    "bmp",
+    "hdr",
+    "dxt",
+    "dds",
+    "farbfeld",
+] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
-tokio = { version = "1.9", features = [
-    "sync",
-    "rt-multi-thread",
-    "macros",
-] }
+tokio = { version = "1.9", features = ["sync", "rt-multi-thread", "macros"] }
 open = "2.0"
+image = { version = "0.23.14", default-features = false, features = [
+    "gif",
+    "jpeg",
+    "ico",
+    "png",
+    "pnm",
+    "tga",
+    "tiff",
+    "webp",
+    "bmp",
+    "hdr",
+    "dxt",
+    "dds",
+    "farbfeld",
+    "jpeg_rayon",
+] }
 
 [package.metadata.nix]
 longDescription = """

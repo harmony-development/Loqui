@@ -1,4 +1,4 @@
-use std::time::Instant;
+use instant::Instant;
 
 use harmony_rust_sdk::{api::profile::UserStatus, client::api::rest::FileId};
 use smol_str::SmolStr;

@@ -10,8 +10,9 @@ use harmony_rust_sdk::{
     },
     client::api::rest::FileId,
 };
+use instant::Duration;
 use smol_str::SmolStr;
-use std::{ops::Not, ptr::NonNull, str::FromStr, time::UNIX_EPOCH};
+use std::{ops::Not, ptr::NonNull, str::FromStr};
 
 use crate::IndexMap;
 
@@ -587,7 +588,7 @@ impl Default for Message {
             content: Default::default(),
             sender: Default::default(),
             timestamp: {
-                let timestamp = UNIX_EPOCH.elapsed().unwrap();
+                let timestamp = Duration::from_millis(instant::now() as u64);
                 NaiveDateTime::from_timestamp(timestamp.as_secs() as i64, timestamp.subsec_nanos())
             },
             overrides: None,

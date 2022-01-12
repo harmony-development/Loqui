@@ -23,6 +23,8 @@ tracing = "0.1"
 smol_str = { version = "0.1.20", features = ["serde"] }
 itertools = "0.10"
 
+instant = { version = "0.1", features = ["wasm-bindgen"] }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = [
     "client_native",

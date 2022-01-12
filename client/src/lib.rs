@@ -49,15 +49,16 @@ use harmony_rust_sdk::{
 };
 
 use error::ClientResult;
+use instant::Instant;
 use member::Member;
 use message::{Attachment, Content, Embed, MessageId, WriteMessagesView};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
+
 use std::{
     array::IntoIter,
     fmt::{self, Debug, Display, Formatter},
     str::FromStr,
-    time::Instant,
 };
 
 use crate::emotes::EmotePack;
@@ -1042,6 +1043,7 @@ impl Client {
     }
 
     pub async fn process_post(&self, events: &mut Vec<FetchEvent>, post: PostProcessEvent) -> ClientResult<()> {
+        tracing::debug!("processing post event: {:?}", post);
         match post {
             PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => {
                 let perm_queries = ["channels.manage.change-information", "messages.send"];
@@ -1131,6 +1133,7 @@ impl Client {
                             })))
                         })
                 })?);
+                tracing::debug!("fetched guild data: {}", guild_id);
                 Ok(())
             }
             PostProcessEvent::FetchMessage {

@@ -262,6 +262,7 @@ dependencies = [
  "harmony_rust_sdk",
  "indexmap",
  "infer",
+ "instant",
  "itertools",
  "serde",
  "smol_str",
@@ -1139,7 +1140,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.3"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#4e065bb5d91bcd641ee295c4527b216f2989530b"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#231001f68210e3816ed6f339cb2f925133b24e2e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1149,7 +1150,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.8.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#4e065bb5d91bcd641ee295c4527b216f2989530b"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#231001f68210e3816ed6f339cb2f925133b24e2e"
 dependencies = [
  "derive-new",
  "derive_more",
