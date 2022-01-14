@@ -87,10 +87,12 @@ jobs:
 
     - name: Install trunk
       run: |
+        current_pwd=$PWD
+        cd ..
         git clone https://github.com/kristoff3r/trunk.git
         cd trunk && git checkout rust_worker
         cargo install --locked --path .
-        cd ..
+        cd $current_pwd
 
     - name: Build
       run: trunk build --release
