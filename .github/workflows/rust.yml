@@ -78,7 +78,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Install rust
-      uses: actions-rs/toolchain@v1.0.7
+      uses: codota/toolchain@00a8bf2bdcfe93aefd70422d3dec07337959d3a4
 
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
