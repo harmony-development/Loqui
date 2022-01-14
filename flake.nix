@@ -17,6 +17,32 @@
         root = ./.;
         buildPlatform = "crate2nix";
         overrides = {
+          pkgs = common: prev: {
+            overlays = prev.overlays ++ [
+              (_: prev: {
+                trunk = prev.nciUtils.buildCrate {
+                  root = builtins.fetchGit {
+                    url = "https://github.com/kristoff3r/trunk.git";
+                    ref = "rust_worker";
+                    rev = "0ff1842640553dfefcf0e0b13aee619b17916844";
+                  };
+                  release = true;
+                };
+              })
+            ];
+          };
+          crateOverrides = common: _: {
+            loqui = prev: {
+              nativeBuildInputs = (prev.nativeBuildInputs or [ ]) ++ (with common.pkgs; [ makeWrapper wrapGAppsHook ]);
+              postInstall = with common.pkgs; ''
+                if [ -f $out/bin/loqui ]; then
+                  wrapProgram $out/bin/loqui\
+                    --set LD_LIBRARY_PATH ${lib.makeLibraryPath common.runtimeLibs}\
+                    --set XDG_DATA_DIRS ${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share
+                fi
+              '';
+            };
+          };
           shell = common: prev: {
             env = prev.env ++ [
               {
@@ -29,17 +55,10 @@
                 name = "local-dev";
                 command = "SSL_CERT_FILE=~/.local/share/mkcert/rootCA.pem cargo r";
               }
+              {
+                package = common.pkgs.trunk;
+              }
             ];
-          };
-          mainBuild = common: prev: {
-            nativeBuildInputs = prev.nativeBuildInputs ++ (with common.pkgs; [ makeWrapper wrapGAppsHook ]);
-            postInstall = with common.pkgs; ''
-              if [ -f $out/bin/loqui ]; then
-                wrapProgram $out/bin/loqui\
-                  --set LD_LIBRARY_PATH ${lib.makeLibraryPath common.runtimeLibs}\
-                  --set XDG_DATA_DIRS ${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share
-              fi
-            '';
           };
         };
       };

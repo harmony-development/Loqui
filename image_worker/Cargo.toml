@@ -1,0 +1,32 @@
+[package]
+name = "image_worker"
+version = "0.1.0"
+edition = "2021"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+js-sys = { version = "0.3" }
+web-sys = { version = "0.3", features = [
+    "WorkerGlobalScope",
+    "DedicatedWorkerGlobalScope",
+    "MessageEvent",
+] }
+rkyv = "0.7"
+image = { version = "0.23.14", default-features = false, features = [
+    "gif",
+    "jpeg",
+    "ico",
+    "png",
+    "pnm",
+    "tga",
+    "tiff",
+    "webp",
+    "bmp",
+    "hdr",
+    "dxt",
+    "dds",
+    "farbfeld",
+] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+image = "0.23"

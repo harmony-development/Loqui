@@ -10,7 +10,7 @@ homepage = "https://github.com/harmony-development/loqui"
 resolver = "2"
 
 [workspace]
-members = ["client"]
+members = ["client", "image_worker"]
 
 [package.metadata.bundle]
 name = "Loqui"
@@ -39,6 +39,7 @@ panic = 'abort'
 [dependencies]
 eframe = { git = "https://github.com/emilk/egui.git", branch = "master" }
 client = { path = "./client" }
+image_worker = { path = "./image_worker" }
 
 hex_color = "1"
 
@@ -50,9 +51,14 @@ guard = "0.5"
 anyhow = "1"
 
 instant = { version = "0.1", features = ["wasm-bindgen"] }
+lazy_static = "1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
+wasm-bindgen = "0.2"
+js-sys = { version = "0.3" }
+web-sys = { version = "0.3", features = ["Worker", "MessageEvent"] }
+rkyv = "0.7"
 tokio = { version = "1.9", features = ["sync", "macros"] }
 tracing-wasm = "0.2"
 console_error_panic_hook = "0.1"
@@ -73,26 +79,12 @@ image = { version = "0.23.14", default-features = false, features = [
 ] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+once_cell = "1.9"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 tokio = { version = "1.9", features = ["sync", "rt-multi-thread", "macros"] }
 open = "2.0"
-image = { version = "0.23.14", default-features = false, features = [
-    "gif",
-    "jpeg",
-    "ico",
-    "png",
-    "pnm",
-    "tga",
-    "tiff",
-    "webp",
-    "bmp",
-    "hdr",
-    "dxt",
-    "dds",
-    "farbfeld",
-    "jpeg_rayon",
-] }
+image = "0.23.14"
 
 [package.metadata.nix]
 longDescription = """
@@ -115,7 +107,7 @@ runtimeLibs = [
 
 [workspace.metadata.nix]
 buildInputs = ["libxkbcommon"]
-devshell.packages = ["cargo-deny", "wasm-bindgen-cli", "trunk"]
+devshell.packages = ["cargo-deny", "wasm-bindgen-cli"]
 devshell.name = "loqui-shell"
 devshell.commands = [{ package = "tagref" }]
 

@@ -1,15 +1,8 @@
-use std::convert::identity;
-
-use client::{
-    harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
-    smol_str::SmolStr,
-    AHashMap,
-};
+use client::{harmony_rust_sdk::api::rest::FileId, smol_str::SmolStr, AHashMap};
 use eframe::{
-    egui::{self, Color32, TextureId},
+    egui::TextureId,
     epi::{self, Image},
 };
-use image::DynamicImage;
 
 #[derive(Default)]
 pub struct ImageCache {
@@ -44,17 +37,16 @@ fn add_generic(map: &mut AHashMap<FileId, (TextureId, [f32; 2])>, frame: &epi::F
     if let Some((tex_id, _)) = map.remove(&image.id) {
         frame.free_texture(tex_id);
     }
-    map.insert(
-        image.id,
-        (image.tex_id, [image.dimensions[0] as f32, image.dimensions[1] as f32]),
-    );
+
+    let dimensions = image.image.size;
+    let texid = frame.alloc_texture(image.image);
+    map.insert(image.id, (texid, [dimensions[0] as f32, dimensions[1] as f32]));
 }
 
 pub struct LoadedImage {
-    tex_id: TextureId,
-    dimensions: [usize; 2],
-    id: FileId,
-    kind: SmolStr,
+    pub image: Image,
+    pub id: FileId,
+    pub kind: SmolStr,
 }
 
 impl LoadedImage {
@@ -62,54 +54,124 @@ impl LoadedImage {
     pub fn id(&self) -> &FileId {
         &self.id
     }
+}
 
-    pub async fn load(frame: epi::Frame, data: Bytes, id: FileId, kind: SmolStr) -> Self {
-        let modify = match kind.as_str() {
-            "minithumbnail" => |image: DynamicImage| image.blur(4.0),
-            "guild" | "avatar" => |image: DynamicImage| image.resize(64, 64, image::imageops::FilterType::Lanczos3),
-            _ => identity,
-        };
+#[cfg(target_arch = "wasm32")]
+pub mod op {
+    use super::*;
 
-        #[cfg(not(target_arch = "wasm32"))]
-        return tokio::task::spawn_blocking(move || Self::load_inner(frame, data, id, kind, modify))
-            .await
-            .unwrap();
+    use client::{
+        harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
+        smol_str::SmolStr,
+    };
+    use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
+    use js_sys::Uint8Array;
+    use std::sync::mpsc::Sender;
+    use wasm_bindgen::{prelude::*, JsCast};
+    use web_sys::{MessageEvent, Worker as WebWorker};
 
-        #[cfg(target_arch = "wasm32")]
-        return Self::load_inner(frame, data, id, kind, modify);
+    impl LoadedImage {
+        pub fn from_archive(data: &ArchivedImageLoaded) -> Self {
+            use std::str::FromStr;
+
+            let dimensions = [data.dimensions[0] as usize, data.dimensions[1] as usize];
+            let image = Image::from_rgba_unmultiplied(dimensions, data.pixels.as_slice());
+            let id = FileId::from_str(data.id.as_str());
+
+            Self {
+                image,
+                id: id.unwrap(),
+                kind: data.kind.as_str().into(),
+            }
+        }
     }
 
-    fn load_inner(
-        frame: epi::Frame,
-        data: Bytes,
-        id: FileId,
-        kind: SmolStr,
-        modify: fn(DynamicImage) -> DynamicImage,
-    ) -> Self {
-        let image = image::load_from_memory(data.as_ref()).unwrap();
-        let image = modify(image);
-        let (pixels, dimensions) = image_to_egui(image);
-        let tex_id = frame.alloc_texture(Image {
-            pixels,
-            size: dimensions,
-        });
+    struct Worker {
+        inner: WebWorker,
+    }
 
-        Self {
-            tex_id,
-            dimensions,
-            id,
-            kind,
-        }
+    // i hate web
+    #[allow(unsafe_code)]
+    unsafe impl Send for Worker {}
+    #[allow(unsafe_code)]
+    unsafe impl Sync for Worker {}
+
+    lazy_static::lazy_static! {
+        static ref IMAGE_WORKER: Worker = spawn_worker();
+    }
+
+    fn spawn_worker() -> Worker {
+        let web = WebWorker::new("./image_worker.js").expect("failed to start worker");
+        Worker { inner: web }
+    }
+
+    pub fn set_image_channel(tx: Sender<LoadedImage>) {
+        let handler = Closure::wrap(Box::new(move |event: MessageEvent| {
+            let data: Uint8Array = event.data().dyn_into().unwrap_throw();
+            let data = data.to_vec();
+            #[allow(unsafe_code)]
+            let loaded = unsafe { rkyv::archived_root::<ImageLoaded>(&data) };
+            let image = LoadedImage::from_archive(loaded);
+            let _ = tx.send(image);
+        }) as Box<dyn FnMut(_)>);
+
+        IMAGE_WORKER.inner.set_onmessage(Some(handler.as_ref().unchecked_ref()));
+
+        handler.forget();
+    }
+
+    pub fn decode_image(data: Bytes, id: FileId, kind: SmolStr) {
+        let val = rkyv::to_bytes::<_, 2048>(&ImageData {
+            data: data.to_vec(),
+            kind: kind.to_string(),
+            id: id.into(),
+        })
+        .unwrap()
+        .into_vec();
+
+        let data = Uint8Array::new_with_length(val.len() as u32);
+        data.copy_from(&val);
+
+        IMAGE_WORKER
+            .inner
+            .post_message(&data)
+            .expect_throw("failed to decode image");
     }
 }
 
-fn image_to_egui(image: DynamicImage) -> (Vec<Color32>, [usize; 2]) {
-    let buf = image.to_rgba8();
-    let dimensions = [buf.width() as usize, buf.height() as usize];
-    let pixels = buf.into_vec();
-    let pixels = pixels
-        .chunks(4)
-        .map(|p| egui::Color32::from_rgba_unmultiplied(p[0], p[1], p[2], p[3]))
-        .collect::<Vec<_>>();
-    (pixels, dimensions)
+#[cfg(not(target_arch = "wasm32"))]
+pub mod op {
+    use super::*;
+
+    use std::sync::{mpsc::Sender, Mutex};
+
+    use client::{
+        harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
+        smol_str::SmolStr,
+    };
+    use once_cell::sync::OnceCell;
+
+    impl LoadedImage {
+        pub fn load(data: Bytes, id: FileId, kind: SmolStr) -> Self {
+            let loaded = image_worker::load_image_logic(data.as_ref(), kind.as_str());
+            let image = Image::from_rgba_unmultiplied(loaded.dimensions, loaded.pixels.as_slice());
+
+            Self { image, id, kind }
+        }
+    }
+
+    lazy_static::lazy_static! {
+        static ref CHANNEL: Mutex<OnceCell<Sender<LoadedImage>>> = Mutex::new(OnceCell::new());
+    }
+
+    pub fn set_image_channel(tx: Sender<LoadedImage>) {
+        CHANNEL.lock().unwrap().set(tx).unwrap();
+    }
+
+    pub fn decode_image(data: Bytes, id: FileId, kind: SmolStr) {
+        tokio::task::spawn_blocking(move || {
+            let loaded = LoadedImage::load(data, id, kind);
+            let _ = CHANNEL.lock().unwrap().get().expect("no channel").send(loaded);
+        });
+    }
 }

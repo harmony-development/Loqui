@@ -1,4 +1,8 @@
-use std::{cell::RefCell, ops::Not, sync::mpsc};
+use std::{
+    cell::RefCell,
+    ops::Not,
+    sync::mpsc::{self, Receiver},
+};
 
 use client::{
     harmony_rust_sdk::{
@@ -43,6 +47,7 @@ pub struct State {
     pub is_connected: bool,
     pub socket_retry_count: u8,
     pub last_socket_retry: Option<Instant>,
+    pub images_rx: Receiver<LoadedImage>,
     next_screen: Option<BoxedScreen>,
     prev_screen: bool,
 }
@@ -124,7 +129,7 @@ impl State {
     }
 
     #[inline(always)]
-    fn handle_events(&mut self, frame: &epi::Frame) {
+    fn handle_events(&mut self) {
         handle_future!(self, |res: ClientResult<Vec<FetchEvent>>| {
             self.run(res, |state, events| {
                 let mut posts = Vec::new();
@@ -132,14 +137,10 @@ impl State {
                     match event {
                         FetchEvent::Attachment { attachment, file } => {
                             if attachment.kind.starts_with("image") && attachment.kind.ends_with("svg+xml").not() {
-                                spawn_future!(
-                                    state,
-                                    LoadedImage::load(
-                                        frame.clone(),
-                                        file.data().clone(),
-                                        attachment.id,
-                                        attachment.name.into()
-                                    )
+                                crate::image_cache::op::decode_image(
+                                    file.data().clone(),
+                                    attachment.id,
+                                    attachment.name.into(),
                                 );
                             }
                         }
@@ -163,13 +164,13 @@ impl State {
 
     #[inline(always)]
     fn handle_images(&mut self, frame: &epi::Frame) {
-        handle_future!(self, |image: LoadedImage| {
+        while let Ok(image) = self.images_rx.try_recv() {
             let maybe_pos = self.loading_images.borrow().iter().position(|id| image.id() == id);
             if let Some(pos) = maybe_pos {
                 self.loading_images.borrow_mut().remove(pos);
             }
             self.image_cache.add(frame, image);
-        });
+        }
     }
 
     #[inline(always)]
@@ -243,6 +244,9 @@ impl App {
             });
         }
 
+        let (images_tx, images_rx) = std::sync::mpsc::channel();
+        crate::image_cache::op::set_image_channel(images_tx);
+
         Self {
             state: State {
                 socket_rx_tx,
@@ -262,6 +266,7 @@ impl App {
                 harmony_lotus: (TextureId::Egui, Vec2::ZERO),
                 next_screen: None,
                 prev_screen: false,
+                images_rx,
             },
             screens: ScreenStack::new(auth::Screen::new()),
             show_errors_window: false,
@@ -493,7 +498,7 @@ impl epi::App for App {
 
         state.handle_about();
         state.handle_errors();
-        state.handle_events(frame);
+        state.handle_events();
         state.handle_sockets();
         state.handle_images(frame);
 

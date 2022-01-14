@@ -11,7 +11,6 @@ use client::{
 use eframe::egui::{Color32, Event, RichText, Vec2};
 
 use crate::{
-    image_cache::LoadedImage,
     screen::guild_settings,
     style as loqui_style,
     widgets::{
@@ -341,7 +340,7 @@ impl Screen {
         }
     }
 
-    fn view_message_attachment(&mut self, state: &State, ui: &mut Ui, frame: &epi::Frame, attachment: &Attachment) {
+    fn view_message_attachment(&mut self, state: &State, ui: &mut Ui, attachment: &Attachment) {
         let mut handled = false;
         let mut fetch = false;
         let mut open = false;
@@ -401,7 +400,7 @@ impl Screen {
                 let data = Bytes::copy_from_slice(minithumbnail.data.as_slice());
                 let id = attachment.id.clone();
                 let kind = SmolStr::new_inline("minithumbnail");
-                spawn_future!(state, LoadedImage::load(frame.clone(), data, id, kind));
+                crate::image_cache::op::decode_image(data, id, kind);
             }
         }
 
@@ -490,7 +489,7 @@ impl Screen {
         });
     }
 
-    fn view_messages(&mut self, state: &mut State, ui: &mut Ui, frame: &epi::Frame) {
+    fn view_messages(&mut self, state: &mut State, ui: &mut Ui) {
         guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
         guard!(let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return });
         guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
@@ -542,7 +541,7 @@ impl Screen {
                                 }
                                 client::message::Content::Files(attachments) => {
                                     for attachment in attachments {
-                                        self.view_message_attachment(state, ui, frame, attachment);
+                                        self.view_message_attachment(state, ui, attachment);
                                     }
                                 }
                                 client::message::Content::Embeds(embeds) => {
@@ -915,13 +914,13 @@ impl Screen {
     }
 
     #[inline(always)]
-    fn show_main_area(&mut self, ui: &mut Ui, state: &mut State, frame: &epi::Frame, ctx: &egui::Context) {
+    fn show_main_area(&mut self, ui: &mut Ui, state: &mut State, ctx: &egui::Context) {
         ui.with_layout(
             Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
             |ui| {
                 ui.vertical(|ui| {
                     ui.allocate_ui([ui.available_width(), ui.available_height() - 38.0].into(), |ui| {
-                        self.view_messages(state, ui, frame);
+                        self.view_messages(state, ui);
                     });
                     ui.group_filled().show(ui, |ui| {
                         self.view_typing_members(state, ui);
@@ -938,7 +937,7 @@ impl AppScreen for Screen {
         "main"
     }
 
-    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _: &epi::Frame, state: &mut State) {
         if ctx.input().key_pressed(egui::Key::Escape) {
             self.editing_message = None;
         }
@@ -972,7 +971,7 @@ impl AppScreen for Screen {
                         self.show_channel_bar(ui, state);
 
                         if self.current.has_channel() {
-                            self.show_main_area(ui, state, frame, ctx);
+                            self.show_main_area(ui, state, ctx);
                         }
                     }
                 });

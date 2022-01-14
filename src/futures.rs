@@ -35,32 +35,14 @@ impl Futures {
         self.rr = Some(frame.lock().repaint_signal.clone());
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn spawn<Fut, Out>(&self, fut: Fut)
-    where
-        Fut: Future<Output = Out> + Send + 'static,
+    pub fn spawn<
+        #[cfg(not(target_arch = "wasm32"))] Fut: Future<Output = Out> + Send + 'static,
+        #[cfg(target_arch = "wasm32")] Fut: Future<Output = Out> + 'static,
         Out: Send + 'static,
-    {
-        let tx = self.tx.clone();
-        let rr = self.rr.clone();
-        spawn(async move {
-            let result = fut.await;
-            let item = Box::new(result);
-            if tx.send(item).is_err() {
-                tracing::debug!("future output dropped before result was sent");
-            }
-            if let Some(rr) = rr {
-                rr.request_repaint();
-            }
-        });
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn spawn<Fut, Out>(&self, fut: Fut)
-    where
-        Fut: Future<Output = Out> + 'static,
-        Out: Send + 'static,
-    {
+    >(
+        &self,
+        fut: Fut,
+    ) {
         let tx = self.tx.clone();
         let rr = self.rr.clone();
         spawn(async move {
