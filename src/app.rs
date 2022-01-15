@@ -312,6 +312,8 @@ impl App {
     #[inline(always)]
     fn view_bottom_panel(&mut self, ui: &mut Ui) {
         ui.horizontal_top(|ui| {
+            self.view_connection_status(ui);
+
             if ui.ctx().is_mobile().not() {
                 if cfg!(debug_assertions) {
                     egui::Frame::none().fill(Color32::RED).show(ui, |ui| {
@@ -319,8 +321,6 @@ impl App {
                             .on_hover_text("egui was compiled with debug assertions enabled.");
                     });
                 }
-
-                self.view_connection_status(ui);
 
                 if self.state.latest_errors.is_empty().not() {
                     let new_errors_but = ui
@@ -516,7 +516,7 @@ impl epi::App for App {
         ctx.set_pixels_per_point(1.45);
 
         let is_main_screen = self.screens.current().id() == "main";
-        if !is_main_screen || ctx.is_mobile().not() {
+        if state.is_connected.not() || !is_main_screen || ctx.is_mobile().not() {
             let frame_panel = egui::Frame {
                 margin: Vec2::ZERO,
                 fill: ctx.style().visuals.extreme_bg_color,

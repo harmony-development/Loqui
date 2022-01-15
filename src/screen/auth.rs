@@ -180,53 +180,50 @@ impl Screen {
         let did_submit = self.view_fields(ui);
         let selected_choice = self.view_choices(ui);
 
-        if let Some(choice) = selected_choice {
-            self.next_step(state, AuthStepResponse::Choice(choice.into()));
-        } else if self.fields.is_empty().not() {
-            let are_fields_filled = self.fields.iter().all(|(_, text)| text.is_empty().not());
-            let continue_resp = ui.add_enabled(are_fields_filled, egui::Button::new("continue"));
-            if are_fields_filled && (did_submit || continue_resp.clicked()) {
-                if self.title == "homeserver" {
-                    self.homeserver(state);
-                } else {
-                    let response = AuthStepResponse::form(
-                        self.fields
-                            .iter()
-                            .map(|((_, r#type), value)| match r#type.as_str() {
-                                "number" => Field::Number(value.parse().unwrap()),
-                                "new-password" | "password" => Field::Bytes(value.as_bytes().to_vec()),
-                                _ => Field::String(value.clone()),
-                            })
-                            .collect(),
-                    );
-                    self.next_step(state, response);
+        ui.horizontal(|ui| {
+            if let Some(choice) = selected_choice {
+                self.next_step(state, AuthStepResponse::Choice(choice.into()));
+            } else if self.fields.is_empty().not() {
+                let are_fields_filled = self.fields.iter().all(|(_, text)| text.is_empty().not());
+                let continue_resp = ui.add_enabled(are_fields_filled, egui::Button::new("continue"));
+                if are_fields_filled && (did_submit || continue_resp.clicked()) {
+                    if self.title == "homeserver" {
+                        self.homeserver(state);
+                    } else {
+                        let response = AuthStepResponse::form(
+                            self.fields
+                                .iter()
+                                .map(|((_, r#type), value)| match r#type.as_str() {
+                                    "number" => Field::Number(value.parse().unwrap()),
+                                    "new-password" | "password" => Field::Bytes(value.as_bytes().to_vec()),
+                                    _ => Field::String(value.clone()),
+                                })
+                                .collect(),
+                        );
+                        self.next_step(state, response);
+                    }
                 }
             }
-        }
 
-        if self.can_go_back && ui.button("back").clicked() {
-            self.prev_step(state);
-        }
+            if self.can_go_back && ui.button("back").clicked() {
+                self.prev_step(state);
+            }
+        });
     }
 
-    fn view_main(&mut self, state: &mut State, ui: &mut Ui) -> Response {
+    fn view_main(&mut self, state: &mut State, ui: &mut Ui) {
         if self.waiting {
-            let wait = ui
-                .horizontal(|ui| {
-                    ui.label(RichText::new("please wait...").heading());
-                    ui.add(egui::Spinner::new());
-                })
-                .response;
-            return wait;
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("please wait...").heading());
+                ui.add(egui::Spinner::new());
+            });
+            return;
         }
 
-        egui::Grid::new("auth_grid")
-            .spacing((0.0, 15.0))
-            .min_col_width(300.0)
-            .show(ui, |ui| {
-                self.view_grid(state, ui);
-            })
-            .response
+        egui::Grid::new("auth_grid_grid")
+            .min_col_width(ui.available_width())
+            .spacing([10.0; 2])
+            .show(ui, |ui| self.view_grid(state, ui));
     }
 }
 
@@ -243,23 +240,42 @@ impl AppScreen for Screen {
             ui.label(RichText::new(self.title.as_str()).strong().heading());
         });
 
+        let is_mobile = ctx.is_mobile();
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.with_layout(
-                Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
-                |ui| {
-                    ui.add_space(50.0);
-                    self.view_main(state, ui);
+            let num_columns = (state.about.is_some() && is_mobile.not()).then(|| 2).unwrap_or(1);
+            let col_width = is_mobile
+                .then(|| ui.available_width())
+                .unwrap_or_else(|| ui.available_width() / num_columns as f32);
+            let available_height_before = ui.available_height();
+
+            egui::Grid::new("auth_grid")
+                .min_col_width(col_width)
+                .min_row_height(available_height_before / 3.0)
+                .max_col_width(col_width)
+                .num_columns(num_columns)
+                .show(ui, |ui| {
+                    ui.allocate_ui(
+                        [
+                            ui.available_width(),
+                            is_mobile
+                                .then(|| available_height_before / 3.0)
+                                .unwrap_or(available_height_before),
+                        ]
+                        .into(),
+                        |ui| self.view_main(state, ui),
+                    );
+                    if is_mobile {
+                        ui.end_row();
+                    }
                     if let Some(about) = state.about.as_ref() {
-                        let desired_width = 250.0;
-                        ui.add_space(ui.available_width() - desired_width);
-                        ui.allocate_ui([desired_width, ui.available_height()].into(), |ui| {
-                            ui.group(|ui| {
-                                view_about(ui, about);
-                            });
+                        if is_mobile {
+                            ui.end_row();
+                        }
+                        ui.group(|ui| {
+                            view_about(ui, about);
                         });
                     }
-                },
-            )
+                });
         });
     }
 }
