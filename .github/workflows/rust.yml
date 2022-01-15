@@ -83,7 +83,7 @@ jobs:
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
       with:
-        key: cache-release-web
+        key: cache-release-web-1
 
     - name: Install trunk
       run: cargo install --locked --git "https://github.com/kristoff3r/trunk.git" --branch rust_worker trunk
