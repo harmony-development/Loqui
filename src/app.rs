@@ -312,61 +312,68 @@ impl App {
     #[inline(always)]
     fn view_bottom_panel(&mut self, ui: &mut Ui) {
         ui.horizontal_top(|ui| {
-            if cfg!(debug_assertions) {
-                egui::Frame::none().fill(Color32::RED).show(ui, |ui| {
-                    ui.colored_label(Color32::BLACK, "⚠ Debug build ⚠")
-                        .on_hover_text("egui was compiled with debug assertions enabled.");
-                });
-            }
+            if ui.ctx().is_mobile().not() {
+                if cfg!(debug_assertions) {
+                    egui::Frame::none().fill(Color32::RED).show(ui, |ui| {
+                        ui.colored_label(Color32::BLACK, "⚠ Debug build ⚠")
+                            .on_hover_text("egui was compiled with debug assertions enabled.");
+                    });
+                }
 
-            self.view_connection_status(ui);
+                self.view_connection_status(ui);
+
+                if self.state.latest_errors.is_empty().not() {
+                    let new_errors_but = ui
+                        .add(egui::Button::new(dangerous_text("new errors")).small())
+                        .on_hover_text("show errors");
+                    if new_errors_but.clicked() {
+                        self.show_errors_window = true;
+                    }
+                } else {
+                    ui.label("no errors");
+                }
+            }
 
             let is_main_or_auth = matches!(self.screens.current().id(), "main" | "auth");
             if is_main_or_auth.not() && ui.button("<- back").on_hover_text("go back").clicked() {
                 self.state.pop_screen();
             }
 
-            if self.state.latest_errors.is_empty().not() {
-                let new_errors_but = ui
-                    .add(egui::Button::new(dangerous_text("new errors")).small())
-                    .on_hover_text("show errors");
-                if new_errors_but.clicked() {
-                    self.show_errors_window = true;
-                }
-            } else {
-                ui.label("no errors");
+            if ui.ctx().is_mobile().not() {
+                ui.add_space(ui.available_width() - 70.0);
+
+                egui::Frame::group(ui.style())
+                    .corner_radius(0.0)
+                    .margin([0.0, 0.0])
+                    .show(ui, |ui| {
+                        menu_text_button("top_panel_menu", "menu", ui, |ui| {
+                            if ui.text_button("about server").clicked() {
+                                self.show_about_window = true;
+                            }
+
+                            if ui.text_button("settings").clicked() {
+                                self.state.push_screen(super::screen::settings::Screen::default());
+                            }
+
+                            if ui.text_button("logout").clicked() {
+                                self.screens.clear(super::screen::auth::Screen::new());
+                                let client = self.state.client().clone();
+                                self.state.client = None;
+                                self.state.reset_socket_state();
+                                let state = &self.state;
+                                spawn_future!(state, async move { client.logout().await });
+                            }
+
+                            if ui.text_button("exit loqui").clicked() {
+                                std::process::exit(0);
+                            }
+
+                            if ui.text_button("egui debug").clicked() {
+                                self.show_egui_debug = true;
+                            }
+                        });
+                    });
             }
-
-            ui.add_space(ui.available_width() - 100.0);
-
-            egui::Frame::group(ui.style()).margin([0.0, 0.0]).show(ui, |ui| {
-                menu_text_button("top_panel_menu", "menu", ui, |ui| {
-                    if ui.text_button("about server").clicked() {
-                        self.show_about_window = true;
-                    }
-
-                    if ui.text_button("settings").clicked() {
-                        self.state.push_screen(super::screen::settings::Screen::default());
-                    }
-
-                    if ui.text_button("logout").clicked() {
-                        self.screens.clear(super::screen::auth::Screen::new());
-                        let client = self.state.client().clone();
-                        self.state.client = None;
-                        self.state.reset_socket_state();
-                        let state = &self.state;
-                        spawn_future!(state, async move { client.logout().await });
-                    }
-
-                    if ui.text_button("exit loqui").clicked() {
-                        std::process::exit(0);
-                    }
-
-                    if ui.text_button("egui debug").clicked() {
-                        self.show_egui_debug = true;
-                    }
-                });
-            });
         });
     }
 
@@ -508,18 +515,22 @@ impl epi::App for App {
 
         ctx.set_pixels_per_point(1.45);
 
-        egui::TopBottomPanel::top("top_status_panel")
-            .frame(egui::Frame {
+        let is_main_screen = self.screens.current().id() == "main";
+        if !is_main_screen || ctx.is_mobile().not() {
+            let frame_panel = egui::Frame {
                 margin: Vec2::ZERO,
                 fill: ctx.style().visuals.extreme_bg_color,
                 stroke: ctx.style().visuals.window_stroke(),
                 ..Default::default()
-            })
-            .max_height(12.0)
-            .min_height(12.0)
-            .show(ctx, |ui| {
-                self.view_bottom_panel(ui);
-            });
+            };
+            egui::TopBottomPanel::top("top_status_panel")
+                .frame(frame_panel)
+                .max_height(12.0)
+                .min_height(12.0)
+                .show(ctx, |ui| {
+                    self.view_bottom_panel(ui);
+                });
+        }
 
         if self.state.latest_errors.is_empty().not() {
             self.view_errors_window(ctx);

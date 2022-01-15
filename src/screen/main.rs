@@ -72,6 +72,19 @@ impl CurrentIds {
     }
 }
 
+#[derive(Clone, Copy)]
+enum Panel {
+    Messages,
+    GuildChannels,
+    Members,
+}
+
+impl Default for Panel {
+    fn default() -> Self {
+        Self::GuildChannels
+    }
+}
+
 #[derive(Default)]
 pub struct Screen {
     // guild id -> channel id
@@ -90,6 +103,7 @@ pub struct Screen {
     guild_name_text: String,
     show_join_guild: bool,
     show_create_guild: bool,
+    viewing_panel: Panel,
 }
 
 impl Screen {
@@ -248,6 +262,7 @@ impl Screen {
                             });
                         }
                         if button.clicked() {
+                            self.viewing_panel = Panel::Messages;
                             self.current.set_channel(channel_id);
                             self.last_channel_id.insert(guild_id, channel_id);
                             if !channel.reached_top && channel.messages.continuous_view().is_empty() {
@@ -848,15 +863,21 @@ impl Screen {
             ..Default::default()
         };
 
-        egui::panel::SidePanel::left("channel_panel")
-            .frame(panel_frame)
-            .min_width(100.0)
-            .max_width(300.0)
-            .default_width(125.0)
-            .resizable(true)
-            .show_inside(ui, |ui| {
-                self.view_channels(state, ui);
-            });
+        let panel = egui::panel::SidePanel::left("channel_panel").frame(panel_frame);
+
+        let panel = if ui.ctx().is_mobile() {
+            panel.resizable(false).min_width(ui.available_width() - 16.0)
+        } else {
+            panel
+                .min_width(100.0)
+                .max_width(300.0)
+                .default_width(125.0)
+                .resizable(true)
+        };
+
+        panel.show_inside(ui, |ui| {
+            self.view_channels(state, ui);
+        });
     }
 
     #[inline(always)]
@@ -869,15 +890,21 @@ impl Screen {
             ..Default::default()
         };
 
-        egui::panel::SidePanel::right("member_panel")
-            .frame(panel_frame)
-            .min_width(100.0)
-            .max_width(300.0)
-            .default_width(125.0)
-            .resizable(true)
-            .show_inside(ui, |ui| {
-                self.view_members(state, ui);
-            });
+        let panel = egui::panel::SidePanel::right("member_panel").frame(panel_frame);
+
+        let panel = if ui.ctx().is_mobile() {
+            panel.resizable(false).min_width(ui.available_width() - 16.0)
+        } else {
+            panel
+                .min_width(100.0)
+                .max_width(300.0)
+                .default_width(125.0)
+                .resizable(true)
+        };
+
+        panel.show_inside(ui, |ui| {
+            self.view_members(state, ui);
+        });
     }
 
     #[inline(always)]
@@ -893,6 +920,18 @@ impl Screen {
             };
             frame.show(ui, |ui| {
                 ui.horizontal_top(|ui| {
+                    if self.current.has_channel() && ui.ctx().is_mobile() {
+                        let show_guilds_but = ui
+                            .add_sized([12.0, 12.0], TextButton::text("☰").small())
+                            .on_hover_text("show guilds / channels");
+                        if show_guilds_but.clicked() {
+                            self.viewing_panel = matches!(self.viewing_panel, Panel::GuildChannels)
+                                .then(|| Panel::Messages)
+                                .unwrap_or(Panel::GuildChannels);
+                        }
+                        ui.add_sized([1.0, 12.0], egui::Separator::default().spacing(0.0));
+                    }
+
                     let chan_name = self
                         .current
                         .channel()
@@ -900,13 +939,21 @@ impl Screen {
                         .map_or_else(|| "select a channel".to_string(), |c| format!("#{}", c.name));
 
                     ui.label(chan_name);
-                    ui.add_sized([12.0, 12.0], egui::Separator::default());
-                    ui.add_space(ui.available_width() - 12.0);
-                    let show_members_but = ui
-                        .add_sized([12.0, 12.0], TextButton::text("👤").small())
-                        .on_hover_text("toggle member list");
-                    if show_members_but.clicked() {
-                        self.disable_users_bar = !self.disable_users_bar;
+                    ui.add_sized([1.0, 12.0], egui::Separator::default().spacing(0.0));
+
+                    if self.current.has_guild() {
+                        ui.add_space(ui.available_width() - 12.0);
+                        let show_members_but = ui
+                            .add_sized([12.0, 12.0], TextButton::text("👤").small())
+                            .on_hover_text("toggle member list");
+                        if show_members_but.clicked() {
+                            self.viewing_panel = matches!(self.viewing_panel, Panel::Members)
+                                .then(|| Panel::Messages)
+                                .unwrap_or(Panel::Members);
+                            self.disable_users_bar = !self.disable_users_bar;
+                        }
+                    } else {
+                        ui.add_space(ui.available_width());
                     }
                 });
             });
@@ -952,30 +999,48 @@ impl AppScreen for Screen {
             fill: loqui_style::BG_LIGHT,
             ..Default::default()
         };
-        egui::CentralPanel::default().frame(panel_frame).show(ctx, |ui| {
-            let (texid, size) = state.harmony_lotus;
-            let size = size * 0.2;
-            ImageBg::new(texid, size)
-                .tint(Color32::WHITE.linear_multiply(0.05))
-                .offset(ui.available_size() - (size * 0.8) - egui::vec2(75.0, 0.0))
-                .show(ui, |ui| {
-                    self.show_guild_panel(ui, state);
+        let central_panel = egui::CentralPanel::default().frame(panel_frame);
 
-                    if self.current.has_guild() {
-                        self.show_channel_panel(ui, state);
-
-                        if !self.disable_users_bar {
-                            self.show_member_panel(ui, state);
-                        }
-
-                        self.show_channel_bar(ui, state);
-
-                        if self.current.has_channel() {
-                            self.show_main_area(ui, state, ctx);
+        if ctx.is_mobile() {
+            central_panel.show(ctx, |ui| {
+                self.show_channel_bar(ui, state);
+                match self.viewing_panel {
+                    Panel::Messages => self.show_main_area(ui, state, ctx),
+                    Panel::Members => self.show_member_panel(ui, state),
+                    Panel::GuildChannels => {
+                        self.show_guild_panel(ui, state);
+                        if self.current.has_guild() {
+                            self.show_channel_panel(ui, state);
                         }
                     }
-                });
-        });
+                }
+            });
+        } else {
+            central_panel.show(ctx, |ui| {
+                let (texid, size) = state.harmony_lotus;
+                let size = size * 0.2;
+                ImageBg::new(texid, size)
+                    .tint(Color32::WHITE.linear_multiply(0.05))
+                    .offset(ui.available_size() - (size * 0.8) - egui::vec2(75.0, 0.0))
+                    .show(ui, |ui| {
+                        self.show_guild_panel(ui, state);
+
+                        if self.current.has_guild() {
+                            self.show_channel_panel(ui, state);
+
+                            if !self.disable_users_bar {
+                                self.show_member_panel(ui, state);
+                            }
+
+                            self.show_channel_bar(ui, state);
+
+                            if self.current.has_channel() {
+                                self.show_main_area(ui, state, ctx);
+                            }
+                        }
+                    });
+            });
+        }
 
         self.prev_editing_message = self.editing_message;
     }

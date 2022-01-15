@@ -150,6 +150,7 @@ impl UiExt for Ui {
 
 pub trait CtxExt {
     fn available_center_pos(&self, offset_size: Vec2) -> Pos2;
+    fn is_mobile(&self) -> bool;
 }
 
 impl CtxExt for Context {
@@ -157,6 +158,10 @@ impl CtxExt for Context {
     fn available_center_pos(&self, offset_size: Vec2) -> Pos2 {
         let center = self.available_rect().center();
         center - (offset_size * 0.5)
+    }
+
+    fn is_mobile(&self) -> bool {
+        self.input().screen_rect().aspect_ratio() < 1.2 || self.pixels_per_point() > 2.0
     }
 }
 
