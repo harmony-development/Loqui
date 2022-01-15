@@ -24,16 +24,6 @@
           pkgs = common: prev: {
             overlays = prev.overlays ++ [
               (_: prev: {
-                trunk = prev.nciUtils.buildCrate {
-                  root = builtins.fetchGit {
-                    url = "https://github.com/kristoff3r/trunk.git";
-                    ref = "rust_worker";
-                    rev = "0ff1842640553dfefcf0e0b13aee619b17916844";
-                  };
-                  release = true;
-                };
-              })
-              (_: prev: {
                 android-sdk = inputs.androidPkgs.sdk.${prev.system} (sdkPkgs: with sdkPkgs; [
                   cmdline-tools-latest
                   build-tools-32-0-0
@@ -42,6 +32,16 @@
                   emulator
                   ndk-bundle
                 ]);
+              })
+              (_: prev: {
+                trunk = prev.nciUtils.buildCrate {
+                  root = builtins.fetchGit {
+                    url = "https://github.com/kristoff3r/trunk.git";
+                    ref = "rust_worker";
+                    rev = "0ff1842640553dfefcf0e0b13aee619b17916844";
+                  };
+                  release = true;
+                };
               })
             ];
           };
@@ -83,7 +83,13 @@
                 command = "SSL_CERT_FILE=~/.local/share/mkcert/rootCA.pem cargo r";
               }
               {
+                help = "Build for the web.";
                 package = trunk;
+              }
+              {
+                name = "cargo-mobile";
+                help = "Build for mobile.";
+                command = "$HOME/.cargo/bin/cargo-mobile $@";
               }
             ];
           };
