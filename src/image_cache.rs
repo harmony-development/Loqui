@@ -59,6 +59,7 @@ impl LoadedImage {
 #[cfg(target_arch = "wasm32")]
 pub mod op {
     use super::*;
+    use crate::utils::pool::Pool;
 
     use client::{
         harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
@@ -66,7 +67,7 @@ pub mod op {
     };
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
     use js_sys::Uint8Array;
-    use std::sync::mpsc::Sender;
+    use std::{cell::RefCell, sync::mpsc::Sender};
     use wasm_bindgen::{prelude::*, JsCast};
     use web_sys::{MessageEvent, Worker as WebWorker};
 
@@ -86,26 +87,33 @@ pub mod op {
         }
     }
 
-    struct Worker {
-        inner: WebWorker,
+    struct WorkerPool {
+        inner: Pool<WebWorker>,
+        channel: RefCell<Option<Sender<LoadedImage>>>,
     }
 
     // i hate web
     #[allow(unsafe_code)]
-    unsafe impl Send for Worker {}
+    unsafe impl Send for WorkerPool {}
     #[allow(unsafe_code)]
-    unsafe impl Sync for Worker {}
+    unsafe impl Sync for WorkerPool {}
 
     lazy_static::lazy_static! {
-        static ref IMAGE_WORKER: Worker = spawn_worker();
+        static ref WORKER_POOL: WorkerPool = WorkerPool {
+            inner: Pool::new(spawn_worker),
+            channel: RefCell::new(None),
+        };
     }
 
-    fn spawn_worker() -> Worker {
-        let web = WebWorker::new("./image_worker.js").expect("failed to start worker");
-        Worker { inner: web }
-    }
+    fn spawn_worker() -> WebWorker {
+        let worker = WebWorker::new("./image_worker.js").expect("failed to start worker");
+        let tx = WORKER_POOL
+            .channel
+            .borrow()
+            .as_ref()
+            .expect("worker pool not initialized")
+            .clone();
 
-    pub fn set_image_channel(tx: Sender<LoadedImage>) {
         let handler = Closure::wrap(Box::new(move |event: MessageEvent| {
             let data: Uint8Array = event.data().dyn_into().unwrap_throw();
             let data = data.to_vec();
@@ -115,9 +123,15 @@ pub mod op {
             let _ = tx.send(image);
         }) as Box<dyn FnMut(_)>);
 
-        IMAGE_WORKER.inner.set_onmessage(Some(handler.as_ref().unchecked_ref()));
+        worker.set_onmessage(Some(handler.as_ref().unchecked_ref()));
 
         handler.forget();
+
+        worker
+    }
+
+    pub fn set_image_channel(tx: Sender<LoadedImage>) {
+        WORKER_POOL.channel.borrow_mut().replace(tx);
     }
 
     pub fn decode_image(data: Bytes, id: FileId, kind: SmolStr) {
@@ -132,8 +146,9 @@ pub mod op {
         let data = Uint8Array::new_with_length(val.len() as u32);
         data.copy_from(&val);
 
-        IMAGE_WORKER
+        WORKER_POOL
             .inner
+            .get()
             .post_message(&data)
             .expect_throw("failed to decode image");
     }

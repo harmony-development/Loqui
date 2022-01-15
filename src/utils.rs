@@ -224,3 +224,92 @@ pub fn parse_urls(text: &str) -> impl Iterator<Item = (&str, Uri)> {
         .filter_map(|maybe_url| Some((maybe_url, maybe_url.parse::<Uri>().ok()?)))
         .filter(|(_, url)| matches!(url.scheme_str(), Some("http" | "https")))
 }
+
+/// simple not thread safe object pooling
+pub mod pool {
+    use std::{
+        cell::RefCell,
+        collections::VecDeque,
+        ops::{Deref, DerefMut},
+        rc::Rc,
+    };
+
+    type Objects<T> = Rc<RefCell<VecDeque<T>>>;
+    type Generator<T> = Rc<dyn Fn() -> T>;
+
+    pub struct Pool<T> {
+        objects: Objects<T>,
+        generator: Generator<T>,
+    }
+
+    impl<T> Clone for Pool<T> {
+        fn clone(&self) -> Self {
+            Self {
+                generator: self.generator.clone(),
+                objects: self.objects.clone(),
+            }
+        }
+    }
+
+    impl<T> Pool<T> {
+        #[inline(always)]
+        fn new_internal(objects: Objects<T>, generator: Generator<T>) -> Self {
+            Self { objects, generator }
+        }
+
+        pub fn new(generator: impl Fn() -> T + 'static) -> Self {
+            Self::new_internal(Rc::new(RefCell::new(VecDeque::new())), Rc::new(generator))
+        }
+
+        pub fn new_with_count(generator: impl Fn() -> T + 'static, count: usize) -> Self {
+            let initial_objects = std::iter::repeat_with(&generator).take(count).collect();
+
+            let objects: Objects<T> = Rc::new(RefCell::new(initial_objects));
+            let generator: Generator<T> = Rc::new(generator);
+
+            Self::new_internal(objects, generator)
+        }
+
+        /// Gets an item from the pool.
+        ///
+        /// Will block if the pool is empty and the generator fn blocks.
+        pub fn get(&self) -> PoolRef<T> {
+            let maybe_item = self.objects.borrow_mut().pop_front();
+            let item = maybe_item.unwrap_or_else(self.generator.as_ref());
+
+            PoolRef {
+                item: Some(item),
+                pool: self.clone(),
+            }
+        }
+
+        pub fn put(&self, item: T) {
+            self.objects.borrow_mut().push_back(item);
+        }
+    }
+
+    pub struct PoolRef<T> {
+        pool: Pool<T>,
+        item: Option<T>,
+    }
+
+    impl<T> Drop for PoolRef<T> {
+        fn drop(&mut self) {
+            self.pool.put(self.item.take().expect("pool ref dropped twice???"));
+        }
+    }
+
+    impl<T> Deref for PoolRef<T> {
+        type Target = T;
+
+        fn deref(&self) -> &Self::Target {
+            self.item.as_ref().expect("pool ref was dropped, but then used???")
+        }
+    }
+
+    impl<T> DerefMut for PoolRef<T> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            self.item.as_mut().expect("pool ref was dropped, but then used???")
+        }
+    }
+}
