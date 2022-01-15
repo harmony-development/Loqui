@@ -86,13 +86,7 @@ jobs:
         key: cache-release-web
 
     - name: Install trunk
-      run: |
-        current_pwd=$PWD
-        cd ..
-        git clone https://github.com/kristoff3r/trunk.git
-        cd trunk && git checkout rust_worker
-        cargo install --locked --path .
-        cd $current_pwd
+      run: cargo install --locked --git https://github.com/kristoff3r/trunk.git --branch rust-worker
 
     - name: Build
       run: trunk build --release --public-url "https://harmonyapp.io/Loqui/"
