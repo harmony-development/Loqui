@@ -86,7 +86,7 @@ jobs:
         key: cache-release-web
 
     - name: Install trunk
-      run: cargo install --locked --git "https://github.com/kristoff3r/trunk.git" --branch rust_worker
+      run: cargo install --locked --git "https://github.com/kristoff3r/trunk.git" --branch rust_worker --bin trunk
 
     - name: Build
       run: trunk build --release --public-url "https://harmonyapp.io/Loqui/"
