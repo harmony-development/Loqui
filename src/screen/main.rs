@@ -382,7 +382,7 @@ impl Screen {
 
             if let Some((texid, size)) = state.image_cache.get_image(&attachment.id) {
                 let size = maybe_size.unwrap_or_else(|| downscale(size));
-                let open_but = ui.add(egui::ImageButton::new(texid, size));
+                let open_but = ui.add(egui::ImageButton::new(texid.id(), size));
                 open = open_but.clicked();
                 handled = true;
             } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
@@ -391,7 +391,7 @@ impl Screen {
                     ui.add_sized(size, egui::Spinner::new().size(32.0))
                         .on_hover_text("loading image")
                 } else {
-                    ui.add(egui::ImageButton::new(texid, size))
+                    ui.add(egui::ImageButton::new(texid.id(), size))
                 };
                 fetch = button.clicked();
                 handled = true;
@@ -718,6 +718,8 @@ impl Screen {
         }
     }
 
+    fn view_upload_button(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::Context) {}
+
     fn view_user_avatar(
         &mut self,
         state: &State,
@@ -733,7 +735,7 @@ impl Screen {
             .and_then(|id| state.image_cache.get_avatar(id));
 
         if let Some((texid, _)) = maybe_tex {
-            ui.image(texid, [32.0, 32.0]);
+            ui.image(texid.id(), [32.0, 32.0]);
         } else {
             ui.add_enabled_ui(false, |ui| {
                 let username = overrides
@@ -1017,9 +1019,9 @@ impl AppScreen for Screen {
             });
         } else {
             central_panel.show(ctx, |ui| {
-                let (texid, size) = state.harmony_lotus;
+                let (texid, size) = state.harmony_lotus.as_ref().map(|(tex, size)| (tex, *size)).unwrap();
                 let size = size * 0.2;
-                ImageBg::new(texid, size)
+                ImageBg::new(texid.id(), size)
                     .tint(Color32::WHITE.linear_multiply(0.05))
                     .offset(ui.available_size() - (size * 0.8) - egui::vec2(75.0, 0.0))
                     .show(ui, |ui| {

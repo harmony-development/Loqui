@@ -161,7 +161,8 @@ impl CtxExt for Context {
     }
 
     fn is_mobile(&self) -> bool {
-        self.input().screen_rect().aspect_ratio() < 1.1 || self.pixels_per_point() > 2.0
+        let input = self.input();
+        input.screen_rect().aspect_ratio() < 1.1 || input.pixels_per_point() > 2.0
     }
 }
 

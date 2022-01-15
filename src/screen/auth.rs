@@ -11,7 +11,7 @@ use client::{
     smol_str::SmolStr,
     Client, IndexMap, Uri,
 };
-use eframe::egui::{Response, RichText};
+use eframe::egui::RichText;
 
 use crate::{screen::main, widgets::view_about};
 

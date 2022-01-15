@@ -643,7 +643,7 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 [[package]]
 name = "eframe"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#6c616a1b69799dec7cf27e64e319422c837a42ec"
+source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
 dependencies = [
  "egui",
  "egui-winit",
@@ -655,7 +655,7 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.16.1"
-source = "git+https://github.com/emilk/egui.git?branch=master#6c616a1b69799dec7cf27e64e319422c837a42ec"
+source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
 dependencies = [
  "ahash",
  "epaint",
@@ -665,7 +665,7 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#6c616a1b69799dec7cf27e64e319422c837a42ec"
+source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
 dependencies = [
  "copypasta",
  "egui",
@@ -678,7 +678,7 @@ dependencies = [
 [[package]]
 name = "egui_glow"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#6c616a1b69799dec7cf27e64e319422c837a42ec"
+source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
 dependencies = [
  "bytemuck",
  "egui",
@@ -694,8 +694,9 @@ dependencies = [
 [[package]]
 name = "egui_web"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#6c616a1b69799dec7cf27e64e319422c837a42ec"
+source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
 dependencies = [
+ "bytemuck",
  "egui",
  "egui_glow",
  "epi",
@@ -714,7 +715,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#6c616a1b69799dec7cf27e64e319422c837a42ec"
+source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
 dependencies = [
  "bytemuck",
 ]
@@ -731,7 +732,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#6c616a1b69799dec7cf27e64e319422c837a42ec"
+source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -744,7 +745,7 @@ dependencies = [
 [[package]]
 name = "epi"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#6c616a1b69799dec7cf27e64e319422c837a42ec"
+source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
 dependencies = [
  "egui",
 ]

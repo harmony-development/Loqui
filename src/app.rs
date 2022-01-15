@@ -15,7 +15,7 @@ use client::{
     tracing, Cache, Client, FetchEvent,
 };
 use eframe::{
-    egui::{self, Color32, FontData, FontDefinitions, TextureId, Ui, Vec2},
+    egui::{self, Color32, FontData, FontDefinitions, TextureHandle, Ui, Vec2},
     epi,
 };
 use instant::Instant;
@@ -41,7 +41,7 @@ pub struct State {
     pub futures: Futures,
     pub latest_errors: Vec<String>,
     pub about: Option<About>,
-    pub harmony_lotus: (TextureId, Vec2),
+    pub harmony_lotus: Option<(TextureHandle, Vec2)>,
     pub reset_socket: AtomBool,
     pub connecting_socket: bool,
     pub is_connected: bool,
@@ -163,13 +163,13 @@ impl State {
     }
 
     #[inline(always)]
-    fn handle_images(&mut self, frame: &epi::Frame) {
+    fn handle_images(&mut self, ctx: &egui::Context) {
         while let Ok(image) = self.images_rx.try_recv() {
             let maybe_pos = self.loading_images.borrow().iter().position(|id| image.id() == id);
             if let Some(pos) = maybe_pos {
                 self.loading_images.borrow_mut().remove(pos);
             }
-            self.image_cache.add(frame, image);
+            self.image_cache.add(ctx, image);
         }
     }
 
@@ -263,7 +263,7 @@ impl App {
                 futures,
                 latest_errors: Vec::new(),
                 about: None,
-                harmony_lotus: (TextureId::Egui, Vec2::ZERO),
+                harmony_lotus: None,
                 next_screen: None,
                 prev_screen: false,
                 images_rx,
@@ -432,14 +432,17 @@ impl App {
             });
     }
 
-    fn load_harmony_lotus(&self, frame: &epi::Frame) -> (TextureId, Vec2) {
+    fn load_harmony_lotus(&self, ctx: &egui::Context) -> (TextureHandle, Vec2) {
         const HARMONY_LOTUS: &[u8] = include_bytes!("../resources/lotus.png");
         let image = image::load_from_memory(HARMONY_LOTUS).expect("harmony lotus must be fine");
         let image = image.into_rgba8();
         let (w, h) = image.dimensions();
         let size = [w as usize, h as usize];
         let rgba = image.into_raw();
-        let texid = frame.alloc_texture(epi::Image::from_rgba_unmultiplied(size, &rgba));
+        let texid = ctx.load_texture(
+            "harmony-lotus",
+            egui::ImageData::Color(egui::ColorImage::from_rgba_unmultiplied(size, &rgba)),
+        );
         (texid, [w as f32, h as f32].into())
     }
 }
@@ -482,7 +485,7 @@ impl epi::App for App {
         ctx.set_fonts(font_defs);
 
         // load harmony lotus
-        self.state.harmony_lotus = self.load_harmony_lotus(frame);
+        self.state.harmony_lotus.replace(self.load_harmony_lotus(ctx));
 
         let mut style = ctx.style().as_ref().clone();
         style.visuals.widgets.hovered.bg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;
@@ -507,7 +510,7 @@ impl epi::App for App {
         state.handle_errors();
         state.handle_events();
         state.handle_sockets();
-        state.handle_images(frame);
+        state.handle_images(ctx);
 
         state.handle_socket_events();
 

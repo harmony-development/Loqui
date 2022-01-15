@@ -1,45 +1,38 @@
 use client::{harmony_rust_sdk::api::rest::FileId, smol_str::SmolStr, AHashMap};
-use eframe::{
-    egui::TextureId,
-    epi::{self, Image},
-};
+use eframe::egui::{self, ImageData as Image, TextureHandle};
 
 #[derive(Default)]
 pub struct ImageCache {
-    avatar: AHashMap<FileId, (TextureId, [f32; 2])>,
-    minithumbnail: AHashMap<FileId, (TextureId, [f32; 2])>,
-    image: AHashMap<FileId, (TextureId, [f32; 2])>,
+    avatar: AHashMap<FileId, (TextureHandle, [f32; 2])>,
+    minithumbnail: AHashMap<FileId, (TextureHandle, [f32; 2])>,
+    image: AHashMap<FileId, (TextureHandle, [f32; 2])>,
 }
 
 impl ImageCache {
-    pub fn add(&mut self, frame: &eframe::epi::Frame, image: LoadedImage) {
+    pub fn add(&mut self, ctx: &egui::Context, image: LoadedImage) {
         match image.kind.as_str() {
-            "guild" | "avatar" => add_generic(&mut self.avatar, frame, image),
-            "minithumbnail" => add_generic(&mut self.minithumbnail, frame, image),
-            _ => add_generic(&mut self.image, frame, image),
+            "guild" | "avatar" => add_generic(&mut self.avatar, ctx, image),
+            "minithumbnail" => add_generic(&mut self.minithumbnail, ctx, image),
+            _ => add_generic(&mut self.image, ctx, image),
         }
     }
 
-    pub fn get_avatar(&self, id: &FileId) -> Option<(TextureId, [f32; 2])> {
-        self.avatar.get(id).copied()
+    pub fn get_avatar(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+        self.avatar.get(id).map(|(tex, size)| (tex, *size))
     }
 
-    pub fn get_thumbnail(&self, id: &FileId) -> Option<(TextureId, [f32; 2])> {
-        self.minithumbnail.get(id).copied()
+    pub fn get_thumbnail(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+        self.minithumbnail.get(id).map(|(tex, size)| (tex, *size))
     }
 
-    pub fn get_image(&self, id: &FileId) -> Option<(TextureId, [f32; 2])> {
-        self.image.get(id).copied()
+    pub fn get_image(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+        self.image.get(id).map(|(tex, size)| (tex, *size))
     }
 }
 
-fn add_generic(map: &mut AHashMap<FileId, (TextureId, [f32; 2])>, frame: &epi::Frame, image: LoadedImage) {
-    if let Some((tex_id, _)) = map.remove(&image.id) {
-        frame.free_texture(tex_id);
-    }
-
-    let dimensions = image.image.size;
-    let texid = frame.alloc_texture(image.image);
+fn add_generic(map: &mut AHashMap<FileId, (TextureHandle, [f32; 2])>, ctx: &egui::Context, image: LoadedImage) {
+    let dimensions = image.image.size();
+    let texid = ctx.load_texture(image.id.to_string(), image.image);
     map.insert(image.id, (texid, [dimensions[0] as f32, dimensions[1] as f32]));
 }
 
@@ -65,6 +58,7 @@ pub mod op {
         harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
         smol_str::SmolStr,
     };
+    use egui::ColorImage;
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
     use js_sys::Uint8Array;
     use std::{cell::RefCell, sync::mpsc::Sender};
@@ -76,7 +70,7 @@ pub mod op {
             use std::str::FromStr;
 
             let dimensions = [data.dimensions[0] as usize, data.dimensions[1] as usize];
-            let image = Image::from_rgba_unmultiplied(dimensions, data.pixels.as_slice());
+            let image = Image::Color(ColorImage::from_rgba_unmultiplied(dimensions, data.pixels.as_slice()));
             let id = FileId::from_str(data.id.as_str());
 
             Self {
@@ -164,12 +158,16 @@ pub mod op {
         harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
         smol_str::SmolStr,
     };
+    use eframe::egui::ColorImage;
     use once_cell::sync::OnceCell;
 
     impl LoadedImage {
         pub fn load(data: Bytes, id: FileId, kind: SmolStr) -> Self {
             let loaded = image_worker::load_image_logic(data.as_ref(), kind.as_str());
-            let image = Image::from_rgba_unmultiplied(loaded.dimensions, loaded.pixels.as_slice());
+            let image = Image::Color(ColorImage::from_rgba_unmultiplied(
+                loaded.dimensions,
+                loaded.pixels.as_slice(),
+            ));
 
             Self { image, id, kind }
         }
