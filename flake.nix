@@ -9,6 +9,10 @@
       url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    androidPkgs = {
+      url = "github:tadfisher/android-nixpkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs:
@@ -29,6 +33,16 @@
                   release = true;
                 };
               })
+              (_: prev: {
+                android-sdk = inputs.androidPkgs.sdk.${prev.system} (sdkPkgs: with sdkPkgs; [
+                  cmdline-tools-latest
+                  build-tools-32-0-0
+                  platform-tools
+                  platforms-android-32
+                  emulator
+                  ndk-bundle
+                ]);
+              })
             ];
           };
           crateOverrides = common: _: {
@@ -43,11 +57,24 @@
               '';
             };
           };
-          shell = common: prev: {
+          shell = common: prev: with common.pkgs; {
+            packages = [ android-sdk ];
             env = prev.env ++ [
               {
                 name = "XDG_DATA_DIRS";
-                eval = with common.pkgs; "$GSETTINGS_SCHEMAS_PATH:$XDG_DATA_DIRS:${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share";
+                eval = "$GSETTINGS_SCHEMAS_PATH:$XDG_DATA_DIRS:${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share";
+              }
+              {
+                name = "ANDROID_HOME";
+                value = "${android-sdk}/share/android-sdk";
+              }
+              {
+                name = "ANDROID_SDK_ROOT";
+                value = "${android-sdk}/share/android-sdk";
+              }
+              {
+                name = "JAVA_HOME";
+                value = jdk11.home;
               }
             ];
             commands = prev.commands ++ [
@@ -56,7 +83,7 @@
                 command = "SSL_CERT_FILE=~/.local/share/mkcert/rootCA.pem cargo r";
               }
               {
-                package = common.pkgs.trunk;
+                package = trunk;
               }
             ];
           };
