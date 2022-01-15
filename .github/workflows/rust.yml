@@ -95,7 +95,7 @@ jobs:
         cd $current_pwd
 
     - name: Build
-      run: trunk build --release
+      run: trunk build --release --public-url "https://harmonyapp.io/Loqui/"
 
     - name: Publish web
       if: ${{ github.ref == 'refs/heads/master' && github.event_name == 'push' }}
