@@ -1,4 +1,4 @@
-use client::{harmony_rust_sdk::api::rest::FileId, smol_str::SmolStr, AHashMap};
+use client::{harmony_rust_sdk::api::rest::FileId, AHashMap};
 use eframe::egui::{self, ImageData as Image, TextureHandle};
 
 #[derive(Default)]
@@ -39,7 +39,7 @@ fn add_generic(map: &mut AHashMap<FileId, (TextureHandle, [f32; 2])>, ctx: &egui
 pub struct LoadedImage {
     pub image: Image,
     pub id: FileId,
-    pub kind: SmolStr,
+    pub kind: String,
 }
 
 impl LoadedImage {
@@ -54,10 +54,7 @@ pub mod op {
     use super::*;
     use crate::utils::pool::Pool;
 
-    use client::{
-        harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
-        smol_str::SmolStr,
-    };
+    use client::harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId};
     use egui::ColorImage;
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
     use js_sys::Uint8Array;
@@ -128,10 +125,10 @@ pub mod op {
         WORKER_POOL.channel.borrow_mut().replace(tx);
     }
 
-    pub fn decode_image(data: Bytes, id: FileId, kind: SmolStr) {
+    pub fn decode_image(data: Bytes, id: FileId, kind: String) {
         let val = rkyv::to_bytes::<_, 2048>(&ImageData {
             data: data.to_vec(),
-            kind: kind.to_string(),
+            kind,
             id: id.into(),
         })
         .unwrap()
@@ -154,15 +151,11 @@ pub mod op {
 
     use std::sync::{mpsc::Sender, Mutex};
 
-    use client::{
-        harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
-        smol_str::SmolStr,
-    };
+    use client::harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId};
     use eframe::egui::ColorImage;
-    use once_cell::sync::OnceCell;
 
     impl LoadedImage {
-        pub fn load(data: Bytes, id: FileId, kind: SmolStr) -> Self {
+        pub fn load(data: Bytes, id: FileId, kind: String) -> Self {
             let loaded = image_worker::load_image_logic(data.as_ref(), kind.as_str());
             let image = Image::Color(ColorImage::from_rgba_unmultiplied(
                 loaded.dimensions,
@@ -174,17 +167,22 @@ pub mod op {
     }
 
     lazy_static::lazy_static! {
-        static ref CHANNEL: Mutex<OnceCell<Sender<LoadedImage>>> = Mutex::new(OnceCell::new());
+        static ref CHANNEL: Mutex<Option<Sender<LoadedImage>>> = Mutex::new(None);
     }
 
     pub fn set_image_channel(tx: Sender<LoadedImage>) {
-        CHANNEL.lock().unwrap().set(tx).unwrap();
+        CHANNEL.lock().expect("poisoned").replace(tx);
     }
 
-    pub fn decode_image(data: Bytes, id: FileId, kind: SmolStr) {
+    pub fn decode_image(data: Bytes, id: FileId, kind: String) {
         tokio::task::spawn_blocking(move || {
             let loaded = LoadedImage::load(data, id, kind);
-            let _ = CHANNEL.lock().unwrap().get().expect("no channel").send(loaded);
+            let _ = CHANNEL
+                .lock()
+                .expect("poisoned")
+                .as_ref()
+                .expect("no channel")
+                .send(loaded);
         });
     }
 }

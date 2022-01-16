@@ -232,6 +232,7 @@ pub fn parse_urls(text: &str) -> impl Iterator<Item = (&str, Uri)> {
 }
 
 /// simple not thread safe object pooling
+#[cfg(target_arch = "wasm32")]
 pub mod pool {
     use std::{
         cell::RefCell,

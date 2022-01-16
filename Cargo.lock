@@ -284,7 +284,6 @@ dependencies = [
  "indexmap",
  "infer",
  "instant",
- "itertools",
  "serde",
  "smol_str",
  "tokio",
@@ -643,7 +642,7 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 [[package]]
 name = "eframe"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
+source = "git+https://github.com/emilk/egui.git?branch=master#c713fd98dd684b2594f1fd600ca938aa0bbe66f9"
 dependencies = [
  "egui",
  "egui-winit",
@@ -655,7 +654,7 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.16.1"
-source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
+source = "git+https://github.com/emilk/egui.git?branch=master#c713fd98dd684b2594f1fd600ca938aa0bbe66f9"
 dependencies = [
  "ahash",
  "epaint",
@@ -665,7 +664,7 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
+source = "git+https://github.com/emilk/egui.git?branch=master#c713fd98dd684b2594f1fd600ca938aa0bbe66f9"
 dependencies = [
  "copypasta",
  "egui",
@@ -678,7 +677,7 @@ dependencies = [
 [[package]]
 name = "egui_glow"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
+source = "git+https://github.com/emilk/egui.git?branch=master#c713fd98dd684b2594f1fd600ca938aa0bbe66f9"
 dependencies = [
  "bytemuck",
  "egui",
@@ -694,7 +693,7 @@ dependencies = [
 [[package]]
 name = "egui_web"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
+source = "git+https://github.com/emilk/egui.git?branch=master#c713fd98dd684b2594f1fd600ca938aa0bbe66f9"
 dependencies = [
  "bytemuck",
  "egui",
@@ -715,7 +714,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
+source = "git+https://github.com/emilk/egui.git?branch=master#c713fd98dd684b2594f1fd600ca938aa0bbe66f9"
 dependencies = [
  "bytemuck",
 ]
@@ -732,7 +731,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
+source = "git+https://github.com/emilk/egui.git?branch=master#c713fd98dd684b2594f1fd600ca938aa0bbe66f9"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -745,7 +744,7 @@ dependencies = [
 [[package]]
 name = "epi"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=fix-textedit-deadlock#237aa2c0fea045724e7e59beddc458cf215d72c5"
+source = "git+https://github.com/emilk/egui.git?branch=master#c713fd98dd684b2594f1fd600ca938aa0bbe66f9"
 dependencies = [
  "egui",
 ]
@@ -927,9 +926,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
+checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
 dependencies = [
  "cfg-if 1.0.0",
  "js-sys",
@@ -1162,7 +1161,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.3"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#231001f68210e3816ed6f339cb2f925133b24e2e"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#951450bba8f5dfe03165df3ea71edc62297558e1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1172,7 +1171,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.8.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#231001f68210e3816ed6f339cb2f925133b24e2e"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#951450bba8f5dfe03165df3ea71edc62297558e1"
 dependencies = [
  "derive-new",
  "derive_more",
@@ -1216,16 +1215,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "hex_color"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cee0f56b7ac7d28f8f3357c2d4ce55401b2066414369d64976ccf740b949a05b"
-dependencies = [
- "lazy_static",
- "regex",
 ]
 
 [[package]]
@@ -1495,9 +1484,9 @@ checksum = "1b03d17f364a3a042d5e5d46b053bbbf82c92c9430c592dd4c064dc6ee997125"
 
 [[package]]
 name = "libloading"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afe203d669ec979b7128619bae5a63b7b42e9203c1b29146079ee05e2f604b52"
+checksum = "efbc0f03f9a775e9f6aed295c6a1ba2253c5757a9e03d55c6caa46a681abcddd"
 dependencies = [
  "cfg-if 1.0.0",
  "winapi",
@@ -1530,13 +1519,11 @@ dependencies = [
  "console_error_panic_hook",
  "eframe",
  "guard",
- "hex_color",
  "image",
  "image_worker",
  "instant",
  "js-sys",
  "lazy_static",
- "once_cell",
  "open",
  "rfd",
  "rkyv",
@@ -2559,9 +2546,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.74"
+version = "1.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee2bb9cd061c5865d345bb02ca49fcef1391741b672b54a0bf7b679badec3142"
+checksum = "c059c05b48c5c0067d4b4b2b4f0732dd65feb52daf7e0ea09cd87e7dadc1af79"
 dependencies = [
  "itoa 1.0.1",
  "ryu",
@@ -2629,9 +2616,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
+checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "smithay-client-toolkit"
@@ -2989,9 +2976,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d81bfa81424cc98cb034b837c985b7a290f592e5b4322f353f94a0ab0f9f594"
+checksum = "77be66445c4eeebb934a7340f227bfe7b338173d3f8c00a60a5a58005c9faecf"
 dependencies = [
  "ansi_term",
  "lazy_static",

@@ -1,7 +1,10 @@
 use std::{
     cell::RefCell,
     ops::Not,
-    sync::mpsc::{self, Receiver},
+    sync::{
+        mpsc::{self, Receiver},
+        Arc, RwLock,
+    },
 };
 
 use client::{
@@ -12,6 +15,7 @@ use client::{
         },
         client::{EventsReadSocket, EventsSocket},
     },
+    message::{Content, Message},
     tracing, Cache, Client, FetchEvent,
 };
 use eframe::{
@@ -24,7 +28,7 @@ use tokio::sync::mpsc as tokio_mpsc;
 use super::utils::*;
 
 use crate::{
-    futures::Futures,
+    futures::{Futures, UploadMessageResult},
     image_cache::{ImageCache, LoadedImage},
     screen::{auth, BoxedScreen, Screen, ScreenStack},
     style as loqui_style,
@@ -38,6 +42,7 @@ pub struct State {
     pub cache: Cache,
     pub image_cache: ImageCache,
     pub loading_images: RefCell<Vec<FileId>>,
+    pub uploading_files: Arc<RwLock<Vec<String>>>,
     pub futures: Futures,
     pub latest_errors: Vec<String>,
     pub about: Option<About>,
@@ -105,7 +110,7 @@ impl State {
             self.connecting_socket = true;
             self.socket_retry_count += 1;
             self.last_socket_retry = Some(Instant::now());
-            spawn_client_fut!(self, |client| { client.connect_socket(Vec::new()).await? });
+            spawn_client_fut!(self, |client| client.connect_socket(Vec::new()).await);
         }
 
         handle_future!(self, |res: ClientResult<EventsSocket>| {
@@ -126,6 +131,43 @@ impl State {
         handle_future!(self, |res: ClientResult<()>| {
             self.run(res, |_, _| {});
         });
+        handle_future!(self, |res: ClientResult<u64>| {
+            self.run(res, |_, _| {});
+        });
+    }
+
+    #[inline(always)]
+    fn handle_upload_message(&mut self) {
+        handle_future!(self, |res: ClientResult<Option<UploadMessageResult>>| {
+            match res {
+                Ok(maybe_upload) => {
+                    guard!(let Some(UploadMessageResult { guild_id, channel_id, attachments }) = maybe_upload else { return });
+
+                    {
+                        let mut uploading_files = self.uploading_files.write().expect("poisoned");
+                        for attachment in attachments.iter() {
+                            if let Some(pos) = uploading_files.iter().position(|name| name == &attachment.name) {
+                                uploading_files.remove(pos);
+                            }
+                        }
+                    }
+
+                    let message = Message {
+                        content: Content::Files(attachments),
+                        sender: self.client().user_id(),
+                        ..Default::default()
+                    };
+                    let echo_id = self.cache.prepare_send_message(guild_id, channel_id, message.clone());
+                    spawn_evs!(self, |evs, client| {
+                        client.send_message(echo_id, guild_id, channel_id, message, evs).await?;
+                    });
+                }
+                Err(err) => {
+                    self.latest_errors.push(err.to_string());
+                    self.uploading_files.write().expect("poisoned").clear();
+                }
+            }
+        });
     }
 
     #[inline(always)]
@@ -136,11 +178,11 @@ impl State {
                 for event in events {
                     match event {
                         FetchEvent::Attachment { attachment, file } => {
-                            if attachment.kind.starts_with("image") && attachment.kind.ends_with("svg+xml").not() {
+                            if attachment.is_raster_image() {
                                 crate::image_cache::op::decode_image(
                                     file.data().clone(),
                                     attachment.id,
-                                    attachment.name.into(),
+                                    attachment.name,
                                 );
                             }
                         }
@@ -260,6 +302,7 @@ impl App {
                 cache,
                 image_cache: Default::default(),
                 loading_images: RefCell::new(Vec::new()),
+                uploading_files: Arc::new(RwLock::new(Vec::new())),
                 futures,
                 latest_errors: Vec::new(),
                 about: None,
@@ -506,6 +549,7 @@ impl epi::App for App {
         state.futures.run();
         state.cache.maintain();
 
+        state.handle_upload_message();
         state.handle_about();
         state.handle_errors();
         state.handle_events();

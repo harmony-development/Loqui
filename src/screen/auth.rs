@@ -79,7 +79,7 @@ impl Screen {
                         spawn_evs!(state, |events, client| {
                             client.initial_sync(events).await?;
                         });
-                        spawn_client_fut!(state, |client| { client.save_session_to().await? });
+                        spawn_client_fut!(state, |client| client.save_session_to().await);
                     }
                 }
                 Err(err) => {
@@ -98,7 +98,7 @@ impl Screen {
                     if let Some(client) = maybe_client {
                         state.client = Some(client);
 
-                        spawn_client_fut!(state, |client| { client.fetch_about().await? });
+                        spawn_client_fut!(state, |client| client.fetch_about().await);
                         if state.client().auth_status().is_authenticated() {
                             spawn_future!(state, std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
                         } else {

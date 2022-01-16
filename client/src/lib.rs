@@ -146,6 +146,11 @@ pub enum FetchEvent {
         message_id: u64,
         message: HarmonyMessage,
     },
+    FailedToSendMessage {
+        guild_id: u64,
+        channel_id: u64,
+        echo_id: u64,
+    },
     InitialSyncComplete,
 }
 
@@ -246,6 +251,16 @@ impl Cache {
 
     pub fn process_event(&mut self, post: &mut Vec<PostProcessEvent>, event: FetchEvent) {
         match event {
+            FetchEvent::FailedToSendMessage {
+                guild_id,
+                channel_id,
+                echo_id,
+            } => {
+                let mut view = self.get_channel_mut(guild_id, channel_id).messages.view_mut();
+                if let Some(msg) = view.get_message_mut(&MessageId::Unack(echo_id)) {
+                    msg.failed_to_send = true;
+                }
+            }
             FetchEvent::Harmony(event) => self.process_harmony_event(post, event),
             FetchEvent::AddInvite { guild_id, id, invite } => {
                 self.get_guild_mut(guild_id).invites.insert(id, invite);
@@ -855,8 +870,9 @@ impl Client {
         guild_id: u64,
         channel_id: u64,
         message: Message,
+        events: &mut Vec<FetchEvent>,
     ) -> ClientResult<u64> {
-        let message_id = self
+        let res = self
             .inner
             .call(
                 SendMessage::new(guild_id, channel_id)
@@ -865,8 +881,21 @@ impl Client {
                     .with_in_reply_to(message.reply_to)
                     .with_overrides(message.overrides.map(Into::into)),
             )
-            .await?
-            .message_id;
+            .await;
+
+        let resp = match res {
+            Ok(resp) => resp,
+            Err(err) => {
+                events.push(FetchEvent::FailedToSendMessage {
+                    echo_id,
+                    channel_id,
+                    guild_id,
+                });
+                return Err(err.into());
+            }
+        };
+
+        let message_id = resp.message_id;
 
         Ok(message_id)
     }

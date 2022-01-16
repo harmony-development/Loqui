@@ -4,7 +4,7 @@ use harmony_rust_sdk::{
     api::{
         chat::{
             self, color, content, embed, get_channel_messages_request::Direction, overrides::Reason, FormattedText,
-            Message as HarmonyMessage, Minithumbnail,
+            Message as HarmonyMessage, Minithumbnail, Photo,
         },
         exports::hrpc::exports::http::Uri,
     },
@@ -278,7 +278,7 @@ impl Messages {
     }
 
     #[inline(always)]
-    pub fn view_mut(&self) -> impl WriteMessagesView + ReadMessagesView + '_ {
+    pub fn view_mut(&mut self) -> impl WriteMessagesView + ReadMessagesView + '_ {
         unsafe { self.view_internal() }
     }
 
@@ -384,6 +384,12 @@ pub struct Attachment {
     pub minithumbnail: Option<Minithumbnail>,
 }
 
+impl PartialEq for Attachment {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
 impl From<Attachment> for chat::Attachment {
     fn from(a: Attachment) -> chat::Attachment {
         chat::Attachment {
@@ -409,7 +415,11 @@ impl Attachment {
     }
 
     pub fn is_thumbnail(&self) -> bool {
-        self.kind.starts_with("image") && self.kind.ends_with("svg+xml").not() && (self.size as u64) < MAX_THUMB_SIZE
+        self.is_raster_image() && (self.size as u64) < MAX_THUMB_SIZE
+    }
+
+    pub fn is_raster_image(&self) -> bool {
+        self.kind.starts_with("image") && self.kind.ends_with("svg+xml").not()
     }
 
     pub fn from_harmony_attachment(attachment: chat::Attachment) -> Option<Self> {
@@ -494,9 +504,25 @@ impl From<Content> for content::Content {
             Content::Embeds(embeds) => content::Content::EmbedMessage(content::EmbedContent {
                 embeds: embeds.into_iter().map(Into::into).collect(),
             }),
-            Content::Files(attachments) => content::Content::AttachmentMessage(content::AttachmentContent {
-                files: attachments.into_iter().map(Into::into).collect(),
-            }),
+            Content::Files(attachments) => {
+                if attachments.iter().all(Attachment::is_raster_image) {
+                    content::Content::PhotoMessage(content::PhotoContent {
+                        photos: attachments
+                            .into_iter()
+                            .map(|attachment| Photo {
+                                name: attachment.name,
+                                hmc: attachment.id.into(),
+                                file_size: attachment.size,
+                                ..Default::default()
+                            })
+                            .collect(),
+                    })
+                } else {
+                    content::Content::AttachmentMessage(content::AttachmentContent {
+                        files: attachments.into_iter().map(Into::into).collect(),
+                    })
+                }
+            }
         }
     }
 }
@@ -540,6 +566,7 @@ pub struct Message {
     pub timestamp: NaiveDateTime,
     pub overrides: Option<Override>,
     pub reply_to: Option<u64>,
+    pub failed_to_send: bool,
 }
 
 impl Message {
@@ -593,6 +620,7 @@ impl Default for Message {
             },
             overrides: None,
             reply_to: None,
+            failed_to_send: false,
         }
     }
 }
@@ -651,6 +679,7 @@ impl From<HarmonyMessage> for Message {
             sender: message.author_id,
             timestamp: { NaiveDateTime::from_timestamp(message.created_at as i64, 0) },
             overrides: message.overrides.map(From::from),
+            failed_to_send: false,
         }
     }
 }

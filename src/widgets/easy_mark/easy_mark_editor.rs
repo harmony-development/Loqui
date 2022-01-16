@@ -6,6 +6,7 @@ pub struct EasyMarkEditor {
     code: String,
     highlight_editor: bool,
     desired_rows: usize,
+    desired_width: f32,
     hint_text: String,
 
     highlighter: super::MemoizedEasymarkHighlighter,
@@ -23,6 +24,7 @@ impl EasyMarkEditor {
             code: String::new(),
             highlight_editor: true,
             desired_rows: 2,
+            desired_width: 200.0,
             hint_text: String::new(),
             highlighter: Default::default(),
         }
@@ -51,6 +53,12 @@ impl EasyMarkEditor {
     }
 
     #[inline(always)]
+    pub fn desired_width(&mut self, desired_width: f32) -> &mut Self {
+        self.desired_width = desired_width;
+        self
+    }
+
+    #[inline(always)]
     pub fn hint_text(&mut self, text: impl Into<String>) -> &mut Self {
         self.hint_text = text.into();
         self
@@ -68,18 +76,18 @@ impl EasyMarkEditor {
 
             ui.add(
                 egui::TextEdit::multiline(code)
+                    .desired_width(self.desired_width)
                     .desired_rows(self.desired_rows)
                     .hint_text(&self.hint_text)
-                    .desired_width(f32::INFINITY)
                     .text_style(egui::TextStyle::Monospace) // for cursor height
                     .layouter(&mut layouter),
             )
         } else {
             ui.add(
                 egui::TextEdit::multiline(code)
+                    .desired_width(self.desired_width)
                     .desired_rows(self.desired_rows)
-                    .hint_text(&self.hint_text)
-                    .desired_width(f32::INFINITY),
+                    .hint_text(&self.hint_text),
             )
         };
 

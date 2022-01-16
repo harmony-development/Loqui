@@ -1,4 +1,4 @@
-use client::tracing;
+use client::{message::Attachment, tracing};
 use eframe::epi::backend::RepaintSignal;
 use std::{
     any::Any,
@@ -12,6 +12,12 @@ use tokio::spawn;
 use wasm_bindgen_futures::spawn_local as spawn;
 
 type AnyItem = Box<dyn Any + Send + 'static>;
+
+pub struct UploadMessageResult {
+    pub guild_id: u64,
+    pub channel_id: u64,
+    pub attachments: Vec<Attachment>,
+}
 
 pub struct Futures {
     queue: Vec<AnyItem>,
@@ -109,12 +115,9 @@ macro_rules! spawn_evs {
 }
 
 macro_rules! spawn_client_fut {
-    ($state:ident, |$client:ident| $fut:tt) => {{
+    ($state:ident, |$client:ident| $fut:expr) => {{
         let $client = $state.client().clone();
-        $state.futures.spawn(async move {
-            let res = $fut;
-            $crate::utils::ClientResult::Ok(res)
-        });
+        $state.futures.spawn(async move { $fut });
     }};
 }
 

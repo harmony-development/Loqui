@@ -37,11 +37,11 @@ codegen-units = 1
 panic = 'abort'
 
 [dependencies]
-eframe = { git = "https://github.com/emilk/egui.git", branch = "fix-textedit-deadlock" }
+eframe = { git = "https://github.com/emilk/egui.git", branch = "master", default-features = false, features = [
+    "egui_glow",
+] }
 client = { path = "./client" }
 image_worker = { path = "./image_worker" }
-
-hex_color = "1"
 
 urlencoding = "2"
 webbrowser = "0.5"
@@ -79,7 +79,6 @@ image = { version = "0.23.14", default-features = false, features = [
 ] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-once_cell = "1.9"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 tokio = { version = "1.9", features = ["sync", "rt-multi-thread", "macros"] }

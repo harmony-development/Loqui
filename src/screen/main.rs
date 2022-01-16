@@ -1,6 +1,7 @@
 use std::ops::Not;
 
 use client::{
+    content,
     guild::Guild,
     harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, rest::FileId},
     member::Member,
@@ -11,6 +12,7 @@ use client::{
 use eframe::egui::{Color32, Event, RichText, Vec2};
 
 use crate::{
+    futures::UploadMessageResult,
     screen::guild_settings,
     style as loqui_style,
     widgets::{
@@ -72,7 +74,7 @@ impl CurrentIds {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Panel {
     Messages,
     GuildChannels,
@@ -82,6 +84,32 @@ enum Panel {
 impl Default for Panel {
     fn default() -> Self {
         Self::GuildChannels
+    }
+}
+
+struct PanelStack {
+    inner: Vec<Panel>,
+}
+
+impl PanelStack {
+    fn push(&mut self, panel: Panel) {
+        self.inner.push(panel);
+    }
+
+    fn pop(&mut self) -> Option<Panel> {
+        self.inner.pop()
+    }
+
+    fn current(&self) -> Panel {
+        self.inner.last().copied().expect("must have panel -- this is a bug")
+    }
+}
+
+impl Default for PanelStack {
+    fn default() -> Self {
+        Self {
+            inner: vec![Panel::default()],
+        }
     }
 }
 
@@ -103,10 +131,18 @@ pub struct Screen {
     guild_name_text: String,
     show_join_guild: bool,
     show_create_guild: bool,
-    viewing_panel: Panel,
+    panel_stack: PanelStack,
 }
 
 impl Screen {
+    fn toggle_panel(&mut self, panel: Panel) {
+        if self.panel_stack.current() == panel {
+            self.panel_stack.pop();
+        } else {
+            self.panel_stack.push(panel);
+        }
+    }
+
     fn view_join_guild(&mut self, state: &mut State, ctx: &egui::Context) {
         let invite_text = &mut self.invite_text;
         egui::Window::new("join guild")
@@ -121,9 +157,7 @@ impl Screen {
                     let enabled = invite_text.is_empty().not();
                     if ui.add_enabled(enabled, egui::Button::new("join")).clicked() {
                         let invite_id = invite_text.clone();
-                        spawn_client_fut!(state, |client| {
-                            client.join_guild(invite_id).await?;
-                        });
+                        spawn_client_fut!(state, |client| client.join_guild(invite_id).await);
                     }
                 });
             });
@@ -143,9 +177,7 @@ impl Screen {
                     let enabled = guild_name_text.is_empty().not();
                     if ui.add_enabled(enabled, egui::Button::new("create")).clicked() {
                         let guild_name = guild_name_text.clone();
-                        spawn_client_fut!(state, |client| {
-                            client.create_guild(guild_name).await?;
-                        });
+                        spawn_client_fut!(state, |client| client.create_guild(guild_name).await);
                     }
                 });
             });
@@ -178,9 +210,7 @@ impl Screen {
                     .on_hover_text(guild.name.as_str())
                     .context_menu_styled(|ui| {
                         if ui.button(dangerous_text("leave guild")).clicked() {
-                            spawn_client_fut!(state, |client| {
-                                client.leave_guild(guild_id).await?;
-                            });
+                            spawn_client_fut!(state, |client| client.leave_guild(guild_id).await);
                             ui.close_menu();
                         }
                     });
@@ -232,7 +262,7 @@ impl Screen {
             .margin([2.0, 2.0])
             .show(ui, |ui| {
                 let but = ui
-                    .add(TextButton::text(format!("⚙ {}", guild_name)).small())
+                    .add(TextButton::text(guild_name).small())
                     .on_hover_text("open guild settings");
 
                 but.clicked()
@@ -262,7 +292,7 @@ impl Screen {
                             });
                         }
                         if button.clicked() {
-                            self.viewing_panel = Panel::Messages;
+                            self.toggle_panel(Panel::Messages);
                             self.current.set_channel(channel_id);
                             self.last_channel_id.insert(guild_id, channel_id);
                             if !channel.reached_top && channel.messages.continuous_view().is_empty() {
@@ -306,7 +336,7 @@ impl Screen {
                 let message_id = id.id().unwrap();
                 self.editing_message = None;
                 spawn_client_fut!(state, |client| {
-                    client.edit_message(guild_id, channel_id, message_id, text).await?;
+                    client.edit_message(guild_id, channel_id, message_id, text).await
                 });
             }
         } else if highlight_message {
@@ -414,8 +444,7 @@ impl Screen {
                 state.loading_images.borrow_mut().push(attachment.id.clone());
                 let data = Bytes::copy_from_slice(minithumbnail.data.as_slice());
                 let id = attachment.id.clone();
-                let kind = SmolStr::new_inline("minithumbnail");
-                crate::image_cache::op::decode_image(data, id, kind);
+                crate::image_cache::op::decode_image(data, id, "minithumbnail".to_string());
             }
         }
 
@@ -598,7 +627,7 @@ impl Screen {
                                 && ui.button(dangerous_text("delete")).clicked()
                             {
                                 spawn_client_fut!(state, |client| {
-                                    client.delete_message(guild_id, channel_id, message_id).await?;
+                                    client.delete_message(guild_id, channel_id, message_id).await
                                 });
                                 ui.close_menu();
                             }
@@ -675,6 +704,7 @@ impl Screen {
         let text_edit = self
             .composer
             .desired_rows(1)
+            .desired_width(ui.available_width() - 36.0)
             .hint_text("Enter message...")
             .editor_ui(ui);
 
@@ -698,9 +728,8 @@ impl Screen {
                 ..Default::default()
             };
             let echo_id = state.cache.prepare_send_message(guild_id, channel_id, message.clone());
-            let client = state.client().clone();
-            spawn_future!(state, async move {
-                client.send_message(echo_id, guild_id, channel_id, message).await
+            spawn_evs!(state, |evs, client| {
+                client.send_message(echo_id, guild_id, channel_id, message, evs).await?;
             });
             self.scroll_to_bottom = true;
         } else if user_inputted_text {
@@ -711,14 +740,62 @@ impl Screen {
                     .not()
             });
             if should_send_typing {
-                spawn_client_fut!(state, |client| {
-                    client.send_typing(guild_id, channel_id).await?;
-                });
+                spawn_client_fut!(state, |client| client.send_typing(guild_id, channel_id).await);
             }
         }
     }
 
-    fn view_upload_button(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::Context) {}
+    fn view_uploading_attachments(&mut self, state: &State, ui: &mut Ui) {
+        ui.label(RichText::new("Uploading:").strong());
+        for name in state.uploading_files.read().expect("poisoned").iter() {
+            egui::Frame::group(ui.style()).margin([0.0; 2]).show(ui, |ui| {
+                ui.label(name);
+            });
+        }
+    }
+
+    fn view_upload_button(&mut self, state: &State, ui: &mut Ui) {
+        guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
+
+        let resp = ui.button("^").on_hover_text("upload file(s)");
+        if resp.clicked() {
+            let uploading_files = state.uploading_files.clone();
+            spawn_client_fut!(state, |client| {
+                let files = rfd::AsyncFileDialog::new().pick_files().await;
+                if let Some(files) = files {
+                    {
+                        let mut guard = uploading_files.write().expect("poisoned");
+                        for file in files.iter() {
+                            guard.push(file.file_name());
+                        }
+                    }
+                    let mut attachments = Vec::with_capacity(files.len());
+                    for file in files {
+                        let data = file.read().await;
+                        let mimetype = content::infer_type_from_bytes(&data);
+                        let size = data.len() as u32;
+                        // TODO: return errors for files that failed to upload
+                        let id = client.upload_file(file.file_name(), mimetype.clone(), data).await?;
+                        attachments.push(Attachment {
+                            id,
+                            kind: mimetype,
+                            size,
+                            name: file.file_name(),
+                            minithumbnail: None,
+                            resolution: None,
+                        });
+                    }
+                    ClientResult::Ok(Some(UploadMessageResult {
+                        guild_id,
+                        channel_id,
+                        attachments,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            });
+        }
+    }
 
     fn view_user_avatar(
         &mut self,
@@ -927,9 +1004,7 @@ impl Screen {
                             .add_sized([12.0, 12.0], TextButton::text("☰").small())
                             .on_hover_text("show guilds / channels");
                         if show_guilds_but.clicked() {
-                            self.viewing_panel = matches!(self.viewing_panel, Panel::GuildChannels)
-                                .then(|| Panel::Messages)
-                                .unwrap_or(Panel::GuildChannels);
+                            self.toggle_panel(Panel::GuildChannels);
                         }
                         ui.add_sized([1.0, 12.0], egui::Separator::default().spacing(0.0));
                     }
@@ -949,9 +1024,7 @@ impl Screen {
                             .add_sized([12.0, 12.0], TextButton::text("👤").small())
                             .on_hover_text("toggle member list");
                         if show_members_but.clicked() {
-                            self.viewing_panel = matches!(self.viewing_panel, Panel::Members)
-                                .then(|| Panel::Messages)
-                                .unwrap_or(Panel::Members);
+                            self.toggle_panel(Panel::Members);
                             self.disable_users_bar = !self.disable_users_bar;
                         }
                     } else {
@@ -968,12 +1041,21 @@ impl Screen {
             Layout::from_main_dir_and_cross_align(egui::Direction::LeftToRight, egui::Align::Center),
             |ui| {
                 ui.vertical(|ui| {
+                    let uploading_any_files = state.uploading_files.read().expect("poisoned").is_empty().not();
+                    if uploading_any_files {
+                        egui::TopBottomPanel::top("uploading_panel").show_inside(ui, |ui| {
+                            ui.horizontal(|ui| self.view_uploading_attachments(state, ui));
+                        });
+                    }
                     ui.allocate_ui([ui.available_width(), ui.available_height() - 38.0].into(), |ui| {
                         self.view_messages(state, ui);
                     });
                     ui.group_filled().show(ui, |ui| {
                         self.view_typing_members(state, ui);
-                        self.view_composer(state, ui, ctx);
+                        ui.horizontal(|ui| {
+                            self.view_composer(state, ui, ctx);
+                            self.view_upload_button(state, ui);
+                        });
                     });
                 });
             },
@@ -1006,7 +1088,7 @@ impl AppScreen for Screen {
         if ctx.is_mobile() {
             central_panel.show(ctx, |ui| {
                 self.show_channel_bar(ui, state);
-                match self.viewing_panel {
+                match self.panel_stack.current() {
                     Panel::Messages => self.show_main_area(ui, state, ctx),
                     Panel::Members => self.show_member_panel(ui, state),
                     Panel::GuildChannels => {

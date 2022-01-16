@@ -177,15 +177,11 @@ pub fn view_member_context_menu_items(
         ui.close_menu();
     }
     if guild.has_perm(all_permissions::USER_MANAGE_BAN) && ui.button(dangerous_text("ban")).clicked() {
-        spawn_client_fut!(state, |client| {
-            client.ban_member(guild_id, member_id).await?;
-        });
+        spawn_client_fut!(state, |client| client.ban_member(guild_id, member_id).await);
         ui.close_menu();
     }
     if guild.has_perm(all_permissions::USER_MANAGE_KICK) && ui.button(dangerous_text("kick")).clicked() {
-        spawn_client_fut!(state, |client| {
-            client.kick_member(guild_id, member_id).await?;
-        });
+        spawn_client_fut!(state, |client| client.kick_member(guild_id, member_id).await);
         ui.close_menu();
     }
 }
@@ -207,9 +203,7 @@ pub fn view_channel_context_menu_items(
         ui.close_menu();
     }
     if guild.has_perm(all_permissions::CHANNELS_MANAGE_DELETE) && ui.button(dangerous_text("delete")).clicked() {
-        spawn_client_fut!(state, |client| {
-            client.delete_channel(guild_id, channel_id).await?;
-        });
+        spawn_client_fut!(state, |client| client.delete_channel(guild_id, channel_id).await);
         ui.close_menu();
     }
 }

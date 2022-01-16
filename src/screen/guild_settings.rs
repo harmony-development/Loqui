@@ -47,9 +47,7 @@ impl Screen {
 
                 if ui.button("create channel").clicked() {
                     let name = self.channel_name_edit_text.drain(..).collect::<String>();
-                    spawn_client_fut!(state, |client| {
-                        client.create_channel(guild_id, name).await?;
-                    });
+                    spawn_client_fut!(state, |client| client.create_channel(guild_id, name).await);
                 }
             });
 
@@ -91,9 +89,7 @@ impl Screen {
                 ui.text_edit_singleline(&mut self.guild_name_edit_text);
                 if ui.add(egui::Button::new("edit").small()).clicked() {
                     let new_name = self.guild_name_edit_text.clone();
-                    spawn_client_fut!(state, |client| {
-                        client.edit_guild(guild_id, Some(new_name), None).await?;
-                    });
+                    spawn_client_fut!(state, |client| client.edit_guild(guild_id, Some(new_name), None).await);
                 }
             });
         } else {
@@ -117,6 +113,7 @@ impl Screen {
                         client.edit_guild(guild_id, None, Some(id)).await?;
                         uploading_guild_pic.set(false);
                     }
+                    ClientResult::Ok(())
                 });
             }
         } else {
@@ -145,9 +142,7 @@ impl Screen {
                 if ui.button("create").clicked() {
                     if let Ok(uses) = self.possible_uses_text.parse::<u64>() {
                         let name = self.id_edit_text.drain(..).collect::<String>();
-                        spawn_client_fut!(state, |client| {
-                            client.create_invite(guild_id, name, uses as u32).await?;
-                        });
+                        spawn_client_fut!(state, |client| client.create_invite(guild_id, name, uses as u32).await);
                     }
                 }
 
@@ -185,9 +180,7 @@ impl Screen {
                             && ui.button(dangerous_text("delete")).clicked()
                         {
                             let name = id.clone();
-                            spawn_client_fut!(state, |client| {
-                                client.delete_invite(guild_id, name).await?;
-                            });
+                            spawn_client_fut!(state, |client| client.delete_invite(guild_id, name).await);
                             ui.close_menu();
                         }
                     });
