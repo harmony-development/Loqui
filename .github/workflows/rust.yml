@@ -56,7 +56,7 @@ jobs:
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
       with:
-        key: cache-debug-1
+        key: cache-debug-2
 
     - name: Clippy
       uses: actions-rs/clippy-check@v1
@@ -78,7 +78,7 @@ jobs:
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
       with:
-        key: cache-release-web-1
+        key: cache-release-web-2
 
     - name: Install trunk
       run: cargo install --locked --git "https://github.com/kristoff3r/trunk.git" --branch rust_worker trunk
@@ -121,7 +121,7 @@ jobs:
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
       with:
-        key: cache-release-1
+        key: cache-release-2
 
     - name: Build
       run: cargo build --locked --release
