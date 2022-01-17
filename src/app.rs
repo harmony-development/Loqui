@@ -286,7 +286,7 @@ impl App {
             });
         }
 
-        let (images_tx, images_rx) = std::sync::mpsc::channel();
+        let (images_tx, images_rx) = std::sync::mpsc::sync_channel(100);
         crate::image_cache::op::set_image_channel(images_tx);
 
         Self {

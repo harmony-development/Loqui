@@ -149,7 +149,7 @@ pub mod op {
 pub mod op {
     use super::*;
 
-    use std::sync::{mpsc::Sender, Mutex};
+    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender};
 
     use client::harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId};
     use eframe::egui::ColorImage;
@@ -166,23 +166,21 @@ pub mod op {
         }
     }
 
-    lazy_static::lazy_static! {
-        static ref CHANNEL: Mutex<Option<Sender<LoadedImage>>> = Mutex::new(None);
-    }
+    static CHANNEL: SyncOnceCell<Sender<LoadedImage>> = SyncOnceCell::new();
 
+    /// This should only be called once.
     pub fn set_image_channel(tx: Sender<LoadedImage>) {
-        CHANNEL.lock().expect("poisoned").replace(tx);
+        if CHANNEL.set(tx).is_err() {
+            unreachable!("image channel already set -- this is a bug");
+        }
     }
 
+    /// Do not call this before calling `set_image_channel`.
     pub fn decode_image(data: Bytes, id: FileId, kind: String) {
         tokio::task::spawn_blocking(move || {
             let loaded = LoadedImage::load(data, id, kind);
-            let _ = CHANNEL
-                .lock()
-                .expect("poisoned")
-                .as_ref()
-                .expect("no channel")
-                .send(loaded);
+            let chan = CHANNEL.get().expect("no image channel set -- this is a bug");
+            let _ = chan.send(loaded);
         });
     }
 }
