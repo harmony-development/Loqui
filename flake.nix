@@ -67,13 +67,13 @@
             };
           };
           shell = common: prev: with common.pkgs; {
-            packages = [ android-sdk ];
+            #packages = [ android-sdk ];
             env = prev.env ++ [
               {
                 name = "XDG_DATA_DIRS";
                 eval = "$GSETTINGS_SCHEMAS_PATH:$XDG_DATA_DIRS:${hicolor-icon-theme}/share:${gnome3.adwaita-icon-theme}/share";
               }
-              {
+              /*{
                 name = "ANDROID_HOME";
                 value = "${android-sdk}/share/android-sdk";
               }
@@ -84,7 +84,7 @@
               {
                 name = "JAVA_HOME";
                 value = jdk11.home;
-              }
+              }*/
             ];
             commands = prev.commands ++ [
               {
