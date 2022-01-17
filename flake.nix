@@ -42,6 +42,15 @@
                   };
                   release = true;
                 };
+                twiggy = prev.nciUtils.buildCrate {
+                  root = builtins.fetchGit {
+                    url = "https://github.com/rustwasm/twiggy.git";
+                    ref = "master";
+                    rev = "195feee4045f0b89d7cba7492900131ac89803dd";
+                  };
+                  memberName = "twiggy";
+                  release = true;
+                };
               })
             ];
           };
@@ -85,6 +94,10 @@
               {
                 help = "Build for the web.";
                 package = trunk;
+              }
+              {
+                help = "Profile binary size.";
+                package = twiggy;
               }
               {
                 name = "cargo-mobile";
