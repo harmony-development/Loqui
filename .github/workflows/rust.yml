@@ -88,6 +88,9 @@ jobs:
     - name: Install trunk
       run: cargo install --locked --git "https://github.com/kristoff3r/trunk.git" --branch rust_worker trunk
 
+    - name: Write release cargo config
+      run: cat .cargo/.config-release.toml >> .cargo/config.toml
+
     - name: Build
       run: trunk build --release --public-url "Loqui/"
 

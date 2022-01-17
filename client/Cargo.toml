@@ -2,7 +2,7 @@
 name = "client"
 version = "0.1.0"
 authors = ["Yusuf Bera Ertan <y.bera003.06@protonmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "GPLv3"
 repository = "https://github.com/harmony-development/loqui"
 homepage = "https://github.com/harmony-development/loqui"

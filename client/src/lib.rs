@@ -56,7 +56,6 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use std::{
-    array::IntoIter,
     fmt::{self, Debug, Display, Formatter},
     str::FromStr,
 };
@@ -1076,7 +1075,8 @@ impl Client {
         match post {
             PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => {
                 let perm_queries = ["channels.manage.change-information", "messages.send"];
-                let queries = IntoIter::new(perm_queries)
+                let queries = perm_queries
+                    .into_iter()
                     .map(|query| QueryHasPermissionRequest::new(guild_id, Some(channel_id), None, query.to_string()))
                     .collect();
                 events.extend(
@@ -1084,7 +1084,7 @@ impl Client {
                         .batch_call(queries)
                         .await?
                         .into_iter()
-                        .zip(IntoIter::new(perm_queries))
+                        .zip(perm_queries.into_iter())
                         .map(move |(resp, query)| {
                             FetchEvent::Harmony(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
                                 guild_id,
@@ -1146,13 +1146,14 @@ impl Client {
                     all_permissions::MESSAGES_PINS_ADD,
                     all_permissions::MESSAGES_PINS_REMOVE,
                 ];
-                let queries = IntoIter::new(perm_queries)
+                let queries = perm_queries
+                    .into_iter()
                     .map(|query| QueryHasPermissionRequest::new(guild_id, None, None, query.to_string()))
                     .collect();
                 events.extend(self.inner.batch_call(queries).await.map(move |response| {
                     response
                         .into_iter()
-                        .zip(IntoIter::new(perm_queries))
+                        .zip(perm_queries.into_iter())
                         .map(move |(resp, query)| {
                             FetchEvent::Harmony(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
                                 guild_id,

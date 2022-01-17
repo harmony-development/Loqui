@@ -37,8 +37,8 @@ It uses [harmony-rust-sdk] to communicate with Harmony servers.
 - To build and run the project with debug info / checks use `cargo run`. Use `cargo run --release` for an optimized release build.
 
 ### Requirements
-- Current stable Rust and Cargo.
-- Make sure you have a working Vulkan setup.
+- Rust toolchain specified in the [rust-toolchain.toml](./rust-toolchain.toml) file.
+This will be managed for you automatically if you have `rustup` setup.
 - gcc, python3, pkg-config, cmake; protobuf, protoc, openssl, x11, xcb, freetype, fontconfig, expat, glib, gtk3, cairo, pango, atk, gdk_pixbuf libraries and development files.
 - Above list may be incomplete, please find out what you need by looking at compiler errors.
 

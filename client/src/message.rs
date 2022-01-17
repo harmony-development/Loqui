@@ -74,7 +74,7 @@ impl ReadMessagesView for MessagesMap {
                     .take_while(|(&id, _)| id.ne(&to))
                     .collect()
             })
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 }
 
@@ -599,8 +599,7 @@ impl Message {
             Content::Text(text) => {
                 post.extend(
                     text.split_whitespace()
-                        .map(|a| a.trim_end_matches('>').trim_start_matches('<').parse::<Uri>())
-                        .flatten()
+                        .flat_map(|a| a.trim_end_matches('>').trim_start_matches('<').parse::<Uri>())
                         .filter(|url| matches!(url.scheme_str(), Some("http" | "https")))
                         .map(PostProcessEvent::FetchLinkMetadata),
                 );
@@ -629,7 +628,7 @@ impl From<chat::Overrides> for Override {
     fn from(overrides: chat::Overrides) -> Self {
         Override {
             name: overrides.username.map(Into::into),
-            avatar_url: overrides.avatar.map(|a| FileId::from_str(&a).ok()).flatten(),
+            avatar_url: overrides.avatar.and_then(|a| FileId::from_str(&a).ok()),
             reason: overrides.reason,
         }
     }
@@ -641,7 +640,7 @@ impl From<embed::EmbedHeading> for EmbedHeading {
             text: h.text,
             subtext: h.subtext,
             url: h.url.map(Into::into),
-            icon: h.icon.map(|i| FileId::from_str(&i).ok()).flatten(),
+            icon: h.icon.and_then(|i| FileId::from_str(&i).ok()),
         }
     }
 }

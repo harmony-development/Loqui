@@ -1,2 +1,2 @@
-[env]
-RUSTC_FORCE_INCREMENTAL = "1"
+[build]
+target = "x86_64-unknown-linux-gnu"

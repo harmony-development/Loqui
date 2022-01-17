@@ -1,0 +1,4 @@
+# Add release options
+[unstable]
+build-std = ["std", "panic_abort"]
+build-std-features = ["panic_immediate_abort"]
