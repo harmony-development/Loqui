@@ -1134,12 +1134,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "guard"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff893cc51ea04f8a3b73fbaf4376c06ebc5a0ccbe86d460896f805d9417c93ea"
-
-[[package]]
 name = "h2"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1518,12 +1512,10 @@ dependencies = [
  "client",
  "console_error_panic_hook",
  "eframe",
- "guard",
  "image",
  "image_worker",
  "instant",
  "js-sys",
- "lazy_static",
  "open",
  "rfd",
  "rkyv",

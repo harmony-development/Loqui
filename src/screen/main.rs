@@ -251,7 +251,7 @@ impl Screen {
     }
 
     fn view_channels(&mut self, state: &mut State, ui: &mut Ui) {
-        guard!(let Some(guild_id) = self.current.guild() else { return });
+        let Some(guild_id) = self.current.guild() else { return };
 
         let guild_name = state
             .cache
@@ -534,9 +534,9 @@ impl Screen {
     }
 
     fn view_messages(&mut self, state: &mut State, ui: &mut Ui) {
-        guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
-        guard!(let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return });
-        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+        let Some((guild_id, channel_id)) = self.current.channel() else { return };
+        let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return };
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
         let user_id = state.client().user_id();
 
         egui::ScrollArea::vertical()
@@ -655,8 +655,8 @@ impl Screen {
     }
 
     fn view_typing_members(&mut self, state: &State, ui: &mut Ui) {
-        guard!(let Some(guild_id) = self.current.guild() else { return });
-        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+        let Some(guild_id) = self.current.guild() else { return };
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
 
         let current_user_id = state.client().user_id();
         let typing_members = self
@@ -699,7 +699,7 @@ impl Screen {
     }
 
     fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::Context) {
-        guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
+        let Some((guild_id, channel_id)) = self.current.channel() else { return };
 
         let text_edit = self
             .composer
@@ -755,7 +755,7 @@ impl Screen {
     }
 
     fn view_upload_button(&mut self, state: &State, ui: &mut Ui) {
-        guard!(let Some((guild_id, channel_id)) = self.current.channel() else { return });
+        let Some((guild_id, channel_id)) = self.current.channel() else { return };
 
         let resp = ui.button("^").on_hover_text("upload file(s)");
         if resp.clicked() {
@@ -827,14 +827,14 @@ impl Screen {
     }
 
     fn view_members(&mut self, state: &State, ui: &mut Ui) {
-        guard!(let Some(guild_id) = self.current.guild() else { return });
-        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+        let Some(guild_id) = self.current.guild() else { return };
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
 
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             let sorted_members = sort_members(state, guild);
             if sorted_members.is_empty().not() {
                 for (id, _) in sorted_members {
-                    guard!(let Some(user) = state.cache.get_user(*id) else { continue });
+                    let Some(user) = state.cache.get_user(*id) else { continue };
                     let frame_resp = ui
                         .scope(|ui| {
                             ui.horizontal(|ui| {

@@ -141,7 +141,7 @@ impl State {
         handle_future!(self, |res: ClientResult<Option<UploadMessageResult>>| {
             match res {
                 Ok(maybe_upload) => {
-                    guard!(let Some(UploadMessageResult { guild_id, channel_id, attachments }) = maybe_upload else { return });
+                    let Some(UploadMessageResult { guild_id, channel_id, attachments }) = maybe_upload else { return };
 
                     {
                         let mut uploading_files = self.uploading_files.write().expect("poisoned");
@@ -453,7 +453,7 @@ impl App {
 
     #[inline(always)]
     fn view_about_window(&mut self, ctx: &egui::Context) {
-        guard!(let Some(about) = self.state.about.as_ref() else { return });
+        let Some(about) = self.state.about.as_ref() else { return };
 
         egui::Window::new("about server")
             .open(&mut self.show_about_window)
@@ -498,7 +498,7 @@ impl epi::App for App {
     fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         self.state.futures.init(frame);
         self.state.futures.spawn(async move {
-            guard!(let Some(session) = Client::read_latest_session().await else { return Ok(None); });
+            let Some(session) = Client::read_latest_session().await else { return Ok(None) };
 
             Client::new(session.homeserver.parse().unwrap(), Some(session.into()))
                 .await

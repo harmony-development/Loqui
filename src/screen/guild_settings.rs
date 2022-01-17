@@ -39,7 +39,7 @@ impl Screen {
 
     fn view_channels(&mut self, state: &mut State, ui: &mut Ui) {
         let guild_id = self.guild_id;
-        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
 
         if guild.has_perm(all_permissions::CHANNELS_MANAGE_CREATE) {
             ui.horizontal_wrapped(|ui| {
@@ -55,7 +55,7 @@ impl Screen {
         }
 
         for channel_id in guild.channels.iter().copied() {
-            guard!(let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { continue });
+            let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { continue };
             self.view_channel(state, ui, channel_id, channel, guild);
         }
     }
@@ -81,7 +81,7 @@ impl Screen {
 
     fn view_general(&mut self, state: &mut State, ui: &mut Ui) {
         let guild_id = self.guild_id;
-        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
 
         if guild.has_perm(all_permissions::GUILD_MANAGE_CHANGE_INFORMATION) {
             ui.horizontal_wrapped(|ui| {
@@ -124,7 +124,7 @@ impl Screen {
 
     fn view_invites(&mut self, state: &mut State, ui: &mut Ui) {
         let guild_id = self.guild_id;
-        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
 
         if guild.has_perm(all_permissions::INVITES_VIEW).not() {
             ui.colored_label(Color32::YELLOW, "no permission to manage invites");
@@ -204,7 +204,7 @@ impl Screen {
 
     fn view_members(&mut self, state: &State, ui: &mut Ui) {
         let guild_id = self.guild_id;
-        guard!(let Some(guild) = state.cache.get_guild(guild_id) else { return });
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
 
         let sorted_members = sort_members(state, guild);
         let chunk_size = (ui.available_width() / 300.0).ceil() as usize;

@@ -58,7 +58,7 @@ pub mod op {
     use egui::ColorImage;
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
     use js_sys::Uint8Array;
-    use std::{cell::RefCell, sync::mpsc::Sender};
+    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender};
     use wasm_bindgen::{prelude::*, JsCast};
     use web_sys::{MessageEvent, Worker as WebWorker};
 
@@ -80,7 +80,16 @@ pub mod op {
 
     struct WorkerPool {
         inner: Pool<WebWorker>,
-        channel: RefCell<Option<Sender<LoadedImage>>>,
+        channel: SyncOnceCell<Sender<LoadedImage>>,
+    }
+
+    impl WorkerPool {
+        fn init() -> Self {
+            Self {
+                inner: Pool::new(spawn_worker),
+                channel: SyncOnceCell::new(),
+            }
+        }
     }
 
     // i hate web
@@ -89,20 +98,16 @@ pub mod op {
     #[allow(unsafe_code)]
     unsafe impl Sync for WorkerPool {}
 
-    lazy_static::lazy_static! {
-        static ref WORKER_POOL: WorkerPool = WorkerPool {
-            inner: Pool::new(spawn_worker),
-            channel: RefCell::new(None),
-        };
-    }
+    static WORKER_POOL: SyncOnceCell<WorkerPool> = SyncOnceCell::new();
 
     fn spawn_worker() -> WebWorker {
         let worker = WebWorker::new("./image_worker.js").expect("failed to start worker");
         let tx = WORKER_POOL
+            .get()
+            .expect("must be initialized")
             .channel
-            .borrow()
-            .as_ref()
-            .expect("worker pool not initialized")
+            .get()
+            .expect("must be initialized")
             .clone();
 
         let handler = Closure::wrap(Box::new(move |event: MessageEvent| {
@@ -122,7 +127,13 @@ pub mod op {
     }
 
     pub fn set_image_channel(tx: Sender<LoadedImage>) {
-        WORKER_POOL.channel.borrow_mut().replace(tx);
+        let worker_pool = WorkerPool::init();
+        if worker_pool.channel.set(tx).is_err() {
+            unreachable!("image channel must only be set once -- this is a bug");
+        }
+        if WORKER_POOL.set(worker_pool).is_err() {
+            unreachable!("worker pool must only be init once -- this is a bug");
+        }
     }
 
     pub fn decode_image(data: Bytes, id: FileId, kind: String) {
@@ -138,6 +149,8 @@ pub mod op {
         data.copy_from(&val);
 
         WORKER_POOL
+            .get()
+            .expect("must be initialized")
             .inner
             .get()
             .post_message(&data)

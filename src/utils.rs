@@ -17,7 +17,6 @@ pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spaw
 use crate::{app::State, style, widgets::TextButton};
 pub use anyhow::{anyhow, bail, ensure, Error};
 pub use client::error::{ClientError, ClientResult};
-pub use guard::guard;
 
 #[derive(Default, Clone)]
 pub struct AtomBool {

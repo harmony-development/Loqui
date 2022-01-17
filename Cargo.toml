@@ -47,11 +47,9 @@ urlencoding = "2"
 webbrowser = "0.5"
 rfd = "0.6"
 
-guard = "0.5"
 anyhow = "1"
 
 instant = { version = "0.1", features = ["wasm-bindgen"] }
-lazy_static = "1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"

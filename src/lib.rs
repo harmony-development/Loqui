@@ -1,4 +1,4 @@
-#![feature(once_cell)]
+#![feature(let_else, once_cell)]
 #![deny(unsafe_code)]
 
 pub(crate) mod app;
