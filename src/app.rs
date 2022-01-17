@@ -511,19 +511,21 @@ impl epi::App for App {
             FontData::from_static(include_bytes!("fonts/Inter.otf")),
         );
         font_defs.font_data.insert(
-            "iosevka".to_string(),
-            FontData::from_static(include_bytes!("fonts/Iosevka.ttf")),
+            "hack".to_string(),
+            FontData::from_static(include_bytes!("fonts/Hack-Regular.ttf")),
+        );
+        font_defs.font_data.insert(
+            "emoji-icon-font".to_string(),
+            FontData::from_static(include_bytes!("fonts/emoji-icon-font.ttf")),
+        );
+
+        font_defs.fonts_for_family.insert(
+            egui::FontFamily::Proportional,
+            vec!["inter".to_string(), "emoji-icon-font".to_string()],
         );
         font_defs
             .fonts_for_family
-            .entry(egui::FontFamily::Proportional)
-            .or_default()
-            .insert(0, "inter".to_string());
-        font_defs
-            .fonts_for_family
-            .entry(egui::FontFamily::Monospace)
-            .or_default()
-            .insert(0, "iosevka".to_string());
+            .insert(egui::FontFamily::Monospace, vec!["hack".to_string()]);
 
         ctx.set_fonts(font_defs);
 
