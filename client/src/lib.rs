@@ -740,6 +740,23 @@ impl Client {
         self.inner.clone()
     }
 
+    pub async fn update_profile(
+        &self,
+        username: Option<String>,
+        avatar: Option<FileId>,
+        status: Option<UserStatus>,
+    ) -> ClientResult<()> {
+        self.inner
+            .call(
+                UpdateProfileRequest::default()
+                    .with_new_user_name(username)
+                    .with_new_user_avatar(avatar.map(Into::into))
+                    .with_new_user_status(status.map(Into::into)),
+            )
+            .await?;
+        Ok(())
+    }
+
     pub async fn connect_socket(&self, guild_ids: Vec<u64>) -> ClientResult<EventsSocket> {
         let mut subs = vec![EventSource::Homeserver, EventSource::Action];
         subs.extend(guild_ids.into_iter().map(EventSource::Guild));

@@ -9,7 +9,7 @@ use client::{
     guild::Guild,
     harmony_rust_sdk::api::{profile::UserStatus, rest::FileId},
     member::Member,
-    tracing, Client, Uri,
+    tracing, Cache, Client, Uri,
 };
 use eframe::egui::{self, Color32, Context, Frame, Key, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText};
 
@@ -41,44 +41,15 @@ impl AtomBool {
     }
 }
 
-#[allow(dead_code)]
-pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
-    if value.chars().count() > new_len {
-        let mut value = value.to_string();
-        value.truncate(value.chars().take(new_len).map(char::len_utf8).sum());
-        value.push('…');
-        Cow::Owned(value)
-    } else {
-        Cow::Borrowed(value)
+pub trait ClientExt {
+    fn this_user<'a>(&self, cache: &'a Cache) -> Option<&'a Member>;
+}
+
+impl ClientExt for Client {
+    fn this_user<'a>(&self, cache: &'a Cache) -> Option<&'a Member> {
+        let user_id = self.user_id();
+        cache.get_user(user_id)
     }
-}
-
-pub fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
-    let mut sorted_members = guild
-        .members
-        .keys()
-        .flat_map(|id| state.cache.get_user(*id).map(|m| (id, m)))
-        .collect::<Vec<_>>();
-    sorted_members.sort_unstable_by(|(_, member), (_, other_member)| {
-        let name = member.username.as_str().cmp(other_member.username.as_str());
-        let offline = matches!(member.status, UserStatus::OfflineUnspecified);
-        let other_offline = matches!(other_member.status, UserStatus::OfflineUnspecified);
-
-        match (offline, other_offline) {
-            (false, true) => Ordering::Less,
-            (true, false) => Ordering::Greater,
-            _ => name,
-        }
-    });
-    sorted_members
-}
-
-// scale down resolution while preserving ratio
-pub fn scale_down(w: f32, h: f32, max_size: f32) -> (f32, f32) {
-    let ratio = w / h;
-    let new_w = max_size;
-    let new_h = max_size / ratio;
-    (new_w, new_h)
 }
 
 pub trait ResponseExt {
@@ -163,6 +134,46 @@ impl CtxExt for Context {
         let input = self.input();
         input.screen_rect().aspect_ratio() < 1.1 || input.pixels_per_point() > 2.0
     }
+}
+
+#[allow(dead_code)]
+pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
+    if value.chars().count() > new_len {
+        let mut value = value.to_string();
+        value.truncate(value.chars().take(new_len).map(char::len_utf8).sum());
+        value.push('…');
+        Cow::Owned(value)
+    } else {
+        Cow::Borrowed(value)
+    }
+}
+
+pub fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
+    let mut sorted_members = guild
+        .members
+        .keys()
+        .flat_map(|id| state.cache.get_user(*id).map(|m| (id, m)))
+        .collect::<Vec<_>>();
+    sorted_members.sort_unstable_by(|(_, member), (_, other_member)| {
+        let name = member.username.as_str().cmp(other_member.username.as_str());
+        let offline = matches!(member.status, UserStatus::OfflineUnspecified);
+        let other_offline = matches!(other_member.status, UserStatus::OfflineUnspecified);
+
+        match (offline, other_offline) {
+            (false, true) => Ordering::Less,
+            (true, false) => Ordering::Greater,
+            _ => name,
+        }
+    });
+    sorted_members
+}
+
+// scale down resolution while preserving ratio
+pub fn scale_down(w: f32, h: f32, max_size: f32) -> (f32, f32) {
+    let ratio = w / h;
+    let new_w = max_size;
+    let new_h = max_size / ratio;
+    (new_w, new_h)
 }
 
 #[inline(always)]

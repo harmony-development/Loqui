@@ -395,7 +395,8 @@ impl App {
                             }
 
                             if ui.text_button("settings").clicked() {
-                                self.state.push_screen(super::screen::settings::Screen::default());
+                                self.state
+                                    .push_screen(super::screen::settings::Screen::new(&self.state));
                             }
 
                             if ui.text_button("logout").clicked() {
