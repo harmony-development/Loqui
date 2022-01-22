@@ -95,6 +95,11 @@ impl Screen {
         handle_future!(state, |res: ClientResult<Option<Client>>| {
             match res {
                 Ok(Some(client)) => {
+                    state
+                        .post_client_tx
+                        .try_send(client.clone())
+                        .expect("cant send client, post task panicked");
+
                     state.client = Some(client);
 
                     spawn_client_fut!(state, |client| client.fetch_about().await);

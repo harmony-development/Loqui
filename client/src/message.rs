@@ -14,7 +14,7 @@ use instant::Duration;
 use smol_str::SmolStr;
 use std::{ops::Not, ptr::NonNull, str::FromStr};
 
-use crate::IndexMap;
+use crate::{IndexMap, PostEventSender};
 
 use super::{content::MAX_THUMB_SIZE, post_heading, PostProcessEvent};
 
@@ -570,16 +570,16 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn post_process(&self, post: &mut Vec<PostProcessEvent>, guild_id: u64, channel_id: u64) {
+    pub fn post_process(&self, post: &PostEventSender, guild_id: u64, channel_id: u64) {
         if let Some(message_id) = self.reply_to.filter(|id| id != &0) {
-            post.push(PostProcessEvent::FetchMessage {
+            let _ = post.send(PostProcessEvent::FetchMessage {
                 guild_id,
                 channel_id,
                 message_id,
             });
         }
         if let Some(id) = self.overrides.as_ref().and_then(|ov| ov.avatar_url.clone()) {
-            post.push(PostProcessEvent::FetchThumbnail(Attachment {
+            let _ = post.send(PostProcessEvent::FetchThumbnail(Attachment {
                 kind: "image".into(),
                 name: "avatar".into(),
                 ..Attachment::new_unknown(id)
@@ -589,7 +589,7 @@ impl Message {
             Content::Files(attachments) => {
                 for attachment in attachments {
                     if attachment.is_thumbnail() {
-                        post.push(PostProcessEvent::FetchThumbnail(attachment.clone()));
+                        let _ = post.send(PostProcessEvent::FetchThumbnail(attachment.clone()));
                     }
                 }
             }
@@ -597,12 +597,14 @@ impl Message {
                 post_heading(post, embeds);
             }
             Content::Text(text) => {
-                post.extend(
-                    text.split_whitespace()
-                        .flat_map(|a| a.trim_end_matches('>').trim_start_matches('<').parse::<Uri>())
-                        .filter(|url| matches!(url.scheme_str(), Some("http" | "https")))
-                        .map(PostProcessEvent::FetchLinkMetadata),
-                );
+                let evs = text
+                    .split_whitespace()
+                    .flat_map(|a| a.trim_end_matches('>').trim_start_matches('<').parse::<Uri>())
+                    .filter(|url| matches!(url.scheme_str(), Some("http" | "https")))
+                    .map(PostProcessEvent::FetchLinkMetadata);
+                for ev in evs {
+                    let _ = post.send(ev);
+                }
             }
         }
     }

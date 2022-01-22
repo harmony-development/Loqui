@@ -97,13 +97,14 @@ macro_rules! handle_future {
 macro_rules! spawn_evs {
     ($state:ident, |$ev:ident, $client:ident| $fut:tt) => {{
         let $client = $state.client().clone();
+        let _evs = $state.event_sender.clone();
         $state.futures.spawn(async move {
-            let mut _evs = Vec::new();
-            let $ev = &mut _evs;
+            let _ev = _evs;
+            let $ev = &_ev;
             {
                 $fut
             }
-            $crate::utils::ClientResult::Ok(_evs)
+            $crate::utils::ClientResult::Ok(())
         });
     }};
 }

@@ -51,7 +51,7 @@ use harmony_rust_sdk::{
 use error::ClientResult;
 use instant::Instant;
 use member::Member;
-use message::{Attachment, Content, Embed, MessageId, WriteMessagesView};
+use message::{Attachment, Content, Embed, MessageId, ReadMessagesView, WriteMessagesView};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
@@ -65,11 +65,17 @@ use crate::emotes::EmotePack;
 
 use self::message::{EmbedHeading, Message};
 
-pub type IndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub use ahash::{AHashMap, AHashSet, AHasher};
 pub use smol_str;
 pub use tracing;
 pub use urlencoding;
+
+pub type IndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
+pub type EventSender = tokio::sync::mpsc::UnboundedSender<FetchEvent>;
+pub type EventReceiver = tokio::sync::mpsc::UnboundedReceiver<FetchEvent>;
+pub type PostEventSender = tokio::sync::mpsc::UnboundedSender<PostProcessEvent>;
+pub type PostEventReceiver = tokio::sync::mpsc::UnboundedReceiver<PostProcessEvent>;
+pub type EventFn = Box<dyn FnMut(FetchEvent) -> Option<FetchEvent>>;
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
 #[derive(Clone, Default, Deserialize, Serialize, Hash, PartialEq, Eq)]
@@ -154,7 +160,6 @@ pub enum FetchEvent {
     InitialSyncComplete,
 }
 
-#[derive(Default)]
 pub struct Cache {
     users: AHashMap<u64, Member>,
     guilds: AHashMap<u64, Guild>,
@@ -162,15 +167,38 @@ pub struct Cache {
     link_embeds: AHashMap<Uri, FetchLinkData>,
     emote_packs: AHashMap<u64, EmotePack>,
     initial_sync_complete: bool,
+    event_receiver: EventReceiver,
+    post_sender: PostEventSender,
+    event_fn: EventFn,
 }
 
 impl Cache {
+    pub fn new(event_receiver: EventReceiver, post_sender: PostEventSender, event_fn: EventFn) -> Self {
+        Self {
+            event_receiver,
+            post_sender,
+            channels: Default::default(),
+            emote_packs: Default::default(),
+            guilds: Default::default(),
+            initial_sync_complete: false,
+            link_embeds: Default::default(),
+            users: Default::default(),
+            event_fn,
+        }
+    }
+
     pub fn maintain(&mut self) {
         for member in self.users.values_mut() {
             if let Some((_, _, time)) = member.typing_in_channel {
                 if time.elapsed().as_secs() > 5 {
                     member.typing_in_channel = None;
                 }
+            }
+        }
+
+        while let Ok(ev) = self.event_receiver.try_recv() {
+            if let Some(ev) = (self.event_fn)(ev) {
+                self.process_event(ev);
             }
         }
     }
@@ -249,7 +277,7 @@ impl Cache {
         self.link_embeds.get(url)
     }
 
-    pub fn process_event(&mut self, post: &mut Vec<PostProcessEvent>, event: FetchEvent) {
+    pub fn process_event(&mut self, event: FetchEvent) {
         match event {
             FetchEvent::FailedToSendMessage {
                 guild_id,
@@ -261,7 +289,7 @@ impl Cache {
                     msg.failed_to_send = true;
                 }
             }
-            FetchEvent::Harmony(event) => self.process_harmony_event(post, event),
+            FetchEvent::Harmony(event) => self.process_harmony_event(event),
             FetchEvent::AddInvite { guild_id, id, invite } => {
                 self.get_guild_mut(guild_id).invites.insert(id, invite);
             }
@@ -277,10 +305,11 @@ impl Cache {
                 message_id,
                 message,
             } => {
-                let channel = self.get_channel_mut(guild_id, channel_id);
                 let message: Message = message.into();
                 let id = MessageId::Ack(message_id);
-                message.post_process(post, guild_id, channel_id);
+                message.post_process(&self.post_sender, guild_id, channel_id);
+
+                let channel = self.get_channel_mut(guild_id, channel_id);
 
                 channel.messages.create_reply_view(id).insert_message(id, message);
             }
@@ -291,7 +320,7 @@ impl Cache {
         }
     }
 
-    pub fn process_harmony_event(&mut self, post: &mut Vec<PostProcessEvent>, event: Event) {
+    pub fn process_harmony_event(&mut self, event: Event) {
         match event {
             Event::Chat(ev) => match ev {
                 ChatEvent::PermissionUpdated(perm) => {
@@ -319,10 +348,10 @@ impl Cache {
                     } = *message_sent;
 
                     if let Some(message) = message {
-                        let channel = self.get_channel_mut(guild_id, channel_id);
                         let message = Message::from(message);
+                        message.post_process(&self.post_sender, guild_id, channel_id);
 
-                        message.post_process(post, guild_id, channel_id);
+                        let channel = self.get_channel_mut(guild_id, channel_id);
 
                         let message_view = channel.messages.continuous_view_mut();
                         if let Some(echo_id) = echo_id {
@@ -345,15 +374,20 @@ impl Cache {
                 ChatEvent::EditedMessage(message_updated) => {
                     let guild_id = message_updated.guild_id;
                     let channel_id = message_updated.channel_id;
+                    let message_id = MessageId::Ack(message_updated.message_id);
 
                     if let Some(msg) = self
                         .get_channel_mut(guild_id, channel_id)
                         .messages
                         .view_mut()
-                        .get_message_mut(&MessageId::Ack(message_updated.message_id))
+                        .get_message_mut(&message_id)
                     {
                         msg.content = Content::Text(message_updated.new_content.map_or_else(String::new, |f| f.text));
-                        msg.post_process(post, guild_id, channel_id);
+                    }
+
+                    let maybe_view = self.get_channel(guild_id, channel_id).map(|chan| chan.messages.view());
+                    if let Some(msg) = maybe_view.as_ref().and_then(|view| view.get_message(&message_id)) {
+                        msg.post_process(&self.post_sender, guild_id, channel_id);
                     }
                 }
                 ChatEvent::DeletedChannel(ChannelDeleted { guild_id, channel_id }) => {
@@ -405,7 +439,9 @@ impl Cache {
                         guild.update_channel_order(position, channel_id);
                     }
 
-                    post.push(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
+                    let _ = self
+                        .post_sender
+                        .send(PostProcessEvent::CheckPermsForChannel(guild_id, channel_id));
                 }
                 ChatEvent::Typing(Typing {
                     guild_id,
@@ -422,7 +458,7 @@ impl Cache {
                     self.get_guild_mut(guild_id).members.insert(member_id, Vec::new());
 
                     if !self.users.contains_key(&member_id) {
-                        post.push(PostProcessEvent::FetchProfile(member_id));
+                        let _ = self.post_sender.send(PostProcessEvent::FetchProfile(member_id));
                     }
                 }
                 ChatEvent::LeftMember(MemberLeft {
@@ -437,7 +473,7 @@ impl Cache {
                     guild.homeserver = homeserver.into();
 
                     if guild.fetched.not() {
-                        post.push(PostProcessEvent::FetchGuildData(guild_id));
+                        let _ = self.post_sender.send(PostProcessEvent::FetchGuildData(guild_id));
                     }
                 }
                 ChatEvent::GuildRemovedFromList(GuildRemovedFromList {
@@ -455,21 +491,21 @@ impl Cache {
                     new_picture,
                     new_metadata: _,
                 }) => {
+                    let parsed_pic = new_picture.and_then(|new_picture| FileId::from_str(&new_picture).ok());
+                    if let Some(id) = parsed_pic.clone() {
+                        let _ = self.post_sender.send(PostProcessEvent::FetchThumbnail(Attachment {
+                            kind: "image".into(),
+                            name: "guild".into(),
+                            ..Attachment::new_unknown(id)
+                        }));
+                    }
                     let mut guild = self.get_guild_mut(guild_id);
 
                     if let Some(name) = new_name {
                         guild.name = name.into();
                     }
-                    if let Some(picture) = new_picture {
-                        let parsed = FileId::from_str(&picture).ok();
-                        guild.picture = parsed.clone();
-                        if let Some(id) = parsed {
-                            post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                                kind: "image".into(),
-                                name: "guild".into(),
-                                ..Attachment::new_unknown(id)
-                            }));
-                        }
+                    if let Some(picture) = parsed_pic {
+                        guild.picture = Some(picture);
                     }
 
                     guild.fetched = true;
@@ -552,6 +588,14 @@ impl Cache {
                     new_status,
                     new_is_bot,
                 }) => {
+                    let parsed_avatar = new_avatar.and_then(|new_avatar| FileId::from_str(&new_avatar).ok());
+                    if let Some(id) = parsed_avatar.clone() {
+                        let _ = self.post_sender.send(PostProcessEvent::FetchThumbnail(Attachment {
+                            kind: "image".into(),
+                            name: "avatar".into(),
+                            ..Attachment::new_unknown(id)
+                        }));
+                    }
                     let mut user = self.get_user_mut(user_id);
                     if let Some(new_username) = new_username {
                         user.username = new_username.into();
@@ -562,16 +606,8 @@ impl Cache {
                     if let Some(is_bot) = new_is_bot {
                         user.is_bot = is_bot;
                     }
-                    if let Some(new_avatar) = new_avatar {
-                        let parsed = FileId::from_str(&new_avatar).ok();
-                        user.avatar_url = parsed.clone();
-                        if let Some(id) = parsed {
-                            post.push(PostProcessEvent::FetchThumbnail(Attachment {
-                                kind: "image".into(),
-                                name: "avatar".into(),
-                                ..Attachment::new_unknown(id)
-                            }));
-                        }
+                    if let Some(new_avatar) = parsed_avatar {
+                        user.avatar_url = Some(new_avatar);
                     }
                     user.fetched = true;
                 }
@@ -587,15 +623,18 @@ impl Cache {
                     added_emotes,
                     deleted_emotes,
                 }) => {
-                    let pack = self.get_emote_pack_mut(pack_id);
-
-                    post.extend(added_emotes.iter().map(|emote| {
+                    let evs = added_emotes.iter().map(|emote| {
                         PostProcessEvent::FetchThumbnail(Attachment {
                             kind: "image".to_string(),
                             name: "emote".to_string(),
                             ..Attachment::new_unknown(FileId::Id(emote.image_id.clone()))
                         })
-                    }));
+                    });
+                    for ev in evs {
+                        let _ = self.post_sender.send(ev);
+                    }
+
+                    let pack = self.get_emote_pack_mut(pack_id);
                     pack.emotes.extend(
                         added_emotes
                             .into_iter()
@@ -618,7 +657,7 @@ impl Cache {
                                 emotes: Default::default(),
                             },
                         );
-                        post.push(PostProcessEvent::FetchEmotes(pack.pack_id));
+                        let _ = self.post_sender.send(PostProcessEvent::FetchEmotes(pack.pack_id));
                     }
                 }
             },
@@ -633,9 +672,8 @@ impl Cache {
         messages: Vec<(u64, HarmonyMessage)>,
         reached_top: bool,
         direction: Direction,
-    ) -> Vec<PostProcessEvent> {
-        let mut post = Vec::new();
-
+        post: &PostEventSender,
+    ) {
         let anchor_id = message_id.map(MessageId::Ack);
         let messages = messages
             .into_iter()
@@ -643,7 +681,7 @@ impl Cache {
             .collect::<Vec<_>>();
 
         messages.iter().for_each(|(_, m)| {
-            m.post_process(&mut post, guild_id, channel_id);
+            m.post_process(post, guild_id, channel_id);
         });
 
         let channel = self.get_channel_mut(guild_id, channel_id);
@@ -652,8 +690,6 @@ impl Cache {
             .messages
             .continuous_view_mut()
             .append_messages(anchor_id.as_ref(), direction, messages);
-
-        post
     }
 
     pub fn prepare_send_message(&mut self, guild_id: u64, channel_id: u64, message: Message) -> u64 {
@@ -889,7 +925,7 @@ impl Client {
         guild_id: u64,
         channel_id: u64,
         message: Message,
-        events: &mut Vec<FetchEvent>,
+        event_sender: &EventSender,
     ) -> ClientResult<u64> {
         let res = self
             .inner
@@ -905,7 +941,7 @@ impl Client {
         let resp = match res {
             Ok(resp) => resp,
             Err(err) => {
-                events.push(FetchEvent::FailedToSendMessage {
+                let _ = event_sender.send(FetchEvent::FailedToSendMessage {
                     echo_id,
                     channel_id,
                     guild_id,
@@ -919,16 +955,22 @@ impl Client {
         Ok(message_id)
     }
 
-    pub async fn fetch_invites(&self, guild_id: u64, events: &mut Vec<FetchEvent>) -> ClientResult<()> {
+    pub async fn fetch_invites(&self, guild_id: u64, event_sender: &EventSender) -> ClientResult<()> {
         let invites = self.inner.call(GetGuildInvitesRequest::new(guild_id)).await?;
-        events.extend(invites.invites.into_iter().filter_map(|invite| {
-            Some(FetchEvent::AddInvite {
-                guild_id,
-                id: invite.invite_id,
-                invite: invite.invite?,
+        let evs = invites
+            .invites
+            .into_iter()
+            .filter_map(|invite| {
+                Some(FetchEvent::AddInvite {
+                    guild_id,
+                    id: invite.invite_id,
+                    invite: invite.invite?,
+                })
             })
-        }));
-        events.push(FetchEvent::FetchedInvites(guild_id));
+            .chain(std::iter::once(FetchEvent::FetchedInvites(guild_id)));
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
         Ok(())
     }
 
@@ -942,14 +984,9 @@ impl Client {
         Ok((id, resp))
     }
 
-    pub async fn fetch_messages(
-        &self,
-        guild_id: u64,
-        channel_id: u64,
-        events: &mut Vec<FetchEvent>,
-    ) -> ClientResult<()> {
+    pub async fn fetch_messages(&self, guild_id: u64, channel_id: u64, event_sender: &EventSender) -> ClientResult<()> {
         let resp = self.inner.call(GetChannelMessages::new(guild_id, channel_id)).await?;
-        events.extend(resp.messages.into_iter().rev().map(move |message| {
+        let evs = resp.messages.into_iter().rev().map(move |message| {
             let message_id = message.message_id;
             FetchEvent::Harmony(Event::Chat(ChatEvent::new_sent_message(Box::new(MessageSent {
                 guild_id,
@@ -958,14 +995,17 @@ impl Client {
                 echo_id: None,
                 message: message.message,
             }))))
-        }));
+        });
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
 
         Ok(())
     }
 
-    pub async fn fetch_channels(&self, guild_id: u64, events: &mut Vec<FetchEvent>) -> ClientResult<()> {
+    pub async fn fetch_channels(&self, guild_id: u64, event_sender: &EventSender) -> ClientResult<()> {
         let resp = self.inner.call(GetGuildChannelsRequest::new(guild_id)).await?;
-        events.extend(resp.channels.into_iter().filter_map(move |channel| {
+        let evs = resp.channels.into_iter().filter_map(move |channel| {
             let channel_id = channel.channel_id;
             let channel = channel.channel?;
             Some(FetchEvent::Harmony(Event::Chat(ChatEvent::new_created_channel(
@@ -978,14 +1018,17 @@ impl Client {
                     metadata: channel.metadata,
                 },
             ))))
-        }));
+        });
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
 
         Ok(())
     }
 
-    pub async fn fetch_members(&self, guild_id: u64, events: &mut Vec<FetchEvent>) -> ClientResult<()> {
+    pub async fn fetch_members(&self, guild_id: u64, event_sender: &EventSender) -> ClientResult<()> {
         let resp = self.inner.call(GetGuildRolesRequest::new(guild_id)).await?;
-        events.extend(resp.roles.into_iter().filter_map(|role| {
+        let evs = resp.roles.into_iter().filter_map(|role| {
             let role_id = role.role_id;
             let role = role.role?;
             Some(FetchEvent::Harmony(Event::Chat(ChatEvent::new_role_created(
@@ -998,7 +1041,10 @@ impl Client {
                     hoist: role.hoist,
                 },
             ))))
-        }));
+        });
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
         let members = self.inner.call(GetGuildMembersRequest::new(guild_id)).await?.members;
         let resp_user_roles = self
             .inner
@@ -1009,41 +1055,45 @@ impl Client {
                     .collect(),
             )
             .await?;
-        events.extend(resp_user_roles.into_iter().zip(members.iter()).map(|(resp, user_id)| {
+        let evs = resp_user_roles.into_iter().zip(members.iter()).map(|(resp, user_id)| {
             FetchEvent::Harmony(Event::Chat(ChatEvent::new_user_roles_updated(UserRolesUpdated::new(
                 guild_id, *user_id, resp.roles,
             ))))
-        }));
+        });
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
         let resp_user_profiles = self
             .inner
             .batch_call(members.iter().map(|user_id| GetProfileRequest::new(*user_id)).collect())
             .await?;
-        events.extend(
-            resp_user_profiles
-                .into_iter()
-                .zip(members.iter())
-                .filter_map(|(resp, user_id)| {
-                    let profile = resp.profile?;
-                    Some(FetchEvent::Harmony(Event::Profile(ProfileEvent::new_profile_updated(
-                        ProfileUpdated {
-                            user_id: *user_id,
-                            new_avatar: profile.user_avatar,
-                            new_username: Some(profile.user_name),
-                            new_status: Some(profile.user_status),
-                            new_is_bot: Some(profile.is_bot),
-                        },
-                    ))))
-                }),
-        );
-        events.extend(members.into_iter().map(move |id| {
+        let evs = resp_user_profiles
+            .into_iter()
+            .zip(members.iter())
+            .filter_map(|(resp, user_id)| {
+                let profile = resp.profile?;
+                Some(FetchEvent::Harmony(Event::Profile(ProfileEvent::new_profile_updated(
+                    ProfileUpdated {
+                        user_id: *user_id,
+                        new_avatar: profile.user_avatar,
+                        new_username: Some(profile.user_name),
+                        new_status: Some(profile.user_status),
+                        new_is_bot: Some(profile.is_bot),
+                    },
+                ))))
+            });
+        let evs = evs.chain(members.iter().map(move |id| {
             FetchEvent::Harmony(Event::Chat(ChatEvent::new_joined_member(MemberJoined::new(
-                id, guild_id,
+                *id, guild_id,
             ))))
         }));
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
         Ok(())
     }
 
-    pub async fn initial_sync(&self, events: &mut Vec<FetchEvent>) -> ClientResult<()> {
+    pub async fn initial_sync(&self, event_sender: &EventSender) -> ClientResult<()> {
         let self_id = if let AuthStatus::Complete(session) = self.inner.auth_status() {
             session.user_id
         } else {
@@ -1055,10 +1105,12 @@ impl Client {
             .await?
             .profile
             .unwrap_or_default();
+
         let guilds = self.inner.call(GetGuildListRequest::new()).await?.guilds;
 
         let mut guild_info_reqs = Vec::with_capacity(guilds.len());
         let mut guild_added_to_list_events = Vec::with_capacity(guilds.len());
+
         for guild in guilds {
             guild_info_reqs.push(GetGuildRequest::new(guild.guild_id));
             guild_added_to_list_events.push(FetchEvent::Harmony(Event::Chat(ChatEvent::GuildAddedToList(
@@ -1068,6 +1120,7 @@ impl Client {
                 },
             ))));
         }
+
         let chunked_guild_info_reqs = guild_info_reqs.into_iter().fold(vec![Vec::new()], |mut tot, item| {
             if tot.last().unwrap().len() < 64 {
                 tot.last_mut().unwrap().push(item);
@@ -1076,9 +1129,10 @@ impl Client {
             }
             tot
         });
+
         for chunk in chunked_guild_info_reqs {
             let guild_infos = self.inner.batch_call(chunk.clone()).await?;
-            events.extend(guild_infos.into_iter().zip(chunk.into_iter()).map(|(resp, req)| {
+            let evs = guild_infos.into_iter().zip(chunk.into_iter()).map(|(resp, req)| {
                 let guild = resp.guild.unwrap_or_default();
                 FetchEvent::Harmony(Event::Chat(ChatEvent::EditedGuild(GuildUpdated {
                     guild_id: req.guild_id,
@@ -1086,23 +1140,32 @@ impl Client {
                     new_name: Some(guild.name),
                     new_picture: guild.picture,
                 })))
-            }));
+            });
+            for ev in evs {
+                let _ = event_sender.send(ev);
+            }
         }
-        events.extend(guild_added_to_list_events);
 
-        events.extend(self.inner.call(GetEmotePacksRequest::new()).await.map(|resp| {
+        for ev in guild_added_to_list_events {
+            let _ = event_sender.send(ev);
+        }
+
+        let evs = self.inner.call(GetEmotePacksRequest::new()).await.map(|resp| {
             resp.packs.into_iter().map(|pack| {
                 FetchEvent::Harmony(Event::Emote(EmoteEvent::EmotePackAdded(EmotePackAdded {
                     pack: Some(pack),
                 })))
             })
-        })?);
+        })?;
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
 
         self.inner
             .call(UpdateProfile::default().with_new_status(UserStatus::Online))
             .await?;
 
-        events.push(FetchEvent::Harmony(Event::Profile(ProfileEvent::ProfileUpdated(
+        let _ = event_sender.send(FetchEvent::Harmony(Event::Profile(ProfileEvent::ProfileUpdated(
             ProfileUpdated {
                 new_is_bot: Some(self_profile.is_bot),
                 new_avatar: self_profile.user_avatar,
@@ -1112,12 +1175,12 @@ impl Client {
             },
         ))));
 
-        events.push(FetchEvent::InitialSyncComplete);
+        let _ = event_sender.send(FetchEvent::InitialSyncComplete);
 
         Ok(())
     }
 
-    pub async fn fetch_guild_perms(&self, guild_id: u64, events: &mut Vec<FetchEvent>) -> ClientResult<()> {
+    pub async fn fetch_guild_perms(&self, guild_id: u64, event_sender: &EventSender) -> ClientResult<()> {
         let perm_queries = [
             "guild.manage.change-information",
             "user.manage.kick",
@@ -1142,7 +1205,7 @@ impl Client {
             .into_iter()
             .map(|query| QueryHasPermissionRequest::new(guild_id, None, None, query.to_string()))
             .collect();
-        events.extend(self.inner.batch_call(queries).await.map(move |response| {
+        let evs = self.inner.batch_call(queries).await.map(move |response| {
             response
                 .into_iter()
                 .zip(perm_queries.into_iter())
@@ -1154,11 +1217,14 @@ impl Client {
                         query: query.to_string(),
                     })))
                 })
-        })?);
+        })?;
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
         Ok(())
     }
 
-    pub async fn process_post(&self, events: &mut Vec<FetchEvent>, post: PostProcessEvent) -> ClientResult<()> {
+    pub async fn process_post(&self, event_sender: &EventSender, post: PostProcessEvent) -> ClientResult<()> {
         tracing::debug!("processing post event: {:?}", post);
         match post {
             PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => {
@@ -1167,31 +1233,33 @@ impl Client {
                     .into_iter()
                     .map(|query| QueryHasPermissionRequest::new(guild_id, Some(channel_id), None, query.to_string()))
                     .collect();
-                events.extend(
-                    self.inner
-                        .batch_call(queries)
-                        .await?
-                        .into_iter()
-                        .zip(perm_queries.into_iter())
-                        .map(move |(resp, query)| {
-                            FetchEvent::Harmony(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
-                                guild_id,
-                                channel_id: Some(channel_id),
-                                ok: resp.ok,
-                                query: query.to_string(),
-                            })))
-                        }),
-                );
+                let evs = self
+                    .inner
+                    .batch_call(queries)
+                    .await?
+                    .into_iter()
+                    .zip(perm_queries.into_iter())
+                    .map(move |(resp, query)| {
+                        FetchEvent::Harmony(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
+                            guild_id,
+                            channel_id: Some(channel_id),
+                            ok: resp.ok,
+                            query: query.to_string(),
+                        })))
+                    });
+                for ev in evs {
+                    let _ = event_sender.send(ev);
+                }
 
                 Ok(())
             }
             PostProcessEvent::FetchThumbnail(attachment) => {
                 let (_, resp) = self.fetch_attachment(attachment.id.clone()).await?;
-                events.push(FetchEvent::Attachment { attachment, file: resp });
+                let _ = event_sender.send(FetchEvent::Attachment { attachment, file: resp });
                 Ok(())
             }
             PostProcessEvent::FetchProfile(user_id) => {
-                events.push(self.inner.call(GetProfileRequest::new(user_id)).await.map(|resp| {
+                let _ = event_sender.send(self.inner.call(GetProfileRequest::new(user_id)).await.map(|resp| {
                     let profile = resp.profile.unwrap_or_default();
                     FetchEvent::Harmony(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
                         user_id,
@@ -1205,7 +1273,7 @@ impl Client {
                 Ok(())
             }
             PostProcessEvent::FetchGuildData(guild_id) => {
-                events.push(self.inner.call(GetGuildRequest::new(guild_id)).await.map(|resp| {
+                let _ = event_sender.send(self.inner.call(GetGuildRequest::new(guild_id)).await.map(|resp| {
                     let guild = resp.guild.unwrap_or_default();
                     FetchEvent::Harmony(Event::Chat(ChatEvent::EditedGuild(GuildUpdated {
                         guild_id,
@@ -1228,7 +1296,7 @@ impl Client {
                     .await?
                     .message;
                 if let Some(message) = message {
-                    events.push(FetchEvent::FetchedReply {
+                    let _ = event_sender.send(FetchEvent::FetchedReply {
                         guild_id,
                         channel_id,
                         message_id,
@@ -1240,36 +1308,33 @@ impl Client {
             PostProcessEvent::FetchLinkMetadata(url) => {
                 let resp = self.inner.call(FetchLinkMetadataRequest::new(url.to_string())).await?;
                 if let Some(data) = resp.data {
-                    events.push(FetchEvent::LinkMetadata { data, url });
+                    let _ = event_sender.send(FetchEvent::LinkMetadata { data, url });
                 }
                 Ok(())
             }
             PostProcessEvent::FetchEmotes(pack_id) => {
-                events.push(
-                    self.inner
-                        .call(GetEmotePackEmotesRequest { pack_id })
-                        .await
-                        .map(|resp| {
-                            FetchEvent::Harmony(Event::Emote(EmoteEvent::EmotePackEmotesUpdated(
-                                EmotePackEmotesUpdated {
-                                    pack_id,
-                                    added_emotes: resp.emotes,
-                                    deleted_emotes: Vec::new(),
-                                },
-                            )))
-                        })?,
-                );
+                let _ = event_sender.send(self.inner.call(GetEmotePackEmotesRequest { pack_id }).await.map(
+                    |resp| {
+                        FetchEvent::Harmony(Event::Emote(EmoteEvent::EmotePackEmotesUpdated(
+                            EmotePackEmotesUpdated {
+                                pack_id,
+                                added_emotes: resp.emotes,
+                                deleted_emotes: Vec::new(),
+                            },
+                        )))
+                    },
+                )?);
                 Ok(())
             }
         }
     }
 }
 
-fn post_heading(post: &mut Vec<PostProcessEvent>, embeds: &[Embed]) {
+fn post_heading(post: &PostEventSender, embeds: &[Embed]) {
     for embed in embeds {
-        let mut inner = |h: Option<&EmbedHeading>| {
+        let inner = |h: Option<&EmbedHeading>| {
             if let Some(id) = h.and_then(|h| h.icon.clone()) {
-                post.push(PostProcessEvent::FetchThumbnail(Attachment {
+                let _ = post.send(PostProcessEvent::FetchThumbnail(Attachment {
                     kind: "image".into(),
                     ..Attachment::new_unknown(id)
                 }));

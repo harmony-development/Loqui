@@ -16,7 +16,7 @@ use client::{
         client::{EventsReadSocket, EventsSocket},
     },
     message::{Content, Message},
-    tracing, Cache, Client, FetchEvent,
+    tracing, Cache, Client, EventSender, FetchEvent,
 };
 use eframe::egui::{self, TextureHandle, Vec2};
 use instant::Instant;
@@ -50,13 +50,55 @@ pub struct State {
     pub images_rx: Receiver<LoadedImage>,
     pub next_screen: Option<BoxedScreen>,
     pub prev_screen: bool,
+    pub event_sender: EventSender,
+    pub post_client_tx: tokio_mpsc::Sender<Client>,
 }
 
 impl State {
     pub fn new() -> Self {
-        let cache = Cache::default();
         let futures = Futures::new();
 
+        // Set up event processing and the cache
+        let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (post_tx, mut post_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (post_client_tx, mut post_client_rx) = tokio::sync::mpsc::channel::<Client>(2);
+
+        {
+            let event_tx = event_tx.clone();
+            futures.spawn(async move {
+                let mut client = post_client_rx.recv().await.expect("no clients");
+
+                loop {
+                    tokio::select! {
+                        Some(new_client) = post_client_rx.recv() => {
+                            client = new_client;
+                        }
+                        Some(post) = post_rx.recv() => {
+                            if let Err(err) = client.process_post(&event_tx, post).await {
+                                tracing::error!("failed to post process event: {}", err);
+                            }
+                        }
+                        else => break,
+                    }
+                }
+            });
+        }
+
+        let cache = Cache::new(
+            event_rx,
+            post_tx,
+            Box::new(|ev| match ev {
+                FetchEvent::Attachment { attachment, file } => {
+                    if attachment.is_raster_image() {
+                        crate::image_cache::op::decode_image(file.data().clone(), attachment.id, attachment.name);
+                    }
+                    None
+                }
+                ev => Some(ev),
+            }),
+        );
+
+        // start socket processor task
         let reset_socket = AtomBool::new(false);
 
         let (socket_rx_tx, mut socket_rx_rx) = tokio_mpsc::channel::<EventsReadSocket>(2);
@@ -85,7 +127,7 @@ impl State {
                                 _ => {}
                             }
                         }
-                        else => std::hint::spin_loop(),
+                        else => break,
                     }
                 }
             });
@@ -114,6 +156,8 @@ impl State {
             next_screen: None,
             prev_screen: false,
             images_rx,
+            event_sender: event_tx,
+            post_client_tx,
         }
     }
 
@@ -123,7 +167,6 @@ impl State {
         self.handle_upload_message();
         self.handle_about();
         self.handle_errors();
-        self.handle_events();
         self.handle_sockets();
         self.handle_images(ctx);
         self.handle_socket_events();
@@ -240,38 +283,6 @@ impl State {
                     self.uploading_files.write().expect("poisoned").clear();
                 }
             }
-        });
-    }
-
-    #[inline(always)]
-    fn handle_events(&mut self) {
-        handle_future!(self, |res: ClientResult<Vec<FetchEvent>>| {
-            self.run(res, |state, events| {
-                let mut posts = Vec::new();
-                for event in events {
-                    match event {
-                        FetchEvent::Attachment { attachment, file } => {
-                            if attachment.is_raster_image() {
-                                crate::image_cache::op::decode_image(
-                                    file.data().clone(),
-                                    attachment.id,
-                                    attachment.name,
-                                );
-                            }
-                        }
-                        event => state.cache.process_event(&mut posts, event),
-                    }
-                }
-                if let Some(client) = state.client.as_ref().cloned() {
-                    state.futures.spawn(async move {
-                        let mut events = Vec::with_capacity(posts.len());
-                        for post in posts {
-                            client.process_post(&mut events, post).await?;
-                        }
-                        ClientResult::Ok(events)
-                    });
-                }
-            });
         });
     }
 
