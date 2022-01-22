@@ -12,7 +12,7 @@ use crate::{
     screen::{auth, ScreenStack},
     state::State,
     style as loqui_style,
-    widgets::{menu_text_button, view_about, view_egui_settings},
+    widgets::{view_about, view_egui_settings},
 };
 
 pub struct App {
@@ -59,7 +59,7 @@ impl App {
                 ui.add(egui::Spinner::new().size(12.0));
                 ui.label("reconnecting");
             } else {
-                let resp = ui.label("❌ disconnected");
+                let resp = ui.label("X disconnected");
                 let last_retry_passed = self
                     .state
                     .last_socket_retry
@@ -74,9 +74,13 @@ impl App {
     #[inline(always)]
     fn view_bottom_panel(&mut self, ui: &mut Ui) {
         ui.horizontal_top(|ui| {
+            ui.style_mut().spacing.item_spacing = egui::vec2(2.0, 0.0);
+
             self.view_connection_status(ui);
 
-            if ui.ctx().is_mobile().not() {
+            let is_mobile = ui.ctx().is_mobile();
+
+            if is_mobile.not() {
                 if cfg!(debug_assertions) {
                     egui::Frame::none().fill(Color32::RED).show(ui, |ui| {
                         ui.colored_label(Color32::BLACK, "⚠ Debug build ⚠")
@@ -96,45 +100,50 @@ impl App {
                 }
             }
 
-            let is_main_or_auth = matches!(self.screens.current().id(), "main" | "auth");
-            if is_main_or_auth.not() && ui.button("<- back").on_hover_text("go back").clicked() {
-                self.state.pop_screen();
+            let show_back_button = matches!(self.screens.current().id(), "main" | "auth").not();
+            if show_back_button {
+                ui.offsetw(140.0);
+                if ui.button("<- back").on_hover_text("go back").clicked() {
+                    self.state.pop_screen();
+                }
             }
 
-            if ui.ctx().is_mobile().not() {
-                ui.add_space(ui.available_width() - 70.0);
-
-                egui::Frame::group(ui.style())
-                    .corner_radius(0.0)
-                    .margin([0.0, 0.0])
-                    .show(ui, |ui| {
-                        menu_text_button("top_panel_menu", "menu", ui, |ui| {
-                            if ui.text_button("about server").clicked() {
-                                self.show_about_window = true;
-                            }
-
-                            if ui.text_button("settings").clicked() {
-                                self.state
-                                    .push_screen(super::screen::settings::Screen::new(&self.state));
-                            }
-
-                            if ui.text_button("logout").clicked() {
-                                self.screens.clear(super::screen::auth::Screen::new());
-                                let client = self.state.client.take().expect("no logout");
-                                self.state.reset_socket_state();
-                                self.state.futures.spawn(async move { client.logout().await });
-                            }
-
-                            if ui.text_button("exit loqui").clicked() {
-                                std::process::exit(0);
-                            }
-
-                            if ui.text_button("egui debug").clicked() {
-                                self.show_egui_debug = true;
-                            }
-                        });
-                    });
+            if show_back_button.not() {
+                ui.offsetw(80.0);
             }
+
+            ui.vertical_centered_justified(|ui| {
+                ui.menu_button("menu ▾", |ui| {
+                    if ui.button("about server").clicked() {
+                        self.show_about_window = true;
+                        ui.close_menu();
+                    }
+
+                    if ui.ctx().is_mobile().not() && ui.button("settings").clicked() {
+                        self.state
+                            .push_screen(super::screen::settings::Screen::new(&self.state));
+                        ui.close_menu();
+                    }
+
+                    if ui.button("logout").clicked() {
+                        self.screens.clear(super::screen::auth::Screen::new());
+                        let client = self.state.client.take().expect("no logout");
+                        self.state.reset_socket_state();
+                        self.state.futures.spawn(async move { client.logout().await });
+                        ui.close_menu();
+                    }
+
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if ui.button("exit loqui").clicked() {
+                        std::process::exit(0);
+                    }
+
+                    if ui.button("egui debug").clicked() {
+                        self.show_egui_debug = true;
+                        ui.close_menu();
+                    }
+                });
+            });
         });
     }
 
@@ -271,17 +280,18 @@ impl epi::App for App {
         ctx.set_pixels_per_point(1.45);
 
         let is_main_screen = self.screens.current().id() == "main";
-        if self.state.is_connected.not() || !is_main_screen || ctx.is_mobile().not() {
+        if self.state.is_connected.not() || is_main_screen.not() || ctx.is_mobile().not() {
+            let style = ctx.style();
             let frame_panel = egui::Frame {
                 margin: Vec2::ZERO,
-                fill: ctx.style().visuals.extreme_bg_color,
-                stroke: ctx.style().visuals.window_stroke(),
+                fill: style.visuals.extreme_bg_color,
+                stroke: style.visuals.window_stroke(),
                 ..Default::default()
             };
             egui::TopBottomPanel::top("top_status_panel")
                 .frame(frame_panel)
-                .max_height(12.0)
-                .min_height(12.0)
+                .max_height(style.spacing.interact_size.y)
+                .min_height(style.spacing.interact_size.y)
                 .show(ctx, |ui| {
                     self.view_bottom_panel(ui);
                 });

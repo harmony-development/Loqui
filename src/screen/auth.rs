@@ -94,24 +94,23 @@ impl Screen {
     fn handle_connect(&mut self, state: &mut State) {
         handle_future!(state, |res: ClientResult<Option<Client>>| {
             match res {
-                Ok(maybe_client) => {
-                    if let Some(client) = maybe_client {
-                        state.client = Some(client);
+                Ok(Some(client)) => {
+                    state.client = Some(client);
 
-                        spawn_client_fut!(state, |client| client.fetch_about().await);
-                        if state.client().auth_status().is_authenticated() {
-                            state
-                                .futures
-                                .spawn(std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
-                        } else {
-                            self.next_step(state, AuthStepResponse::Initial);
-                        }
+                    spawn_client_fut!(state, |client| client.fetch_about().await);
+                    if state.client().auth_status().is_authenticated() {
+                        state
+                            .futures
+                            .spawn(std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
+                    } else {
+                        self.next_step(state, AuthStepResponse::Initial);
                     }
                 }
                 Err(err) => {
                     state.latest_errors.push(err.to_string());
                     self.reset();
                 }
+                _ => {}
             }
         });
     }

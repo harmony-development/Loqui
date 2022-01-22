@@ -84,6 +84,7 @@ pub trait UiExt {
     fn add_hovered(&mut self, widget: impl Widget) -> Response;
     fn group_filled_with(&self, color: Color32) -> Frame;
     fn group_filled(&self) -> Frame;
+    fn offsetw(&mut self, offset: f32);
 }
 
 impl UiExt for Ui {
@@ -115,6 +116,10 @@ impl UiExt for Ui {
     #[inline(always)]
     fn group_filled_with(&self, color: Color32) -> Frame {
         egui::Frame::group(self.style()).fill(color)
+    }
+
+    fn offsetw(&mut self, offset: f32) {
+        self.add_space(self.available_width() - offset);
     }
 }
 

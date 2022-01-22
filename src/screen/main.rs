@@ -22,7 +22,7 @@ use crate::{
     },
 };
 
-use super::prelude::*;
+use super::{prelude::*, settings};
 
 #[derive(Debug, Default)]
 struct CurrentIds {
@@ -987,8 +987,9 @@ impl Screen {
 
     #[inline(always)]
     fn show_channel_bar(&mut self, ui: &mut Ui, state: &mut State) {
-        let top_channel_bar_width = ui.available_width() - 8.0;
-        ui.allocate_ui([top_channel_bar_width, 12.0].into(), |ui| {
+        let interact_size = ui.style().spacing.interact_size;
+        let top_channel_bar_width = ui.available_width() - 8.0 - self.current.has_guild().then(|| 5.0).unwrap_or(0.0);
+        ui.allocate_ui([top_channel_bar_width, interact_size.y].into(), |ui| {
             let frame = egui::Frame {
                 margin: [4.0, 2.0].into(),
                 fill: ui.style().visuals.window_fill(),
@@ -997,15 +998,17 @@ impl Screen {
                 ..Default::default()
             };
             frame.show(ui, |ui| {
-                ui.horizontal_top(|ui| {
+                ui.horizontal(|ui| {
+                    ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
+
                     if self.current.has_channel() && ui.ctx().is_mobile() {
                         let show_guilds_but = ui
-                            .add_sized([12.0, 12.0], TextButton::text("☰").small())
+                            .add_sized([12.0, interact_size.y], TextButton::text("☰").small())
                             .on_hover_text("show guilds / channels");
                         if show_guilds_but.clicked() {
                             self.toggle_panel(Panel::GuildChannels);
                         }
-                        ui.add_sized([1.0, 12.0], egui::Separator::default().spacing(0.0));
+                        ui.add_sized([8.0, interact_size.y], egui::Separator::default().spacing(4.0));
                     }
 
                     let chan_name = self
@@ -1014,20 +1017,27 @@ impl Screen {
                         .and_then(|(gid, cid)| state.cache.get_channel(gid, cid))
                         .map_or_else(|| "select a channel".to_string(), |c| format!("#{}", c.name));
 
-                    ui.label(chan_name);
-                    ui.add_sized([1.0, 12.0], egui::Separator::default().spacing(0.0));
+                    ui.label(RichText::new(chan_name).strong());
+                    ui.add_sized([8.0, interact_size.y], egui::Separator::default().spacing(4.0));
 
                     if self.current.has_guild() {
-                        ui.add_space(ui.available_width() - 12.0);
+                        ui.offsetw(24.0);
                         let show_members_but = ui
-                            .add_sized([12.0, 12.0], TextButton::text("👤").small())
+                            .add_sized([12.0, interact_size.y], TextButton::text("👤"))
                             .on_hover_text("toggle member list");
                         if show_members_but.clicked() {
                             self.toggle_panel(Panel::Members);
                             self.disable_users_bar = !self.disable_users_bar;
                         }
                     } else {
-                        ui.add_space(ui.available_width());
+                        ui.offsetw(12.0);
+                    }
+
+                    let settings_but = ui
+                        .add_sized([12.0, interact_size.y], TextButton::text("⚙"))
+                        .on_hover_text("settings");
+                    if settings_but.clicked() {
+                        state.push_screen(settings::Screen::new(state));
                     }
                 });
             });
