@@ -2,7 +2,7 @@ use prelude::*;
 
 mod prelude {
     pub use super::Screen as AppScreen;
-    pub use crate::{app::State, utils::*};
+    pub use crate::{state::State, utils::*};
     pub use eframe::{
         egui::{self, Layout, Ui},
         epi,

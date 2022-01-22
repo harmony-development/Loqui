@@ -14,7 +14,7 @@ use eframe::egui::{
 };
 
 use crate::{
-    app::State,
+    state::State,
     utils::{dangerous_text, spawn_client_fut},
 };
 
