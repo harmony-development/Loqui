@@ -78,7 +78,7 @@ impl State {
                                 tracing::error!("failed to post process event: {}", err);
                             }
                         }
-                        else => break,
+                        else => std::hint::spin_loop(),
                     }
                 }
             });
@@ -127,7 +127,7 @@ impl State {
                                 _ => {}
                             }
                         }
-                        else => break,
+                        else => std::hint::spin_loop(),
                     }
                 }
             });
