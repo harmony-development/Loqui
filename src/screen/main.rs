@@ -224,6 +224,7 @@ impl Screen {
                         spawn_evs!(state, |events, c| {
                             c.fetch_channels(guild_id, events).await?;
                             c.fetch_members(guild_id, events).await?;
+                            c.fetch_guild_perms(guild_id, events).await?;
                         });
                     }
                     self.scroll_to_bottom = true;

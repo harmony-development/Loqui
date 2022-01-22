@@ -57,6 +57,7 @@ use smol_str::SmolStr;
 
 use std::{
     fmt::{self, Debug, Display, Formatter},
+    ops::Not,
     str::FromStr,
 };
 
@@ -435,7 +436,9 @@ impl Cache {
                     let guild = self.get_guild_mut(guild_id);
                     guild.homeserver = homeserver.into();
 
-                    post.push(PostProcessEvent::FetchGuildData(guild_id));
+                    if guild.fetched.not() {
+                        post.push(PostProcessEvent::FetchGuildData(guild_id));
+                    }
                 }
                 ChatEvent::GuildRemovedFromList(GuildRemovedFromList {
                     guild_id,
@@ -1053,12 +1056,39 @@ impl Client {
             .profile
             .unwrap_or_default();
         let guilds = self.inner.call(GetGuildListRequest::new()).await?.guilds;
-        events.extend(guilds.into_iter().map(|guild| {
-            FetchEvent::Harmony(Event::Chat(ChatEvent::GuildAddedToList(GuildAddedToList {
-                guild_id: guild.guild_id,
-                homeserver: guild.server_id,
-            })))
-        }));
+
+        let mut guild_info_reqs = Vec::with_capacity(guilds.len());
+        let mut guild_added_to_list_events = Vec::with_capacity(guilds.len());
+        for guild in guilds {
+            guild_info_reqs.push(GetGuildRequest::new(guild.guild_id));
+            guild_added_to_list_events.push(FetchEvent::Harmony(Event::Chat(ChatEvent::GuildAddedToList(
+                GuildAddedToList {
+                    guild_id: guild.guild_id,
+                    homeserver: guild.server_id,
+                },
+            ))));
+        }
+        let chunked_guild_info_reqs = guild_info_reqs.into_iter().fold(vec![Vec::new()], |mut tot, item| {
+            if tot.last().unwrap().len() < 64 {
+                tot.last_mut().unwrap().push(item);
+            } else {
+                tot.push(vec![item]);
+            }
+            tot
+        });
+        for chunk in chunked_guild_info_reqs {
+            let guild_infos = self.inner.batch_call(chunk.clone()).await?;
+            events.extend(guild_infos.into_iter().zip(chunk.into_iter()).map(|(resp, req)| {
+                let guild = resp.guild.unwrap_or_default();
+                FetchEvent::Harmony(Event::Chat(ChatEvent::EditedGuild(GuildUpdated {
+                    guild_id: req.guild_id,
+                    new_metadata: guild.metadata,
+                    new_name: Some(guild.name),
+                    new_picture: guild.picture,
+                })))
+            }));
+        }
+        events.extend(guild_added_to_list_events);
 
         events.extend(self.inner.call(GetEmotePacksRequest::new()).await.map(|resp| {
             resp.packs.into_iter().map(|pack| {
@@ -1084,6 +1114,47 @@ impl Client {
 
         events.push(FetchEvent::InitialSyncComplete);
 
+        Ok(())
+    }
+
+    pub async fn fetch_guild_perms(&self, guild_id: u64, events: &mut Vec<FetchEvent>) -> ClientResult<()> {
+        let perm_queries = [
+            "guild.manage.change-information",
+            "user.manage.kick",
+            "user.manage.ban",
+            "user.manage.unban",
+            "invites.manage.create",
+            "invites.manage.delete",
+            "invites.view",
+            "channels.manage.move",
+            "channels.manage.create",
+            "channels.manage.delete",
+            "roles.manage",
+            "roles.get",
+            "roles.user.manage",
+            "roles.user.get",
+            "permissions.manage.set",
+            "permissions.manage.get",
+            all_permissions::MESSAGES_PINS_ADD,
+            all_permissions::MESSAGES_PINS_REMOVE,
+        ];
+        let queries = perm_queries
+            .into_iter()
+            .map(|query| QueryHasPermissionRequest::new(guild_id, None, None, query.to_string()))
+            .collect();
+        events.extend(self.inner.batch_call(queries).await.map(move |response| {
+            response
+                .into_iter()
+                .zip(perm_queries.into_iter())
+                .map(move |(resp, query)| {
+                    FetchEvent::Harmony(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
+                        guild_id,
+                        channel_id: None,
+                        ok: resp.ok,
+                        query: query.to_string(),
+                    })))
+                })
+        })?);
         Ok(())
     }
 
@@ -1142,43 +1213,6 @@ impl Client {
                         new_name: Some(guild.name),
                         new_picture: guild.picture,
                     })))
-                })?);
-                let perm_queries = [
-                    "guild.manage.change-information",
-                    "user.manage.kick",
-                    "user.manage.ban",
-                    "user.manage.unban",
-                    "invites.manage.create",
-                    "invites.manage.delete",
-                    "invites.view",
-                    "channels.manage.move",
-                    "channels.manage.create",
-                    "channels.manage.delete",
-                    "roles.manage",
-                    "roles.get",
-                    "roles.user.manage",
-                    "roles.user.get",
-                    "permissions.manage.set",
-                    "permissions.manage.get",
-                    all_permissions::MESSAGES_PINS_ADD,
-                    all_permissions::MESSAGES_PINS_REMOVE,
-                ];
-                let queries = perm_queries
-                    .into_iter()
-                    .map(|query| QueryHasPermissionRequest::new(guild_id, None, None, query.to_string()))
-                    .collect();
-                events.extend(self.inner.batch_call(queries).await.map(move |response| {
-                    response
-                        .into_iter()
-                        .zip(perm_queries.into_iter())
-                        .map(move |(resp, query)| {
-                            FetchEvent::Harmony(Event::Chat(ChatEvent::PermissionUpdated(PermissionUpdated {
-                                guild_id,
-                                channel_id: None,
-                                ok: resp.ok,
-                                query: query.to_string(),
-                            })))
-                        })
                 })?);
                 tracing::debug!("fetched guild data: {}", guild_id);
                 Ok(())
