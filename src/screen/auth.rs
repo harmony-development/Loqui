@@ -100,7 +100,9 @@ impl Screen {
 
                         spawn_client_fut!(state, |client| client.fetch_about().await);
                         if state.client().auth_status().is_authenticated() {
-                            spawn_future!(state, std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
+                            state
+                                .futures
+                                .spawn(std::future::ready(ClientResult::Ok(Option::<AuthStep>::None)));
                         } else {
                             self.next_step(state, AuthStepResponse::Initial);
                         }
@@ -123,7 +125,7 @@ impl Screen {
             .parse::<Uri>();
 
         state.run(maybe_homeserver_url, |state, homeserver_url| {
-            spawn_future!(state, async move {
+            state.futures.spawn(async move {
                 let client = Client::new(homeserver_url, None).await?;
                 client.inner().begin_auth().await?;
                 ClientResult::Ok(Some(client))
@@ -134,16 +136,17 @@ impl Screen {
 
     fn prev_step(&mut self, state: &mut State) {
         let fut = state.client().inner().prev_auth_step();
-        spawn_future!(state, fut.map_ok(|resp| resp.step).map_err(ClientError::from));
+        state
+            .futures
+            .spawn(fut.map_ok(|resp| resp.step).map_err(ClientError::from));
         self.waiting = true;
     }
 
     fn next_step(&mut self, state: &mut State, response: AuthStepResponse) {
         let fut = state.client().inner().next_auth_step(response);
-        spawn_future!(
-            state,
+        state.futures.spawn(
             fut.map_ok(|resp| resp.and_then(|resp| resp.step))
-                .map_err(ClientError::from)
+                .map_err(ClientError::from),
         );
         self.waiting = true;
     }

@@ -457,9 +457,8 @@ impl Screen {
             self.loading_attachment
                 .insert(attachment.id.clone(), image_load_bool.clone());
 
-            let client = state.client().clone();
             let attachment = attachment.clone();
-            spawn_future!(state, async move {
+            spawn_client_fut!(state, |client| {
                 let res = client.fetch_attachment(attachment.id.clone()).await;
                 image_load_bool.set(false);
                 let (_, file) = res?;

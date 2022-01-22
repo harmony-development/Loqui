@@ -86,12 +86,6 @@ impl Futures {
     }
 }
 
-macro_rules! spawn_future {
-    ($state:ident, $fut:expr) => {
-        $state.futures.spawn::<_, _>($fut);
-    };
-}
-
 macro_rules! handle_future {
     ($state:ident, |$val:ident: $val_ty:ty| $handler:expr) => {
         while let Some($val) = $state.futures.get::<$val_ty>() {
@@ -124,4 +118,3 @@ macro_rules! spawn_client_fut {
 pub(crate) use handle_future;
 pub(crate) use spawn_client_fut;
 pub(crate) use spawn_evs;
-pub(crate) use spawn_future;

@@ -155,7 +155,7 @@ impl State {
             }
             Err(err) => {
                 let msg = err.to_string();
-                let exit = msg.contains("h.bad-session");
+                let exit = msg.contains("bad-session") || msg.contains("invalid-session");
                 self.latest_errors.push(msg);
                 exit
             }
@@ -263,14 +263,12 @@ impl State {
                     }
                 }
                 if let Some(client) = state.client.as_ref().cloned() {
-                    spawn_future!(state, {
-                        async move {
-                            let mut events = Vec::with_capacity(posts.len());
-                            for post in posts {
-                                client.process_post(&mut events, post).await?;
-                            }
-                            ClientResult::Ok(events)
+                    state.futures.spawn(async move {
+                        let mut events = Vec::with_capacity(posts.len());
+                        for post in posts {
+                            client.process_post(&mut events, post).await?;
                         }
+                        ClientResult::Ok(events)
                     });
                 }
             });
@@ -295,7 +293,7 @@ impl State {
             evs.push(FetchEvent::Harmony(ev));
         }
         if !evs.is_empty() {
-            spawn_future!(self, std::future::ready(ClientResult::Ok(evs)));
+            self.futures.spawn(std::future::ready(ClientResult::Ok(evs)));
         }
     }
 

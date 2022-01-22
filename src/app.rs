@@ -120,11 +120,9 @@ impl App {
 
                             if ui.text_button("logout").clicked() {
                                 self.screens.clear(super::screen::auth::Screen::new());
-                                let client = self.state.client().clone();
-                                self.state.client = None;
+                                let client = self.state.client.take().expect("no logout");
                                 self.state.reset_socket_state();
-                                let state = &self.state;
-                                spawn_future!(state, async move { client.logout().await });
+                                self.state.futures.spawn(async move { client.logout().await });
                             }
 
                             if ui.text_button("exit loqui").clicked() {

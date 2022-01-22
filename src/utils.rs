@@ -13,7 +13,7 @@ use client::{
 };
 use eframe::egui::{self, Color32, Context, Frame, Key, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText};
 
-pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs, spawn_future};
+pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs};
 use crate::{state::State, style, widgets::TextButton};
 pub use anyhow::{anyhow, bail, ensure, Error};
 pub use client::error::{ClientError, ClientResult};
