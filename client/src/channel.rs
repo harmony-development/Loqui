@@ -1,3 +1,5 @@
+use ahash::AHashSet;
+
 use crate::role::RolePerms;
 
 use super::message::Messages;
@@ -9,10 +11,11 @@ pub struct Channel {
     pub name: SmolStr,
     pub is_category: bool,
     pub messages: Messages,
+    pub pinned_messages: AHashSet<u64>,
     pub reached_top: bool,
     pub perms: Vec<Permission>,
     pub role_perms: RolePerms,
-    pub fetched: bool,
+    pub fetched_msgs_pins: bool,
 }
 
 impl Channel {

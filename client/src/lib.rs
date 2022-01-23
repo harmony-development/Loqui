@@ -25,9 +25,10 @@ use harmony_rust_sdk::{
             BanUserRequest, ChannelKind, Content as HarmonyContent, CreateChannelRequest, CreateGuildRequest,
             CreateInviteRequest, DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Event, EventSource,
             FormattedText, GetGuildChannelsRequest, GetGuildInvitesRequest, GetGuildListRequest,
-            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetUserRolesRequest,
-            Invite, JoinGuildRequest, KickUserRequest, LeaveGuildRequest, Message as HarmonyMessage, Permission,
-            QueryHasPermissionRequest, Role, TypingRequest, UnbanUserRequest, UpdateMessageTextRequest,
+            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetPinnedMessagesRequest,
+            GetUserRolesRequest, Invite, JoinGuildRequest, KickUserRequest, LeaveGuildRequest,
+            Message as HarmonyMessage, Permission, PinMessageRequest, QueryHasPermissionRequest, Role, TypingRequest,
+            UnbanUserRequest, UnpinMessageRequest, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -137,6 +138,7 @@ pub enum FetchEvent {
         id: String,
         invite: Invite,
     },
+    FetchedMsgsPins(u64, u64),
     FetchedInvites(u64),
     LinkMetadata {
         url: Uri,
@@ -293,6 +295,9 @@ impl Cache {
             FetchEvent::AddInvite { guild_id, id, invite } => {
                 self.get_guild_mut(guild_id).invites.insert(id, invite);
             }
+            FetchEvent::FetchedMsgsPins(guild_id, channel_id) => {
+                self.get_channel_mut(guild_id, channel_id).fetched_msgs_pins = true;
+            }
             FetchEvent::FetchedInvites(guild_id) => {
                 self.get_guild_mut(guild_id).fetched_invites = true;
             }
@@ -430,7 +435,6 @@ impl Cache {
                     let channel = self.get_channel_mut(guild_id, channel_id);
                     channel.name = name.into();
                     channel.is_category = kind == i32::from(ChannelKind::Category);
-                    channel.fetched = true;
 
                     let guild = self.get_guild_mut(guild_id);
                     // [tag:channel_added_to_client]
@@ -578,7 +582,25 @@ impl Cache {
                         self.get_guild_mut(guild_id).role_perms.insert(role_id, new_perms);
                     }
                 }
-                _ => panic!(),
+                ChatEvent::MessagePinned(MessagePinned {
+                    guild_id,
+                    channel_id,
+                    message_id,
+                }) => {
+                    self.get_channel_mut(guild_id, channel_id)
+                        .pinned_messages
+                        .insert(message_id);
+                }
+                ChatEvent::MessageUnpinned(MessageUnpinned {
+                    guild_id,
+                    channel_id,
+                    message_id,
+                }) => {
+                    self.get_channel_mut(guild_id, channel_id)
+                        .pinned_messages
+                        .remove(&message_id);
+                }
+                ev => tracing::error!("event not implemented: {:?}", ev),
             },
             Event::Profile(ev) => match ev {
                 ProfileEvent::ProfileUpdated(ProfileUpdated {
@@ -881,6 +903,20 @@ impl Client {
         Ok(())
     }
 
+    pub async fn unpin_message(&self, guild_id: u64, channel_id: u64, message_id: u64) -> ClientResult<()> {
+        self.inner
+            .call(UnpinMessageRequest::new(guild_id, channel_id, message_id))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn pin_message(&self, guild_id: u64, channel_id: u64, message_id: u64) -> ClientResult<()> {
+        self.inner
+            .call(PinMessageRequest::new(guild_id, channel_id, message_id))
+            .await?;
+        Ok(())
+    }
+
     pub async fn leave_guild(&self, guild_id: u64) -> ClientResult<()> {
         self.inner.call(LeaveGuildRequest::new(guild_id)).await?;
         Ok(())
@@ -971,6 +1007,28 @@ impl Client {
         for ev in evs {
             let _ = event_sender.send(ev);
         }
+        Ok(())
+    }
+
+    pub async fn fetch_pinned_messages(
+        &self,
+        guild_id: u64,
+        channel_id: u64,
+        event_sender: &EventSender,
+    ) -> ClientResult<()> {
+        let resp = self
+            .inner
+            .call(GetPinnedMessagesRequest::new(guild_id, channel_id))
+            .await?;
+        let evs = resp.pinned_message_ids.into_iter().map(|id| {
+            FetchEvent::Harmony(Event::Chat(ChatEvent::MessagePinned(MessagePinned::new(
+                guild_id, channel_id, id,
+            ))))
+        });
+        for ev in evs {
+            let _ = event_sender.send(ev);
+        }
+
         Ok(())
     }
 
@@ -1198,8 +1256,6 @@ impl Client {
             "roles.user.get",
             "permissions.manage.set",
             "permissions.manage.get",
-            all_permissions::MESSAGES_PINS_ADD,
-            all_permissions::MESSAGES_PINS_REMOVE,
         ];
         let queries = perm_queries
             .into_iter()
@@ -1228,7 +1284,12 @@ impl Client {
         tracing::debug!("processing post event: {:?}", post);
         match post {
             PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => {
-                let perm_queries = ["channels.manage.change-information", "messages.send"];
+                let perm_queries = [
+                    "channels.manage.change-information",
+                    "messages.send",
+                    all_permissions::MESSAGES_PINS_ADD,
+                    all_permissions::MESSAGES_PINS_REMOVE,
+                ];
                 let queries = perm_queries
                     .into_iter()
                     .map(|query| QueryHasPermissionRequest::new(guild_id, Some(channel_id), None, query.to_string()))

@@ -1,6 +1,7 @@
 use std::ops::Not;
 
 use client::{
+    channel::Channel,
     content,
     guild::Guild,
     harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, rest::FileId},
@@ -131,6 +132,7 @@ pub struct Screen {
     guild_name_text: String,
     show_join_guild: bool,
     show_create_guild: bool,
+    show_pinned_messages: bool,
     panel_stack: PanelStack,
 }
 
@@ -141,6 +143,28 @@ impl Screen {
         } else {
             self.panel_stack.push(panel);
         }
+    }
+
+    fn view_pinned_messages(&mut self, state: &State, ctx: &egui::Context) {
+        let Some((guild_id, channel_id)) = self.current.channel() else { return };
+        let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return };
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
+        let user_id = state.client().user_id();
+
+        let mut show_pinned_messages = self.show_pinned_messages;
+        egui::Window::new("pinned messages")
+            .open(&mut show_pinned_messages)
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().stick_to_bottom().show(ui, |ui| {
+                    for id in &channel.pinned_messages {
+                        let id = MessageId::Ack(*id);
+                        let Some(message) = channel.messages.view().get_message(&id) else { continue };
+                        self.view_message(state, ui, guild, channel, message, guild_id, channel_id, &id, user_id);
+                    }
+                });
+            });
+
+        self.show_pinned_messages = show_pinned_messages;
     }
 
     fn view_join_guild(&mut self, state: &mut State, ctx: &egui::Context) {
@@ -223,8 +247,12 @@ impl Screen {
                     if guild.channels.is_empty() && guild.members.is_empty() {
                         spawn_evs!(state, |events, c| {
                             c.fetch_channels(guild_id, events).await?;
-                            c.fetch_members(guild_id, events).await?;
+                        });
+                        spawn_evs!(state, |events, c| {
                             c.fetch_guild_perms(guild_id, events).await?;
+                        });
+                        spawn_evs!(state, |events, c| {
+                            c.fetch_members(guild_id, events).await?;
                         });
                     }
                     self.scroll_to_bottom = true;
@@ -281,30 +309,36 @@ impl Screen {
 
             if channels.is_empty().not() {
                 for (channel_id, channel) in channels {
-                    if channel.fetched {
-                        let symbol = channel.is_category.then(|| "☰ ").unwrap_or("#");
-                        let text = format!("{}{}", symbol, channel.name);
+                    let symbol = channel.is_category.then(|| "☰ ").unwrap_or("#");
+                    let text = format!("{}{}", symbol, channel.name);
 
-                        let is_enabled = (channel.is_category || self.current.is_channel(guild_id, channel_id)).not();
-                        let mut button = ui.add_enabled(is_enabled, TextButton::text(text));
-                        if let Some(guild) = maybe_guild {
-                            button = button.context_menu_styled(|ui| {
-                                view_channel_context_menu_items(ui, state, guild_id, channel_id, guild, channel);
+                    let is_enabled = (channel.is_category || self.current.is_channel(guild_id, channel_id)).not();
+                    let mut button = ui.add_enabled(is_enabled, TextButton::text(text));
+                    if let Some(guild) = maybe_guild {
+                        button = button.context_menu_styled(|ui| {
+                            view_channel_context_menu_items(ui, state, guild_id, channel_id, guild, channel);
+                        });
+                    }
+                    if button.clicked() {
+                        self.toggle_panel(Panel::Messages);
+                        self.current.set_channel(channel_id);
+                        self.last_channel_id.insert(guild_id, channel_id);
+                        if channel.fetched_msgs_pins.not()
+                            && channel.reached_top.not()
+                            && channel.messages.continuous_view().is_empty()
+                        {
+                            spawn_evs!(state, |events, c| {
+                                c.fetch_messages(guild_id, channel_id, events).await?;
+                                let _ = events.send(FetchEvent::FetchedMsgsPins(guild_id, channel_id));
                             });
                         }
-                        if button.clicked() {
-                            self.toggle_panel(Panel::Messages);
-                            self.current.set_channel(channel_id);
-                            self.last_channel_id.insert(guild_id, channel_id);
-                            if !channel.reached_top && channel.messages.continuous_view().is_empty() {
-                                spawn_evs!(state, |events, c| {
-                                    c.fetch_messages(guild_id, channel_id, events).await?;
-                                });
-                            }
-                            self.scroll_to_bottom = true;
+                        if channel.fetched_msgs_pins.not() && channel.pinned_messages.is_empty() {
+                            spawn_evs!(state, |events, c| {
+                                c.fetch_pinned_messages(guild_id, channel_id, events).await?;
+                                let _ = events.send(FetchEvent::FetchedMsgsPins(guild_id, channel_id));
+                            });
                         }
-                    } else {
-                        ui.add(egui::Spinner::new());
+                        self.scroll_to_bottom = true;
                     }
                 }
             } else {
@@ -533,7 +567,132 @@ impl Screen {
         });
     }
 
-    fn view_messages(&mut self, state: &mut State, ui: &mut Ui) {
+    #[allow(clippy::too_many_arguments)]
+    fn view_message(
+        &mut self,
+        state: &State,
+        ui: &mut Ui,
+        guild: &Guild,
+        channel: &Channel,
+        message: &Message,
+        guild_id: u64,
+        channel_id: u64,
+        id: &MessageId,
+        user_id: u64,
+    ) {
+        let msg = ui
+            .group_filled_with(loqui_style::BG_LIGHT)
+            .stroke((0.0, Color32::WHITE).into())
+            .margin([5.0, 5.0])
+            .show(ui, |ui| {
+                let overrides = message.overrides.as_ref();
+                let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
+                let user = state.cache.get_user(message.sender);
+                let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
+                let display_name = override_name.unwrap_or(sender_name);
+
+                let color = guild
+                    .highest_role_for_member(message.sender)
+                    .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
+
+                let user_resp = ui
+                    .scope(|ui| {
+                        ui.horizontal(|ui| {
+                            let extreme_bg_color = ui.style().visuals.extreme_bg_color;
+                            self.view_user_avatar(state, ui, user, overrides, extreme_bg_color);
+                            ui.label(RichText::new(display_name).color(color).strong());
+                            if override_name.is_some() {
+                                ui.label(RichText::new(format!("({})", sender_name)).italics().small());
+                            }
+                        });
+                    })
+                    .response;
+
+                if let Some(user) = user {
+                    user_resp.context_menu_styled(|ui| {
+                        view_member_context_menu_items(ui, state, guild_id, message.sender, guild, user);
+                    });
+                }
+
+                match &message.content {
+                    client::message::Content::Text(text) => {
+                        self.view_message_text_content(state, ui, id, guild_id, channel_id, text);
+                        self.view_message_url_embeds(state, ui, text);
+                    }
+                    client::message::Content::Files(attachments) => {
+                        for attachment in attachments {
+                            self.view_message_attachment(state, ui, attachment);
+                        }
+                    }
+                    client::message::Content::Embeds(embeds) => {
+                        for embed in embeds {
+                            self.view_message_embed(ui, embed);
+                        }
+                    }
+                }
+            })
+            .response;
+
+        msg.context_menu_styled(|ui| {
+            if let Some(message_id) = id.id() {
+                if let client::message::Content::Text(text) = &message.content {
+                    if channel.has_perm(all_permissions::MESSAGES_SEND)
+                        && message.sender == user_id
+                        && ui.button("edit").clicked()
+                    {
+                        self.editing_message = id.id();
+                        let edit_text = self.edit_message_composer.text_mut();
+                        edit_text.clear();
+                        edit_text.push_str(text);
+                        ui.close_menu();
+                    }
+                    if ui.button("reply").clicked() {
+                        let composer_text = self.composer.text_mut();
+                        composer_text.clear();
+                        composer_text.push_str("> ");
+                        composer_text.push_str(text);
+                        composer_text.push('\n');
+                        ui.close_menu();
+                    }
+                    if ui.button("copy").clicked() {
+                        ui.output().copied_text = text.clone();
+                        ui.close_menu();
+                    }
+                }
+                if message.sender == state.client().user_id() && ui.button(dangerous_text("delete")).clicked() {
+                    spawn_client_fut!(state, |client| {
+                        client.delete_message(guild_id, channel_id, message_id).await
+                    });
+                    ui.close_menu();
+                }
+                if channel.pinned_messages.contains(&message_id) {
+                    if channel.has_perm(all_permissions::MESSAGES_PINS_REMOVE) && ui.button("unpin").clicked() {
+                        spawn_client_fut!(state, |client| {
+                            client.unpin_message(guild_id, channel_id, message_id).await
+                        });
+                        ui.close_menu();
+                    }
+                } else if channel.has_perm(all_permissions::MESSAGES_PINS_ADD) && ui.button("pin").clicked() {
+                    spawn_client_fut!(state, |client| {
+                        client.pin_message(guild_id, channel_id, message_id).await
+                    });
+                    ui.close_menu();
+                }
+                if ui.button("toggle highlighting").clicked() {
+                    let key = (guild_id, channel_id, *id);
+                    let is_highlighted = self.dont_highlight_message.contains(&key).not();
+                    if is_highlighted {
+                        self.dont_highlight_message.insert(key);
+                    } else {
+                        self.dont_highlight_message.remove(&key);
+                    }
+                    ui.close_menu();
+                }
+            }
+        });
+    }
+
+    fn view_messages(&mut self, state: &State, ui: &mut Ui) {
         let Some((guild_id, channel_id)) = self.current.channel() else { return };
         let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return };
         let Some(guild) = state.cache.get_guild(guild_id) else { return };
@@ -544,108 +703,7 @@ impl Screen {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for (id, message) in channel.messages.continuous_view().all_messages() {
-                    let msg = ui
-                        .group_filled_with(loqui_style::BG_LIGHT)
-                        .stroke((0.0, Color32::WHITE).into())
-                        .margin([5.0, 5.0])
-                        .show(ui, |ui| {
-                            let overrides = message.overrides.as_ref();
-                            let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
-                            let user = state.cache.get_user(message.sender);
-                            let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
-                            let display_name = override_name.unwrap_or(sender_name);
-
-                            let color = guild
-                                .highest_role_for_member(message.sender)
-                                .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
-
-                            let user_resp = ui
-                                .scope(|ui| {
-                                    ui.horizontal(|ui| {
-                                        let extreme_bg_color = ui.style().visuals.extreme_bg_color;
-                                        self.view_user_avatar(state, ui, user, overrides, extreme_bg_color);
-                                        ui.label(RichText::new(display_name).color(color).strong());
-                                        if override_name.is_some() {
-                                            ui.label(RichText::new(format!("({})", sender_name)).italics().small());
-                                        }
-                                    });
-                                })
-                                .response;
-
-                            if let Some(user) = user {
-                                user_resp.context_menu_styled(|ui| {
-                                    view_member_context_menu_items(ui, state, guild_id, message.sender, guild, user);
-                                });
-                            }
-
-                            match &message.content {
-                                client::message::Content::Text(text) => {
-                                    self.view_message_text_content(state, ui, id, guild_id, channel_id, text);
-                                    self.view_message_url_embeds(state, ui, text);
-                                }
-                                client::message::Content::Files(attachments) => {
-                                    for attachment in attachments {
-                                        self.view_message_attachment(state, ui, attachment);
-                                    }
-                                }
-                                client::message::Content::Embeds(embeds) => {
-                                    for embed in embeds {
-                                        self.view_message_embed(ui, embed);
-                                    }
-                                }
-                            }
-                        })
-                        .response;
-
-                    msg.context_menu_styled(|ui| {
-                        if let Some(message_id) = id.id() {
-                            if let client::message::Content::Text(text) = &message.content {
-                                if channel.has_perm(all_permissions::MESSAGES_SEND)
-                                    && message.sender == user_id
-                                    && ui.button("edit").clicked()
-                                {
-                                    self.editing_message = id.id();
-                                    let edit_text = self.edit_message_composer.text_mut();
-                                    edit_text.clear();
-                                    edit_text.push_str(text);
-                                    ui.close_menu();
-                                }
-                                if ui.button("reply").clicked() {
-                                    let composer_text = self.composer.text_mut();
-                                    composer_text.clear();
-                                    composer_text.push_str("> ");
-                                    composer_text.push_str(text);
-                                    composer_text.push('\n');
-                                    ui.close_menu();
-                                }
-                                if ui.button("copy").clicked() {
-                                    ui.output().copied_text = text.clone();
-                                    ui.close_menu();
-                                }
-                            }
-                            if message.sender == state.client().user_id()
-                                && ui.button(dangerous_text("delete")).clicked()
-                            {
-                                spawn_client_fut!(state, |client| {
-                                    client.delete_message(guild_id, channel_id, message_id).await
-                                });
-                                ui.close_menu();
-                            }
-                            if channel.has_perm(all_permissions::MESSAGES_PINS_ADD) && ui.button("pin").clicked() {
-                                ui.close_menu();
-                            }
-                            if ui.button("toggle highlighting").clicked() {
-                                let key = (guild_id, channel_id, *id);
-                                let is_highlighted = self.dont_highlight_message.contains(&key).not();
-                                if is_highlighted {
-                                    self.dont_highlight_message.insert(key);
-                                } else {
-                                    self.dont_highlight_message.remove(&key);
-                                }
-                                ui.close_menu();
-                            }
-                        }
-                    });
+                    self.view_message(state, ui, guild, channel, message, guild_id, channel_id, id, user_id);
                 }
                 if self.scroll_to_bottom {
                     ui.scroll_to_cursor(egui::Align::Max);
@@ -989,7 +1047,12 @@ impl Screen {
     #[inline(always)]
     fn show_channel_bar(&mut self, ui: &mut Ui, state: &mut State) {
         let interact_size = ui.style().spacing.interact_size;
-        let top_channel_bar_width = ui.available_width() - 8.0 - self.current.has_guild().then(|| 5.0).unwrap_or(0.0);
+        let top_channel_bar_width = ui.available_width()
+            - 8.0
+            - self.current.has_guild().then(|| 6.0).unwrap_or(0.0)
+            - self.current.has_channel().then(|| 6.0).unwrap_or(0.0);
+        let is_mobile = ui.ctx().is_mobile();
+
         ui.allocate_ui([top_channel_bar_width, interact_size.y].into(), |ui| {
             let frame = egui::Frame {
                 margin: [4.0, 2.0].into(),
@@ -1002,7 +1065,7 @@ impl Screen {
                 ui.horizontal(|ui| {
                     ui.style_mut().spacing.item_spacing = egui::Vec2::ZERO;
 
-                    if self.current.has_channel() && ui.ctx().is_mobile() {
+                    if self.current.has_channel() && is_mobile {
                         let show_guilds_but = ui
                             .add_sized([12.0, interact_size.y], TextButton::text("☰").small())
                             .on_hover_text("show guilds / channels");
@@ -1021,8 +1084,19 @@ impl Screen {
                     ui.label(RichText::new(chan_name).strong());
                     ui.add_sized([8.0, interact_size.y], egui::Separator::default().spacing(4.0));
 
+                    let mut offset = 0.0;
+                    if self.current.has_channel() {
+                        offset += 12.0;
+                    }
                     if self.current.has_guild() {
-                        ui.offsetw(24.0);
+                        offset += 12.0;
+                    }
+                    if is_mobile {
+                        offset += 12.0;
+                    }
+                    ui.offsetw(offset);
+
+                    if self.current.has_guild() {
                         let show_members_but = ui
                             .add_sized([12.0, interact_size.y], TextButton::text("👤"))
                             .on_hover_text("toggle member list");
@@ -1030,15 +1104,24 @@ impl Screen {
                             self.toggle_panel(Panel::Members);
                             self.disable_users_bar = !self.disable_users_bar;
                         }
-                    } else {
-                        ui.offsetw(12.0);
                     }
 
-                    let settings_but = ui
-                        .add_sized([12.0, interact_size.y], TextButton::text("⚙"))
-                        .on_hover_text("settings");
-                    if settings_but.clicked() {
-                        state.push_screen(settings::Screen::new(state));
+                    if self.current.has_channel() {
+                        let pinned_msgs_but = ui
+                            .add_sized([12.0, interact_size.y], TextButton::text("📌"))
+                            .on_hover_text("show pinned messages");
+                        if pinned_msgs_but.clicked() {
+                            self.show_pinned_messages = true;
+                        }
+                    }
+
+                    if is_mobile {
+                        let settings_but = ui
+                            .add_sized([12.0, interact_size.y], TextButton::text("⚙"))
+                            .on_hover_text("settings");
+                        if settings_but.clicked() {
+                            state.push_screen(settings::Screen::new(state));
+                        }
                     }
                 });
             });
@@ -1087,6 +1170,7 @@ impl AppScreen for Screen {
 
         self.view_join_guild(state, ctx);
         self.view_create_guild(state, ctx);
+        self.view_pinned_messages(state, ctx);
 
         let panel_frame = egui::Frame {
             margin: Vec2::new(8.0, 8.0),
