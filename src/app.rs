@@ -319,8 +319,10 @@ impl epi::App for App {
         // post ui update handling
 
         if let Some(screen) = self.state.next_screen.take() {
+            self.screens.current_mut().on_push(ctx, frame, &mut self.state);
             self.screens.push_boxed(screen);
         } else if self.state.prev_screen {
+            self.screens.current_mut().on_pop(ctx, frame, &mut self.state);
             self.screens.pop();
             self.state.prev_screen = false;
         }

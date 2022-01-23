@@ -13,7 +13,6 @@ use super::prelude::*;
 pub struct Screen {
     user_name_edit_text: String,
     uploading_user_pic: AtomBool,
-    is_saving_config: AtomBool,
     scale_factor: f32,
 }
 
@@ -25,95 +24,77 @@ impl Screen {
                 .this_user(&state.cache)
                 .map_or_else(String::new, |m| m.username.to_string()),
             uploading_user_pic: AtomBool::new(false),
-            is_saving_config: AtomBool::new(false),
             scale_factor: ctx.pixels_per_point(),
         }
     }
 
+    fn save_config(&self, state: &State) {
+        let conf = state.config.clone();
+        let local_conf = state.local_config.clone();
+
+        spawn_client_fut!(state, |client| {
+            let res = conf.store(&client).await;
+            local_conf.store();
+            res
+        });
+    }
+
     fn view_app(&mut self, state: &mut State, ui: &mut Ui) {
-        let is_saving = self.is_saving_config.get();
+        ui.horizontal(|ui| {
+            ui.spacing_mut().slider_width = 90.0;
 
-        ui.add_enabled_ui(is_saving.not(), |ui| {
-            let save_resp = ui
-                .horizontal(|ui| {
-                    let resp = ui.button("save");
-                    if is_saving {
-                        ui.add(egui::Spinner::new());
-                    }
-                    resp
-                })
-                .inner;
+            ui.add(
+                egui::Slider::new(&mut self.scale_factor, 0.5..=5.0)
+                    .logarithmic(true)
+                    .clamp_to_range(true)
+                    .text("Scale"),
+            )
+            .on_hover_text("Physical pixels per point.");
 
-            if save_resp.clicked() {
-                let conf = state.config.clone();
-                let local_conf = state.local_config.clone();
-
-                let is_saving_config = self.is_saving_config.clone();
-                spawn_client_fut!(state, |client| {
-                    is_saving_config.set(true);
-                    let res = conf.store(&client).await;
-                    local_conf.store();
-                    is_saving_config.set(false);
-                    res
-                });
+            if let Some(native_pixels_per_point) = state
+                .integration_info
+                .as_ref()
+                .and_then(|info| info.native_pixels_per_point)
+            {
+                let enabled = self.scale_factor != native_pixels_per_point;
+                if ui
+                    .add_enabled(enabled, egui::Button::new("Reset"))
+                    .on_hover_text(format!("Reset scale to native value ({:.1})", native_pixels_per_point))
+                    .clicked()
+                {
+                    self.scale_factor = native_pixels_per_point;
+                }
             }
 
-            ui.horizontal(|ui| {
-                ui.spacing_mut().slider_width = 90.0;
+            if ui.ctx().is_using_pointer().not() {
+                state.local_config.scale_factor = self.scale_factor;
+            }
+        });
 
-                ui.add(
-                    egui::Slider::new(&mut self.scale_factor, 0.5..=5.0)
-                        .logarithmic(true)
-                        .clamp_to_range(true)
-                        .text("Scale"),
-                )
-                .on_hover_text("Physical pixels per point.");
+        ui.horizontal(|ui| {
+            ui.label("background image:");
 
-                if let Some(native_pixels_per_point) = state
-                    .integration_info
-                    .as_ref()
-                    .and_then(|info| info.native_pixels_per_point)
-                {
-                    let enabled = self.scale_factor != native_pixels_per_point;
-                    if ui
-                        .add_enabled(enabled, egui::Button::new("Reset"))
-                        .on_hover_text(format!("Reset scale to native value ({:.1})", native_pixels_per_point))
-                        .clicked()
-                    {
-                        self.scale_factor = native_pixels_per_point;
-                    }
+            let chosen_image = match &state.config.bg_image {
+                BgImage::External(s) => format!("▼ external: {}", s),
+                BgImage::Local(s) => format!("▼ local: {}", s),
+                BgImage::Default => "▼ default".to_string(),
+                BgImage::None => "▼ none".to_string(),
+            };
+
+            ui.menu_button(chosen_image, |ui| {
+                if ui.button("choose file").clicked() {
+                    ui.close_menu();
                 }
 
-                if ui.ctx().is_using_pointer().not() {
-                    state.local_config.scale_factor = self.scale_factor;
+                if ui.button("none").clicked() {
+                    state.config.bg_image = BgImage::None;
+                    ui.close_menu();
                 }
-            });
 
-            ui.horizontal(|ui| {
-                ui.label("background image:");
-
-                let chosen_image = match &state.config.bg_image {
-                    BgImage::External(s) => format!("▼ external: {}", s),
-                    BgImage::Local(s) => format!("▼ local: {}", s),
-                    BgImage::Default => "▼ default".to_string(),
-                    BgImage::None => "▼ none".to_string(),
-                };
-
-                ui.menu_button(chosen_image, |ui| {
-                    if ui.button("choose file").clicked() {
-                        ui.close_menu();
-                    }
-
-                    if ui.button("none").clicked() {
-                        state.config.bg_image = BgImage::None;
-                        ui.close_menu();
-                    }
-
-                    if ui.button("default").clicked() {
-                        state.config.bg_image = BgImage::Default;
-                        ui.close_menu();
-                    }
-                });
+                if ui.button("default").clicked() {
+                    state.config.bg_image = BgImage::Default;
+                    ui.close_menu();
+                }
             });
         });
     }
@@ -176,5 +157,13 @@ impl AppScreen for Screen {
                 });
             });
         });
+    }
+
+    fn on_pop(&mut self, _: &egui::Context, _: &epi::Frame, state: &mut State) {
+        self.save_config(state);
+    }
+
+    fn on_push(&mut self, _: &egui::Context, _: &epi::Frame, state: &mut State) {
+        self.save_config(state);
     }
 }
