@@ -1285,8 +1285,9 @@ impl Client {
         match post {
             PostProcessEvent::CheckPermsForChannel(guild_id, channel_id) => {
                 let perm_queries = [
-                    "channels.manage.change-information",
-                    "messages.send",
+                    all_permissions::MESSAGES_VIEW,
+                    all_permissions::CHANNELS_MANAGE_CHANGE_INFORMATION,
+                    all_permissions::MESSAGES_SEND,
                     all_permissions::MESSAGES_PINS_ADD,
                     all_permissions::MESSAGES_PINS_REMOVE,
                 ];

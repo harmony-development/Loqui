@@ -1,18 +1,12 @@
 use std::{
     cell::RefCell,
     ops::Not,
-    sync::{
-        mpsc::{self, Receiver},
-        Arc, RwLock,
-    },
+    sync::{mpsc::Receiver, Arc, RwLock},
 };
 
 use client::{
     harmony_rust_sdk::{
-        api::{
-            chat::Event,
-            rest::{About, FileId},
-        },
+        api::rest::{About, FileId},
         client::{EventsReadSocket, EventsSocket},
     },
     message::{Content, Message},
@@ -32,7 +26,6 @@ use crate::{
 
 pub struct State {
     pub socket_rx_tx: tokio_mpsc::Sender<EventsReadSocket>,
-    pub socket_event_rx: mpsc::Receiver<Event>,
     pub client: Option<Client>,
     pub cache: Cache,
     pub image_cache: ImageCache,
@@ -78,7 +71,7 @@ impl State {
                                 tracing::error!("failed to post process event: {}", err);
                             }
                         }
-                        else => std::hint::spin_loop(),
+                        else => break,
                     }
                 }
             });
@@ -102,8 +95,8 @@ impl State {
         let reset_socket = AtomBool::new(false);
 
         let (socket_rx_tx, mut socket_rx_rx) = tokio_mpsc::channel::<EventsReadSocket>(2);
-        let (socket_event_tx, socket_event_rx) = mpsc::channel::<Event>();
         {
+            let event_tx = event_tx.clone();
             let reset_socket = reset_socket.clone();
             futures.spawn(async move {
                 let mut rx = socket_rx_rx.recv().await.expect("closed");
@@ -116,7 +109,7 @@ impl State {
                         res = rx.get_event(), if reset_socket.get().not() => {
                             match res {
                                 Ok(Some(ev)) => {
-                                    if socket_event_tx.send(ev).is_err() {
+                                    if event_tx.send(FetchEvent::Harmony(ev)).is_err() {
                                         reset_socket.set(true);
                                     }
                                 }
@@ -127,7 +120,7 @@ impl State {
                                 _ => {}
                             }
                         }
-                        else => std::hint::spin_loop(),
+                        else => break,
                     }
                 }
             });
@@ -138,7 +131,6 @@ impl State {
 
         Self {
             socket_rx_tx,
-            socket_event_rx,
             reset_socket,
             connecting_socket: false,
             is_connected: false,
@@ -169,7 +161,6 @@ impl State {
         self.handle_errors();
         self.handle_sockets();
         self.handle_images(ctx);
-        self.handle_socket_events();
 
         self.cache.maintain();
     }
@@ -294,17 +285,6 @@ impl State {
                 self.loading_images.borrow_mut().remove(pos);
             }
             self.image_cache.add(ctx, image);
-        }
-    }
-
-    #[inline(always)]
-    fn handle_socket_events(&mut self) {
-        let mut evs = Vec::new();
-        while let Ok(ev) = self.socket_event_rx.try_recv() {
-            evs.push(FetchEvent::Harmony(ev));
-        }
-        if !evs.is_empty() {
-            self.futures.spawn(std::future::ready(ClientResult::Ok(evs)));
         }
     }
 

@@ -1,4 +1,4 @@
-use ahash::AHashSet;
+use indexmap::IndexSet;
 
 use crate::role::RolePerms;
 
@@ -11,7 +11,7 @@ pub struct Channel {
     pub name: SmolStr,
     pub is_category: bool,
     pub messages: Messages,
-    pub pinned_messages: AHashSet<u64>,
+    pub pinned_messages: IndexSet<u64>,
     pub reached_top: bool,
     pub perms: Vec<Permission>,
     pub role_perms: RolePerms,
