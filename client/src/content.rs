@@ -23,8 +23,17 @@ pub use web::*;
 #[cfg(target_arch = "wasm32")]
 pub mod web {
     use gloo_storage::{LocalStorage, Storage};
+    use serde::{de::DeserializeOwned, Serialize};
 
     use crate::Session;
+
+    pub fn set_local_config<T: Serialize>(name: &str, val: &T) {
+        let _ = <LocalStorage as Storage>::set(name, val);
+    }
+
+    pub fn get_local_config<T: DeserializeOwned>(name: &str) -> Option<T> {
+        <LocalStorage as Storage>::get(name).ok()
+    }
 
     pub fn get_latest_session() -> Option<Session> {
         <LocalStorage as Storage>::get("latest_session").ok()
@@ -43,10 +52,23 @@ pub mod web {
 pub mod native {
     use crate::{error::ClientError, Session};
     use harmony_rust_sdk::client::api::rest::FileId;
+    use serde::{de::DeserializeOwned, Serialize};
     use std::path::{Path, PathBuf};
 
     lazy_static::lazy_static! {
         static ref STORE: ContentStore = ContentStore::default();
+    }
+
+    pub fn set_local_config<T: Serialize>(name: &str, val: &T) {
+        let config_path = STORE.config_dir().join(name);
+        let raw = toml::to_vec(val).expect("must be valid serde struct");
+        std::fs::write(config_path, raw).expect("failed to write");
+    }
+
+    pub fn get_local_config<T: DeserializeOwned>(name: &str) -> Option<T> {
+        let config_path = STORE.config_dir().join(name);
+        let raw = std::fs::read(config_path).ok()?;
+        toml::from_slice(&raw).ok()
     }
 
     pub fn get_latest_session() -> Option<Session> {
@@ -69,6 +91,7 @@ pub mod native {
     pub const SESSIONS_DIR_NAME: &str = "sessions";
     pub const LOG_FILENAME: &str = "log";
     pub const CONTENT_DIR_NAME: &str = "content";
+    pub const CONFIG_DIR_NAME: &str = "config";
 
     #[derive(Debug, Clone)]
     pub struct ContentStore {
@@ -76,19 +99,26 @@ pub mod native {
         sessions_dir: PathBuf,
         log_file: PathBuf,
         content_dir: PathBuf,
+        config_dir: PathBuf,
     }
 
     impl Default for ContentStore {
         fn default() -> Self {
-            let (sessions_dir, log_file, content_dir) =
+            let (sessions_dir, log_file, content_dir, config_dir) =
                 match directories_next::ProjectDirs::from("nodomain", "yusdacra", "loqui") {
                     Some(app_dirs) => (
                         app_dirs.data_dir().join(SESSIONS_DIR_NAME),
                         app_dirs.data_dir().join(LOG_FILENAME),
                         app_dirs.cache_dir().join(CONTENT_DIR_NAME),
+                        app_dirs.config_dir().to_path_buf(),
                     ),
                     // Fallback to current working directory if no HOME is present
-                    None => (SESSIONS_DIR_NAME.into(), LOG_FILENAME.into(), CONTENT_DIR_NAME.into()),
+                    None => (
+                        SESSIONS_DIR_NAME.into(),
+                        LOG_FILENAME.into(),
+                        CONTENT_DIR_NAME.into(),
+                        CONFIG_DIR_NAME.into(),
+                    ),
                 };
 
             Self {
@@ -96,6 +126,7 @@ pub mod native {
                 sessions_dir,
                 log_file,
                 content_dir,
+                config_dir,
             }
         }
     }
@@ -125,24 +156,34 @@ pub mod native {
             create_dir_all(self.content_dir())?;
             create_dir_all(self.sessions_dir())?;
             create_dir_all(self.log_file().parent().unwrap_or_else(|| Path::new(".")))?;
+            create_dir_all(self.config_dir())?;
 
             Ok(())
         }
 
+        #[inline(always)]
         pub fn latest_session_file(&self) -> &Path {
             self.latest_session_file.as_path()
         }
 
+        #[inline(always)]
         pub fn content_dir(&self) -> &Path {
             self.content_dir.as_path()
         }
 
+        #[inline(always)]
         pub fn sessions_dir(&self) -> &Path {
             self.sessions_dir.as_path()
         }
 
+        #[inline(always)]
         pub fn log_file(&self) -> &Path {
             self.log_file.as_path()
+        }
+
+        #[inline(always)]
+        pub fn config_dir(&self) -> &Path {
+            self.config_dir.as_path()
         }
     }
 }

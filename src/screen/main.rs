@@ -1121,7 +1121,7 @@ impl Screen {
                             .add_sized([12.0, interact_size.y], TextButton::text("⚙"))
                             .on_hover_text("settings");
                         if settings_but.clicked() {
-                            state.push_screen(settings::Screen::new(state));
+                            state.push_screen(settings::Screen::new(ui.ctx(), state));
                         }
                     }
                 });
@@ -1240,8 +1240,9 @@ impl AppScreen for Screen {
             } else {
                 central_panel.show(ctx, |ui| {
                     ui.centered_and_justified(|ui| {
-                        ui.add(egui::Spinner::new().size(ui.style().spacing.interact_size.y * 4.0))
-                    });
+                        ui.add(egui::Spinner::new().size(ui.style().spacing.interact_size.y * 3.0));
+                        ui.label(RichText::new("loading...").heading());
+                    })
                 });
             }
         }

@@ -14,10 +14,11 @@ pub struct Screen {
     user_name_edit_text: String,
     uploading_user_pic: AtomBool,
     is_saving_config: AtomBool,
+    scale_factor: f32,
 }
 
 impl Screen {
-    pub fn new(state: &State) -> Self {
+    pub fn new(ctx: &egui::Context, state: &State) -> Self {
         Self {
             user_name_edit_text: state
                 .client()
@@ -25,6 +26,7 @@ impl Screen {
                 .map_or_else(String::new, |m| m.username.to_string()),
             uploading_user_pic: AtomBool::new(false),
             is_saving_config: AtomBool::new(false),
+            scale_factor: ctx.pixels_per_point(),
         }
     }
 
@@ -41,16 +43,51 @@ impl Screen {
                     resp
                 })
                 .inner;
+
             if save_resp.clicked() {
                 let conf = state.config.clone();
+                let local_conf = state.local_config.clone();
+
                 let is_saving_config = self.is_saving_config.clone();
                 spawn_client_fut!(state, |client| {
                     is_saving_config.set(true);
                     let res = conf.store(&client).await;
+                    local_conf.store();
                     is_saving_config.set(false);
                     res
                 });
             }
+
+            ui.horizontal(|ui| {
+                ui.spacing_mut().slider_width = 90.0;
+
+                ui.add(
+                    egui::Slider::new(&mut self.scale_factor, 0.5..=5.0)
+                        .logarithmic(true)
+                        .clamp_to_range(true)
+                        .text("Scale"),
+                )
+                .on_hover_text("Physical pixels per point.");
+
+                if let Some(native_pixels_per_point) = state
+                    .integration_info
+                    .as_ref()
+                    .and_then(|info| info.native_pixels_per_point)
+                {
+                    let enabled = self.scale_factor != native_pixels_per_point;
+                    if ui
+                        .add_enabled(enabled, egui::Button::new("Reset"))
+                        .on_hover_text(format!("Reset scale to native value ({:.1})", native_pixels_per_point))
+                        .clicked()
+                    {
+                        self.scale_factor = native_pixels_per_point;
+                    }
+                }
+
+                if ui.ctx().is_using_pointer().not() {
+                    state.local_config.scale_factor = self.scale_factor;
+                }
+            });
 
             ui.horizontal(|ui| {
                 ui.label("background image:");

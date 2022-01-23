@@ -1,9 +1,26 @@
 use client::{
+    content,
     error::{ClientError, ClientResult},
     harmony_rust_sdk::api::profile::{GetAppDataRequest, SetAppDataRequest},
     Client,
 };
 use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Default, Debug, Deserialize, Serialize)]
+pub struct LocalConfig {
+    #[serde(default)]
+    pub scale_factor: f32,
+}
+
+impl LocalConfig {
+    pub fn load() -> Self {
+        content::get_local_config::<Self>("config").unwrap_or_default()
+    }
+
+    pub fn store(&self) {
+        content::set_local_config("config", self)
+    }
+}
 
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct Config {

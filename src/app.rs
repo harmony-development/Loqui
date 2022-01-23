@@ -72,7 +72,7 @@ impl App {
     }
 
     #[inline(always)]
-    fn view_bottom_panel(&mut self, ui: &mut Ui) {
+    fn view_bottom_panel(&mut self, ui: &mut Ui, frame: &epi::Frame) {
         ui.horizontal_top(|ui| {
             ui.style_mut().spacing.item_spacing = egui::vec2(2.0, 0.0);
 
@@ -121,7 +121,7 @@ impl App {
 
                     if ui.ctx().is_mobile().not() && ui.button("settings").clicked() {
                         self.state
-                            .push_screen(super::screen::settings::Screen::new(&self.state));
+                            .push_screen(super::screen::settings::Screen::new(ui.ctx(), &self.state));
                         ui.close_menu();
                     }
 
@@ -135,7 +135,8 @@ impl App {
 
                     #[cfg(not(target_arch = "wasm32"))]
                     if ui.button("exit loqui").clicked() {
-                        std::process::exit(0);
+                        frame.quit();
+                        ui.close_menu();
                     }
 
                     if ui.button("egui debug").clicked() {
@@ -223,6 +224,16 @@ impl epi::App for App {
     }
 
     fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
+        self.state.integration_info = Some(frame.info());
+        if self.state.local_config.scale_factor < 0.5 {
+            self.state.local_config.scale_factor = self
+                .state
+                .integration_info
+                .as_ref()
+                .and_then(|info| info.native_pixels_per_point)
+                .unwrap_or(1.45);
+        }
+
         self.state.futures.init(frame);
         self.state.futures.spawn(async move {
             let Some(session) = Client::read_latest_session().await else { return Ok(None) };
@@ -277,7 +288,7 @@ impl epi::App for App {
 
         // ui drawing starts here
 
-        ctx.set_pixels_per_point(1.45);
+        ctx.set_pixels_per_point(self.state.local_config.scale_factor);
 
         let is_main_screen = self.screens.current().id() == "main";
         if self.state.is_connected.not() || is_main_screen.not() || ctx.is_mobile().not() {
@@ -293,7 +304,7 @@ impl epi::App for App {
                 .max_height(style.spacing.interact_size.y)
                 .min_height(style.spacing.interact_size.y)
                 .show(ctx, |ui| {
-                    self.view_bottom_panel(ui);
+                    self.view_bottom_panel(ui, frame);
                 });
         }
 

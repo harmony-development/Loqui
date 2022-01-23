@@ -12,14 +12,17 @@ use client::{
     message::{Content, Message},
     tracing, Cache, Client, EventSender, FetchEvent,
 };
-use eframe::egui::{self, TextureHandle, Vec2};
+use eframe::{
+    egui::{self, TextureHandle, Vec2},
+    epi::IntegrationInfo,
+};
 use instant::Instant;
 use tokio::sync::mpsc as tokio_mpsc;
 
 use super::utils::*;
 
 use crate::{
-    config::Config,
+    config::{Config, LocalConfig},
     futures::{Futures, UploadMessageResult},
     image_cache::{ImageCache, LoadedImage},
     screen::{BoxedScreen, Screen},
@@ -47,6 +50,8 @@ pub struct State {
     pub event_sender: EventSender,
     pub post_client_tx: tokio_mpsc::Sender<Client>,
     pub config: Config,
+    pub local_config: LocalConfig,
+    pub integration_info: Option<IntegrationInfo>,
 }
 
 impl State {
@@ -153,6 +158,8 @@ impl State {
             event_sender: event_tx,
             post_client_tx,
             config: Config::default(),
+            local_config: LocalConfig::load(),
+            integration_info: None,
         }
     }
 
