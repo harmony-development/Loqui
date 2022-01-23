@@ -21,6 +21,7 @@ pub struct App {
     show_errors_window: bool,
     show_about_window: bool,
     show_egui_debug: bool,
+    did_set_scale_factor: bool,
 }
 
 impl App {
@@ -34,6 +35,7 @@ impl App {
             show_errors_window: false,
             show_about_window: false,
             show_egui_debug: false,
+            did_set_scale_factor: false,
         }
     }
 
@@ -288,7 +290,11 @@ impl epi::App for App {
 
         // ui drawing starts here
 
-        ctx.set_pixels_per_point(self.state.local_config.scale_factor);
+        // HACK: remove this when `set_pixels_per_point` works in setup
+        if self.did_set_scale_factor.not() {
+            ctx.set_pixels_per_point(self.state.local_config.scale_factor);
+            self.did_set_scale_factor = true;
+        }
 
         let is_main_screen = self.screens.current().id() == "main";
         if self.state.is_connected.not() || is_main_screen.not() || ctx.is_mobile().not() {
@@ -326,5 +332,9 @@ impl epi::App for App {
             self.screens.pop();
             self.state.prev_screen = false;
         }
+    }
+
+    fn on_exit(&mut self) {
+        self.state.save_config();
     }
 }

@@ -163,6 +163,17 @@ impl State {
         }
     }
 
+    pub fn save_config(&self) {
+        let conf = self.config.clone();
+        let local_conf = self.local_config.clone();
+
+        spawn_client_fut!(self, |client| {
+            let res = conf.store(&client).await;
+            local_conf.store();
+            res
+        });
+    }
+
     pub fn maintain(&mut self, ctx: &egui::Context) {
         self.futures.run();
 

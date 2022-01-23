@@ -28,17 +28,6 @@ impl Screen {
         }
     }
 
-    fn save_config(&self, state: &State) {
-        let conf = state.config.clone();
-        let local_conf = state.local_config.clone();
-
-        spawn_client_fut!(state, |client| {
-            let res = conf.store(&client).await;
-            local_conf.store();
-            res
-        });
-    }
-
     fn view_app(&mut self, state: &mut State, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.spacing_mut().slider_width = 90.0;
@@ -68,6 +57,7 @@ impl Screen {
 
             if ui.ctx().is_using_pointer().not() {
                 state.local_config.scale_factor = self.scale_factor;
+                ui.ctx().set_pixels_per_point(state.local_config.scale_factor);
             }
         });
 
@@ -160,10 +150,10 @@ impl AppScreen for Screen {
     }
 
     fn on_pop(&mut self, _: &egui::Context, _: &epi::Frame, state: &mut State) {
-        self.save_config(state);
+        state.save_config();
     }
 
     fn on_push(&mut self, _: &egui::Context, _: &epi::Frame, state: &mut State) {
-        self.save_config(state);
+        state.save_config();
     }
 }
