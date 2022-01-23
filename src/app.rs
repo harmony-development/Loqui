@@ -2,7 +2,7 @@ use std::ops::Not;
 
 use client::Client;
 use eframe::{
-    egui::{self, Color32, FontData, FontDefinitions, TextureHandle, Ui, Vec2},
+    egui::{self, Color32, FontData, FontDefinitions, Ui, Vec2},
     epi,
 };
 
@@ -12,7 +12,7 @@ use crate::{
     screen::{auth, ScreenStack},
     state::State,
     style as loqui_style,
-    widgets::{view_about, view_egui_settings},
+    widgets::{view_egui_settings, About},
 };
 
 pub struct App {
@@ -189,7 +189,7 @@ impl App {
             .open(&mut self.show_about_window)
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    view_about(ui, about);
+                    ui.add(About::new(about.clone()));
                 });
             });
     }
@@ -204,20 +204,6 @@ impl App {
                 });
             });
     }
-
-    fn load_harmony_lotus(&self, ctx: &egui::Context) -> (TextureHandle, Vec2) {
-        const HARMONY_LOTUS: &[u8] = include_bytes!("../data/lotus.png");
-        let image = image::load_from_memory(HARMONY_LOTUS).expect("harmony lotus must be fine");
-        let image = image.into_rgba8();
-        let (w, h) = image.dimensions();
-        let size = [w as usize, h as usize];
-        let rgba = image.into_raw();
-        let texid = ctx.load_texture(
-            "harmony-lotus",
-            egui::ImageData::Color(egui::ColorImage::from_rgba_unmultiplied(size, &rgba)),
-        );
-        (texid, [w as f32, h as f32].into())
-    }
 }
 
 impl epi::App for App {
@@ -226,17 +212,8 @@ impl epi::App for App {
     }
 
     fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
-        self.state.integration_info = Some(frame.info());
-        if self.state.local_config.scale_factor < 0.5 {
-            self.state.local_config.scale_factor = self
-                .state
-                .integration_info
-                .as_ref()
-                .and_then(|info| info.native_pixels_per_point)
-                .unwrap_or(1.45);
-        }
+        self.state.init(ctx, frame);
 
-        self.state.futures.init(frame);
         self.state.futures.spawn(async move {
             let Some(session) = Client::read_latest_session().await else { return Ok(None) };
 
@@ -268,9 +245,6 @@ impl epi::App for App {
             .insert(egui::FontFamily::Monospace, vec!["hack".to_string()]);
 
         ctx.set_fonts(font_defs);
-
-        // load harmony lotus
-        self.state.harmony_lotus.replace(self.load_harmony_lotus(ctx));
 
         let mut style = ctx.style().as_ref().clone();
         style.visuals.widgets.hovered.bg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;

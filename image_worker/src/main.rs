@@ -2,7 +2,7 @@
 mod op {
     use js_sys::Uint8Array;
     use wasm_bindgen::{prelude::*, JsCast};
-    use web_sys::{DedicatedWorkerGlobalScope, MessageEvent, WorkerGlobalScope};
+    use web_sys::{DedicatedWorkerGlobalScope, MessageEvent};
 
     use image_worker::load_image;
 

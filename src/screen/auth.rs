@@ -13,7 +13,7 @@ use client::{
 };
 use eframe::egui::RichText;
 
-use crate::{config::Config, screen::main, widgets::view_about};
+use crate::{config::Config, screen::main, widgets::About};
 
 use super::prelude::*;
 
@@ -281,7 +281,7 @@ impl AppScreen for Screen {
                             ui.end_row();
                         }
                         ui.group(|ui| {
-                            view_about(ui, about);
+                            ui.add(About::new(about.clone()));
                         });
                     }
                 });

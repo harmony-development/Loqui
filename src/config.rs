@@ -6,8 +6,11 @@ use client::{
 };
 use serde::{Deserialize, Serialize};
 
+/// Application instance specific config. AKA not synced across different loqui
+/// instances (web, other desktops etc.).
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct LocalConfig {
+    /// Scale factor (pixels per point).
     #[serde(default)]
     pub scale_factor: f32,
 }
@@ -22,8 +25,10 @@ impl LocalConfig {
     }
 }
 
+/// Synced config across all loqui instances for a user.
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct Config {
+    /// Background image for this user.
     #[serde(default)]
     pub bg_image: BgImage,
 }
@@ -52,9 +57,13 @@ impl Config {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum BgImage {
+    /// Show the harmony lotus.
     Default,
+    /// Show nothing.
     None,
+    /// Show a local image.
     Local(String),
+    /// Fetch and show an external image.
     External(String),
 }
 

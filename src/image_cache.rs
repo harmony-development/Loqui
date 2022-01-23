@@ -17,14 +17,17 @@ impl ImageCache {
         }
     }
 
+    /// Get an avatar image. Avatars are always 64 x 64
     pub fn get_avatar(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
         self.avatar.get(id).map(|(tex, size)| (tex, *size))
     }
 
+    /// Get a minithumbnail image. Minithumbnails are always blurred
     pub fn get_thumbnail(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
         self.minithumbnail.get(id).map(|(tex, size)| (tex, *size))
     }
 
+    /// Get some image.
     pub fn get_image(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
         self.image.get(id).map(|(tex, size)| (tex, *size))
     }
@@ -55,10 +58,11 @@ pub mod op {
     use crate::utils::pool::Pool;
 
     use client::harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId};
+    use eframe::epi::backend::RepaintSignal;
     use egui::ColorImage;
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
     use js_sys::Uint8Array;
-    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender};
+    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender, sync::Arc};
     use wasm_bindgen::{prelude::*, JsCast};
     use web_sys::{MessageEvent, Worker as WebWorker};
 
@@ -80,14 +84,16 @@ pub mod op {
 
     struct WorkerPool {
         inner: Pool<WebWorker>,
-        channel: SyncOnceCell<Sender<LoadedImage>>,
+        channel: Sender<LoadedImage>,
+        rr: Arc<dyn RepaintSignal>,
     }
 
     impl WorkerPool {
-        fn init() -> Self {
+        fn new(chan: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) -> Self {
             Self {
                 inner: Pool::new(spawn_worker),
-                channel: SyncOnceCell::new(),
+                channel: chan,
+                rr,
             }
         }
     }
@@ -102,13 +108,10 @@ pub mod op {
 
     fn spawn_worker() -> WebWorker {
         let worker = WebWorker::new("./image_worker.js").expect("failed to start worker");
-        let tx = WORKER_POOL
-            .get()
-            .expect("must be initialized")
-            .channel
-            .get()
-            .expect("must be initialized")
-            .clone();
+
+        let pool = WORKER_POOL.get().expect("must be initialized");
+        let tx = pool.channel.clone();
+        let rr = pool.rr.clone();
 
         let handler = Closure::wrap(Box::new(move |event: MessageEvent| {
             let data: Uint8Array = event.data().dyn_into().unwrap_throw();
@@ -117,6 +120,7 @@ pub mod op {
             let loaded = unsafe { rkyv::archived_root::<ImageLoaded>(&data) };
             let image = LoadedImage::from_archive(loaded);
             let _ = tx.send(image);
+            rr.request_repaint();
         }) as Box<dyn FnMut(_)>);
 
         worker.set_onmessage(Some(handler.as_ref().unchecked_ref()));
@@ -126,11 +130,8 @@ pub mod op {
         worker
     }
 
-    pub fn set_image_channel(tx: Sender<LoadedImage>) {
-        let worker_pool = WorkerPool::init();
-        if worker_pool.channel.set(tx).is_err() {
-            unreachable!("image channel must only be set once -- this is a bug");
-        }
+    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) {
+        let worker_pool = WorkerPool::new(tx, rr);
         if WORKER_POOL.set(worker_pool).is_err() {
             unreachable!("worker pool must only be init once -- this is a bug");
         }
@@ -162,10 +163,13 @@ pub mod op {
 pub mod op {
     use super::*;
 
-    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender};
+    use std::{
+        lazy::SyncOnceCell,
+        sync::{mpsc::SyncSender as Sender, Arc},
+    };
 
     use client::harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId};
-    use eframe::egui::ColorImage;
+    use eframe::{egui::ColorImage, epi::backend::RepaintSignal};
 
     impl LoadedImage {
         pub fn load(data: Bytes, id: FileId, kind: String) -> Self {
@@ -179,11 +183,11 @@ pub mod op {
         }
     }
 
-    static CHANNEL: SyncOnceCell<Sender<LoadedImage>> = SyncOnceCell::new();
+    static CHANNEL: SyncOnceCell<(Sender<LoadedImage>, Arc<dyn RepaintSignal>)> = SyncOnceCell::new();
 
     /// This should only be called once.
-    pub fn set_image_channel(tx: Sender<LoadedImage>) {
-        if CHANNEL.set(tx).is_err() {
+    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) {
+        if CHANNEL.set((tx, rr)).is_err() {
             unreachable!("image channel already set -- this is a bug");
         }
     }
@@ -193,7 +197,8 @@ pub mod op {
         tokio::task::spawn_blocking(move || {
             let loaded = LoadedImage::load(data, id, kind);
             let chan = CHANNEL.get().expect("no image channel set -- this is a bug");
-            let _ = chan.send(loaded);
+            let _ = chan.0.send(loaded);
+            chan.1.request_repaint();
         });
     }
 }

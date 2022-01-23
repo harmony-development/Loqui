@@ -54,10 +54,6 @@ fn main() {
     eframe::run_native(Box::new(app), native_options);
 }
 
-/// This is the entry-point for all the web-assembly.
-/// This is called once from the HTML.
-/// It loads the app, installs some callbacks, then returns.
-/// You can add more callbacks like this if you want to call in to your code.
 #[cfg(target_arch = "wasm32")]
 fn main() -> Result<(), eframe::wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();

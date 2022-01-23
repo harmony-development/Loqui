@@ -11,13 +11,18 @@ use client::{
     member::Member,
     tracing, Cache, Client, Uri,
 };
-use eframe::egui::{self, Color32, Context, Frame, Key, Pos2, Response, RichText, Ui, Vec2, Widget, WidgetText};
+use eframe::egui::{
+    self, Color32, Context, Frame, Key, Pos2, Response, RichText, TextureHandle, Ui, Vec2, Widget, WidgetText,
+};
 
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs};
 use crate::{state::State, style, widgets::TextButton};
 pub use anyhow::{anyhow, bail, ensure, Error};
 pub use client::error::{ClientError, ClientResult};
 
+/// A wrapper around an `Arc<AtomicBool>`.
+///
+/// Mostly useful for keeping track of whether a future has finished or not.
 #[derive(Default, Clone)]
 pub struct AtomBool {
     inner: Arc<AtomicBool>,
@@ -42,6 +47,7 @@ impl AtomBool {
 }
 
 pub trait ClientExt {
+    /// Returns the current logged-in user.
     fn this_user<'a>(&self, cache: &'a Cache) -> Option<&'a Member>;
 }
 
@@ -53,8 +59,12 @@ impl ClientExt for Client {
 }
 
 pub trait ResponseExt {
+    /// Did the user submit the text input? Intended for sigleline text inputs.
     fn did_submit(&self, ui: &Ui) -> bool;
+    /// Shows some text at the pointer on hover.
     fn on_hover_text_at_pointer(self, text: &str) -> Self;
+    /// Shows a stylized context menu. This should be used instead of the
+    /// normal `context_menu` function, because it will style it correctly.
     fn context_menu_styled(self, add_contents: impl FnOnce(&mut Ui)) -> Self;
 }
 
@@ -79,11 +89,20 @@ impl ResponseExt for Response {
 }
 
 pub trait UiExt {
+    /// Shows a text button
     fn text_button(&mut self, text: impl Into<WidgetText>) -> Response;
+    /// Animates via a tracking bool and returns the anim value. Automatically
+    /// resets the animation if the anim value reaches 0.0 / 1.0
+    ///
+    /// mostly useful for animations that loop, eg. typing anim
     fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32;
+    /// Adds a widget if the current ui is hovered.
     fn add_hovered(&mut self, widget: impl Widget) -> Response;
+    /// Creates a group frame filled with the passed color.
     fn group_filled_with(&self, color: Color32) -> Frame;
+    /// Creates a group frame filled with the window fill color.
     fn group_filled(&self) -> Frame;
+    /// Fills all the available width, except the passed offset.
     fn offsetw(&mut self, offset: f32);
 }
 
@@ -124,7 +143,9 @@ impl UiExt for Ui {
 }
 
 pub trait CtxExt {
+    /// Returns the center of the available rect currently.
     fn available_center_pos(&self, offset_size: Vec2) -> Pos2;
+    /// Are we on mobile or not?
     fn is_mobile(&self) -> bool;
 }
 
@@ -137,6 +158,8 @@ impl CtxExt for Context {
 
     fn is_mobile(&self) -> bool {
         let input = self.input();
+        // HACK: we should check whether or not we are on hidpi here...
+        // otherwise `input.pixels_per_point() > 2.0` will break!
         input.screen_rect().aspect_ratio() < 1.1 || input.pixels_per_point() > 2.0
     }
 }
@@ -153,6 +176,7 @@ impl CtxExt for Ui {
     }
 }
 
+/// Truncate some string.
 #[allow(dead_code)]
 pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
     if value.chars().count() > new_len {
@@ -165,6 +189,7 @@ pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
     }
 }
 
+/// Sorts members by alphabet and offline / online.
 pub fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64, &'a Member)> {
     let mut sorted_members = guild
         .members
@@ -193,16 +218,19 @@ pub fn scale_down(w: f32, h: f32, max_size: f32) -> (f32, f32) {
     (new_w, new_h)
 }
 
+/// Converts u8 array to egui color.
 #[inline(always)]
-pub fn rgb_color(color: [u8; 3]) -> Color32 {
+pub const fn rgb_color(color: [u8; 3]) -> Color32 {
     Color32::from_rgb(color[0], color[1], color[2])
 }
 
+/// Returns a text that represents a "dangerous" action (ie. red color).
 #[inline(always)]
 pub fn dangerous_text(text: impl Into<String>) -> RichText {
     RichText::new(text).color(Color32::RED)
 }
 
+/// Construct a URL from a harmony file ID.
 pub fn make_url_from_file_id(client: &Client, id: &FileId) -> String {
     match id {
         FileId::Hmc(hmc) => format!(
@@ -251,11 +279,26 @@ pub fn open_url(url: impl Deref<Target = str> + Send + 'static) {
     }
 }
 
+/// Parse URLs from some text. Treats whitespace as seperators.
 pub fn parse_urls(text: &str) -> impl Iterator<Item = (&str, Uri)> {
     text.split_whitespace()
         .filter(|s| s.starts_with("http://") || s.starts_with("https://"))
         .filter_map(|maybe_url| Some((maybe_url, maybe_url.parse::<Uri>().ok()?)))
         .filter(|(_, url)| matches!(url.scheme_str(), Some("http" | "https")))
+}
+
+pub fn load_harmony_lotus(ctx: &egui::Context) -> (TextureHandle, Vec2) {
+    const HARMONY_LOTUS: &[u8] = include_bytes!("../data/lotus.png");
+    let image = image::load_from_memory(HARMONY_LOTUS).expect("harmony lotus must be fine");
+    let image = image.into_rgba8();
+    let (w, h) = image.dimensions();
+    let size = [w as usize, h as usize];
+    let rgba = image.into_raw();
+    let texid = ctx.load_texture(
+        "harmony-lotus",
+        egui::ImageData::Color(egui::ColorImage::from_rgba_unmultiplied(size, &rgba)),
+    );
+    (texid, [w as f32, h as f32].into())
 }
 
 /// simple not thread safe object pooling

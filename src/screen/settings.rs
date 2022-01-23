@@ -5,7 +5,7 @@ use eframe::egui::RichText;
 
 use crate::{
     config::BgImage,
-    widgets::{seperated_collapsing, view_egui_settings, Avatar},
+    widgets::{view_egui_settings, Avatar, SeperatedCollapsingHeader},
 };
 
 use super::prelude::*;
@@ -135,13 +135,18 @@ impl AppScreen for Screen {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-                    seperated_collapsing(ui, "app", false, |ui| {
-                        self.view_app(state, ui);
-                    });
-                    seperated_collapsing(ui, "profile", false, |ui| {
-                        self.view_profile(state, ui);
-                    });
-                    seperated_collapsing(ui, "egui settings (advanced)", false, |ui| {
+                    SeperatedCollapsingHeader::new("profile")
+                        .with(|h| h.default_open(true))
+                        .show(ui, |ui| {
+                            self.view_profile(state, ui);
+                        });
+                    SeperatedCollapsingHeader::new("app")
+                        .with(|h| h.default_open(true))
+                        .show(ui, |ui| {
+                            self.view_app(state, ui);
+                        });
+                    SeperatedCollapsingHeader::new("egui settings (advanced)").show(ui, |ui| {
+                        ui.label("note: these settings are not persisted");
                         view_egui_settings(ctx, ui);
                     });
                 });

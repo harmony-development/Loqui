@@ -5,7 +5,7 @@ use client::{
     guild::Guild,
     harmony_rust_sdk::api::{
         chat::all_permissions,
-        rest::{About, FileId},
+        rest::{About as AboutServer, FileId},
     },
     member::Member,
 };
@@ -21,6 +21,7 @@ use crate::{
 pub mod bg_image;
 pub mod easy_mark;
 
+/// A button that doesnt have a frame
 pub struct TextButton {
     inner: Button,
 }
@@ -54,26 +55,41 @@ impl Widget for TextButton {
     }
 }
 
-pub fn view_about(ui: &mut Ui, about: &About) {
-    ui.vertical(|ui| {
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(&about.server_name).heading().strong());
-            ui.label(&about.version);
-        });
-        ui.separator();
-        if about.about_server.is_empty().not() {
-            ui.label(&about.about_server);
-        } else {
-            ui.label("no about");
-        }
-        if about.message_of_the_day.is_empty().not() {
-            ui.label(format!("motd: {}", about.message_of_the_day));
-        } else {
-            ui.label("no motd");
-        }
-    });
+/// View server about info
+pub struct About {
+    about: AboutServer,
 }
 
+impl About {
+    pub fn new(about_server: AboutServer) -> Self {
+        Self { about: about_server }
+    }
+}
+
+impl Widget for About {
+    fn ui(self, ui: &mut Ui) -> Response {
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(self.about.server_name).heading().strong());
+                ui.label(self.about.version);
+            });
+            ui.separator();
+            if self.about.about_server.is_empty().not() {
+                ui.label(self.about.about_server);
+            } else {
+                ui.label("no about");
+            }
+            if self.about.message_of_the_day.is_empty().not() {
+                ui.label(format!("motd: {}", self.about.message_of_the_day));
+            } else {
+                ui.label("no motd");
+            }
+        })
+        .response
+    }
+}
+
+/// View an avatar
 pub struct Avatar<'a> {
     state: &'a State,
     maybe_id: Option<&'a FileId>,
@@ -120,22 +136,34 @@ impl<'a> Widget for Avatar<'a> {
     }
 }
 
-pub fn seperated_collapsing<R>(
-    ui: &mut Ui,
-    title: &str,
-    show_default: bool,
-    add_contents: impl FnOnce(&mut Ui) -> R,
-) -> CollapsingResponse<R> {
-    ui.horizontal_top(|ui| {
-        let resp = egui::CollapsingHeader::new(title)
-            .default_open(show_default)
-            .show(ui, add_contents);
-        ui.add(egui::Separator::default().horizontal());
-        resp
-    })
-    .inner
+/// A widget that shows a seperater horizontally next to the header.
+pub struct SeperatedCollapsingHeader {
+    inner: CollapsingHeader,
 }
 
+impl SeperatedCollapsingHeader {
+    pub fn new(text: impl Into<WidgetText>) -> Self {
+        Self {
+            inner: CollapsingHeader::new(text),
+        }
+    }
+
+    pub fn with(mut self, f: impl FnOnce(CollapsingHeader) -> CollapsingHeader) -> Self {
+        self.inner = f(self.inner);
+        self
+    }
+
+    pub fn show<R>(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> CollapsingResponse<R> {
+        ui.horizontal_top(|ui| {
+            let resp = self.inner.show(ui, add_contents);
+            ui.add(egui::Separator::default().horizontal());
+            resp
+        })
+        .inner
+    }
+}
+
+/// View egui settings
 pub fn view_egui_settings(ctx: &egui::Context, ui: &mut Ui) {
     ctx.settings_ui(ui);
     CollapsingHeader::new("Inspection")
@@ -146,6 +174,7 @@ pub fn view_egui_settings(ctx: &egui::Context, ui: &mut Ui) {
         .show(ui, |ui| ctx.memory_ui(ui));
 }
 
+/// View member related actions
 pub fn view_member_context_menu_items(
     ui: &mut Ui,
     state: &State,
@@ -172,6 +201,7 @@ pub fn view_member_context_menu_items(
     }
 }
 
+/// View channel related actions
 pub fn view_channel_context_menu_items(
     ui: &mut Ui,
     state: &State,

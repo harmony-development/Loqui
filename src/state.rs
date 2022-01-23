@@ -1,7 +1,10 @@
 use std::{
     cell::RefCell,
     ops::Not,
-    sync::{mpsc::Receiver, Arc, RwLock},
+    sync::{
+        mpsc::{Receiver, SyncSender},
+        Arc, RwLock,
+    },
 };
 
 use client::{
@@ -28,29 +31,62 @@ use crate::{
     screen::{BoxedScreen, Screen},
 };
 
+/// Big, monolithic struct that holds all state for everything.
 pub struct State {
+    /// State for managing the event socket ///
+    /// Channel to send new connected event sockets to the event processor task.
     pub socket_rx_tx: tokio_mpsc::Sender<EventsReadSocket>,
-    pub client: Option<Client>,
-    pub cache: Cache,
-    pub image_cache: ImageCache,
-    pub loading_images: RefCell<Vec<FileId>>,
-    pub uploading_files: Arc<RwLock<Vec<String>>>,
-    pub futures: Futures,
-    pub latest_errors: Vec<String>,
-    pub about: Option<About>,
-    pub harmony_lotus: Option<(TextureHandle, Vec2)>,
+    /// Whether to reset the socket or not.
     pub reset_socket: AtomBool,
+    /// Whether we are currently connecting a new socket or not.
     pub connecting_socket: bool,
+    /// Whether we are currently connected with a socket.
     pub is_connected: bool,
+    /// The amount of tries we tried to connect a socket, but failed.
     pub socket_retry_count: u8,
+    /// Last time we tried to connect to a socket.
     pub last_socket_retry: Option<Instant>,
-    pub images_rx: Receiver<LoadedImage>,
-    pub next_screen: Option<BoxedScreen>,
-    pub prev_screen: bool,
-    pub event_sender: EventSender,
-    pub post_client_tx: tokio_mpsc::Sender<Client>,
+
+    /// Config that is synced across all loqui instances for this user.
     pub config: Config,
+    /// Config that is local to this loqui instance.
     pub local_config: LocalConfig,
+
+    /// Futures task manager and output handler.
+    pub futures: Futures,
+
+    /// The current client. Will be `None` if none is connected.
+    pub client: Option<Client>,
+    /// The cache used to store everything harmony related.
+    pub cache: Cache,
+    /// Channel to send events to the cache for processing.
+    pub event_sender: EventSender,
+    /// Channel to send newly connected clients to the post event process task.
+    pub post_client_tx: tokio_mpsc::Sender<Client>,
+
+    /// Cache containing decoded images in memory.
+    pub image_cache: ImageCache,
+    /// Channel for receiving decoded images.
+    pub images_rx: Receiver<LoadedImage>,
+    /// Channel for decoded images to be sent.
+    pub images_tx: SyncSender<LoadedImage>,
+
+    /// Images we are currently loading.
+    pub loading_images: RefCell<Vec<FileId>>,
+    /// Files that are being uploaded.
+    pub uploading_files: Arc<RwLock<Vec<String>>>,
+    /// Screen to push to screen stack on next frame.
+    pub next_screen: Option<BoxedScreen>,
+    /// Whether pop the current screen on next frame.
+    pub prev_screen: bool,
+
+    /// Latest errors received.
+    pub latest_errors: Vec<String>,
+    /// About server information. Will be `None` if we aren't connected
+    /// to any server.
+    pub about: Option<About>,
+    /// The harmony lotus. This is loaded on app start.
+    pub harmony_lotus: Option<(TextureHandle, Vec2)>,
     pub integration_info: Option<IntegrationInfo>,
 }
 
@@ -134,7 +170,6 @@ impl State {
         }
 
         let (images_tx, images_rx) = std::sync::mpsc::sync_channel(100);
-        crate::image_cache::op::set_image_channel(images_tx);
 
         Self {
             socket_rx_tx,
@@ -155,6 +190,7 @@ impl State {
             next_screen: None,
             prev_screen: false,
             images_rx,
+            images_tx,
             event_sender: event_tx,
             post_client_tx,
             config: Config::default(),
@@ -163,6 +199,25 @@ impl State {
         }
     }
 
+    pub fn init(&mut self, ctx: &egui::Context, frame: &eframe::epi::Frame) {
+        crate::image_cache::op::set_image_channel(self.images_tx.clone(), frame.lock().repaint_signal.clone());
+
+        self.integration_info = Some(frame.info());
+        if self.local_config.scale_factor < 0.5 {
+            self.local_config.scale_factor = self
+                .integration_info
+                .as_ref()
+                .and_then(|info| info.native_pixels_per_point)
+                .unwrap_or(1.45);
+        }
+
+        self.futures.init(frame);
+
+        // load harmony lotus
+        self.harmony_lotus.replace(load_harmony_lotus(ctx));
+    }
+
+    /// Saves the current config in memory to disk.
     pub fn save_config(&self) {
         let conf = self.config.clone();
         let local_conf = self.local_config.clone();
@@ -174,6 +229,11 @@ impl State {
         });
     }
 
+    /// This must be run each frame to handle stuff like:
+    /// - completed future outputs,
+    /// - socket events,
+    /// - typing notifs,
+    /// - etc.
     pub fn maintain(&mut self, ctx: &egui::Context) {
         self.futures.run();
 
@@ -187,18 +247,24 @@ impl State {
         self.cache.maintain();
     }
 
+    /// Get the current client. Will panic if there is none.
     pub fn client(&self) -> &Client {
         self.client.as_ref().expect("client not initialized yet")
     }
 
+    /// Set a screen to be pushed onto the stack in the next frame.
     pub fn push_screen<S: Screen>(&mut self, screen: S) {
         self.next_screen = Some(Box::new(screen));
     }
 
+    /// Sets the state to pop the current screen in the next frame.
     pub fn pop_screen(&mut self) {
         self.prev_screen = true;
     }
 
+    /// Takes a result and runs a closure on it that takes the result's
+    /// success value. Will handle bad session and other connection errors,
+    /// and automatically push to `latest_errors`.
     pub fn run<F, E, O>(&mut self, res: Result<O, E>, f: F) -> bool
     where
         F: FnOnce(&mut Self, O),
@@ -218,6 +284,7 @@ impl State {
         }
     }
 
+    /// Reset socket state to disconnected.
     pub fn reset_socket_state(&mut self) {
         self.socket_retry_count = 0;
         self.last_socket_retry = None;

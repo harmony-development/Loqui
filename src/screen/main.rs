@@ -117,27 +117,53 @@ impl Default for PanelStack {
 
 #[derive(Default)]
 pub struct Screen {
-    // guild id -> channel id
+    /// guild id -> channel id
     last_channel_id: AHashMap<u64, u64>,
+    /// (guild id, channel id, message id)
+    /// if exists on this map, then dont show the message with rich text
     dont_highlight_message: AHashSet<(u64, u64, MessageId)>,
+    /// file id -> bool
+    /// if `true`, then we are (down)loading this attachment
     loading_attachment: AHashMap<FileId, AtomBool>,
+    /// current guild / channel
     current: CurrentIds,
     composer: EasyMarkEditor,
     edit_message_composer: EasyMarkEditor,
+    /// whether to scroll to bottom on next frame
     scroll_to_bottom: bool,
+    /// acked message id
+    /// the message the user is currently editing (or not)
     editing_message: Option<u64>,
+    /// acked message id
+    /// the message the user was editing before (or not)
     prev_editing_message: Option<u64>,
+    /// whether to show guild members list
     disable_users_bar: bool,
+    /// animate bool for typing anim
     typing_animating: bool,
-    invite_text: String,
-    guild_name_text: String,
+
+    /// guild join window ///
+    /// whether to show join guild window
     show_join_guild: bool,
+    /// invite id for the guild to join
+    invite_text: String,
+
+    /// guild create window ///
     show_create_guild: bool,
+    /// guild name we want to create with
+    guild_name_text: String,
+
+    /// pinned messages window ///
+    /// whether to show pinned messages window
     show_pinned_messages: bool,
+
+    /// panel stack keeping track of where we are / were
     panel_stack: PanelStack,
 }
 
 impl Screen {
+    /// toggle panel, if we are currently on the given panel then pop
+    /// otherwise push the panel to the stack
     fn toggle_panel(&mut self, panel: Panel) {
         if self.panel_stack.current() == panel {
             self.panel_stack.pop();
@@ -153,6 +179,7 @@ impl Screen {
         let user_id = state.client().user_id();
 
         let mut show_pinned_messages = self.show_pinned_messages;
+
         egui::Window::new("pinned messages")
             .open(&mut show_pinned_messages)
             .show(ctx, |ui| {

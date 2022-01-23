@@ -6,7 +6,9 @@ use client::{
 };
 use eframe::egui::{Color32, RichText};
 
-use crate::widgets::{seperated_collapsing, view_channel_context_menu_items, view_member_context_menu_items, Avatar};
+use crate::widgets::{
+    view_channel_context_menu_items, view_member_context_menu_items, Avatar, SeperatedCollapsingHeader,
+};
 
 use super::prelude::*;
 
@@ -246,11 +248,14 @@ impl AppScreen for Screen {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-                    seperated_collapsing(ui, "general", true, |ui| self.view_general(state, ui));
-                    seperated_collapsing(ui, "invites", false, |ui| self.view_invites(state, ui));
-                    seperated_collapsing(ui, "roles", false, |ui| self.view_roles(state, ui));
-                    seperated_collapsing(ui, "members", false, |ui| self.view_members(state, ui));
-                    seperated_collapsing(ui, "channels", false, |ui| self.view_channels(state, ui));
+                    SeperatedCollapsingHeader::new("general")
+                        .with(|h| h.default_open(true))
+                        .show(ui, |ui| self.view_general(state, ui));
+
+                    SeperatedCollapsingHeader::new("invites").show(ui, |ui| self.view_invites(state, ui));
+                    SeperatedCollapsingHeader::new("roles").show(ui, |ui| self.view_roles(state, ui));
+                    SeperatedCollapsingHeader::new("members").show(ui, |ui| self.view_members(state, ui));
+                    SeperatedCollapsingHeader::new("channels").show(ui, |ui| self.view_channels(state, ui));
                 });
             });
         });
