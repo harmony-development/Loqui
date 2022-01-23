@@ -104,6 +104,8 @@ pub trait UiExt {
     fn group_filled(&self) -> Frame;
     /// Fills all the available width, except the passed offset.
     fn offsetw(&mut self, offset: f32);
+    /// Downscale some size to fit the available width
+    fn downscale(&self, size: [f32; 2]) -> [f32; 2];
 }
 
 impl UiExt for Ui {
@@ -139,6 +141,14 @@ impl UiExt for Ui {
 
     fn offsetw(&mut self, offset: f32) {
         self.add_space(self.available_width() - offset);
+    }
+
+    fn downscale(&self, size: [f32; 2]) -> [f32; 2] {
+        let available_width = self.available_width() / 2.25_f32;
+        let [w, h] = size;
+        let max_size = (w < available_width).then(|| w).unwrap_or(available_width);
+        let (w, h) = scale_down(w, h, max_size);
+        [w as f32, h as f32]
     }
 }
 

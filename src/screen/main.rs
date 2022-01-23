@@ -162,6 +162,26 @@ pub struct Screen {
 }
 
 impl Screen {
+    fn is_fetching_attachment(&self, attachment: &Attachment) -> bool {
+        self.loading_attachment
+            .get(&attachment.id)
+            .map_or_else(|| attachment.is_thumbnail(), AtomBool::get)
+    }
+
+    fn download_file(&mut self, state: &State, attachment: Attachment) {
+        let image_load_bool = AtomBool::new(true);
+        self.loading_attachment
+            .insert(attachment.id.clone(), image_load_bool.clone());
+
+        spawn_evs!(state, |sender, client| {
+            let res = client.fetch_attachment(attachment.id.clone()).await;
+            image_load_bool.set(false);
+            let (_, file) = res?;
+            let _ = sender.send(FetchEvent::Attachment { attachment, file });
+            ClientResult::Ok(())
+        });
+    }
+
     /// toggle panel, if we are currently on the given panel then pop
     /// otherwise push the panel to the stack
     fn toggle_panel(&mut self, panel: Panel) {
@@ -415,8 +435,8 @@ impl Screen {
     }
 
     fn view_message_url_embeds(&mut self, state: &State, ui: &mut Ui, text: &str) {
-        let urls = parse_urls(text).filter_map(|(og, url)| Some((state.cache.get_link_data(&url)?, og)));
-        for (data, url) in urls {
+        let urls = parse_urls(text).filter_map(|(og, url)| Some((state.cache.get_link_data(&url)?, url, og)));
+        for (data, url, raw_url) in urls {
             match data {
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
                     let site_title_empty = data.site_title.is_empty().not();
@@ -440,8 +460,40 @@ impl Screen {
                     }
                 }
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsMedia(data) => {
-                    if ui.button(format!("open '{}' in browser", data.filename)).clicked() {
-                        open_url(url.to_string());
+                    let attachment = Attachment {
+                        name: data.filename.clone(),
+                        kind: data.mimetype.clone(),
+                        // we dont want the attachment to count as thumbnail
+                        size: u32::MAX,
+                        ..Attachment::new_unknown(FileId::External(url))
+                    };
+
+                    let mut download = false;
+                    let mut open = false;
+                    let is_fetching = self.is_fetching_attachment(&attachment);
+
+                    if is_fetching.not() {
+                        if attachment.is_raster_image() {
+                            if let Some((tex, size)) = state.image_cache.get_image(&attachment.id) {
+                                let size = ui.downscale(size);
+                                let open_but = ui.add(egui::ImageButton::new(tex.id(), size));
+                                open = open_but.clicked();
+                            } else {
+                                download = ui.button(format!("download '{}'", data.filename)).clicked();
+                            }
+                        } else {
+                            open = ui.button(format!("open '{}'", data.filename)).clicked();
+                        }
+                    } else {
+                        ui.add(egui::Spinner::new())
+                            .on_hover_text(format!("downloading '{}'", data.filename));
+                    }
+
+                    if open {
+                        open_url(raw_url.to_string());
+                    }
+                    if download {
+                        self.download_file(state, attachment);
                     }
                 }
             }
@@ -453,33 +505,22 @@ impl Screen {
         let mut fetch = false;
         let mut open = false;
 
-        if attachment.kind.starts_with("image") {
+        if attachment.is_raster_image() {
             let mut no_thumbnail = false;
-
-            let available_width = ui.available_width() / 3_f32;
-            let downscale = |size: [f32; 2]| {
-                let [w, h] = size;
-                let max_size = (w < available_width).then(|| w).unwrap_or(available_width);
-                let (w, h) = scale_down(w, h, max_size);
-                [w as f32, h as f32]
-            };
 
             let maybe_size = attachment
                 .resolution
-                .and_then(|(w, h)| (w == 0 || h == 0).not().then(|| downscale([w as f32, h as f32])));
+                .and_then(|(w, h)| (w == 0 || h == 0).not().then(|| ui.downscale([w as f32, h as f32])));
 
-            let is_fetching = self
-                .loading_attachment
-                .get(&attachment.id)
-                .map_or_else(|| attachment.is_thumbnail(), AtomBool::get);
+            let is_fetching = self.is_fetching_attachment(attachment);
 
             if let Some((texid, size)) = state.image_cache.get_image(&attachment.id) {
-                let size = maybe_size.unwrap_or_else(|| downscale(size));
+                let size = maybe_size.unwrap_or_else(|| ui.downscale(size));
                 let open_but = ui.add(egui::ImageButton::new(texid.id(), size));
                 open = open_but.clicked();
                 handled = true;
             } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
-                let size = maybe_size.unwrap_or_else(|| downscale(size));
+                let size = maybe_size.unwrap_or_else(|| ui.downscale(size));
                 let button = if is_fetching {
                     ui.add_sized(size, egui::Spinner::new().size(32.0))
                         .on_hover_text("loading image")
@@ -516,17 +557,7 @@ impl Screen {
         }
 
         if fetch {
-            let image_load_bool = AtomBool::new(true);
-            self.loading_attachment
-                .insert(attachment.id.clone(), image_load_bool.clone());
-
-            let attachment = attachment.clone();
-            spawn_client_fut!(state, |client| {
-                let res = client.fetch_attachment(attachment.id.clone()).await;
-                image_load_bool.set(false);
-                let (_, file) = res?;
-                ClientResult::Ok(vec![FetchEvent::Attachment { attachment, file }])
-            });
+            self.download_file(state, attachment.clone());
         }
 
         if open {
