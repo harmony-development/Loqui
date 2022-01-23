@@ -141,6 +141,18 @@ impl CtxExt for Context {
     }
 }
 
+impl CtxExt for Ui {
+    #[inline(always)]
+    fn available_center_pos(&self, offset_size: Vec2) -> Pos2 {
+        self.ctx().available_center_pos(offset_size)
+    }
+
+    #[inline(always)]
+    fn is_mobile(&self) -> bool {
+        self.ctx().is_mobile()
+    }
+}
+
 #[allow(dead_code)]
 pub fn truncate_string(value: &str, new_len: usize) -> Cow<'_, str> {
     if value.chars().count() > new_len {
