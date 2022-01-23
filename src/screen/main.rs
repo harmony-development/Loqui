@@ -13,6 +13,7 @@ use client::{
 use eframe::egui::{Color32, Event, RichText, Vec2};
 
 use crate::{
+    config::BgImage,
     futures::UploadMessageResult,
     screen::guild_settings,
     style as loqui_style,
@@ -1182,42 +1183,67 @@ impl AppScreen for Screen {
         if ctx.is_mobile() {
             central_panel.show(ctx, |ui| {
                 self.show_channel_bar(ui, state);
-                match self.panel_stack.current() {
-                    Panel::Messages => self.show_main_area(ui, state, ctx),
-                    Panel::Members => self.show_member_panel(ui, state),
-                    Panel::GuildChannels => {
-                        self.show_guild_panel(ui, state);
-                        if self.current.has_guild() {
-                            self.show_channel_panel(ui, state);
+
+                if state.cache.is_initial_sync_complete() {
+                    match self.panel_stack.current() {
+                        Panel::Messages => self.show_main_area(ui, state, ctx),
+                        Panel::Members => self.show_member_panel(ui, state),
+                        Panel::GuildChannels => {
+                            self.show_guild_panel(ui, state);
+                            if self.current.has_guild() {
+                                self.show_channel_panel(ui, state);
+                            }
                         }
                     }
+                } else {
+                    ui.centered_and_justified(|ui| {
+                        ui.add(egui::Spinner::new().size(ui.style().spacing.interact_size.y * 4.0))
+                    });
                 }
             });
         } else {
-            central_panel.show(ctx, |ui| {
-                let (texid, size) = state.harmony_lotus.as_ref().map(|(tex, size)| (tex, *size)).unwrap();
-                let size = size * 0.2;
-                ImageBg::new(texid.id(), size)
-                    .tint(Color32::WHITE.linear_multiply(0.05))
-                    .offset(ui.available_size() - (size * 0.8) - egui::vec2(75.0, 0.0))
-                    .show(ui, |ui| {
-                        self.show_guild_panel(ui, state);
+            let mut show_main = |state: &mut State, ui: &mut Ui| {
+                self.show_guild_panel(ui, state);
 
-                        if self.current.has_guild() {
-                            self.show_channel_panel(ui, state);
+                if self.current.has_guild() {
+                    self.show_channel_panel(ui, state);
 
-                            if !self.disable_users_bar {
-                                self.show_member_panel(ui, state);
-                            }
+                    if !self.disable_users_bar {
+                        self.show_member_panel(ui, state);
+                    }
 
-                            self.show_channel_bar(ui, state);
+                    self.show_channel_bar(ui, state);
 
-                            if self.current.has_channel() {
-                                self.show_main_area(ui, state, ctx);
-                            }
-                        }
+                    if self.current.has_channel() {
+                        self.show_main_area(ui, state, ctx);
+                    }
+                }
+            };
+
+            if state.cache.is_initial_sync_complete() {
+                central_panel.show(ctx, |ui| match state.config.bg_image {
+                    BgImage::None => show_main(state, ui),
+                    BgImage::Default => {
+                        let (texid, size) = state
+                            .harmony_lotus
+                            .as_ref()
+                            .map(|(tex, size)| (tex.id(), *size))
+                            .unwrap();
+                        let size = size * 0.2;
+                        ImageBg::new(texid, size)
+                            .tint(Color32::WHITE.linear_multiply(0.05))
+                            .offset(ui.available_size() - (size * 0.8) - egui::vec2(75.0, 0.0))
+                            .show(ui, |ui| show_main(state, ui));
+                    }
+                    _ => show_main(state, ui),
+                });
+            } else {
+                central_panel.show(ctx, |ui| {
+                    ui.centered_and_justified(|ui| {
+                        ui.add(egui::Spinner::new().size(ui.style().spacing.interact_size.y * 4.0))
                     });
-            });
+                });
+            }
         }
 
         self.prev_editing_message = self.editing_message;

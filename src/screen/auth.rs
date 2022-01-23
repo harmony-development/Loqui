@@ -13,7 +13,7 @@ use client::{
 };
 use eframe::egui::RichText;
 
-use crate::{screen::main, widgets::view_about};
+use crate::{config::Config, screen::main, widgets::view_about};
 
 use super::prelude::*;
 
@@ -77,7 +77,9 @@ impl Screen {
                         state.push_screen(main::Screen::default());
                         state.reset_socket.set(true);
                         spawn_evs!(state, |events, client| {
+                            let conf = Config::load(&client).await?;
                             client.initial_sync(events).await?;
+                            conf
                         });
                         spawn_client_fut!(state, |client| client.save_session_to().await);
                     }

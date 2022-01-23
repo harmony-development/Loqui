@@ -3,13 +3,17 @@ use std::ops::Not;
 use client::content;
 use eframe::egui::RichText;
 
-use crate::widgets::{seperated_collapsing, view_egui_settings, Avatar};
+use crate::{
+    config::BgImage,
+    widgets::{seperated_collapsing, view_egui_settings, Avatar},
+};
 
 use super::prelude::*;
 
 pub struct Screen {
     user_name_edit_text: String,
     uploading_user_pic: AtomBool,
+    is_saving_config: AtomBool,
 }
 
 impl Screen {
@@ -20,7 +24,61 @@ impl Screen {
                 .this_user(&state.cache)
                 .map_or_else(String::new, |m| m.username.to_string()),
             uploading_user_pic: AtomBool::new(false),
+            is_saving_config: AtomBool::new(false),
         }
+    }
+
+    fn view_app(&mut self, state: &mut State, ui: &mut Ui) {
+        let is_saving = self.is_saving_config.get();
+
+        ui.add_enabled_ui(is_saving.not(), |ui| {
+            let save_resp = ui
+                .horizontal(|ui| {
+                    let resp = ui.button("save");
+                    if is_saving {
+                        ui.add(egui::Spinner::new());
+                    }
+                    resp
+                })
+                .inner;
+            if save_resp.clicked() {
+                let conf = state.config.clone();
+                let is_saving_config = self.is_saving_config.clone();
+                spawn_client_fut!(state, |client| {
+                    is_saving_config.set(true);
+                    let res = conf.store(&client).await;
+                    is_saving_config.set(false);
+                    res
+                });
+            }
+
+            ui.horizontal(|ui| {
+                ui.label("background image:");
+
+                let chosen_image = match &state.config.bg_image {
+                    BgImage::External(s) => format!("▼ external: {}", s),
+                    BgImage::Local(s) => format!("▼ local: {}", s),
+                    BgImage::Default => "▼ default".to_string(),
+                    BgImage::None => "▼ none".to_string(),
+                };
+
+                ui.menu_button(chosen_image, |ui| {
+                    if ui.button("choose file").clicked() {
+                        ui.close_menu();
+                    }
+
+                    if ui.button("none").clicked() {
+                        state.config.bg_image = BgImage::None;
+                        ui.close_menu();
+                    }
+
+                    if ui.button("default").clicked() {
+                        state.config.bg_image = BgImage::Default;
+                        ui.close_menu();
+                    }
+                });
+            });
+        });
     }
 
     fn view_profile(&mut self, state: &mut State, ui: &mut Ui) {
@@ -69,7 +127,9 @@ impl AppScreen for Screen {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-                    seperated_collapsing(ui, "app", false, |_ui| {});
+                    seperated_collapsing(ui, "app", false, |ui| {
+                        self.view_app(state, ui);
+                    });
                     seperated_collapsing(ui, "profile", false, |ui| {
                         self.view_profile(state, ui);
                     });

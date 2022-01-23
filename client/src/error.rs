@@ -27,6 +27,20 @@ pub enum ClientError {
     Custom(String),
 }
 
+impl ClientError {
+    pub fn is_error_code(&self, code: &str) -> bool {
+        if let ClientError::Internal(InnerClientError::Internal(InternalClientError::EndpointError {
+            hrpc_error,
+            ..
+        })) = self
+        {
+            hrpc_error.identifier == code
+        } else {
+            false
+        }
+    }
+}
+
 impl Clone for ClientError {
     fn clone(&self) -> Self {
         use ClientError::*;

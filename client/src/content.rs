@@ -45,9 +45,12 @@ pub mod native {
     use harmony_rust_sdk::client::api::rest::FileId;
     use std::path::{Path, PathBuf};
 
+    lazy_static::lazy_static! {
+        static ref STORE: ContentStore = ContentStore::default();
+    }
+
     pub fn get_latest_session() -> Option<Session> {
-        let content_store = ContentStore::default();
-        let session_raw = std::fs::read(content_store.latest_session_file()).ok()?;
+        let session_raw = std::fs::read(STORE.latest_session_file()).ok()?;
         let session = toml::from_slice::<Session>(&session_raw)
             .map_err(|err| ClientError::Custom(err.to_string()))
             .ok()?;
@@ -55,14 +58,12 @@ pub mod native {
     }
 
     pub fn put_session(session: Session) {
-        let content_store = ContentStore::default();
         let serialized = toml::to_string_pretty(&session).expect("failed to serialize");
-        let _ = std::fs::write(content_store.latest_session_file(), serialized.into_bytes());
+        let _ = std::fs::write(STORE.latest_session_file(), serialized.into_bytes());
     }
 
     pub fn delete_latest_session() {
-        let content_store = ContentStore::default();
-        let _ = std::fs::remove_file(content_store.latest_session_file());
+        let _ = std::fs::remove_file(STORE.latest_session_file());
     }
 
     pub const SESSIONS_DIR_NAME: &str = "sessions";

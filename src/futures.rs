@@ -101,10 +101,8 @@ macro_rules! spawn_evs {
         $state.futures.spawn(async move {
             let _ev = _evs;
             let $ev = &_ev;
-            {
-                $fut
-            }
-            $crate::utils::ClientResult::Ok(())
+            let out = { $fut };
+            $crate::utils::ClientResult::Ok(out)
         });
     }};
 }

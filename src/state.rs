@@ -19,6 +19,7 @@ use tokio::sync::mpsc as tokio_mpsc;
 use super::utils::*;
 
 use crate::{
+    config::Config,
     futures::{Futures, UploadMessageResult},
     image_cache::{ImageCache, LoadedImage},
     screen::{BoxedScreen, Screen},
@@ -45,6 +46,7 @@ pub struct State {
     pub prev_screen: bool,
     pub event_sender: EventSender,
     pub post_client_tx: tokio_mpsc::Sender<Client>,
+    pub config: Config,
 }
 
 impl State {
@@ -150,6 +152,7 @@ impl State {
             images_rx,
             event_sender: event_tx,
             post_client_tx,
+            config: Config::default(),
         }
     }
 
@@ -161,6 +164,7 @@ impl State {
         self.handle_errors();
         self.handle_sockets();
         self.handle_images(ctx);
+        self.handle_config();
 
         self.cache.maintain();
     }
@@ -293,6 +297,15 @@ impl State {
         handle_future!(self, |res: ClientResult<About>| {
             self.run(res, |state, about| {
                 state.about = Some(about);
+            });
+        });
+    }
+
+    #[inline(always)]
+    fn handle_config(&mut self) {
+        handle_future!(self, |res: ClientResult<Config>| {
+            self.run(res, |state, config| {
+                state.config = config;
             });
         });
     }
