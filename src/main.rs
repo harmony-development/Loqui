@@ -34,7 +34,7 @@ fn main() {
         .init();
 
     let icon_data = {
-        let icon_raw = include_bytes!("../resources/loqui.ico");
+        let icon_raw = include_bytes!("../data/loqui.ico");
         let image = image::load_from_memory(icon_raw).expect("icon must be valid");
         let image = image.to_rgba8();
         eframe::epi::IconData {

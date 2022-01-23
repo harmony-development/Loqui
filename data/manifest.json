@@ -1,0 +1,10 @@
+{
+    "name": "Loqui",
+    "short_name": "loqui",
+    "start_url": "index.html",
+    "display": "standalone",
+    "background_color": "#151613",
+    "theme_color": "#ec943c",
+    "orientation": "landscape-primary",
+    "icons": []
+  }

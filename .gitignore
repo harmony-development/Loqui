@@ -5,6 +5,7 @@
 # Nix
 /result*
 /nix/result*
+/shell.nix
 
 # Direnv
 /.direnv

@@ -1,14 +1,24 @@
 <!DOCTYPE html>
 <html>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
-<!-- Disable zooming: -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.40, user-scalable=yes">
 
 <head>
     <title>loqui</title>
+    
+    <!-- trunk build drive config -->
     <link data-trunk rel="rust" data-type="main" href="Cargo.toml">
     <link data-trunk rel="rust" data-type="worker" href="image_worker/Cargo.toml">
+    <link data-trunk rel="copy-file" href="data/manifest.json">
+    <link data-trunk rel="icon" href="data/loqui.ico">
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="manifest.json" />
+    <!-- IOS stuff -->
+    <meta name="apple-mobile-web-app-status-bar" content="#ec943c" />
+    <meta name="theme-color" content="#ec943c" />
+    
     <style>
         html {
             /* Remove touch delay: */

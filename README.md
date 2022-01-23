@@ -1,12 +1,12 @@
-<img align="left" src="./resources/loqui.svg" width="150"/>
+<img align="left" src="./data/loqui.svg" width="150"/>
 <h1 align="left" style="font-weight: bold;">Loqui</h1>
 
 Loqui is a [Harmony] client written in Rust using the [egui] GUI library.
 It uses [harmony-rust-sdk] to communicate with Harmony servers.
 
-![Loqui](resources/main.jpg)
+![Loqui](./screenshots/main.jpg)
 
-[See more screenshots](./resources)
+[See more screenshots](./screenshots)
 
 ## Roadmap
 

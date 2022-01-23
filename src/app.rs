@@ -204,7 +204,7 @@ impl App {
     }
 
     fn load_harmony_lotus(&self, ctx: &egui::Context) -> (TextureHandle, Vec2) {
-        const HARMONY_LOTUS: &[u8] = include_bytes!("../resources/lotus.png");
+        const HARMONY_LOTUS: &[u8] = include_bytes!("../data/lotus.png");
         let image = image::load_from_memory(HARMONY_LOTUS).expect("harmony lotus must be fine");
         let image = image.into_rgba8();
         let (w, h) = image.dimensions();
