@@ -73,6 +73,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: check
     if: github.event_name == 'push'
+    env:
+      RUSTFLAGS: --cfg=web_sys_unstable_apis
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
