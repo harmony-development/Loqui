@@ -106,7 +106,7 @@ impl EasyMarkEditor {
 }
 
 fn shortcuts(ui: &Ui, code: &mut dyn TextBuffer, ccursor_range: &mut CCursorRange) -> bool {
-    let mut any_change = false;
+    /*let mut any_change = false;
     for event in &ui.input().events {
         if let Event::Key {
             key,
@@ -156,7 +156,8 @@ fn shortcuts(ui: &Ui, code: &mut dyn TextBuffer, ccursor_range: &mut CCursorRang
             }
         }
     }
-    any_change
+    any_change*/
+    false
 }
 
 /// E.g. toggle *strong* with `toggle(&mut text, &mut cursor, "*")`
