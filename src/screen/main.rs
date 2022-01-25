@@ -207,7 +207,9 @@ impl Screen {
                     for id in &channel.pinned_messages {
                         let id = MessageId::Ack(*id);
                         let Some(message) = channel.messages.view().get_message(&id) else { continue };
-                        self.view_message(state, ui, guild, channel, message, guild_id, channel_id, &id, user_id);
+                        self.view_message(
+                            state, ui, guild, channel, message, guild_id, channel_id, &id, user_id, true,
+                        );
                     }
                 });
             });
@@ -522,8 +524,12 @@ impl Screen {
             } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
                 let size = maybe_size.unwrap_or_else(|| ui.downscale(size));
                 let button = if is_fetching {
-                    ui.add_sized(size, egui::Spinner::new().size(32.0))
-                        .on_hover_text("loading image")
+                    ImageBg::new(texid.id(), size)
+                        .show(ui, |ui| {
+                            ui.add_sized(size, egui::Spinner::new().size(32.0))
+                                .on_hover_text_at_pointer("loading image")
+                        })
+                        .response
                 } else {
                     ui.add(egui::ImageButton::new(texid.id(), size))
                 };
@@ -532,7 +538,7 @@ impl Screen {
             } else if let Some(size) = maybe_size {
                 let button = if is_fetching {
                     ui.add_sized(size, egui::Spinner::new().size(32.0))
-                        .on_hover_text("loading image")
+                        .on_hover_text_at_pointer("loading image")
                 } else {
                     ui.add_sized(size, egui::Button::new(format!("download '{}'", attachment.name)))
                 };
@@ -638,39 +644,40 @@ impl Screen {
         channel_id: u64,
         id: &MessageId,
         user_id: u64,
+        display_user: bool,
     ) {
         let msg = ui
-            .group_filled_with(loqui_style::BG_LIGHT)
-            .stroke((0.0, Color32::WHITE).into())
-            .margin([5.0, 5.0])
-            .show(ui, |ui| {
-                let overrides = message.overrides.as_ref();
-                let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
+            .scope(|ui| {
                 let user = state.cache.get_user(message.sender);
-                let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
-                let display_name = override_name.unwrap_or(sender_name);
 
-                let color = guild
-                    .highest_role_for_member(message.sender)
-                    .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
+                if display_user {
+                    let overrides = message.overrides.as_ref();
+                    let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
+                    let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
+                    let display_name = override_name.unwrap_or(sender_name);
 
-                let user_resp = ui
-                    .scope(|ui| {
-                        ui.horizontal(|ui| {
-                            let extreme_bg_color = ui.style().visuals.extreme_bg_color;
-                            self.view_user_avatar(state, ui, user, overrides, extreme_bg_color);
-                            ui.label(RichText::new(display_name).color(color).strong());
-                            if override_name.is_some() {
-                                ui.label(RichText::new(format!("({})", sender_name)).italics().small());
-                            }
+                    let color = guild
+                        .highest_role_for_member(message.sender)
+                        .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
+
+                    let user_resp = ui
+                        .scope(|ui| {
+                            ui.horizontal(|ui| {
+                                let extreme_bg_color = ui.style().visuals.extreme_bg_color;
+                                self.view_user_avatar(state, ui, user, overrides, extreme_bg_color);
+                                ui.label(RichText::new(display_name).color(color).strong());
+                                if override_name.is_some() {
+                                    ui.label(RichText::new(format!("({})", sender_name)).italics().small());
+                                }
+                            });
+                        })
+                        .response;
+
+                    if let Some(user) = user {
+                        user_resp.context_menu_styled(|ui| {
+                            view_member_context_menu_items(ui, state, guild_id, message.sender, guild, user);
                         });
-                    })
-                    .response;
-
-                if let Some(user) = user {
-                    user_resp.context_menu_styled(|ui| {
-                        view_member_context_menu_items(ui, state, guild_id, message.sender, guild, user);
-                    });
+                    }
                 }
 
                 match &message.content {
@@ -762,7 +769,14 @@ impl Screen {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for (id, message) in channel.messages.continuous_view().all_messages() {
-                    self.view_message(state, ui, guild, channel, message, guild_id, channel_id, id, user_id);
+                    ui.group_filled_with(loqui_style::BG_LIGHT)
+                        .stroke((0.0, Color32::WHITE).into())
+                        .margin([5.0, 5.0])
+                        .show(ui, |ui| {
+                            self.view_message(
+                                state, ui, guild, channel, message, guild_id, channel_id, id, user_id, true,
+                            );
+                        });
                 }
                 if self.scroll_to_bottom {
                     ui.scroll_to_cursor(egui::Align::Max);
@@ -828,7 +842,7 @@ impl Screen {
         let user_inputted_text = ctx.input().events.iter().any(|ev| matches!(ev, Event::Text(_)));
         let should_focus_composer = (self.show_create_guild || self.show_join_guild).not()
             && text_edit.has_focus().not()
-            && self.editing_message.is_none()
+            && ctx.wants_keyboard_input().not()
             && user_inputted_text;
 
         if should_focus_composer {

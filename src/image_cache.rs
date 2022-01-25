@@ -116,6 +116,9 @@ pub mod op {
         let handler = Closure::wrap(Box::new(move |event: MessageEvent| {
             let data: Uint8Array = event.data().dyn_into().unwrap_throw();
             let data = data.to_vec();
+            if data.is_empty() {
+                return;
+            }
             #[allow(unsafe_code)]
             let loaded = unsafe { rkyv::archived_root::<ImageLoaded>(&data) };
             let image = LoadedImage::from_archive(loaded);
@@ -168,18 +171,27 @@ pub mod op {
         sync::{mpsc::SyncSender as Sender, Arc},
     };
 
-    use client::harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId};
+    use client::{
+        harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
+        tracing,
+    };
     use eframe::{egui::ColorImage, epi::backend::RepaintSignal};
 
     impl LoadedImage {
-        pub fn load(data: Bytes, id: FileId, kind: String) -> Self {
-            let loaded = image_worker::load_image_logic(data.as_ref(), kind.as_str());
+        pub fn load(data: Bytes, id: FileId, kind: String) -> Option<Self> {
+            let Some(loaded) = image_worker::load_image_logic(data.as_ref(), kind.as_str()) else {
+                tracing::error!(
+                    "could not load an image (id {}); most likely unsupported format",
+                    id
+                );
+                return None;
+            };
             let image = Image::Color(ColorImage::from_rgba_unmultiplied(
                 loaded.dimensions,
                 loaded.pixels.as_slice(),
             ));
 
-            Self { image, id, kind }
+            Some(Self { image, id, kind })
         }
     }
 
@@ -195,7 +207,7 @@ pub mod op {
     /// Do not call this before calling `set_image_channel`.
     pub fn decode_image(data: Bytes, id: FileId, kind: String) {
         tokio::task::spawn_blocking(move || {
-            let loaded = LoadedImage::load(data, id, kind);
+            let Some(loaded) = LoadedImage::load(data, id, kind) else { return };
             let chan = CHANNEL.get().expect("no image channel set -- this is a bug");
             let _ = chan.0.send(loaded);
             chan.1.request_repaint();

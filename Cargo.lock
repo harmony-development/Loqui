@@ -1367,6 +1367,7 @@ dependencies = [
  "image",
  "js-sys",
  "rkyv",
+ "tracing",
  "wasm-bindgen",
  "web-sys",
 ]
