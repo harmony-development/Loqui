@@ -1,7 +1,7 @@
 # Flake's default package for non-flake-enabled nix instances
 (import
   (
-    let lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+    let lock = builtins.fromJSON (builtins.readFile ../flake.lock);
     in
     fetchTarball {
       url =
