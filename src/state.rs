@@ -13,6 +13,7 @@ use client::{
         client::{EventsReadSocket, EventsSocket},
     },
     message::{Content, Message},
+    smol_str::SmolStr,
     tracing, Cache, Client, EventSender, FetchEvent,
 };
 use eframe::{
@@ -292,6 +293,14 @@ impl State {
         self.is_connected = false;
         self.connecting_socket = false;
         self.reset_socket.set(false);
+    }
+
+    pub fn get_member_display_name<'a>(&'a self, msg: &'a Message) -> &'a str {
+        let user = self.cache.get_user(msg.sender);
+        let overrides = msg.overrides.as_ref();
+        let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
+        let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
+        override_name.unwrap_or(sender_name)
     }
 
     #[inline(always)]

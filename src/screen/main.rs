@@ -772,14 +772,43 @@ impl Screen {
             .stick_to_bottom()
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                for (id, message) in channel.messages.continuous_view().all_messages() {
+                let all_messages = channel.messages.continuous_view().all_messages();
+                let chunked_messages =
+                    all_messages
+                        .into_iter()
+                        .fold(vec![Vec::<(&MessageId, &Message)>::new()], |mut tot, (id, msg)| {
+                            let is_same_author = tot
+                                .last()
+                                .and_then(|msgs| msgs.last())
+                                .map_or(false, |(_, omsg)| omsg.sender == msg.sender);
+                            let is_same_display_name =
+                                tot.last().and_then(|msgs| msgs.last()).map_or(false, |(_, omsg)| {
+                                    let odisp = state.get_member_display_name(omsg);
+                                    let disp = state.get_member_display_name(msg);
+                                    odisp == disp
+                                });
+                            if is_same_author && is_same_display_name {
+                                tot.last_mut().unwrap().push((id, msg));
+                            } else {
+                                tot.push(vec![(id, msg)]);
+                            }
+                            tot
+                        });
+                for mut chunk in chunked_messages {
                     ui.group_filled_with(loqui_style::BG_LIGHT)
                         .stroke((0.0, Color32::WHITE).into())
                         .margin([5.0, 5.0])
                         .show(ui, |ui| {
-                            self.view_message(
-                                state, ui, guild, channel, message, guild_id, channel_id, id, user_id, true,
-                            );
+                            if let Some((id, message)) = chunk.is_empty().not().then(|| chunk.remove(0)) {
+                                self.view_message(
+                                    state, ui, guild, channel, message, guild_id, channel_id, id, user_id, true,
+                                );
+                            }
+                            for (id, message) in chunk {
+                                self.view_message(
+                                    state, ui, guild, channel, message, guild_id, channel_id, id, user_id, false,
+                                );
+                            }
                         });
                 }
                 if self.scroll_to_bottom {
