@@ -203,6 +203,7 @@ impl State {
         crate::image_cache::op::set_image_channel(self.images_tx.clone(), frame.lock().repaint_signal.clone());
 
         self.integration_info = Some(frame.info());
+        #[cfg(not(target_arch = "wasm32"))]
         if self.local_config.scale_factor < 0.5 {
             self.local_config.scale_factor = self
                 .integration_info
