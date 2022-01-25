@@ -2,7 +2,7 @@ use std::ops::Not;
 
 use client::Client;
 use eframe::{
-    egui::{self, Color32, FontData, FontDefinitions, Ui, Vec2},
+    egui::{self, vec2, Color32, FontData, FontDefinitions, Ui, Vec2},
     epi,
 };
 
@@ -76,7 +76,7 @@ impl App {
     #[inline(always)]
     fn view_bottom_panel(&mut self, ui: &mut Ui, frame: &epi::Frame) {
         ui.horizontal_top(|ui| {
-            ui.style_mut().spacing.item_spacing = egui::vec2(2.0, 0.0);
+            ui.style_mut().spacing.item_spacing = vec2(2.0, 0.0);
 
             self.view_connection_status(ui);
 

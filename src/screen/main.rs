@@ -10,7 +10,7 @@ use client::{
     smol_str::SmolStr,
     AHashMap, AHashSet, FetchEvent,
 };
-use eframe::egui::{Color32, Event, RichText, Vec2};
+use eframe::egui::{vec2, Color32, Event, RichText, Vec2};
 
 use crate::{
     config::BgImage,
@@ -127,7 +127,11 @@ pub struct Screen {
     loading_attachment: AHashMap<FileId, AtomBool>,
     /// current guild / channel
     current: CurrentIds,
+    /// main message composer
     composer: EasyMarkEditor,
+    /// was the main composer focused in last frame
+    is_composer_focused: bool,
+    /// composer used for editing messages
     edit_message_composer: EasyMarkEditor,
     /// whether to scroll to bottom on next frame
     scroll_to_bottom: bool,
@@ -829,12 +833,12 @@ impl Screen {
         }
     }
 
-    fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::Context) {
+    fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::Context, desired_lines: usize) {
         let Some((guild_id, channel_id)) = self.current.channel() else { return };
 
         let text_edit = self
             .composer
-            .desired_rows(1)
+            .desired_rows(desired_lines)
             .desired_width(ui.available_width() - 36.0)
             .hint_text("Enter message...")
             .editor_ui(ui);
@@ -874,6 +878,8 @@ impl Screen {
                 spawn_client_fut!(state, |client| client.send_typing(guild_id, channel_id).await);
             }
         }
+
+        self.is_composer_focused = text_edit.has_focus();
     }
 
     fn view_uploading_attachments(&mut self, state: &State, ui: &mut Ui) {
@@ -1213,13 +1219,20 @@ impl Screen {
                             ui.horizontal(|ui| self.view_uploading_attachments(state, ui));
                         });
                     }
-                    ui.allocate_ui([ui.available_width(), ui.available_height() - 38.0].into(), |ui| {
-                        self.view_messages(state, ui);
-                    });
+
+                    let (desired_lines, extra_offset) = self.is_composer_focused.then(|| (4, 0.0)).unwrap_or((1, 14.0));
+                    let desired_height = (desired_lines as f32 * ui.style().spacing.interact_size.y) + extra_offset;
+                    ui.allocate_ui(
+                        vec2(ui.available_width(), ui.available_height() - desired_height),
+                        |ui| {
+                            self.view_messages(state, ui);
+                        },
+                    );
+
                     ui.group_filled().show(ui, |ui| {
                         self.view_typing_members(state, ui);
                         ui.horizontal(|ui| {
-                            self.view_composer(state, ui, ctx);
+                            self.view_composer(state, ui, ctx, desired_lines);
                             self.view_upload_button(state, ui);
                         });
                     });
@@ -1304,7 +1317,7 @@ impl AppScreen for Screen {
                         let size = size * 0.2;
                         ImageBg::new(texid, size)
                             .tint(Color32::WHITE.linear_multiply(0.05))
-                            .offset(ui.available_size() - (size * 0.8) - egui::vec2(75.0, 0.0))
+                            .offset(ui.available_size() - (size * 0.8) - vec2(75.0, 0.0))
                             .show(ui, |ui| show_main(state, ui));
                     }
                     _ => show_main(state, ui),
