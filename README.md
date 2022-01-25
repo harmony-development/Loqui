@@ -8,6 +8,8 @@ It uses [harmony-rust-sdk] to communicate with Harmony servers.
 
 [See more screenshots](./screenshots)
 
+Use it on your browser via https://loqui.harmonyapp.io 
+
 ## Roadmap
 
 - Voice channels (needs implementation in `scherzo` server first)
