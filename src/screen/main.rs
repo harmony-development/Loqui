@@ -1,4 +1,4 @@
-use std::ops::Not;
+use std::{ops::Not, path::PathBuf, sync::Arc};
 
 use client::{
     channel::Channel,
@@ -1240,6 +1240,75 @@ impl Screen {
             },
         );
     }
+
+    fn handle_dropped_files(&self, ctx: &egui::Context, state: &State) {
+        let Some((guild_id, channel_id)) = self.current.channel() else { return };
+
+        enum DataType {
+            Path(PathBuf),
+            Bytes { filename: String, bytes: Arc<[u8]> },
+        }
+
+        for file in ctx.input_mut().raw.dropped_files.drain(..) {
+            let data = file
+                .bytes
+                .map(|bytes| DataType::Bytes {
+                    bytes,
+                    filename: file.name,
+                })
+                .or_else(|| file.path.map(DataType::Path));
+
+            if let Some(data) = data {
+                let uploading_files = state.uploading_files.clone();
+                spawn_client_fut!(state, |client| {
+                    let (name, mimetype, data) = match data {
+                        DataType::Path(path) => {
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                let name = path
+                                    .file_name()
+                                    .map_or_else(|| "unknown".to_string(), |s| s.to_string_lossy().into_owned());
+                                let data = tokio::task::spawn_blocking(move || std::fs::read(path).unwrap())
+                                    .await
+                                    .unwrap();
+                                let mimetype = content::infer_type_from_bytes(&data);
+
+                                (name, mimetype, data)
+                            }
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                unreachable!("wasm does not send path");
+                            }
+                        }
+                        DataType::Bytes { filename, bytes } => {
+                            let name = filename;
+                            let data = bytes.to_vec();
+                            let mimetype = content::infer_type_from_bytes(&data);
+
+                            (name, mimetype, data)
+                        }
+                    };
+
+                    {
+                        let mut guard = uploading_files.write().expect("poisoned");
+                        guard.push(name.clone());
+                    }
+
+                    let id = client.upload_file(name.clone(), mimetype.clone(), data).await?;
+
+                    ClientResult::Ok(Some(UploadMessageResult {
+                        guild_id,
+                        channel_id,
+                        attachments: vec![Attachment {
+                            name,
+                            kind: mimetype,
+                            ..Attachment::new_unknown(id)
+                        }],
+                    }))
+                });
+            }
+        }
+    }
 }
 
 impl AppScreen for Screen {
@@ -1252,6 +1321,7 @@ impl AppScreen for Screen {
             self.editing_message = None;
         }
 
+        self.handle_dropped_files(ctx, state);
         self.handle_arrow_up_edit(ctx, state);
 
         self.view_join_guild(state, ctx);

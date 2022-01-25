@@ -1,3 +1,5 @@
+#![feature(let_else)]
+
 use std::convert::identity;
 
 use image::DynamicImage;
