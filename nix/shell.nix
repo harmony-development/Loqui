@@ -9,4 +9,4 @@
       sha256 = lock.nodes.flakeCompat.locked.narHash;
     }
   )
-  { src = ./.; }).shellNix.default
+  { src = ../.; }).shellNix.default
