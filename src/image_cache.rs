@@ -63,11 +63,7 @@ pub mod op {
     use js_sys::Uint8Array;
     use std::{
         lazy::SyncOnceCell,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            mpsc::SyncSender as Sender,
-            Arc, RwLock,
-        },
+        sync::{mpsc::SyncSender as Sender, Arc},
     };
     use wasm_bindgen::{prelude::*, JsCast};
     use web_sys::{MessageEvent, Worker as WebWorker};
@@ -88,81 +84,36 @@ pub mod op {
         }
     }
 
-    const INITIAL_WORKER_COUNT: usize = 4;
-
-    struct Worker {
-        inner: WebWorker,
-    }
-
-    #[allow(unsafe_code)]
-    unsafe impl Sync for Worker {}
-    #[allow(unsafe_code)]
-    unsafe impl Send for Worker {}
-
     struct WorkerPool {
-        inner: RwLock<Vec<(Arc<AtomicBool>, Arc<Worker>)>>,
-        tx: Sender<LoadedImage>,
-        rr: Arc<dyn RepaintSignal>,
+        inner: WebWorker,
     }
 
     impl WorkerPool {
         fn new(chan: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) -> Self {
             Self {
-                inner: RwLock::new(
-                    std::iter::repeat_with(|| {
-                        let is_usable = Arc::new(AtomicBool::new(true));
-                        let inner = spawn_worker(chan.clone(), rr.clone(), is_usable.clone());
-                        (is_usable, Arc::new(Worker { inner }))
-                    })
-                    .take(INITIAL_WORKER_COUNT)
-                    .collect(),
-                ),
-                tx: chan,
-                rr,
+                inner: spawn_worker(chan, rr),
             }
         }
 
-        fn get_worker(&self) -> Arc<Worker> {
-            #[allow(unsafe_code)]
-            unsafe {
-                let mut worker_index = None;
-
-                for (index, (is_usable, _)) in self.inner.read().unwrap_unchecked().iter().enumerate() {
-                    if is_usable.load(Ordering::SeqCst) {
-                        worker_index = Some(index);
-                    }
-                }
-
-                if worker_index.is_none() {
-                    let is_usable = Arc::new(AtomicBool::new(true));
-                    let inner = spawn_worker(self.tx.clone(), self.rr.clone(), is_usable.clone());
-                    let mut workers = self.inner.write().unwrap_unchecked();
-                    workers.push((is_usable, Arc::new(Worker { inner })));
-                    worker_index = Some(workers.len() - 1);
-                }
-
-                let worker_index = worker_index.unwrap_unchecked();
-
-                let workers = self.inner.read().unwrap_unchecked();
-                let (is_usable, worker) = workers.get(worker_index).unwrap_unchecked();
-
-                is_usable.store(false, Ordering::SeqCst);
-
-                worker.clone()
-            }
+        fn get_worker(&self) -> &WebWorker {
+            &self.inner
         }
     }
 
+    #[allow(unsafe_code)]
+    unsafe impl Sync for WorkerPool {}
+    #[allow(unsafe_code)]
+    unsafe impl Send for WorkerPool {}
+
     static WORKER_POOL: SyncOnceCell<WorkerPool> = SyncOnceCell::new();
 
-    fn spawn_worker(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>, is_usable: Arc<AtomicBool>) -> WebWorker {
+    fn spawn_worker(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) -> WebWorker {
         let worker = WebWorker::new("./image_worker.js").expect("failed to start worker");
 
         let handler = Closure::wrap(Box::new(move |event: MessageEvent| {
             let data: Uint8Array = event.data().dyn_into().unwrap_throw();
             let data = data.to_vec();
             if data.is_empty() {
-                is_usable.store(true, Ordering::SeqCst);
                 return;
             }
             #[allow(unsafe_code)]
@@ -170,7 +121,6 @@ pub mod op {
             let image = LoadedImage::from_archive(loaded);
             let _ = tx.send(image);
             rr.request_repaint();
-            is_usable.store(true, Ordering::SeqCst);
         }) as Box<dyn FnMut(_)>);
 
         worker.set_onmessage(Some(handler.as_ref().unchecked_ref()));
@@ -203,7 +153,6 @@ pub mod op {
             .get()
             .expect("must be initialized")
             .get_worker()
-            .inner
             .post_message(&data)
             .expect_throw("failed to decode image");
     }

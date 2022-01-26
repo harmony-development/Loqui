@@ -74,7 +74,7 @@ impl App {
     }
 
     #[inline(always)]
-    fn view_bottom_panel(&mut self, ui: &mut Ui, frame: &epi::Frame) {
+    fn view_bottom_panel(&mut self, ui: &mut Ui, _frame: &epi::Frame) {
         ui.horizontal_top(|ui| {
             ui.style_mut().spacing.item_spacing = vec2(2.0, 0.0);
 
@@ -137,7 +137,7 @@ impl App {
 
                     #[cfg(not(target_arch = "wasm32"))]
                     if ui.button("exit loqui").clicked() {
-                        frame.quit();
+                        _frame.quit();
                         ui.close_menu();
                     }
 
