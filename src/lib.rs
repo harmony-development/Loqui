@@ -1,4 +1,4 @@
-#![feature(let_else, once_cell, get_mut_unchecked)]
+#![feature(let_else, once_cell, get_mut_unchecked, drain_filter)]
 #![deny(unsafe_code)]
 
 pub(crate) mod app;

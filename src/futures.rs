@@ -2,6 +2,7 @@ use client::{message::Attachment, tracing};
 use eframe::epi::backend::RepaintSignal;
 use std::{
     any::Any,
+    cell::RefCell,
     future::Future,
     sync::{mpsc, Arc},
 };
@@ -20,7 +21,7 @@ pub struct UploadMessageResult {
 }
 
 pub struct Futures {
-    queue: Vec<AnyItem>,
+    queue: RefCell<Vec<AnyItem>>,
     rx: mpsc::Receiver<AnyItem>,
     tx: mpsc::Sender<AnyItem>,
     rr: Option<Arc<dyn RepaintSignal>>,
@@ -33,7 +34,7 @@ impl Futures {
             tx,
             rx,
             rr: None,
-            queue: Vec::new(),
+            queue: RefCell::new(Vec::new()),
         }
     }
 
@@ -63,32 +64,40 @@ impl Futures {
         });
     }
 
-    pub fn run(&mut self) {
+    /// Polls the futures for any output(s).
+    pub fn poll(&mut self) {
         while let Ok(item) = self.rx.try_recv() {
-            self.queue.push(item);
+            self.queue.get_mut().push(item);
         }
     }
 
-    pub fn get<T>(&mut self) -> Option<T>
+    /// Extract all outputs which have the type `T`.
+    ///
+    /// # Safety
+    ///
+    /// This is ONLY safe if:
+    /// 1. The queue is currently *not* being accessed. This should always be the case,
+    /// since `run` takes a mutable refence to self. `Futures` can also not be sent to
+    /// other threads because of `RefCell` usage.
+    /// 2. The returned iterator isn't kept longer than `self`. This should usually be the case,
+    /// if you use `handle_future` macro, which is safe.
+    #[allow(unsafe_code)]
+    pub unsafe fn get<T>(&self) -> impl Iterator<Item = T>
     where
         T: 'static,
     {
-        let mut to_get = None;
-        for (index, item) in self.queue.iter().enumerate() {
-            if std::any::TypeId::of::<T>() == item.as_ref().type_id() {
-                to_get = Some(index);
-            }
-        }
-        to_get.map(|index| {
-            let item = self.queue.remove(index);
-            *item.downcast::<T>().expect("cant fail, we compare type ids before")
-        })
+        let queue = self.queue.as_ptr().as_mut().expect("not null");
+
+        queue
+            .drain_filter(|item| std::any::TypeId::of::<T>() == item.as_ref().type_id())
+            .map(|item| *item.downcast::<T>().expect("cant fail, we compare type ids before"))
     }
 }
 
 macro_rules! handle_future {
     ($state:ident, |$val:ident: $val_ty:ty| $handler:expr) => {
-        while let Some($val) = $state.futures.get::<$val_ty>() {
+        #[allow(unsafe_code)]
+        for $val in unsafe { $state.futures.get::<$val_ty>() } {
             $handler
         }
     };

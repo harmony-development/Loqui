@@ -237,7 +237,7 @@ impl State {
     /// - typing notifs,
     /// - etc.
     pub fn maintain(&mut self, ctx: &egui::Context) {
-        self.futures.run();
+        self.futures.poll();
 
         self.handle_upload_message();
         self.handle_about();
@@ -295,6 +295,10 @@ impl State {
         self.reset_socket.set(false);
     }
 
+    /// Returns member display name for a message (ie. respecting overrides).
+    ///
+    /// It will return "unknown" if there is no override in the message and
+    /// the user isn't in the cache.
     pub fn get_member_display_name<'a>(&'a self, msg: &'a Message) -> &'a str {
         let user = self.cache.get_user(msg.sender);
         let overrides = msg.overrides.as_ref();
