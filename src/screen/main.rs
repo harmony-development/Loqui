@@ -777,17 +777,17 @@ impl Screen {
                     all_messages
                         .into_iter()
                         .fold(vec![Vec::<(&MessageId, &Message)>::new()], |mut tot, (id, msg)| {
-                            let is_same_author = tot
-                                .last()
-                                .and_then(|msgs| msgs.last())
-                                .map_or(false, |(_, omsg)| omsg.sender == msg.sender);
-                            let is_same_display_name =
-                                tot.last().and_then(|msgs| msgs.last()).map_or(false, |(_, omsg)| {
-                                    let odisp = state.get_member_display_name(omsg);
-                                    let disp = state.get_member_display_name(msg);
-                                    odisp == disp
-                                });
-                            if is_same_author && is_same_display_name {
+                            let last_chunk = tot.last().unwrap();
+
+                            let is_same_author = last_chunk.last().map_or(false, |(_, omsg)| omsg.sender == msg.sender);
+                            let is_same_display_name = last_chunk.last().map_or(false, |(_, omsg)| {
+                                let odisp = state.get_member_display_name(omsg);
+                                let disp = state.get_member_display_name(msg);
+                                odisp == disp
+                            });
+                            let is_chunk_big = last_chunk.len() > 5;
+
+                            if is_same_author && is_same_display_name && is_chunk_big.not() {
                                 tot.last_mut().unwrap().push((id, msg));
                             } else {
                                 tot.push(vec![(id, msg)]);
