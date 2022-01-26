@@ -892,7 +892,7 @@ impl Screen {
         let user_inputted_text = {
             let input = ctx.input();
             let has_text = input.events.iter().any(|ev| matches!(ev, Event::Text(_)));
-            let any_modifier = input.modifiers.any();
+            let any_modifier = input.modifiers.alt || input.modifiers.command;
             has_text && any_modifier.not()
         };
         let should_focus_composer = (self.show_create_guild || self.show_join_guild).not()
@@ -904,7 +904,10 @@ impl Screen {
             text_edit.request_focus();
         }
 
-        let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
+        let is_pressed = {
+            let input = ui.input();
+            input.key_pressed(egui::Key::Enter) && !input.modifiers.shift
+        };
         if self.composer.text().trim().is_empty().not() && text_edit.has_focus() && is_pressed {
             let text_string = self.composer.text().trim().to_string();
             self.composer.text_mut().clear();
