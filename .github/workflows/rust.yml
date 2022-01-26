@@ -102,14 +102,16 @@ jobs:
     - name: Build
       run: trunk build --release --public-url "Loqui/"
 
-    - name: Publish web
-      if: ${{ github.ref == 'refs/heads/master' && github.event_name == 'push' }}
-      uses: peaceiris/actions-gh-pages@v3
+    - uses: papeloto/action-zip@v1
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: dist/
-        publish_branch: gh-pages
+        files: dist/
+        dest: dist.zip
 
+    - name: Artifact web
+      uses: actions/upload-artifact@v2.3.1
+      with:
+        name: build-web
+        path: dist.zip
 
   build:
     runs-on: ${{ matrix.os }}
@@ -188,6 +190,7 @@ jobs:
           mv build-windows/loqui.exe build-windows/loqui-windows.exe
           mv build-linux/loqui build-linux/loqui-linux
           mv build-macos/loqui build-macos/loqui-macos
+          mv build-web/dist.zip build-web/web-dist.zip
           chmod +x build-{windows,linux,macos}/*
 
     - name: Upload release
@@ -196,4 +199,4 @@ jobs:
       run: |
           wget -q https://github.com/TheAssassin/pyuploadtool/releases/download/continuous/pyuploadtool-x86_64.AppImage
           chmod +x pyuploadtool-x86_64.AppImage
-          ./pyuploadtool-x86_64.AppImage build-windows/loqui-windows.exe build-linux/loqui-linux build-macos/loqui-macos
+          ./pyuploadtool-x86_64.AppImage build-windows/loqui-windows.exe build-linux/loqui-linux build-macos/loqui-macos build-web/web-dist.zip
