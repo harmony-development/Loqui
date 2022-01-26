@@ -144,7 +144,8 @@ impl UiExt for Ui {
     }
 
     fn downscale(&self, size: [f32; 2]) -> [f32; 2] {
-        let available_width = self.available_width() * 0.35_f32;
+        let width_scale = self.is_mobile().then(|| 0.9_f32).unwrap_or(0.25_f32);
+        let available_width = self.available_width() * width_scale;
         let [w, h] = size;
         let max_size = (w < available_width).then(|| w).unwrap_or(available_width);
         let (w, h) = scale_down(w, h, max_size);
@@ -225,7 +226,11 @@ pub fn scale_down(w: f32, h: f32, max_size: f32) -> (f32, f32) {
     let ratio = w / h;
     let new_w = max_size;
     let new_h = max_size / ratio;
-    (new_w, new_h)
+    if new_w > w {
+        (w, h)
+    } else {
+        (new_w, new_h)
+    }
 }
 
 /// Converts u8 array to egui color.

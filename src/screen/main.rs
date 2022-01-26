@@ -415,7 +415,7 @@ impl Screen {
     ) {
         ui.scope(|ui| {
             let weak_text = ui.visuals().weak_text_color();
-            let strong_text = ui.visuals().strong_text_color().linear_multiply(0.5);
+            let strong_text = ui.visuals().strong_text_color().linear_multiply(0.35);
             let color = is_failed
                 .then(|| Color32::RED)
                 .or_else(|| id.is_ack().then(|| strong_text))
