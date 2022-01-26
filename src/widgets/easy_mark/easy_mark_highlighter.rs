@@ -7,23 +7,23 @@ use super::easy_mark_parser;
 /// In practice, the highlighter is fast enough not to need any caching.
 #[derive(Default)]
 pub struct MemoizedEasymarkHighlighter {
-    visuals: egui::Visuals,
+    style: egui::Style,
     code: String,
     output: egui::text::LayoutJob,
 }
 
 impl MemoizedEasymarkHighlighter {
-    pub fn highlight(&mut self, visuals: &egui::Visuals, code: &str) -> egui::text::LayoutJob {
-        if (&self.visuals, self.code.as_str()) != (visuals, code) {
-            self.visuals = visuals.clone();
+    pub fn highlight(&mut self, egui_style: &egui::Style, code: &str) -> egui::text::LayoutJob {
+        if (&self.style, self.code.as_str()) != (egui_style, code) {
+            self.style = egui_style.clone();
             self.code = code.to_owned();
-            self.output = highlight_easymark(visuals, code);
+            self.output = highlight_easymark(egui_style, code);
         }
         self.output.clone()
     }
 }
 
-pub fn highlight_easymark(visuals: &egui::Visuals, mut text: &str) -> egui::text::LayoutJob {
+pub fn highlight_easymark(egui_style: &egui::Style, mut text: &str) -> egui::text::LayoutJob {
     let mut job = egui::text::LayoutJob::default();
     let mut style = easy_mark_parser::Style::default();
     let mut start_of_line = true;
@@ -35,7 +35,7 @@ pub fn highlight_easymark(visuals: &egui::Visuals, mut text: &str) -> egui::text
                 &text[..end],
                 0.0,
                 format_from_style(
-                    visuals,
+                    egui_style,
                     &easy_mark_parser::Style {
                         code: true,
                         ..Default::default()
@@ -50,7 +50,7 @@ pub fn highlight_easymark(visuals: &egui::Visuals, mut text: &str) -> egui::text
         if text.starts_with('`') {
             style.code = true;
             let end = text[1..].find(&['`', '\n'][..]).map_or_else(|| text.len(), |i| i + 2);
-            job.append(&text[..end], 0.0, format_from_style(visuals, &style));
+            job.append(&text[..end], 0.0, format_from_style(egui_style, &style));
             text = &text[end..];
             style.code = false;
             continue;
@@ -77,7 +77,7 @@ pub fn highlight_easymark(visuals: &egui::Visuals, mut text: &str) -> egui::text
             skip = 1;
             if style.strong {
                 // Include the character that i ending ths style:
-                job.append(&text[..skip], 0.0, format_from_style(visuals, &style));
+                job.append(&text[..skip], 0.0, format_from_style(egui_style, &style));
                 text = &text[skip..];
                 skip = 0;
             }
@@ -86,7 +86,7 @@ pub fn highlight_easymark(visuals: &egui::Visuals, mut text: &str) -> egui::text
             skip = 1;
             if style.small {
                 // Include the character that i ending ths style:
-                job.append(&text[..skip], 0.0, format_from_style(visuals, &style));
+                job.append(&text[..skip], 0.0, format_from_style(egui_style, &style));
                 text = &text[skip..];
                 skip = 0;
             }
@@ -95,7 +95,7 @@ pub fn highlight_easymark(visuals: &egui::Visuals, mut text: &str) -> egui::text
             skip = 1;
             if style.raised {
                 // Include the character that i ending ths style:
-                job.append(&text[..skip], 0.0, format_from_style(visuals, &style));
+                job.append(&text[..skip], 0.0, format_from_style(egui_style, &style));
                 text = &text[skip..];
                 skip = 0;
             }
@@ -112,12 +112,12 @@ pub fn highlight_easymark(visuals: &egui::Visuals, mut text: &str) -> egui::text
             .map_or_else(|| text.len(), |i| (skip + i).max(1));
 
         if line_end <= end {
-            job.append(&text[..line_end], 0.0, format_from_style(visuals, &style));
+            job.append(&text[..line_end], 0.0, format_from_style(egui_style, &style));
             text = &text[line_end..];
             start_of_line = true;
             style = Default::default();
         } else {
-            job.append(&text[..end], 0.0, format_from_style(visuals, &style));
+            job.append(&text[..end], 0.0, format_from_style(egui_style, &style));
             text = &text[end..];
             start_of_line = false;
         }
@@ -126,15 +126,15 @@ pub fn highlight_easymark(visuals: &egui::Visuals, mut text: &str) -> egui::text
     job
 }
 
-fn format_from_style(visuals: &egui::Visuals, emark_style: &easy_mark_parser::Style) -> egui::text::TextFormat {
+fn format_from_style(egui_style: &egui::Style, emark_style: &easy_mark_parser::Style) -> egui::text::TextFormat {
     use egui::{Align, Color32, Stroke, TextStyle};
 
     let color = if emark_style.strong || emark_style.heading {
-        visuals.strong_text_color()
+        egui_style.visuals.strong_text_color()
     } else if emark_style.quoted {
-        visuals.weak_text_color()
+        egui_style.visuals.weak_text_color()
     } else {
-        visuals.text_color()
+        egui_style.visuals.text_color()
     };
 
     let text_style = if emark_style.heading {
@@ -148,7 +148,7 @@ fn format_from_style(visuals: &egui::Visuals, emark_style: &easy_mark_parser::St
     };
 
     let background = if emark_style.code {
-        visuals.code_bg_color
+        egui_style.visuals.code_bg_color
     } else {
         Color32::TRANSPARENT
     };
@@ -168,7 +168,7 @@ fn format_from_style(visuals: &egui::Visuals, emark_style: &easy_mark_parser::St
     let valign = if emark_style.raised { Align::TOP } else { Align::BOTTOM };
 
     egui::text::TextFormat {
-        style: text_style,
+        font_id: text_style.resolve(egui_style),
         color,
         background,
         italics: emark_style.italics,

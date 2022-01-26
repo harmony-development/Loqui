@@ -69,7 +69,7 @@ impl EasyMarkEditor {
 
         let response = if self.highlight_editor {
             let mut layouter = |ui: &egui::Ui, easymark: &str, wrap_width: f32| {
-                let mut layout_job = highlighter.highlight(ui.visuals(), easymark);
+                let mut layout_job = highlighter.highlight(ui.style(), easymark);
                 layout_job.wrap_width = wrap_width;
                 ui.fonts().layout_job(layout_job)
             };
@@ -79,7 +79,7 @@ impl EasyMarkEditor {
                     .desired_width(self.desired_width)
                     .desired_rows(self.desired_rows)
                     .hint_text(&self.hint_text)
-                    .text_style(egui::TextStyle::Monospace) // for cursor height
+                    .font(egui::TextStyle::Monospace) // for cursor height
                     .layouter(&mut layouter),
             )
         } else {
@@ -105,6 +105,7 @@ impl EasyMarkEditor {
     }
 }
 
+#[allow(unused_variables)]
 fn shortcuts(ui: &Ui, code: &mut dyn TextBuffer, ccursor_range: &mut CCursorRange) -> bool {
     /*let mut any_change = false;
     for event in &ui.input().events {
@@ -161,6 +162,7 @@ fn shortcuts(ui: &Ui, code: &mut dyn TextBuffer, ccursor_range: &mut CCursorRang
 }
 
 /// E.g. toggle *strong* with `toggle(&mut text, &mut cursor, "*")`
+#[allow(dead_code)]
 fn toggle_surrounding(code: &mut dyn TextBuffer, ccursor_range: &mut CCursorRange, surrounding: &str) {
     let [primary, secondary] = ccursor_range.sorted();
 

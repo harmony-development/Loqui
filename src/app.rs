@@ -236,12 +236,12 @@ impl epi::App for App {
             FontData::from_static(include_bytes!("fonts/emoji-icon-font.ttf")),
         );
 
-        font_defs.fonts_for_family.insert(
+        font_defs.families.insert(
             egui::FontFamily::Proportional,
             vec!["inter".to_string(), "emoji-icon-font".to_string()],
         );
         font_defs
-            .fonts_for_family
+            .families
             .insert(egui::FontFamily::Monospace, vec!["hack".to_string()]);
 
         ctx.set_fonts(font_defs);
