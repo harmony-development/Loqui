@@ -199,3 +199,25 @@ jobs:
           wget -q https://github.com/TheAssassin/pyuploadtool/releases/download/continuous/pyuploadtool-x86_64.AppImage
           chmod +x pyuploadtool-x86_64.AppImage
           ./pyuploadtool-x86_64.AppImage build-windows/loqui-windows.exe build-linux/loqui-linux build-macos/loqui-macos build-web/web-dist.zip
+
+  deploy-web:
+    if: github.event_name == 'push'
+    needs: upload-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          repository: 'harmony-development/ansible'
+      - run: 'echo "$SSH_KEY" > key && chmod 600 key'
+        shell: bash
+        env:
+          SSH_KEY: ${{secrets.ACTIONS_SSH_KEY}}
+      - run: 'echo "$KNOWN_HOSTS" > known_hosts && chmod 600 known_hosts'
+        shell: bash
+        env:
+          KNOWN_HOSTS: ${{secrets.ACTIONS_SSH_KNOWN_HOSTS}}
+      - run: 'ansible-playbook only-loqui.yml --key-file key'
+        shell: bash
+        env:
+          SSH_HOST: ${{secrets.ACTIONS_SSH_HOST}}
