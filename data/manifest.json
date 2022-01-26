@@ -6,5 +6,10 @@
     "background_color": "#151613",
     "theme_color": "#ec943c",
     "orientation": "landscape-primary",
-    "icons": []
+    "icons": [
+      {
+        "src": "loqui.svg",
+        "sizes": "48x48"
+      }
+    ]
   }
