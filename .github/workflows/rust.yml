@@ -102,10 +102,9 @@ jobs:
     - name: Build
       run: trunk build --release --public-url "Loqui/"
 
-    - uses: papeloto/action-zip@v1
+    - uses: montudor/action-zip@v1
       with:
-        files: dist/
-        dest: dist.zip
+        args: zip -r dist.zip dist/
 
     - name: Artifact web
       uses: actions/upload-artifact@v2.3.1
