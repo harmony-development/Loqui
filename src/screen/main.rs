@@ -402,6 +402,7 @@ impl Screen {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn view_message_text_content(
         &mut self,
         state: &State,
@@ -410,34 +411,45 @@ impl Screen {
         guild_id: u64,
         channel_id: u64,
         text: &str,
+        is_failed: bool,
     ) {
-        let highlight_message = self.dont_highlight_message.contains(&(guild_id, channel_id, *id)).not();
+        ui.scope(|ui| {
+            let weak_text = ui.visuals().weak_text_color();
+            let strong_text = ui.visuals().strong_text_color().linear_multiply(0.5);
+            let color = is_failed
+                .then(|| Color32::RED)
+                .or_else(|| id.is_ack().then(|| strong_text))
+                .unwrap_or(weak_text);
+            ui.style_mut().visuals.override_text_color = Some(color);
 
-        if id.is_ack() && id.id() == self.editing_message {
-            let edit = self.edit_message_composer.highlight(highlight_message).editor_ui(ui);
-            let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
-            if self.prev_editing_message.is_none() {
-                edit.request_focus();
+            let highlight_message = self.dont_highlight_message.contains(&(guild_id, channel_id, *id)).not();
+
+            if id.is_ack() && id.id() == self.editing_message {
+                let edit = self.edit_message_composer.highlight(highlight_message).editor_ui(ui);
+                let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
+                if self.prev_editing_message.is_none() {
+                    edit.request_focus();
+                }
+                let trimmed_edit_msg = self.edit_message_composer.text().trim();
+                if trimmed_edit_msg.is_empty().not() && edit.has_focus() && is_pressed {
+                    let text = trimmed_edit_msg.to_string();
+                    let message_id = id.id().unwrap();
+                    self.editing_message = None;
+                    spawn_client_fut!(state, |client| {
+                        client.edit_message(guild_id, channel_id, message_id, text).await
+                    });
+                }
+            } else if highlight_message {
+                let urls = parse_urls(text);
+                let mut text = text.to_string();
+                for (source, _) in urls {
+                    text = text.replace(source, &format!("<{}>", source));
+                }
+                easy_mark::easy_mark(ui, &text);
+            } else {
+                ui.label(text);
             }
-            let trimmed_edit_msg = self.edit_message_composer.text().trim();
-            if trimmed_edit_msg.is_empty().not() && edit.has_focus() && is_pressed {
-                let text = trimmed_edit_msg.to_string();
-                let message_id = id.id().unwrap();
-                self.editing_message = None;
-                spawn_client_fut!(state, |client| {
-                    client.edit_message(guild_id, channel_id, message_id, text).await
-                });
-            }
-        } else if highlight_message {
-            let urls = parse_urls(text);
-            let mut text = text.to_string();
-            for (source, _) in urls {
-                text = text.replace(source, &format!("<{}>", source));
-            }
-            easy_mark::easy_mark(ui, &text);
-        } else {
-            ui.label(text);
-        }
+        });
     }
 
     fn view_message_url_embeds(&mut self, state: &State, ui: &mut Ui, text: &str) {
@@ -703,7 +715,15 @@ impl Screen {
 
                 match &message.content {
                     client::message::Content::Text(text) => {
-                        self.view_message_text_content(state, ui, id, guild_id, channel_id, text);
+                        self.view_message_text_content(
+                            state,
+                            ui,
+                            id,
+                            guild_id,
+                            channel_id,
+                            text,
+                            message.failed_to_send,
+                        );
                         self.view_message_url_embeds(state, ui, text);
                     }
                     client::message::Content::Files(attachments) => {
