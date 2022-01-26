@@ -144,7 +144,7 @@ impl UiExt for Ui {
     }
 
     fn downscale(&self, size: [f32; 2]) -> [f32; 2] {
-        let available_width = self.available_width() / 2.25_f32;
+        let available_width = self.available_width() * 0.35_f32;
         let [w, h] = size;
         let max_size = (w < available_width).then(|| w).unwrap_or(available_width);
         let (w, h) = scale_down(w, h, max_size);

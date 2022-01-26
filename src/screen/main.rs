@@ -443,24 +443,41 @@ impl Screen {
     fn view_message_url_embeds(&mut self, state: &State, ui: &mut Ui, text: &str) {
         let urls = parse_urls(text).filter_map(|(og, url)| Some((state.cache.get_link_data(&url)?, url, og)));
         for (data, url, raw_url) in urls {
+            let id = FileId::External(url);
             match data {
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
-                    let site_title_empty = data.site_title.is_empty().not();
-                    let page_title_empty = data.page_title.is_empty().not();
-                    let desc_empty = data.description.is_empty().not();
-                    if site_title_empty || page_title_empty || desc_empty {
+                    let has_site_title = data.site_title.is_empty().not();
+                    let has_page_title = data.page_title.is_empty().not();
+                    let has_desc = data.description.is_empty().not();
+                    let maybe_thumbnail = state.image_cache.get_image(&id);
+
+                    if has_site_title || has_page_title || has_desc {
                         ui.group(|ui| {
-                            if site_title_empty {
-                                ui.add(egui::Label::new(RichText::new(&data.site_title).small()));
+                            if has_site_title {
+                                let but_resp = ui
+                                    .add(TextButton::text(RichText::new(&data.site_title).small()).small())
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                if but_resp.clicked() {
+                                    open_url(raw_url.to_string());
+                                }
                             }
-                            if page_title_empty {
-                                ui.add(egui::Label::new(RichText::new(&data.page_title).strong()));
+                            if has_page_title {
+                                let but_resp = ui
+                                    .add(TextButton::text(RichText::new(&data.page_title).strong()).small())
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                if but_resp.clicked() {
+                                    open_url(raw_url.to_string());
+                                }
                             }
-                            if site_title_empty && page_title_empty {
+                            if has_site_title && has_page_title {
                                 ui.separator();
                             }
-                            if desc_empty {
+                            if has_desc {
                                 ui.label(&data.description);
+                            }
+                            if let Some((tex, size)) = maybe_thumbnail {
+                                let size = ui.downscale(size);
+                                ui.image(tex.id(), size);
                             }
                         });
                     }
@@ -471,7 +488,7 @@ impl Screen {
                         kind: data.mimetype.clone(),
                         // we dont want the attachment to count as thumbnail
                         size: u32::MAX,
-                        ..Attachment::new_unknown(FileId::External(url))
+                        ..Attachment::new_unknown(id)
                     };
 
                     let mut download = false;

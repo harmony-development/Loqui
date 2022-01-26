@@ -302,6 +302,14 @@ impl Cache {
                 self.get_guild_mut(guild_id).fetched_invites = true;
             }
             FetchEvent::LinkMetadata { url, data } => {
+                if let FetchLinkData::IsSite(site) = &data {
+                    if let Ok(url) = site.image.parse::<Uri>() {
+                        let id = FileId::External(url);
+                        let _ = self
+                            .post_sender
+                            .send(PostProcessEvent::FetchThumbnail(Attachment::new_unknown(id)));
+                    }
+                }
                 self.link_embeds.insert(url, data);
             }
             FetchEvent::FetchedReply {
@@ -1316,8 +1324,16 @@ impl Client {
                 Ok(())
             }
             PostProcessEvent::FetchThumbnail(attachment) => {
-                let (_, resp) = self.fetch_attachment(attachment.id.clone()).await?;
-                let _ = event_sender.send(FetchEvent::Attachment { attachment, file: resp });
+                let (id, resp) = self.fetch_attachment(attachment.id.clone()).await?;
+                let _ = event_sender.send(FetchEvent::Attachment {
+                    attachment: Attachment {
+                        id,
+                        kind: resp.mimetype().to_string(),
+                        size: resp.data().len() as u32,
+                        ..attachment
+                    },
+                    file: resp,
+                });
                 Ok(())
             }
             PostProcessEvent::FetchProfile(user_id) => {

@@ -162,6 +162,7 @@ pub mod op {
             let data: Uint8Array = event.data().dyn_into().unwrap_throw();
             let data = data.to_vec();
             if data.is_empty() {
+                is_usable.store(true, Ordering::SeqCst);
                 return;
             }
             #[allow(unsafe_code)]
