@@ -1,15 +1,16 @@
 {
-    "name": "Loqui",
-    "short_name": "loqui",
-    "start_url": "index.html",
-    "display": "standalone",
-    "background_color": "#151613",
-    "theme_color": "#ec943c",
-    "orientation": "landscape-primary",
-    "icons": [
-      {
-        "src": "loqui.svg",
-        "sizes": "48x48"
-      }
-    ]
-  }
+  "name": "Loqui",
+  "short_name": "loqui",
+  "theme_color": "#ec943c",
+  "background_color": "#151613",
+  "display": "standalone",
+  "orientation": "landscape",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/loqui.webp",
+      "sizes": "144x144"
+    }
+  ]
+}

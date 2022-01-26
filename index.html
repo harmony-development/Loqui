@@ -2,7 +2,7 @@
 <html>
 
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.40, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <head>
     <title>loqui</title>
@@ -11,7 +11,9 @@
     <link data-trunk rel="rust" data-type="main" href="Cargo.toml">
     <link data-trunk rel="rust" data-type="worker" href="image_worker/Cargo.toml">
     <link data-trunk rel="copy-file" href="data/manifest.json">
-    <link data-trunk rel="icon" href="data/loqui.svg">
+    <link data-trunk rel="copy-file" href="sw.js">
+    <link data-trunk rel="icon" href="data/loqui.webp">
+    <link data-trunk rel="copy-file" href="data/loqui.webp">
 
     <!-- PWA manifest -->
     <link rel="manifest" href="manifest.json" />
@@ -55,6 +57,19 @@
 <body>
     <!-- The WASM code will resize this canvas to cover the entire screen -->
     <canvas id="egui_canvas"></canvas>
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                // Registration was successful
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, function(err) {
+                // registration failed :(
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+    }
+    </script>
 </body>
 
 </html>
