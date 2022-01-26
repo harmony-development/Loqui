@@ -889,7 +889,12 @@ impl Screen {
             .hint_text("Enter message...")
             .editor_ui(ui);
 
-        let user_inputted_text = ctx.input().events.iter().any(|ev| matches!(ev, Event::Text(_)));
+        let user_inputted_text = {
+            let input = ctx.input();
+            let has_text = input.events.iter().any(|ev| matches!(ev, Event::Text(_)));
+            let any_modifier = input.modifiers.any();
+            has_text && any_modifier.not()
+        };
         let should_focus_composer = (self.show_create_guild || self.show_join_guild).not()
             && text_edit.has_focus().not()
             && ctx.wants_keyboard_input().not()
