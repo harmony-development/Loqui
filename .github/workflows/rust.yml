@@ -176,7 +176,7 @@ jobs:
 
   upload-release:
     if: github.event_name == 'push'
-    needs: build
+    needs: [ build, build-web ]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/download-artifact@v2
