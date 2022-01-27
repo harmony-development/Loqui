@@ -753,7 +753,7 @@ impl Screen {
                         edit_text.push_str(text);
                         ui.close_menu();
                     }
-                    if ui.button("reply").clicked() {
+                    if ui.button("quote reply").clicked() {
                         let composer_text = self.composer.text_mut();
                         composer_text.clear();
                         composer_text.push_str("> ");
@@ -805,7 +805,7 @@ impl Screen {
         let Some(guild) = state.cache.get_guild(guild_id) else { return };
         let user_id = state.client().user_id();
 
-        egui::ScrollArea::vertical()
+        let scrolled = egui::ScrollArea::vertical()
             .stick_to_bottom()
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -831,19 +831,23 @@ impl Screen {
                             }
                             tot
                         });
-                for mut chunk in chunked_messages {
+                for chunk in chunked_messages {
                     ui.group_filled_with(loqui_style::BG_LIGHT)
                         .stroke((0.0, Color32::WHITE).into())
                         .margin([5.0, 5.0])
                         .show(ui, |ui| {
-                            if let Some((id, message)) = chunk.is_empty().not().then(|| chunk.remove(0)) {
+                            for (index, (id, message)) in chunk.into_iter().enumerate() {
                                 self.view_message(
-                                    state, ui, guild, channel, message, guild_id, channel_id, id, user_id, true,
-                                );
-                            }
-                            for (id, message) in chunk {
-                                self.view_message(
-                                    state, ui, guild, channel, message, guild_id, channel_id, id, user_id, false,
+                                    state,
+                                    ui,
+                                    guild,
+                                    channel,
+                                    message,
+                                    guild_id,
+                                    channel_id,
+                                    id,
+                                    user_id,
+                                    index == 0,
                                 );
                             }
                         });

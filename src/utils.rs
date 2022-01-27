@@ -315,3 +315,9 @@ pub fn load_harmony_lotus(ctx: &egui::Context) -> (TextureHandle, Vec2) {
     );
     (texid, [w as f32, h as f32].into())
 }
+
+/// Shorthand for generating a [`egui::Id`].
+#[inline(always)]
+pub fn id(source: impl std::hash::Hash) -> egui::Id {
+    egui::Id::new(source)
+}

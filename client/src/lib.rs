@@ -112,6 +112,7 @@ impl From<Session> for InnerSession {
         InnerSession {
             user_id: session.user_id.parse().unwrap(),
             session_token: session.session_token.into(),
+            guest_token: None,
         }
     }
 }
@@ -617,6 +618,7 @@ impl Cache {
                     new_avatar,
                     new_status,
                     new_is_bot,
+                    new_account_kind,
                 }) => {
                     let parsed_avatar = new_avatar.and_then(|new_avatar| FileId::from_str(&new_avatar).ok());
                     if let Some(id) = parsed_avatar.clone() {
@@ -1145,6 +1147,7 @@ impl Client {
                         new_username: Some(profile.user_name),
                         new_status: Some(profile.user_status),
                         new_is_bot: Some(profile.is_bot),
+                        new_account_kind: Some(profile.account_kind),
                     },
                 ))))
             });
@@ -1238,6 +1241,7 @@ impl Client {
                 new_status: Some(UserStatus::Online.into()),
                 new_username: Some(self_profile.user_name),
                 user_id: self_id,
+                new_account_kind: None,
             },
         ))));
 
@@ -1345,6 +1349,7 @@ impl Client {
                         new_status: Some(profile.user_status),
                         new_username: Some(profile.user_name),
                         new_is_bot: Some(profile.is_bot),
+                        new_account_kind: Some(profile.account_kind),
                     })))
                 })?);
 
