@@ -750,7 +750,7 @@ checksum = "6907e25393cdcc1f4f3f513d9aac1e840eb1cc341a0fccb01171f7d14d10b946"
 [[package]]
 name = "eframe"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1e4d8ae943004689a9d2b7310853e10470b66ce3"
+source = "git+https://github.com/emilk/egui.git?branch=master#3333d63b913e4d09b5b291469dbeb3d6fd191bbf"
 dependencies = [
  "egui",
  "egui-winit",
@@ -762,7 +762,7 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.16.1"
-source = "git+https://github.com/emilk/egui.git?branch=master#1e4d8ae943004689a9d2b7310853e10470b66ce3"
+source = "git+https://github.com/emilk/egui.git?branch=master#3333d63b913e4d09b5b291469dbeb3d6fd191bbf"
 dependencies = [
  "ahash",
  "epaint",
@@ -772,7 +772,7 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1e4d8ae943004689a9d2b7310853e10470b66ce3"
+source = "git+https://github.com/emilk/egui.git?branch=master#3333d63b913e4d09b5b291469dbeb3d6fd191bbf"
 dependencies = [
  "copypasta",
  "egui",
@@ -785,7 +785,7 @@ dependencies = [
 [[package]]
 name = "egui_glow"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1e4d8ae943004689a9d2b7310853e10470b66ce3"
+source = "git+https://github.com/emilk/egui.git?branch=master#3333d63b913e4d09b5b291469dbeb3d6fd191bbf"
 dependencies = [
  "bytemuck",
  "egui",
@@ -801,7 +801,7 @@ dependencies = [
 [[package]]
 name = "egui_web"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1e4d8ae943004689a9d2b7310853e10470b66ce3"
+source = "git+https://github.com/emilk/egui.git?branch=master#3333d63b913e4d09b5b291469dbeb3d6fd191bbf"
 dependencies = [
  "bytemuck",
  "egui",
@@ -822,7 +822,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1e4d8ae943004689a9d2b7310853e10470b66ce3"
+source = "git+https://github.com/emilk/egui.git?branch=master#3333d63b913e4d09b5b291469dbeb3d6fd191bbf"
 dependencies = [
  "bytemuck",
 ]
@@ -860,7 +860,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1e4d8ae943004689a9d2b7310853e10470b66ce3"
+source = "git+https://github.com/emilk/egui.git?branch=master#3333d63b913e4d09b5b291469dbeb3d6fd191bbf"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -873,7 +873,7 @@ dependencies = [
 [[package]]
 name = "epi"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1e4d8ae943004689a9d2b7310853e10470b66ce3"
+source = "git+https://github.com/emilk/egui.git?branch=master#3333d63b913e4d09b5b291469dbeb3d6fd191bbf"
 dependencies = [
  "egui",
 ]
