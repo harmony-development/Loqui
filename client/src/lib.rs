@@ -303,12 +303,26 @@ impl Cache {
                 self.get_guild_mut(guild_id).fetched_invites = true;
             }
             FetchEvent::LinkMetadata { url, data } => {
-                if let FetchLinkData::IsSite(site) = &data {
-                    if let Ok(url) = site.image.parse::<Uri>() {
-                        let id = FileId::External(url);
-                        let _ = self
-                            .post_sender
-                            .send(PostProcessEvent::FetchThumbnail(Attachment::new_unknown(id)));
+                match &data {
+                    FetchLinkData::IsSite(site) => {
+                        if let Ok(url) = site.image.parse::<Uri>() {
+                            let id = FileId::External(url);
+                            let _ = self
+                                .post_sender
+                                .send(PostProcessEvent::FetchThumbnail(Attachment::new_unknown(id)));
+                        }
+                    }
+                    FetchLinkData::IsMedia(media) => {
+                        let attachment = Attachment {
+                            name: media.filename.clone(),
+                            kind: media.mimetype.clone(),
+                            size: media.size.unwrap_or(u32::MAX),
+                            ..Attachment::new_unknown(FileId::External(url.clone()))
+                        };
+
+                        if attachment.is_thumbnail() {
+                            let _ = self.post_sender.send(PostProcessEvent::FetchThumbnail(attachment));
+                        }
                     }
                 }
                 self.link_embeds.insert(url, data);
