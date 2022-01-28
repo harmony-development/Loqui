@@ -131,6 +131,8 @@ pub struct Screen {
     composer: EasyMarkEditor,
     /// was the main composer focused in last frame
     is_composer_focused: bool,
+    /// whether to focus the main composer in the next frame
+    focus_composer: bool,
     /// composer used for editing messages
     edit_message_composer: EasyMarkEditor,
     /// whether to scroll to bottom on next frame
@@ -759,6 +761,7 @@ impl Screen {
                         composer_text.push_str("> ");
                         composer_text.push_str(text);
                         composer_text.push('\n');
+                        self.focus_composer = true;
                         ui.close_menu();
                     }
                     if ui.button("copy").clicked() {
@@ -805,7 +808,7 @@ impl Screen {
         let Some(guild) = state.cache.get_guild(guild_id) else { return };
         let user_id = state.client().user_id();
 
-        let scrolled = egui::ScrollArea::vertical()
+        egui::ScrollArea::vertical()
             .stick_to_bottom()
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -925,7 +928,17 @@ impl Screen {
             && user_inputted_text;
 
         if should_focus_composer {
+            for event in ctx.input().events.iter() {
+                if let Event::Text(text) = event {
+                    self.composer.text_mut().push_str(text);
+                }
+            }
             text_edit.request_focus();
+        }
+
+        if self.focus_composer {
+            text_edit.request_focus();
+            self.focus_composer = false;
         }
 
         let is_pressed = {
@@ -945,6 +958,7 @@ impl Screen {
                 client.send_message(echo_id, guild_id, channel_id, message, evs).await?;
             });
             self.scroll_to_bottom = true;
+            text_edit.surrender_focus();
         } else if user_inputted_text {
             let current_user_id = state.client().user_id();
             let should_send_typing = state.cache.get_guild(guild_id).map_or(false, |guild| {
