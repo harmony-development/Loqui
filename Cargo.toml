@@ -59,7 +59,7 @@ wasm-bindgen = "0.2"
 js-sys = { version = "0.3" }
 web-sys = { version = "0.3", features = ["Worker", "MessageEvent"] }
 rkyv = "0.7"
-tokio = { version = "1.9", features = ["sync", "macros"] }
+tokio = { version = "1.16", features = ["sync", "macros"] }
 tracing-wasm = "0.2"
 console_error_panic_hook = "0.1"
 image = { version = "0.23.14", default-features = false, features = [
