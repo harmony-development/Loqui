@@ -917,6 +917,7 @@ impl Screen {
     fn view_composer(&mut self, state: &mut State, ui: &mut Ui, ctx: &egui::Context, desired_lines: usize) {
         let Some((guild_id, channel_id)) = self.current.channel() else { return };
 
+        let text_string = self.composer.text().trim().to_string();
         let text_edit = self
             .composer
             .desired_rows(desired_lines)
@@ -953,8 +954,7 @@ impl Screen {
             let input = ui.input();
             input.key_pressed(egui::Key::Enter) && !input.modifiers.shift
         };
-        if self.composer.text().trim().is_empty().not() && text_edit.has_focus() && is_pressed {
-            let text_string = self.composer.text().trim().to_string();
+        if text_string.is_empty().not() && text_edit.has_focus() && is_pressed {
             self.composer.text_mut().clear();
             let message = Message {
                 content: Content::Text(text_string),
