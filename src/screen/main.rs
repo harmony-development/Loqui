@@ -931,30 +931,42 @@ impl Screen {
             let any_modifier = input.modifiers.alt || input.modifiers.command;
             has_text && any_modifier.not()
         };
-        let should_focus_composer = (self.show_create_guild || self.show_join_guild).not()
-            && text_edit.has_focus().not()
-            && ctx.wants_keyboard_input().not()
-            && user_inputted_text;
 
-        if should_focus_composer {
+        if text_edit.has_focus().not() {
+            let mut focus = false;
             for event in ctx.input().events.iter() {
-                if let Event::Text(text) = event {
+                if let Event::Paste(text) = event {
                     self.composer.text_mut().push_str(text);
+                    focus = true;
                 }
             }
-            text_edit.request_focus();
+            if focus {
+                text_edit.request_focus();
+            }
+        } else {
+            let should_focus_composer = (self.show_create_guild || self.show_join_guild).not()
+                && text_edit.has_focus().not()
+                && ctx.wants_keyboard_input().not()
+                && user_inputted_text;
+
+            if should_focus_composer {
+                for event in ctx.input().events.iter() {
+                    if let Event::Text(text) = event {
+                        self.composer.text_mut().push_str(text);
+                    }
+                }
+                text_edit.request_focus();
+            } else if self.focus_composer {
+                text_edit.request_focus();
+                self.focus_composer = false;
+            }
         }
 
-        if self.focus_composer {
-            text_edit.request_focus();
-            self.focus_composer = false;
-        }
-
-        let is_pressed = {
+        let did_submit_enter = {
             let input = ui.input();
             input.key_pressed(egui::Key::Enter) && !input.modifiers.shift
         };
-        if text_string.is_empty().not() && text_edit.has_focus() && is_pressed {
+        if text_string.is_empty().not() && text_edit.has_focus() && did_submit_enter {
             self.composer.text_mut().clear();
             let message = Message {
                 content: Content::Text(text_string),
