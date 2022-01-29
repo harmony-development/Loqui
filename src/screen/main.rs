@@ -1476,7 +1476,7 @@ impl AppScreen for Screen {
             };
 
             if state.cache.is_initial_sync_complete() {
-                central_panel.show(ctx, |ui| match state.config.bg_image {
+                central_panel.show(ctx, |ui| match state.local_config.bg_image {
                     BgImage::None => show_main(state, ui),
                     BgImage::Default => {
                         let (texid, size) = state

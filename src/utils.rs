@@ -333,3 +333,25 @@ pub fn load_harmony_lotus(ctx: &egui::Context) -> (TextureHandle, Vec2) {
 pub fn id(source: impl std::hash::Hash) -> egui::Id {
     egui::Id::new(source)
 }
+
+pub fn show_notification(summary: impl AsRef<str>, body: impl AsRef<str>) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let res = notify_rust::Notification::new()
+            .summary(summary.as_ref())
+            .body(body.as_ref())
+            .appname("loqui")
+            .icon("loqui")
+            .hint(notify_rust::Hint::Category("im".to_string()))
+            .show();
+        if let Err(err) = res {
+            tracing::error!("error while trying to send notification: {}", err);
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let mut options = web_sys::NotificationOptions::new();
+        options.body(body.as_ref()).icon("loqui").require_interaction(false);
+        let _ = web_sys::Notification::new_with_options(summary.as_ref(), &options);
+    }
+}

@@ -154,7 +154,7 @@ impl SeperatedCollapsingHeader {
     }
 
     pub fn show<R>(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> CollapsingResponse<R> {
-        ui.horizontal_top(|ui| {
+        ui.horizontal(|ui| {
             let resp = self.inner.show(ui, add_contents);
             ui.add(egui::Separator::default().horizontal());
             resp

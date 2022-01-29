@@ -9,7 +9,10 @@ use std::{
 
 use client::{
     harmony_rust_sdk::{
-        api::rest::{About, FileId},
+        api::{
+            chat::{stream_event::Event as ChatEvent, Event},
+            rest::{About, FileId},
+        },
         client::{EventsReadSocket, EventsSocket},
     },
     message::{Content, Message},
@@ -121,19 +124,7 @@ impl State {
             });
         }
 
-        let cache = Cache::new(
-            event_rx,
-            post_tx,
-            Box::new(|ev| match ev {
-                FetchEvent::Attachment { attachment, file } => {
-                    if attachment.is_raster_image() {
-                        crate::image_cache::op::decode_image(file.data().clone(), attachment.id, attachment.name);
-                    }
-                    None
-                }
-                ev => Some(ev),
-            }),
-        );
+        let cache = Cache::new(event_rx, post_tx);
 
         // start socket processor task
         let reset_socket = AtomBool::new(false);
@@ -246,7 +237,32 @@ impl State {
         self.handle_images(ctx);
         self.handle_config();
 
-        self.cache.maintain();
+        self.cache.maintain(|ev| match ev {
+            FetchEvent::Attachment { attachment, file } => {
+                if attachment.is_raster_image() {
+                    crate::image_cache::op::decode_image(file.data().clone(), attachment.id, attachment.name);
+                }
+                None
+            }
+            ev => {
+                if let FetchEvent::Harmony(Event::Chat(ChatEvent::SentMessage(message_sent))) = &ev {
+                    let Some(message) = message_sent.message.as_ref() else { return Some(ev) };
+                    if let Some(text) = message.get_text_content() {
+                        if message.author_id != self.client.as_ref().unwrap().user_id() {
+                            let triggers_keyword = text
+                                .text
+                                .split_whitespace()
+                                .filter_map(|word| self.config.mention_keywords.iter().find(|keyword| *keyword == word))
+                                .next();
+                            if let Some(keyword) = triggers_keyword {
+                                show_notification(format!("mention keyword '{}' triggered", keyword), &text.text);
+                            }
+                        }
+                    }
+                }
+                Some(ev)
+            }
+        });
     }
 
     /// Get the current client. Will panic if there is none.
@@ -320,7 +336,7 @@ impl State {
             self.connecting_socket = true;
             self.socket_retry_count += 1;
             self.last_socket_retry = Some(Instant::now());
-            spawn_client_fut!(self, |client| client.connect_socket(Vec::new()).await);
+            spawn_client_fut!(self, |client| client.connect_socket().await);
         }
 
         handle_future!(self, |res: ClientResult<EventsSocket>| {

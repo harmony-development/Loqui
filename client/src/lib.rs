@@ -76,7 +76,6 @@ pub type EventSender = tokio::sync::mpsc::UnboundedSender<FetchEvent>;
 pub type EventReceiver = tokio::sync::mpsc::UnboundedReceiver<FetchEvent>;
 pub type PostEventSender = tokio::sync::mpsc::UnboundedSender<PostProcessEvent>;
 pub type PostEventReceiver = tokio::sync::mpsc::UnboundedReceiver<PostProcessEvent>;
-pub type EventFn = Box<dyn FnMut(FetchEvent) -> Option<FetchEvent>>;
 
 /// A sesssion struct with our requirements (unlike the `InnerSession` type)
 #[derive(Clone, Default, Deserialize, Serialize, Hash, PartialEq, Eq)]
@@ -172,11 +171,10 @@ pub struct Cache {
     initial_sync_complete: bool,
     event_receiver: EventReceiver,
     post_sender: PostEventSender,
-    event_fn: EventFn,
 }
 
 impl Cache {
-    pub fn new(event_receiver: EventReceiver, post_sender: PostEventSender, event_fn: EventFn) -> Self {
+    pub fn new(event_receiver: EventReceiver, post_sender: PostEventSender) -> Self {
         Self {
             event_receiver,
             post_sender,
@@ -186,11 +184,10 @@ impl Cache {
             initial_sync_complete: false,
             link_embeds: Default::default(),
             users: Default::default(),
-            event_fn,
         }
     }
 
-    pub fn maintain(&mut self) {
+    pub fn maintain(&mut self, mut event_fn: impl FnMut(FetchEvent) -> Option<FetchEvent>) {
         for member in self.users.values_mut() {
             if let Some((_, _, time)) = member.typing_in_channel {
                 if time.elapsed().as_secs() > 5 {
@@ -200,7 +197,7 @@ impl Cache {
         }
 
         while let Ok(ev) = self.event_receiver.try_recv() {
-            if let Some(ev) = (self.event_fn)(ev) {
+            if let Some(ev) = (event_fn)(ev) {
                 self.process_event(ev);
             }
         }
@@ -366,15 +363,13 @@ impl Cache {
                         self.get_guild_mut(guild_id).perms.push(perm);
                     }
                 }
-                ChatEvent::SentMessage(message_sent) => {
-                    let MessageSent {
-                        echo_id,
-                        guild_id,
-                        channel_id,
-                        message_id,
-                        message,
-                    } = *message_sent;
-
+                ChatEvent::SentMessage(MessageSent {
+                    echo_id,
+                    guild_id,
+                    channel_id,
+                    message_id,
+                    message,
+                }) => {
                     if let Some(message) = message {
                         let message = Message::from(message);
                         message.post_process(&self.post_sender, guild_id, channel_id);
@@ -842,10 +837,8 @@ impl Client {
         Ok(())
     }
 
-    pub async fn connect_socket(&self, guild_ids: Vec<u64>) -> ClientResult<EventsSocket> {
-        let mut subs = vec![EventSource::Homeserver, EventSource::Action];
-        subs.extend(guild_ids.into_iter().map(EventSource::Guild));
-        let resp = self.inner.subscribe_events(subs).await?;
+    pub async fn connect_socket(&self) -> ClientResult<EventsSocket> {
+        let resp = self.inner.subscribe_events(false).await?;
         Ok(resp)
     }
 
@@ -1070,13 +1063,13 @@ impl Client {
         let resp = self.inner.call(GetChannelMessages::new(guild_id, channel_id)).await?;
         let evs = resp.messages.into_iter().rev().map(move |message| {
             let message_id = message.message_id;
-            FetchEvent::Harmony(Event::Chat(ChatEvent::new_sent_message(Box::new(MessageSent {
+            FetchEvent::Harmony(Event::Chat(ChatEvent::new_sent_message(MessageSent {
                 guild_id,
                 channel_id,
                 message_id,
                 echo_id: None,
                 message: message.message,
-            }))))
+            })))
         });
         for ev in evs {
             let _ = event_sender.send(ev);

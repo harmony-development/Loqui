@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 use client::content;
-use eframe::egui::RichText;
+use eframe::egui::{Color32, RichText};
 
 use crate::{
     config::BgImage,
@@ -14,6 +14,7 @@ pub struct Screen {
     user_name_edit_text: String,
     uploading_user_pic: AtomBool,
     scale_factor: f32,
+    mention_keyword_edit: String,
 }
 
 impl Screen {
@@ -25,6 +26,7 @@ impl Screen {
                 .map_or_else(String::new, |m| m.username.to_string()),
             uploading_user_pic: AtomBool::new(false),
             scale_factor: ctx.pixels_per_point(),
+            mention_keyword_edit: String::new(),
         }
     }
 
@@ -64,7 +66,7 @@ impl Screen {
         ui.horizontal(|ui| {
             ui.label("background image:");
 
-            let chosen_image = match &state.config.bg_image {
+            let chosen_image = match &state.local_config.bg_image {
                 BgImage::External(s) => format!("▼ external: {}", s),
                 BgImage::Local(s) => format!("▼ local: {}", s),
                 BgImage::Default => "▼ default".to_string(),
@@ -77,56 +79,97 @@ impl Screen {
                 }
 
                 if ui.button("none").clicked() {
-                    state.config.bg_image = BgImage::None;
+                    state.local_config.bg_image = BgImage::None;
                     ui.close_menu();
                 }
 
                 if ui.button("default").clicked() {
-                    state.config.bg_image = BgImage::Default;
+                    state.local_config.bg_image = BgImage::Default;
                     ui.close_menu();
                 }
             });
         });
     }
 
+    // this assumes that the parent ui is vertical layout
     fn view_profile(&mut self, state: &mut State, ui: &mut Ui) {
         let Some(member) = state.client().this_user(&state.cache) else {
             ui.label("loading...");
             return;
         };
 
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new("username").small());
-            ui.text_edit_singleline(&mut self.user_name_edit_text);
-            if ui.add(egui::Button::new("edit").small()).clicked() {
-                let new_name = self.user_name_edit_text.clone();
-                spawn_client_fut!(state, |client| client.update_profile(Some(new_name), None, None).await);
+        ui.horizontal_top(|ui| {
+            if self.uploading_user_pic.get().not() {
+                let avatar = Avatar::new(member.avatar_url.as_ref(), member.username.as_str(), state).size(64.0);
+                let avatar_but = ui.add(avatar).on_hover_text("set picture");
+                if avatar_but.clicked() {
+                    let uploading_user_pic = self.uploading_user_pic.clone();
+                    spawn_client_fut!(state, |client| {
+                        let maybe_file = rfd::AsyncFileDialog::new().pick_file().await;
+                        if let Some(file) = maybe_file {
+                            uploading_user_pic.set(true);
+                            let name = file.file_name();
+                            let data = file.read().await;
+                            let mimetype = content::infer_type_from_bytes(&data);
+                            let id = client.upload_file(name, mimetype, data).await?;
+                            client.update_profile(None, Some(id), None).await?;
+                            uploading_user_pic.set(false);
+                        }
+                        ClientResult::Ok(())
+                    });
+                }
+            } else {
+                ui.add(egui::Spinner::new().size(64.0))
+                    .on_hover_text("uploading avatar");
             }
+            ui.vertical(|ui| {
+                ui.label(RichText::new("username").small());
+                ui.horizontal(|ui| {
+                    ui.add(egui::TextEdit::singleline(&mut self.user_name_edit_text).desired_width(100.0));
+                    if ui.add(egui::Button::new("edit").small()).clicked() {
+                        let new_name = self.user_name_edit_text.clone();
+                        spawn_client_fut!(state, |client| client.update_profile(Some(new_name), None, None).await);
+                    }
+                });
+            });
         });
 
-        if self.uploading_user_pic.get().not() {
-            let avatar = Avatar::new(member.avatar_url.as_ref(), member.username.as_str(), state).size(64.0);
-            let avatar_but = ui.add(avatar).on_hover_text("set picture");
-            if avatar_but.clicked() {
-                let uploading_user_pic = self.uploading_user_pic.clone();
-                spawn_client_fut!(state, |client| {
-                    let maybe_file = rfd::AsyncFileDialog::new().pick_file().await;
-                    if let Some(file) = maybe_file {
-                        uploading_user_pic.set(true);
-                        let name = file.file_name();
-                        let data = file.read().await;
-                        let mimetype = content::infer_type_from_bytes(&data);
-                        let id = client.upload_file(name, mimetype, data).await?;
-                        client.update_profile(None, Some(id), None).await?;
-                        uploading_user_pic.set(false);
-                    }
-                    ClientResult::Ok(())
-                });
+        ui.horizontal(|ui| {
+            ui.label("mention keywords");
+            ui.add(egui::Separator::default().horizontal());
+        });
+        ui.horizontal(|ui| {
+            let text_edit = ui.add(egui::TextEdit::singleline(&mut self.mention_keyword_edit).desired_width(100.0));
+            if ui.button("+ add").clicked() || text_edit.did_submit(ui) {
+                let keyword = self.mention_keyword_edit.drain(..).collect();
+                state.config.mention_keywords.push(keyword);
             }
-        } else {
-            ui.add(egui::Spinner::new().size(64.0))
-                .on_hover_text("uploading avatar");
-        }
+        });
+        ui.horizontal_wrapped(|ui| {
+            let mut delete_word = None;
+            for (word_index, word) in state.config.mention_keywords.iter().enumerate() {
+                let text = {
+                    let mut job = egui::text::LayoutJob::default();
+                    job.append(
+                        "X ",
+                        0.0,
+                        egui::TextFormat {
+                            color: Color32::RED,
+                            ..egui::TextFormat::default()
+                        },
+                    );
+                    job.append(word, 0.0, egui::TextFormat::default());
+                    ui.painter().fonts().layout_job(job)
+                };
+                let but = ui.button(text).on_hover_text("click to delete");
+                if but.clicked() {
+                    delete_word = Some(word_index);
+                }
+            }
+            if let Some(word_to_delete) = delete_word {
+                state.config.mention_keywords.remove(word_to_delete);
+            }
+        });
     }
 }
 

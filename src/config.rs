@@ -13,6 +13,9 @@ pub struct LocalConfig {
     /// Scale factor (pixels per point).
     #[serde(default)]
     pub scale_factor: f32,
+    /// Background image for this user.
+    #[serde(default)]
+    pub bg_image: BgImage,
 }
 
 impl LocalConfig {
@@ -25,12 +28,30 @@ impl LocalConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum BgImage {
+    /// Show the harmony lotus.
+    Default,
+    /// Show nothing.
+    None,
+    /// Show a local image.
+    Local(String),
+    /// Fetch and show an external image.
+    External(String),
+}
+
+impl Default for BgImage {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
 /// Synced config across all loqui instances for a user.
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct Config {
-    /// Background image for this user.
+    /// Keywords that will trigger a mention
     #[serde(default)]
-    pub bg_image: BgImage,
+    pub mention_keywords: Vec<String>,
 }
 
 impl Config {
@@ -52,23 +73,5 @@ impl Config {
         let req = SetAppDataRequest::new("loqui".to_string(), serialized);
         client.inner().call(req).await?;
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum BgImage {
-    /// Show the harmony lotus.
-    Default,
-    /// Show nothing.
-    None,
-    /// Show a local image.
-    Local(String),
-    /// Fetch and show an external image.
-    External(String),
-}
-
-impl Default for BgImage {
-    fn default() -> Self {
-        Self::Default
     }
 }
