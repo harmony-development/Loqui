@@ -146,7 +146,14 @@ impl UiExt for Ui {
     }
 
     fn downscale(&self, size: [f32; 2]) -> [f32; 2] {
-        self.downscale_to(size, self.is_mobile().then(|| 0.9).unwrap_or(0.25))
+        self.downscale_to(
+            size,
+            self.is_mobile().then(|| 0.95).unwrap_or_else(|| {
+                (size[0] / size[1] < 0.9)
+                    .then(|| 800.0 / self.input().screen_rect.width())
+                    .unwrap_or_else(|| 400.0 / self.input().screen_rect.width())
+            }),
+        )
     }
 
     fn downscale_to(&self, size: [f32; 2], factor: f32) -> [f32; 2] {

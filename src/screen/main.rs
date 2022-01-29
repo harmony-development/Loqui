@@ -470,7 +470,7 @@ impl Screen {
                             let factor = ui
                                 .is_mobile()
                                 .then(|| 0.95)
-                                .unwrap_or_else(|| (ui.available_width() > 1440.0).then(|| 0.45).unwrap_or(0.7));
+                                .unwrap_or_else(|| (500.0 / ui.input().screen_rect.width()));
                             ui.set_max_width(ui.available_width() * factor);
 
                             if has_site_title {
