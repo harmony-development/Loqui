@@ -427,14 +427,14 @@ impl Screen {
             let highlight_message = self.dont_highlight_message.contains(&(guild_id, channel_id, *id)).not();
 
             if id.is_ack() && id.id() == self.editing_message {
+                let trimmed_edit_msg = self.edit_message_composer.text().trim().to_string();
                 let edit = self.edit_message_composer.highlight(highlight_message).editor_ui(ui);
                 let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
                 if self.prev_editing_message.is_none() {
                     edit.request_focus();
                 }
-                let trimmed_edit_msg = self.edit_message_composer.text().trim();
                 if trimmed_edit_msg.is_empty().not() && edit.has_focus() && is_pressed {
-                    let text = trimmed_edit_msg.to_string();
+                    let text = trimmed_edit_msg;
                     let message_id = id.id().unwrap();
                     self.editing_message = None;
                     spawn_client_fut!(state, |client| {
