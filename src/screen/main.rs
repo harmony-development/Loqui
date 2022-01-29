@@ -8,7 +8,7 @@ use client::{
     member::Member,
     message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override, ReadMessagesView},
     smol_str::SmolStr,
-    AHashMap, AHashSet, FetchEvent,
+    AHashMap, AHashSet, FetchEvent, Uri,
 };
 use eframe::egui::{vec2, Color32, Event, RichText, Vec2};
 
@@ -457,9 +457,9 @@ impl Screen {
     fn view_message_url_embeds(&mut self, state: &State, ui: &mut Ui, text: &str) {
         let urls = parse_urls(text).filter_map(|(og, url)| Some((state.cache.get_link_data(&url)?, url, og)));
         for (data, url, raw_url) in urls {
-            let id = FileId::External(url);
             match data {
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
+                    let id = FileId::External(data.image.parse::<Uri>().unwrap_or(url));
                     let has_site_title = data.site_title.is_empty().not();
                     let has_page_title = data.page_title.is_empty().not();
                     let has_desc = data.description.is_empty().not();
@@ -467,6 +467,12 @@ impl Screen {
 
                     if has_site_title || has_page_title || has_desc {
                         ui.group(|ui| {
+                            let factor = ui
+                                .is_mobile()
+                                .then(|| 0.95)
+                                .unwrap_or_else(|| (ui.available_width() > 1440.0).then(|| 0.45).unwrap_or(0.7));
+                            ui.set_max_width(ui.available_width() * factor);
+
                             if has_site_title {
                                 let but_resp = ui
                                     .add(TextButton::text(RichText::new(&data.site_title).small()).small())
@@ -483,20 +489,22 @@ impl Screen {
                                     open_url(raw_url.to_string());
                                 }
                             }
-                            if has_site_title && has_page_title {
+                            if has_site_title || has_page_title {
                                 ui.separator();
                             }
                             if has_desc {
                                 ui.label(&data.description);
+                                ui.separator();
                             }
                             if let Some((tex, size)) = maybe_thumbnail {
-                                let size = ui.downscale(size);
+                                let size = ui.downscale_to(size, 1.0);
                                 ui.image(tex.id(), size);
                             }
                         });
                     }
                 }
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsMedia(data) => {
+                    let id = FileId::External(url);
                     let attachment = Attachment {
                         name: data.filename.clone(),
                         kind: data.mimetype.clone(),

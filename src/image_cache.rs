@@ -34,6 +34,7 @@ impl ImageCache {
 }
 
 fn add_generic(map: &mut AHashMap<FileId, (TextureHandle, [f32; 2])>, ctx: &egui::Context, image: LoadedImage) {
+    client::tracing::debug!("decoded image id {}, kind {}", image.id, image.kind);
     let dimensions = image.image.size();
     let texid = ctx.load_texture(image.id.to_string(), image.image);
     map.insert(image.id, (texid, [dimensions[0] as f32, dimensions[1] as f32]));

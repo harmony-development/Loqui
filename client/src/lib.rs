@@ -1343,6 +1343,7 @@ impl Client {
             }
             PostProcessEvent::FetchThumbnail(attachment) => {
                 let (id, resp) = self.fetch_attachment(attachment.id.clone()).await?;
+                tracing::debug!("fetched attachment: {} {}", id, resp.mimetype());
                 let _ = event_sender.send(FetchEvent::Attachment {
                     attachment: Attachment {
                         id,

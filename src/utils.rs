@@ -106,6 +106,8 @@ pub trait UiExt {
     fn offsetw(&mut self, offset: f32);
     /// Downscale some size to fit the available width
     fn downscale(&self, size: [f32; 2]) -> [f32; 2];
+    /// Downscale some size to fit the available width
+    fn downscale_to(&self, size: [f32; 2], factor: f32) -> [f32; 2];
 }
 
 impl UiExt for Ui {
@@ -144,8 +146,11 @@ impl UiExt for Ui {
     }
 
     fn downscale(&self, size: [f32; 2]) -> [f32; 2] {
-        let width_scale = self.is_mobile().then(|| 0.9_f32).unwrap_or(0.25_f32);
-        let available_width = self.available_width() * width_scale;
+        self.downscale_to(size, self.is_mobile().then(|| 0.9).unwrap_or(0.25))
+    }
+
+    fn downscale_to(&self, size: [f32; 2], factor: f32) -> [f32; 2] {
+        let available_width = self.available_width() * factor;
         let [w, h] = size;
         let max_size = (w < available_width).then(|| w).unwrap_or(available_width);
         let (w, h) = scale_down(w, h, max_size);
