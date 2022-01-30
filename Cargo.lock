@@ -1294,7 +1294,7 @@ dependencies = [
 [[package]]
 name = "harmony_build"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#322b8730906b3ef2cb7c3f64469567af17f2aa25"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#3a7f65af8aefcfb3e808fce7d60b0defd6772f45"
 dependencies = [
  "hrpc-build",
  "prost-build",
@@ -1305,7 +1305,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.3"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#322b8730906b3ef2cb7c3f64469567af17f2aa25"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#3a7f65af8aefcfb3e808fce7d60b0defd6772f45"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1315,7 +1315,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.8.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#322b8730906b3ef2cb7c3f64469567af17f2aa25"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=master#3a7f65af8aefcfb3e808fce7d60b0defd6772f45"
 dependencies = [
  "derive-new",
  "derive_more",
