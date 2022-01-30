@@ -337,14 +337,16 @@ pub fn id(source: impl std::hash::Hash) -> egui::Id {
 pub fn show_notification(summary: impl AsRef<str>, body: impl AsRef<str>) {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let res = notify_rust::Notification::new()
+        let mut notif = notify_rust::Notification::new();
+        notif
             .summary(summary.as_ref())
             .body(body.as_ref())
-            .appname("loqui")
-            .icon("loqui")
-            .hint(notify_rust::Hint::Category("im".to_string()))
-            .show();
-        if let Err(err) = res {
+            .hint(notify_rust::Hint::Category("im".to_string()));
+
+        #[cfg(not(target_os = "macos"))]
+        notif.appname("loqui").icon("loqui");
+
+        if let Err(err) = notif.show() {
             tracing::error!("error while trying to send notification: {}", err);
         }
     }
