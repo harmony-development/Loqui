@@ -338,13 +338,13 @@ pub fn show_notification(summary: impl AsRef<str>, body: impl AsRef<str>) {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let mut notif = notify_rust::Notification::new();
-        notif
-            .summary(summary.as_ref())
-            .body(body.as_ref())
-            .hint(notify_rust::Hint::Category("im".to_string()));
+        notif.summary(summary.as_ref()).body(body.as_ref());
 
         #[cfg(not(target_os = "macos"))]
-        notif.appname("loqui").icon("loqui");
+        notif
+            .appname("loqui")
+            .icon("loqui")
+            .hint(notify_rust::Hint::Category("im".to_string()));
 
         if let Err(err) = notif.show() {
             tracing::error!("error while trying to send notification: {}", err);
