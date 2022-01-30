@@ -168,6 +168,11 @@ pub struct Screen {
 }
 
 impl Screen {
+    fn scroll_to_bottom(&mut self, ui: &mut Ui) {
+        self.scroll_to_bottom = true;
+        ui.ctx().request_repaint();
+    }
+
     fn is_fetching_attachment(&self, attachment: &Attachment) -> bool {
         self.loading_attachment
             .get(&attachment.id)
@@ -311,7 +316,7 @@ impl Screen {
                             c.fetch_members(guild_id, events).await?;
                         });
                     }
-                    self.scroll_to_bottom = true;
+                    self.scroll_to_bottom(ui);
                 }
 
                 ui.separator();
@@ -394,7 +399,7 @@ impl Screen {
                                 let _ = events.send(FetchEvent::FetchedMsgsPins(guild_id, channel_id));
                             });
                         }
-                        self.scroll_to_bottom = true;
+                        self.scroll_to_bottom(ui);
                     }
                 }
             } else {
@@ -977,7 +982,7 @@ impl Screen {
             spawn_evs!(state, |evs, client| {
                 client.send_message(echo_id, guild_id, channel_id, message, evs).await?;
             });
-            self.scroll_to_bottom = true;
+            self.scroll_to_bottom(ui);
             text_edit.surrender_focus();
         } else if user_inputted_text {
             let current_user_id = state.client().user_id();
