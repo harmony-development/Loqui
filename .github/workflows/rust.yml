@@ -192,7 +192,7 @@ jobs:
           mv build-linux/loqui build-linux/loqui-linux
           mv build-macos/loqui build-macos/loqui-macos
           mv build-web/dist.zip build-web/web-dist.zip
-          chmod +x build-{windows,linux,macos}/*
+          chmod +x build-{linux,macos}/*
 
     - name: Upload release
       env:
