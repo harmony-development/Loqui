@@ -1,8 +1,6 @@
 #![feature(let_else)]
 
-use std::convert::identity;
-
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 #[cfg(target_arch = "wasm32")]
 use rkyv::{Archive, Deserialize, Serialize};
 
@@ -42,8 +40,14 @@ pub fn load_image(data: Vec<u8>) -> Vec<u8> {
 pub fn load_image_logic(data: &[u8], kind: &str) -> Option<ImageLoaded> {
     let modify = match kind {
         "minithumbnail" => |image: DynamicImage| image.blur(4.0),
-        "guild" | "avatar" => |image: DynamicImage| image.resize(64, 64, image::imageops::FilterType::Lanczos3),
-        _ => identity,
+        "guild" | "avatar" => |image: DynamicImage| image.resize(96, 96, image::imageops::FilterType::Lanczos3),
+        _ => |image: DynamicImage| {
+            if image.dimensions().0 > 1280 || image.dimensions().1 > 720 {
+                image.resize(1280, 720, image::imageops::FilterType::Triangle)
+            } else {
+                image
+            }
+        },
     };
 
     let image = image::load_from_memory(data).ok()?;

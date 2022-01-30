@@ -943,23 +943,23 @@ impl Screen {
             if focus {
                 text_edit.request_focus();
             }
-        } else {
-            let should_focus_composer = (self.show_create_guild || self.show_join_guild).not()
-                && text_edit.has_focus().not()
-                && ctx.wants_keyboard_input().not()
-                && user_inputted_text;
+        }
 
-            if should_focus_composer {
-                for event in ctx.input().events.iter() {
-                    if let Event::Text(text) = event {
-                        self.composer.text_mut().push_str(text);
-                    }
+        let should_focus_composer = (self.show_create_guild || self.show_join_guild).not()
+            && text_edit.has_focus().not()
+            && ctx.wants_keyboard_input().not()
+            && user_inputted_text;
+
+        if should_focus_composer {
+            for event in ctx.input().events.iter() {
+                if let Event::Text(text) = event {
+                    self.composer.text_mut().push_str(text);
                 }
-                text_edit.request_focus();
-            } else if self.focus_composer {
-                text_edit.request_focus();
-                self.focus_composer = false;
             }
+            text_edit.request_focus();
+        } else if self.focus_composer {
+            text_edit.request_focus();
+            self.focus_composer = false;
         }
 
         let did_submit_enter = {
