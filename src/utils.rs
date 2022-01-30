@@ -149,9 +149,14 @@ impl UiExt for Ui {
         self.downscale_to(
             size,
             self.is_mobile().then(|| 0.95).unwrap_or_else(|| {
-                (size[0] / size[1] > 1.1)
-                    .then(|| 800.0 / self.input().screen_rect.width())
-                    .unwrap_or_else(|| 400.0 / self.input().screen_rect.width())
+                let img_factor = size[0] / size[1];
+                (img_factor > 1.3)
+                    .then(|| 550.0 / self.input().screen_rect.width())
+                    .unwrap_or_else(|| {
+                        (img_factor < 0.7)
+                            .then(|| 250.0 / self.input().screen_rect.width())
+                            .unwrap_or_else(|| 400.0 / self.input().screen_rect.width())
+                    })
             }),
         )
     }
