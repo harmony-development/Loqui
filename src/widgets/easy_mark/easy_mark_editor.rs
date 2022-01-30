@@ -64,7 +64,7 @@ impl EasyMarkEditor {
         self
     }
 
-    pub fn editor_ui(&mut self, ui: &mut egui::Ui) -> Response {
+    pub fn editor_ui(&mut self, ui: &mut egui::Ui, id: Id) -> Response {
         let Self { code, highlighter, .. } = self;
 
         let response = if self.highlight_editor {
@@ -77,6 +77,7 @@ impl EasyMarkEditor {
             ui.add(
                 egui::TextEdit::multiline(code)
                     .desired_width(self.desired_width)
+                    .id(id)
                     .desired_rows(self.desired_rows)
                     .hint_text(&self.hint_text)
                     .font(egui::TextStyle::Monospace) // for cursor height
@@ -86,6 +87,7 @@ impl EasyMarkEditor {
             ui.add(
                 egui::TextEdit::multiline(code)
                     .desired_width(self.desired_width)
+                    .id(id)
                     .desired_rows(self.desired_rows)
                     .hint_text(&self.hint_text),
             )

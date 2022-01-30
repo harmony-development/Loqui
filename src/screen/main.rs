@@ -1,4 +1,4 @@
-use std::{ops::Not, path::PathBuf, sync::Arc};
+use std::{lazy::OnceCell, ops::Not, path::PathBuf, sync::Arc};
 
 use client::{
     channel::Channel,
@@ -16,7 +16,7 @@ use crate::{
     config::BgImage,
     futures::UploadMessageResult,
     screen::guild_settings,
-    style as loqui_style,
+    style as loqui_style, utils,
     widgets::{
         bg_image::ImageBg,
         easy_mark::{self, EasyMarkEditor},
@@ -129,10 +129,6 @@ pub struct Screen {
     current: CurrentIds,
     /// main message composer
     composer: EasyMarkEditor,
-    /// was the main composer focused in last frame
-    is_composer_focused: bool,
-    /// whether to focus the main composer in the next frame
-    focus_composer: bool,
     /// composer used for editing messages
     edit_message_composer: EasyMarkEditor,
     /// whether to scroll to bottom on next frame
@@ -165,9 +161,14 @@ pub struct Screen {
 
     /// panel stack keeping track of where we are / were
     panel_stack: PanelStack,
+    main_composer_id: OnceCell<egui::Id>,
 }
 
 impl Screen {
+    fn main_composer_id(&self) -> egui::Id {
+        *self.main_composer_id.get_or_init(|| utils::id("main_composer"))
+    }
+
     fn scroll_to_bottom(&mut self, ui: &mut Ui) {
         self.scroll_to_bottom = true;
         ui.ctx().request_repaint();
@@ -433,7 +434,10 @@ impl Screen {
 
             if id.is_ack() && id.id() == self.editing_message {
                 let trimmed_edit_msg = self.edit_message_composer.text().trim().to_string();
-                let edit = self.edit_message_composer.highlight(highlight_message).editor_ui(ui);
+                let edit = self
+                    .edit_message_composer
+                    .highlight(highlight_message)
+                    .editor_ui(ui, utils::id((guild_id, channel_id, id)));
                 let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
                 if self.prev_editing_message.is_none() {
                     edit.request_focus();
@@ -774,7 +778,7 @@ impl Screen {
                         composer_text.push_str("> ");
                         composer_text.push_str(text);
                         composer_text.push('\n');
-                        self.focus_composer = true;
+                        ui.memory().request_focus(self.main_composer_id());
                         ui.close_menu();
                     }
                     if ui.button("copy").clicked() {
@@ -923,12 +927,13 @@ impl Screen {
         let Some((guild_id, channel_id)) = self.current.channel() else { return };
 
         let text_string = self.composer.text().trim().to_string();
+        let id = self.main_composer_id();
         let text_edit = self
             .composer
             .desired_rows(desired_lines)
             .desired_width(ui.available_width() - 36.0)
             .hint_text("Enter message...")
-            .editor_ui(ui);
+            .editor_ui(ui, id);
 
         let user_inputted_text = {
             let input = ctx.input();
@@ -962,9 +967,6 @@ impl Screen {
                 }
             }
             text_edit.request_focus();
-        } else if self.focus_composer {
-            text_edit.request_focus();
-            self.focus_composer = false;
         }
 
         let did_submit_enter = {
@@ -995,8 +997,6 @@ impl Screen {
                 spawn_client_fut!(state, |client| client.send_typing(guild_id, channel_id).await);
             }
         }
-
-        self.is_composer_focused = text_edit.has_focus();
     }
 
     fn view_uploading_attachments(&mut self, state: &State, ui: &mut Ui) {
@@ -1346,7 +1346,11 @@ impl Screen {
                         });
                     }
 
-                    let (desired_lines, extra_offset) = self.is_composer_focused.then(|| (4, 0.0)).unwrap_or((1, 14.0));
+                    let (desired_lines, extra_offset) = ui
+                        .memory()
+                        .has_focus(self.main_composer_id())
+                        .then(|| (4, 0.0))
+                        .unwrap_or((1, 14.0));
                     let extra_offset = typing_members.then(|| extra_offset + 20.0).unwrap_or(extra_offset);
                     let desired_height = (desired_lines as f32 * ui.style().spacing.interact_size.y) + extra_offset;
                     ui.allocate_ui(
