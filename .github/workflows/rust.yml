@@ -61,7 +61,7 @@ jobs:
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
       with:
-        key: cache-debug-2
+        key: cache-debug-3
 
     - name: Clippy
       uses: actions-rs/clippy-check@v1
@@ -140,7 +140,7 @@ jobs:
     - name: Cache rust
       uses: Swatinem/rust-cache@v1
       with:
-        key: cache-release-2
+        key: cache-release-3
 
     - name: Build
       run: cargo build --locked --release
