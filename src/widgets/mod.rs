@@ -9,9 +9,7 @@ use client::{
     },
     member::Member,
 };
-use eframe::egui::{
-    self, Button, CollapsingHeader, CollapsingResponse, Color32, Response, RichText, Ui, Widget, WidgetText,
-};
+use eframe::egui::{self, Button, CollapsingHeader, Color32, Response, RichText, Ui, Widget, WidgetText};
 
 use crate::{
     state::State,
@@ -133,33 +131,6 @@ impl<'a> Widget for Avatar<'a> {
 
             ui.add_sized([self.size; 2], button)
         }
-    }
-}
-
-/// A widget that shows a seperater horizontally next to the header.
-pub struct SeperatedCollapsingHeader {
-    inner: CollapsingHeader,
-}
-
-impl SeperatedCollapsingHeader {
-    pub fn new(text: impl Into<WidgetText>) -> Self {
-        Self {
-            inner: CollapsingHeader::new(text),
-        }
-    }
-
-    pub fn with(mut self, f: impl FnOnce(CollapsingHeader) -> CollapsingHeader) -> Self {
-        self.inner = f(self.inner);
-        self
-    }
-
-    pub fn show<R>(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> CollapsingResponse<R> {
-        ui.horizontal(|ui| {
-            let resp = self.inner.show(ui, add_contents);
-            ui.add(egui::Separator::default().horizontal());
-            resp
-        })
-        .inner
     }
 }
 

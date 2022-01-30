@@ -1,11 +1,11 @@
 use std::ops::Not;
 
 use client::content;
-use eframe::egui::{Color32, RichText};
+use eframe::egui::{CollapsingHeader, Color32, RichText};
 
 use crate::{
     config::BgImage,
-    widgets::{view_egui_settings, Avatar, SeperatedCollapsingHeader},
+    widgets::{view_egui_settings, Avatar},
 };
 
 use super::prelude::*;
@@ -178,17 +178,13 @@ impl AppScreen for Screen {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-                    SeperatedCollapsingHeader::new("profile")
-                        .with(|h| h.default_open(true))
-                        .show(ui, |ui| {
-                            self.view_profile(state, ui);
-                        });
-                    SeperatedCollapsingHeader::new("app")
-                        .with(|h| h.default_open(true))
-                        .show(ui, |ui| {
-                            self.view_app(state, ui);
-                        });
-                    SeperatedCollapsingHeader::new("egui settings (advanced)").show(ui, |ui| {
+                    CollapsingHeader::new("profile").default_open(true).show(ui, |ui| {
+                        self.view_profile(state, ui);
+                    });
+                    CollapsingHeader::new("app").default_open(true).show(ui, |ui| {
+                        self.view_app(state, ui);
+                    });
+                    CollapsingHeader::new("egui settings (advanced)").show(ui, |ui| {
                         ui.label("note: these settings are not persisted");
                         view_egui_settings(ctx, ui);
                     });

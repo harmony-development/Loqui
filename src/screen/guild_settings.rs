@@ -4,11 +4,9 @@ use client::{
     channel::Channel, content, get_random_u64, guild::Guild, harmony_rust_sdk::api::chat::all_permissions,
     member::Member,
 };
-use eframe::egui::{Color32, RichText};
+use eframe::egui::{CollapsingHeader, Color32, RichText};
 
-use crate::widgets::{
-    view_channel_context_menu_items, view_member_context_menu_items, Avatar, SeperatedCollapsingHeader,
-};
+use crate::widgets::{view_channel_context_menu_items, view_member_context_menu_items, Avatar};
 
 use super::prelude::*;
 
@@ -85,43 +83,51 @@ impl Screen {
         let guild_id = self.guild_id;
         let Some(guild) = state.cache.get_guild(guild_id) else { return };
 
-        if guild.has_perm(all_permissions::GUILD_MANAGE_CHANGE_INFORMATION) {
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new("guild name").small());
-                ui.text_edit_singleline(&mut self.guild_name_edit_text);
-                if ui.add(egui::Button::new("edit").small()).clicked() {
-                    let new_name = self.guild_name_edit_text.clone();
-                    spawn_client_fut!(state, |client| client.edit_guild(guild_id, Some(new_name), None).await);
+        ui.horizontal_top(|ui| {
+            if self.uploading_guild_pic.get().not() {
+                let avatar_but = ui
+                    .add_enabled(
+                        guild.has_perm(all_permissions::GUILD_MANAGE_CHANGE_INFORMATION),
+                        Avatar::new(guild.picture.as_ref(), guild.name.as_str(), state).size(64.0),
+                    )
+                    .on_hover_text("set picture");
+                if avatar_but.clicked() {
+                    let uploading_guild_pic = self.uploading_guild_pic.clone();
+                    spawn_client_fut!(state, |client| {
+                        let maybe_file = rfd::AsyncFileDialog::new().pick_file().await;
+                        if let Some(file) = maybe_file {
+                            uploading_guild_pic.set(true);
+                            let name = file.file_name();
+                            let data = file.read().await;
+                            let mimetype = content::infer_type_from_bytes(&data);
+                            let id = client.upload_file(name, mimetype, data).await?;
+                            client.edit_guild(guild_id, None, Some(id)).await?;
+                            uploading_guild_pic.set(false);
+                        }
+                        ClientResult::Ok(())
+                    });
+                }
+            } else {
+                ui.add(egui::Spinner::new().size(64.0))
+                    .on_hover_text("uploading avatar");
+            }
+
+            ui.vertical(|ui| {
+                if guild.has_perm(all_permissions::GUILD_MANAGE_CHANGE_INFORMATION) {
+                    ui.label(RichText::new("guild name").small());
+                    ui.horizontal(|ui| {
+                        ui.add(egui::TextEdit::singleline(&mut self.guild_name_edit_text).desired_width(100.0));
+                        if ui.add(egui::Button::new("edit").small()).clicked() {
+                            let new_name = self.guild_name_edit_text.clone();
+                            spawn_client_fut!(state, |client| client.edit_guild(guild_id, Some(new_name), None).await);
+                        }
+                    });
+                } else {
+                    ui.label(RichText::new("guild name").small());
+                    ui.label(guild.name.as_str());
                 }
             });
-        } else {
-            ui.label(guild.name.as_str());
-        }
-
-        if self.uploading_guild_pic.get().not() {
-            let avatar_but = ui
-                .add(Avatar::new(guild.picture.as_ref(), guild.name.as_str(), state).size(64.0))
-                .on_hover_text("set picture");
-            if avatar_but.clicked() {
-                let uploading_guild_pic = self.uploading_guild_pic.clone();
-                spawn_client_fut!(state, |client| {
-                    let maybe_file = rfd::AsyncFileDialog::new().pick_file().await;
-                    if let Some(file) = maybe_file {
-                        uploading_guild_pic.set(true);
-                        let name = file.file_name();
-                        let data = file.read().await;
-                        let mimetype = content::infer_type_from_bytes(&data);
-                        let id = client.upload_file(name, mimetype, data).await?;
-                        client.edit_guild(guild_id, None, Some(id)).await?;
-                        uploading_guild_pic.set(false);
-                    }
-                    ClientResult::Ok(())
-                });
-            }
-        } else {
-            ui.add(egui::Spinner::new().size(64.0))
-                .on_hover_text("uploading avatar");
-        }
+        });
     }
 
     fn view_invites(&mut self, state: &mut State, ui: &mut Ui) {
@@ -248,14 +254,14 @@ impl AppScreen for Screen {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-                    SeperatedCollapsingHeader::new("general")
-                        .with(|h| h.default_open(true))
+                    CollapsingHeader::new("general")
+                        .default_open(true)
                         .show(ui, |ui| self.view_general(state, ui));
 
-                    SeperatedCollapsingHeader::new("invites").show(ui, |ui| self.view_invites(state, ui));
-                    SeperatedCollapsingHeader::new("roles").show(ui, |ui| self.view_roles(state, ui));
-                    SeperatedCollapsingHeader::new("members").show(ui, |ui| self.view_members(state, ui));
-                    SeperatedCollapsingHeader::new("channels").show(ui, |ui| self.view_channels(state, ui));
+                    CollapsingHeader::new("invites").show(ui, |ui| self.view_invites(state, ui));
+                    CollapsingHeader::new("roles").show(ui, |ui| self.view_roles(state, ui));
+                    CollapsingHeader::new("members").show(ui, |ui| self.view_members(state, ui));
+                    CollapsingHeader::new("channels").show(ui, |ui| self.view_channels(state, ui));
                 });
             });
         });

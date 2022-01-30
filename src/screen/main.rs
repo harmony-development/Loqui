@@ -1342,7 +1342,7 @@ impl Screen {
                     }
 
                     let (desired_lines, extra_offset) = self.is_composer_focused.then(|| (4, 0.0)).unwrap_or((1, 14.0));
-                    let extra_offset = typing_members.then(|| extra_offset + 14.0).unwrap_or(extra_offset);
+                    let extra_offset = typing_members.then(|| extra_offset + 20.0).unwrap_or(extra_offset);
                     let desired_height = (desired_lines as f32 * ui.style().spacing.interact_size.y) + extra_offset;
                     ui.allocate_ui(
                         vec2(ui.available_width(), ui.available_height() - desired_height),
