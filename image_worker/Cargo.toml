@@ -15,7 +15,7 @@ web-sys = { version = "0.3", features = [
     "MessageEvent",
 ] }
 rkyv = "0.7"
-image = { version = "0.23.14", default-features = false, features = [
+image = { git = "https://github.com/image-rs/image.git", branch = "master", default-features = false, features = [
     "gif",
     "jpeg",
     "ico",
@@ -32,4 +32,4 @@ image = { version = "0.23.14", default-features = false, features = [
 ] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-image = "0.23"
+image = { git = "https://github.com/image-rs/image.git", branch = "master" }
