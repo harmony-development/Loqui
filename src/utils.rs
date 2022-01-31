@@ -108,12 +108,19 @@ pub trait UiExt {
     fn downscale(&self, size: [f32; 2]) -> [f32; 2];
     /// Downscale some size to fit the available width
     fn downscale_to(&self, size: [f32; 2], factor: f32) -> [f32; 2];
+    /// Add an image button without a frame
+    fn frameless_image_button(&mut self, texture_id: egui::TextureId, size: impl Into<Vec2>) -> Response;
 }
 
 impl UiExt for Ui {
     #[inline(always)]
     fn text_button(&mut self, text: impl Into<WidgetText>) -> Response {
         self.add(TextButton::text(text))
+    }
+
+    fn frameless_image_button(&mut self, texture_id: egui::TextureId, size: impl Into<Vec2>) -> Response {
+        self.add(egui::ImageButton::new(texture_id, size).frame(false))
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
     }
 
     fn animate_bool_with_time_alternate(&mut self, id: &str, b: &mut bool, time: f32) -> f32 {

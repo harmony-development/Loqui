@@ -530,7 +530,7 @@ impl Screen {
                         if attachment.is_raster_image() {
                             if let Some((tex, size)) = state.image_cache.get_image(&attachment.id) {
                                 let size = ui.downscale(size);
-                                let open_but = ui.add(egui::ImageButton::new(tex.id(), size));
+                                let open_but = ui.frameless_image_button(tex.id(), size);
                                 open = open_but.clicked();
                             } else {
                                 download = ui.button(format!("download '{}'", data.filename)).clicked();
@@ -568,22 +568,22 @@ impl Screen {
 
             let is_fetching = self.is_fetching_attachment(attachment);
 
-            if let Some((texid, size)) = state.image_cache.get_image(&attachment.id) {
+            if let Some((tex, size)) = state.image_cache.get_image(&attachment.id) {
                 let size = maybe_size.unwrap_or_else(|| ui.downscale(size));
-                let open_but = ui.add(egui::ImageButton::new(texid.id(), size));
+                let open_but = ui.frameless_image_button(tex.id(), size);
                 open = open_but.clicked();
                 handled = true;
-            } else if let Some((texid, size)) = state.image_cache.get_thumbnail(&attachment.id) {
+            } else if let Some((tex, size)) = state.image_cache.get_thumbnail(&attachment.id) {
                 let size = maybe_size.unwrap_or_else(|| ui.downscale(size));
                 let button = if is_fetching {
-                    ImageBg::new(texid.id(), size)
+                    ImageBg::new(tex.id(), size)
                         .show(ui, |ui| {
                             ui.add_sized(size, egui::Spinner::new().size(32.0))
                                 .on_hover_text_at_pointer("loading image")
                         })
                         .response
                 } else {
-                    ui.add(egui::ImageButton::new(texid.id(), size))
+                    ui.frameless_image_button(tex.id(), size)
                 };
                 fetch = button.clicked();
                 handled = true;
@@ -717,10 +717,12 @@ impl Screen {
                             ui.horizontal(|ui| {
                                 let extreme_bg_color = ui.style().visuals.extreme_bg_color;
                                 self.view_user_avatar(state, ui, user, overrides, extreme_bg_color);
-                                ui.label(RichText::new(display_name).color(color).strong());
-                                if override_name.is_some() {
-                                    ui.label(RichText::new(format!("({})", sender_name)).italics().small());
-                                }
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new(display_name).color(color).strong());
+                                    if override_name.is_some() {
+                                        ui.label(RichText::new(format!("({})", sender_name)).italics().small());
+                                    }
+                                });
                             });
                         })
                         .response;
