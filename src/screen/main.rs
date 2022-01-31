@@ -181,13 +181,14 @@ impl Screen {
     }
 
     fn download_file(&mut self, state: &State, attachment: Attachment) {
-        let image_load_bool = AtomBool::new(true);
+        let image_load_bool = AtomBool::new(false);
         self.loading_attachment
             .insert(attachment.id.clone(), image_load_bool.clone());
 
         spawn_evs!(state, |sender, client| {
-            let res = client.fetch_attachment(attachment.id.clone()).await;
-            image_load_bool.set(false);
+            let res = image_load_bool
+                .scope(client.fetch_attachment(attachment.id.clone()))
+                .await;
             let (_, file) = res?;
             let _ = sender.send(FetchEvent::Attachment { attachment, file });
             ClientResult::Ok(())

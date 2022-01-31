@@ -96,13 +96,16 @@ impl Screen {
                     spawn_client_fut!(state, |client| {
                         let maybe_file = rfd::AsyncFileDialog::new().pick_file().await;
                         if let Some(file) = maybe_file {
-                            uploading_guild_pic.set(true);
-                            let name = file.file_name();
-                            let data = file.read().await;
-                            let mimetype = content::infer_type_from_bytes(&data);
-                            let id = client.upload_file(name, mimetype, data).await?;
-                            client.edit_guild(guild_id, None, Some(id)).await?;
-                            uploading_guild_pic.set(false);
+                            uploading_guild_pic
+                                .scope(async move {
+                                    let name = file.file_name();
+                                    let data = file.read().await;
+                                    let mimetype = content::infer_type_from_bytes(&data);
+                                    let id = client.upload_file(name, mimetype, data).await?;
+                                    client.edit_guild(guild_id, None, Some(id)).await?;
+                                    ClientResult::Ok(())
+                                })
+                                .await?;
                         }
                         ClientResult::Ok(())
                     });
@@ -197,12 +200,9 @@ impl Screen {
                 ui.colored_label(Color32::YELLOW, "no invites");
             }
         } else if self.fetching_invites.get().not() {
-            self.fetching_invites.set(true);
             let fetching_invites = self.fetching_invites.clone();
             spawn_evs!(state, |events, client| {
-                let res = client.fetch_invites(guild_id, events).await;
-                fetching_invites.set(false);
-                res?;
+                fetching_invites.scope(client.fetch_invites(guild_id, events)).await?;
             });
         } else {
             ui.add(egui::Spinner::new().size(32.0))

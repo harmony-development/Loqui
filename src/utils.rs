@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     cmp::Ordering,
+    future::Future,
     ops::Deref,
     sync::{atomic::AtomicBool, Arc},
 };
@@ -43,6 +44,18 @@ impl AtomBool {
     #[inline(always)]
     pub fn set(&self, val: bool) {
         self.inner.store(val, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Runs a future under this atom's scope. Before running the future,
+    /// it is set to `true`, after the future is finished it is set to `false`.
+    pub async fn scope<Fut>(&self, fut: Fut) -> <Fut as Future>::Output
+    where
+        Fut: Future,
+    {
+        self.set(true);
+        let res = fut.await;
+        self.set(false);
+        res
     }
 }
 
