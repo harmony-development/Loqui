@@ -38,6 +38,7 @@ impl Screen {
 
     #[inline(always)]
     fn handle_futures(&mut self, state: &mut State) {
+        #[cfg(not(target_arch = "wasm32"))]
         handle_future!(state, |maybe_file: Option<FileHandle>| {
             if let Some(file) = maybe_file {
                 state.local_config.bg_image = BgImage::Local(file.path().to_path_buf());
