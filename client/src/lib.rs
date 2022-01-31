@@ -123,7 +123,7 @@ pub enum PostProcessEvent {
         channel_id: u64,
         message_id: u64,
     },
-    FetchLinkMetadata(Uri),
+    FetchLinkMetadata(Vec<Uri>),
     FetchEmotes(u64),
 }
 
@@ -378,7 +378,11 @@ impl Cache {
             } => {
                 let message: Message = message.into();
                 let id = MessageId::Ack(message_id);
-                message.post_process(&self.post_sender, guild_id, channel_id);
+                let mut urls = Vec::new();
+                message.post_process(&self.post_sender, &mut urls, guild_id, channel_id);
+                if urls.is_empty().not() {
+                    let _ = self.post_sender.send(PostProcessEvent::FetchLinkMetadata(urls));
+                }
 
                 let channel = self.get_channel_mut(guild_id, channel_id);
 
@@ -418,7 +422,11 @@ impl Cache {
                 }) => {
                     if let Some(message) = message {
                         let message = Message::from(message);
-                        message.post_process(&self.post_sender, guild_id, channel_id);
+                        let mut urls = Vec::new();
+                        message.post_process(&self.post_sender, &mut urls, guild_id, channel_id);
+                        if urls.is_empty().not() {
+                            let _ = self.post_sender.send(PostProcessEvent::FetchLinkMetadata(urls));
+                        }
 
                         let channel = self.get_channel_mut(guild_id, channel_id);
 
@@ -456,7 +464,11 @@ impl Cache {
 
                     let maybe_view = self.get_channel(guild_id, channel_id).map(|chan| chan.messages.view());
                     if let Some(msg) = maybe_view.as_ref().and_then(|view| view.get_message(&message_id)) {
-                        msg.post_process(&self.post_sender, guild_id, channel_id);
+                        let mut urls = Vec::new();
+                        msg.post_process(&self.post_sender, &mut urls, guild_id, channel_id);
+                        if urls.is_empty().not() {
+                            let _ = self.post_sender.send(PostProcessEvent::FetchLinkMetadata(urls));
+                        }
                     }
                 }
                 ChatEvent::DeletedChannel(ChannelDeleted { guild_id, channel_id }) => {
@@ -764,9 +776,13 @@ impl Cache {
             .map(|(id, msg)| (MessageId::Ack(id), Message::from(msg)))
             .collect::<Vec<_>>();
 
+        let mut urls = Vec::new();
         messages.iter().for_each(|(_, m)| {
-            m.post_process(&self.post_sender, guild_id, channel_id);
+            m.post_process(&self.post_sender, &mut urls, guild_id, channel_id);
         });
+        if urls.is_empty().not() {
+            let _ = self.post_sender.send(PostProcessEvent::FetchLinkMetadata(urls));
+        }
 
         let channel = self.get_channel_mut(guild_id, channel_id);
         channel.reached_top = reached_top;
@@ -1459,10 +1475,24 @@ impl Client {
                 }
                 Ok(())
             }
-            PostProcessEvent::FetchLinkMetadata(url) => {
-                let resp = self.inner.call(FetchLinkMetadataRequest::new(url.to_string())).await?;
-                if let Some(data) = resp.data {
-                    let _ = event_sender.send(FetchEvent::LinkMetadata { data, url });
+            PostProcessEvent::FetchLinkMetadata(mut urls) => {
+                if urls.len() == 1 {
+                    let url = urls.pop().unwrap();
+                    let resp = self.inner.call(FetchLinkMetadataRequest::new(url.to_string())).await?;
+                    if let Some(data) = resp.data {
+                        let _ = event_sender.send(FetchEvent::LinkMetadata { data, url });
+                    }
+                } else if urls.is_empty().not() {
+                    let reqs = urls
+                        .iter()
+                        .map(|url| FetchLinkMetadataRequest::new(url.to_string()))
+                        .collect();
+                    let resps = self.inner.batch_call(reqs).await?;
+                    for (resp, url) in resps.into_iter().zip(urls) {
+                        if let Some(data) = resp.data {
+                            let _ = event_sender.send(FetchEvent::LinkMetadata { data, url });
+                        }
+                    }
                 }
                 Ok(())
             }
