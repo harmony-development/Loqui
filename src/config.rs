@@ -55,8 +55,6 @@ impl BgImage {
                 .expect("task panicked")
                 .map_err(|err| err.to_string())
                 .map(Bytes::from),
-            #[cfg(target_arch = "wasm32")]
-            Self::Local(path) => unreachable!(),
             Self::External(url) => {
                 (async {
                     let resp = reqwest::get(url).await.map_err(|err| err.to_string())?;
