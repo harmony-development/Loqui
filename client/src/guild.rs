@@ -13,6 +13,7 @@ use crate::role::{Role, RolePerms, Roles};
 #[derive(Debug, Clone, Default)]
 pub struct Guild {
     pub name: SmolStr,
+    pub owners: Vec<u64>,
     pub picture: Option<FileId>,
     pub channels: Vec<u64>,
     pub roles: Roles,

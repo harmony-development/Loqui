@@ -163,6 +163,12 @@ pub enum FetchEvent {
         direction: Direction,
         reached_top: bool,
     },
+    FetchedGuild {
+        id: u64,
+        name: String,
+        picture: Option<String>,
+        owners: Vec<u64>,
+    },
     InitialSyncComplete,
 }
 
@@ -283,6 +289,25 @@ impl Cache {
 
     pub fn process_event(&mut self, event: FetchEvent) {
         match event {
+            FetchEvent::FetchedGuild {
+                id,
+                name,
+                picture,
+                owners,
+            } => {
+                let mut guild = self.get_guild_mut(id);
+                guild.name = name.into();
+                guild.picture = picture.and_then(|s| FileId::from_str(&s).ok());
+                guild.owners = owners;
+                guild.fetched = true;
+                if let Some(id) = guild.picture.clone() {
+                    let _ = self.post_sender.send(PostProcessEvent::FetchThumbnail(Attachment {
+                        kind: "image".into(),
+                        name: "guild".into(),
+                        ..Attachment::new_unknown(id)
+                    }));
+                }
+            }
             FetchEvent::FetchedMessageHistory {
                 guild_id,
                 channel_id,
@@ -550,8 +575,6 @@ impl Cache {
                     if let Some(picture) = parsed_pic {
                         guild.picture = Some(picture);
                     }
-
-                    guild.fetched = true;
                 }
                 ChatEvent::RoleCreated(RoleCreated {
                     guild_id,
@@ -1250,12 +1273,12 @@ impl Client {
             let guild_infos = self.inner.batch_call(chunk.clone()).await?;
             let evs = guild_infos.into_iter().zip(chunk.into_iter()).map(|(resp, req)| {
                 let guild = resp.guild.unwrap_or_default();
-                FetchEvent::Harmony(Event::Chat(ChatEvent::EditedGuild(GuildUpdated {
-                    guild_id: req.guild_id,
-                    new_metadata: guild.metadata,
-                    new_name: Some(guild.name),
-                    new_picture: guild.picture,
-                })))
+                FetchEvent::FetchedGuild {
+                    id: req.guild_id,
+                    name: guild.name,
+                    owners: guild.owner_ids,
+                    picture: guild.picture,
+                }
             });
             for ev in evs {
                 let _ = event_sender.send(ev);

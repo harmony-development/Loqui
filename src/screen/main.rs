@@ -1097,7 +1097,12 @@ impl Screen {
                                         .highest_role_for_member(*id)
                                         .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
                                     self.view_user_avatar(state, ui, Some(user), None, loqui_style::BG_LIGHT);
-                                    ui.colored_label(role_color, user.username.as_str());
+                                    ui.vertical(|ui| {
+                                        ui.colored_label(role_color, user.username.as_str());
+                                        if guild.owners.contains(id) {
+                                            ui.label(RichText::new("(owner)").small());
+                                        }
+                                    });
                                 } else {
                                     ui.add(egui::Spinner::new().size(32.0));
                                 }
