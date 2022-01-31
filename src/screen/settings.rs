@@ -134,10 +134,7 @@ impl Screen {
             });
         });
 
-        ui.horizontal(|ui| {
-            ui.label("mention keywords");
-            ui.add(egui::Separator::default().horizontal());
-        });
+        ui.heading("mention keywords");
         ui.horizontal(|ui| {
             let text_edit = ui.add(egui::TextEdit::singleline(&mut self.mention_keyword_edit).desired_width(100.0));
             if ui.button("+ add").clicked() || text_edit.did_submit(ui) {
