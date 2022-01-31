@@ -163,6 +163,10 @@ impl State {
 
         let (images_tx, images_rx) = std::sync::mpsc::sync_channel(100);
 
+        let local_config = LocalConfig::load();
+
+        futures.spawn(local_config.bg_image.clone().load());
+
         Self {
             socket_rx_tx,
             reset_socket,
@@ -186,7 +190,7 @@ impl State {
             event_sender: event_tx,
             post_client_tx,
             config: Config::default(),
-            local_config: LocalConfig::load(),
+            local_config,
             integration_info: None,
         }
     }
