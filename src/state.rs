@@ -212,14 +212,12 @@ impl State {
 
     /// Saves the current config in memory to disk.
     pub fn save_config(&self) {
-        let conf = self.config.clone();
-        let local_conf = self.local_config.clone();
+        self.local_config.store();
 
-        spawn_client_fut!(self, |client| {
-            let res = conf.store(&client).await;
-            local_conf.store();
-            res
-        });
+        if let Some(client) = self.client.clone() {
+            let conf = self.config.clone();
+            self.futures.spawn(async move { conf.store(&client).await });
+        }
     }
 
     /// This must be run each frame to handle stuff like:

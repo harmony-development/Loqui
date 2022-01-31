@@ -61,26 +61,26 @@ pub mod native {
 
     pub fn set_local_config<T: Serialize>(name: &str, val: &T) {
         let config_path = STORE.config_dir().join(name);
-        let raw = toml::to_vec(val).expect("must be valid serde struct");
+        let raw = serde_json::to_vec(val).expect("must be valid serde struct");
         std::fs::write(config_path, raw).expect("failed to write");
     }
 
     pub fn get_local_config<T: DeserializeOwned>(name: &str) -> Option<T> {
         let config_path = STORE.config_dir().join(name);
         let raw = std::fs::read(config_path).ok()?;
-        toml::from_slice(&raw).ok()
+        serde_json::from_slice(&raw).ok()
     }
 
     pub fn get_latest_session() -> Option<Session> {
         let session_raw = std::fs::read(STORE.latest_session_file()).ok()?;
-        let session = toml::from_slice::<Session>(&session_raw)
+        let session = serde_json::from_slice::<Session>(&session_raw)
             .map_err(|err| ClientError::Custom(err.to_string()))
             .ok()?;
         Some(session)
     }
 
     pub fn put_session(session: Session) {
-        let serialized = toml::to_string_pretty(&session).expect("failed to serialize");
+        let serialized = serde_json::to_string(&session).expect("failed to serialize");
         let _ = std::fs::write(STORE.latest_session_file(), serialized.into_bytes());
     }
 

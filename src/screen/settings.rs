@@ -2,6 +2,7 @@ use std::ops::Not;
 
 use client::content;
 use eframe::egui::{CollapsingHeader, Color32, RichText};
+use rfd::FileHandle;
 
 use crate::{
     config::BgImage,
@@ -15,19 +16,34 @@ pub struct Screen {
     uploading_user_pic: AtomBool,
     scale_factor: f32,
     mention_keyword_edit: String,
+    inputting_bg_image_url: bool,
+    bg_image_url_text: String,
 }
 
 impl Screen {
     pub fn new(ctx: &egui::Context, state: &State) -> Self {
         Self {
             user_name_edit_text: state
-                .client()
-                .this_user(&state.cache)
+                .client
+                .as_ref()
+                .and_then(|c| c.this_user(&state.cache))
                 .map_or_else(String::new, |m| m.username.to_string()),
             uploading_user_pic: AtomBool::new(false),
             scale_factor: ctx.pixels_per_point(),
             mention_keyword_edit: String::new(),
+            inputting_bg_image_url: false,
+            bg_image_url_text: String::new(),
         }
+    }
+
+    #[inline(always)]
+    fn handle_futures(&mut self, state: &mut State) {
+        handle_future!(state, |maybe_file: Option<FileHandle>| {
+            if let Some(file) = maybe_file {
+                state.local_config.bg_image = BgImage::Local(file.path().to_path_buf());
+                state.futures.spawn(state.local_config.bg_image.clone().load());
+            }
+        });
     }
 
     fn view_app(&mut self, state: &mut State, ui: &mut Ui) {
@@ -50,7 +66,7 @@ impl Screen {
                 let enabled = self.scale_factor != native_pixels_per_point;
                 if ui
                     .add_enabled(enabled, egui::Button::new("Reset"))
-                    .on_hover_text(format!("Reset scale to native value ({:.1})", native_pixels_per_point))
+                    .on_hover_text(format!("Reset scale to native value ({native_pixels_per_point:.1})"))
                     .clicked()
                 {
                     self.scale_factor = native_pixels_per_point;
@@ -66,34 +82,50 @@ impl Screen {
         ui.horizontal(|ui| {
             ui.label("background image:");
 
-            let chosen_image = match &state.local_config.bg_image {
-                BgImage::External(s) => format!("▼ external: {}", s),
-                BgImage::Local(s) => format!("▼ local: {}", s),
-                BgImage::Default => "▼ default".to_string(),
-                BgImage::None => "▼ none".to_string(),
-            };
-
-            ui.menu_button(chosen_image, |ui| {
-                if ui.button("choose file").clicked() {
-                    ui.close_menu();
+            if self.inputting_bg_image_url {
+                let edit = ui.text_edit_singleline(&mut self.bg_image_url_text);
+                if ui.button("submit").clicked() || edit.did_submit(ui) {
+                    state.local_config.bg_image = BgImage::External(self.bg_image_url_text.drain(..).collect());
+                    state.futures.spawn(state.local_config.bg_image.clone().load());
+                    self.inputting_bg_image_url = false;
                 }
+            } else {
+                let chosen_image = match &state.local_config.bg_image {
+                    BgImage::External(s) => format!("▼ external: {s}"),
+                    BgImage::Local(s) => format!("▼ local: {s:?}"),
+                    BgImage::Default => "▼ default".to_string(),
+                    BgImage::None => "▼ none".to_string(),
+                };
 
-                if ui.button("none").clicked() {
-                    state.local_config.bg_image = BgImage::None;
-                    ui.close_menu();
-                }
+                ui.menu_button(chosen_image, |ui| {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if ui.button("choose file").clicked() {
+                        state.futures.spawn(rfd::AsyncFileDialog::new().pick_file());
+                        ui.close_menu();
+                    }
 
-                if ui.button("default").clicked() {
-                    state.local_config.bg_image = BgImage::Default;
-                    ui.close_menu();
-                }
-            });
+                    if ui.button("enter url").clicked() {
+                        self.inputting_bg_image_url = true;
+                        ui.close_menu();
+                    }
+
+                    if ui.button("none").clicked() {
+                        state.local_config.bg_image = BgImage::None;
+                        ui.close_menu();
+                    }
+
+                    if ui.button("default").clicked() {
+                        state.local_config.bg_image = BgImage::Default;
+                        ui.close_menu();
+                    }
+                });
+            }
         });
     }
 
     // this assumes that the parent ui is vertical layout
     fn view_profile(&mut self, state: &mut State, ui: &mut Ui) {
-        let Some(member) = state.client().this_user(&state.cache) else {
+        let Some(member) = state.client.as_ref().and_then(|c| c.this_user(&state.cache)) else {
             ui.label("loading...");
             return;
         };
@@ -172,6 +204,8 @@ impl Screen {
 
 impl AppScreen for Screen {
     fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame, state: &mut State) {
+        self.handle_futures(state);
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {

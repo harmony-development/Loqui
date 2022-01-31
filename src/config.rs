@@ -1,7 +1,13 @@
+use std::path::PathBuf;
+
 use client::{
     content,
     error::{ClientError, ClientResult},
-    harmony_rust_sdk::api::profile::{GetAppDataRequest, SetAppDataRequest},
+    harmony_rust_sdk::api::{
+        exports::prost::bytes::Bytes,
+        profile::{GetAppDataRequest, SetAppDataRequest},
+        rest::FileId,
+    },
     Client,
 };
 use serde::{Deserialize, Serialize};
@@ -35,9 +41,40 @@ pub enum BgImage {
     /// Show nothing.
     None,
     /// Show a local image.
-    Local(String),
+    Local(PathBuf),
     /// Fetch and show an external image.
     External(String),
+}
+
+impl BgImage {
+    pub async fn load(self) -> ClientResult<()> {
+        let res = match self {
+            #[cfg(not(target_arch = "wasm32"))]
+            Self::Local(path) => tokio::task::spawn_blocking(move || std::fs::read(path))
+                .await
+                .expect("task panicked")
+                .map_err(|err| err.to_string())
+                .map(Bytes::from),
+            #[cfg(target_arch = "wasm32")]
+            Self::Local(path) => unreachable!(),
+            Self::External(url) => {
+                (async {
+                    let resp = reqwest::get(url).await.map_err(|err| err.to_string())?;
+                    resp.bytes().await.map_err(|err| err.to_string())
+                })
+                .await
+            }
+            _ => return Ok(()),
+        };
+
+        match res {
+            Ok(data) => {
+                crate::image_cache::op::decode_image(data, FileId::Id(String::new()), "bg_image".to_string());
+                Ok(())
+            }
+            Err(err) => Err(ClientError::Custom(err)),
+        }
+    }
 }
 
 impl Default for BgImage {

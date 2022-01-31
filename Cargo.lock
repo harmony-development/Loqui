@@ -396,9 +396,9 @@ dependencies = [
  "instant",
  "lazy_static",
  "serde",
+ "serde_json",
  "smol_str",
  "tokio",
- "toml",
  "tracing",
  "urlencoding",
 ]
@@ -1818,6 +1818,7 @@ dependencies = [
  "js-sys",
  "notify-rust",
  "open",
+ "reqwest",
  "rfd",
  "rkyv",
  "serde",

@@ -855,25 +855,22 @@ impl Screen {
                             tot
                         });
                 for chunk in chunked_messages {
-                    ui.group_filled_with(loqui_style::BG_LIGHT)
-                        .stroke((0.0, Color32::WHITE).into())
-                        .margin([5.0, 5.0])
-                        .show(ui, |ui| {
-                            for (index, (id, message)) in chunk.into_iter().enumerate() {
-                                self.view_message(
-                                    state,
-                                    ui,
-                                    guild,
-                                    channel,
-                                    message,
-                                    guild_id,
-                                    channel_id,
-                                    id,
-                                    user_id,
-                                    index == 0,
-                                );
-                            }
-                        });
+                    egui::Frame::none().margin([5.0, 5.0]).show(ui, |ui| {
+                        for (index, (id, message)) in chunk.into_iter().enumerate() {
+                            self.view_message(
+                                state,
+                                ui,
+                                guild,
+                                channel,
+                                message,
+                                guild_id,
+                                channel_id,
+                                id,
+                                user_id,
+                                index == 0,
+                            );
+                        }
+                    });
                 }
                 if self.scroll_to_bottom {
                     ui.scroll_to_cursor(egui::Align::Max);
@@ -1529,7 +1526,16 @@ impl AppScreen for Screen {
                             .offset(ui.available_size() - (size * 0.8) - vec2(75.0, 0.0))
                             .show(ui, |ui| show_main(state, ui));
                     }
-                    _ => show_main(state, ui),
+                    _ => {
+                        if let Some((tex, _)) = state.image_cache.get_bg_image() {
+                            let size = ctx.available_rect().size() + egui::vec2(8.0, 8.0);
+                            ImageBg::new(tex.id(), size)
+                                .offset(egui::vec2(-8.0, -8.0))
+                                .show(ui, |ui| show_main(state, ui));
+                        } else {
+                            show_main(state, ui);
+                        }
+                    }
                 });
             } else {
                 central_panel.show(ctx, |ui| {

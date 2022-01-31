@@ -6,6 +6,7 @@ pub struct ImageCache {
     avatar: AHashMap<FileId, (TextureHandle, [f32; 2])>,
     minithumbnail: AHashMap<FileId, (TextureHandle, [f32; 2])>,
     image: AHashMap<FileId, (TextureHandle, [f32; 2])>,
+    bg_image: Option<(TextureHandle, [f32; 2])>,
 }
 
 impl ImageCache {
@@ -13,6 +14,11 @@ impl ImageCache {
         match image.kind.as_str() {
             "guild" | "avatar" => add_generic(&mut self.avatar, ctx, image),
             "minithumbnail" => add_generic(&mut self.minithumbnail, ctx, image),
+            "bg_image" => {
+                let dimensions = image.image.size();
+                let texid = ctx.load_texture(image.id.to_string(), image.image);
+                self.bg_image = Some((texid, [dimensions[0] as f32, dimensions[1] as f32]));
+            }
             _ => add_generic(&mut self.image, ctx, image),
         }
     }
@@ -30,6 +36,10 @@ impl ImageCache {
     /// Get some image.
     pub fn get_image(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
         self.image.get(id).map(|(tex, size)| (tex, *size))
+    }
+
+    pub fn get_bg_image(&self) -> Option<(&TextureHandle, [f32; 2])> {
+        self.bg_image.as_ref().map(|(tex, size)| (tex, *size))
     }
 }
 
