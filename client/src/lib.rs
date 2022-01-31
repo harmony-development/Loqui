@@ -24,11 +24,11 @@ use harmony_rust_sdk::{
             stream_event::{Event as ChatEvent, *},
             BanUserRequest, ChannelKind, Content as HarmonyContent, CreateChannelRequest, CreateGuildRequest,
             CreateInviteRequest, DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Event, EventSource,
-            FormattedText, GetGuildChannelsRequest, GetGuildInvitesRequest, GetGuildListRequest,
-            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetPinnedMessagesRequest,
-            GetUserRolesRequest, Invite, JoinGuildRequest, KickUserRequest, LeaveGuildRequest,
-            Message as HarmonyMessage, Permission, PinMessageRequest, QueryHasPermissionRequest, Role, TypingRequest,
-            UnbanUserRequest, UnpinMessageRequest, UpdateMessageTextRequest,
+            FormattedText, GetChannelMessagesRequest, GetGuildChannelsRequest, GetGuildInvitesRequest,
+            GetGuildListRequest, GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest,
+            GetPinnedMessagesRequest, GetUserRolesRequest, Invite, JoinGuildRequest, KickUserRequest,
+            LeaveGuildRequest, Message as HarmonyMessage, Permission, PinMessageRequest, QueryHasPermissionRequest,
+            Role, TypingRequest, UnbanUserRequest, UnpinMessageRequest, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -159,6 +159,14 @@ pub enum FetchEvent {
         channel_id: u64,
         echo_id: u64,
     },
+    FetchedMessageHistory {
+        guild_id: u64,
+        channel_id: u64,
+        messages: Vec<(u64, HarmonyMessage)>,
+        anchor: Option<u64>,
+        direction: Direction,
+        reached_top: bool,
+    },
     InitialSyncComplete,
 }
 
@@ -279,6 +287,23 @@ impl Cache {
 
     pub fn process_event(&mut self, event: FetchEvent) {
         match event {
+            FetchEvent::FetchedMessageHistory {
+                guild_id,
+                channel_id,
+                messages,
+                anchor,
+                reached_top,
+                direction,
+            } => {
+                self.process_get_message_history_response(
+                    guild_id,
+                    channel_id,
+                    anchor,
+                    messages,
+                    reached_top,
+                    direction,
+                );
+            }
             FetchEvent::FailedToSendMessage {
                 guild_id,
                 channel_id,
@@ -713,7 +738,6 @@ impl Cache {
         messages: Vec<(u64, HarmonyMessage)>,
         reached_top: bool,
         direction: Direction,
-        post: &PostEventSender,
     ) {
         let anchor_id = message_id.map(MessageId::Ack);
         let messages = messages
@@ -722,7 +746,7 @@ impl Cache {
             .collect::<Vec<_>>();
 
         messages.iter().for_each(|(_, m)| {
-            m.post_process(post, guild_id, channel_id);
+            m.post_process(&self.post_sender, guild_id, channel_id);
         });
 
         let channel = self.get_channel_mut(guild_id, channel_id);
@@ -1059,21 +1083,41 @@ impl Client {
         Ok((id, resp))
     }
 
-    pub async fn fetch_messages(&self, guild_id: u64, channel_id: u64, event_sender: &EventSender) -> ClientResult<()> {
-        let resp = self.inner.call(GetChannelMessages::new(guild_id, channel_id)).await?;
-        let evs = resp.messages.into_iter().rev().map(move |message| {
-            let message_id = message.message_id;
-            FetchEvent::Harmony(Event::Chat(ChatEvent::new_sent_message(MessageSent {
+    pub async fn fetch_messages(
+        &self,
+        guild_id: u64,
+        channel_id: u64,
+        anchor: Option<u64>,
+        direction: Option<Direction>,
+        event_sender: &EventSender,
+    ) -> ClientResult<()> {
+        let resp = self
+            .inner
+            .call(GetChannelMessagesRequest::new(
                 guild_id,
                 channel_id,
-                message_id,
-                echo_id: None,
-                message: message.message,
-            })))
+                anchor,
+                direction.map(Into::into),
+                None,
+            ))
+            .await?;
+        let messages = resp
+            .messages
+            .into_iter()
+            .rev()
+            .filter_map(move |message| {
+                let message_id = message.message_id;
+                Some((message_id, message.message?))
+            })
+            .collect();
+        let _ = event_sender.send(FetchEvent::FetchedMessageHistory {
+            guild_id,
+            channel_id,
+            anchor,
+            direction: direction.unwrap_or_default(),
+            messages,
+            reached_top: resp.reached_top,
         });
-        for ev in evs {
-            let _ = event_sender.send(ev);
-        }
 
         Ok(())
     }

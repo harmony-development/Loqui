@@ -390,7 +390,7 @@ impl Screen {
                             && channel.messages.continuous_view().is_empty()
                         {
                             spawn_evs!(state, |events, c| {
-                                c.fetch_messages(guild_id, channel_id, events).await?;
+                                c.fetch_messages(guild_id, channel_id, None, None, events).await?;
                                 let _ = events.send(FetchEvent::FetchedMsgsPins(guild_id, channel_id));
                             });
                         }
