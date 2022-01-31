@@ -1,6 +1,9 @@
 use instant::Instant;
 
-use harmony_rust_sdk::{api::profile::UserStatus, client::api::rest::FileId};
+use harmony_rust_sdk::{
+    api::profile::{AccountKind, UserStatus},
+    client::api::rest::FileId,
+};
 use smol_str::SmolStr;
 
 #[derive(Debug, Clone)]
@@ -10,8 +13,8 @@ pub struct Member {
     pub display_user: bool,
     pub typing_in_channel: Option<(u64, u64, Instant)>,
     pub status: UserStatus,
-    pub is_bot: bool,
     pub fetched: bool,
+    pub kind: AccountKind,
 }
 
 impl Default for Member {
@@ -22,8 +25,8 @@ impl Default for Member {
             display_user: true,
             typing_in_channel: None,
             status: UserStatus::OfflineUnspecified,
-            is_bot: false,
             fetched: false,
+            kind: AccountKind::FullUnspecified,
         }
     }
 }

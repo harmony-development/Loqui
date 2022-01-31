@@ -23,12 +23,12 @@ use harmony_rust_sdk::{
             get_channel_messages_request::Direction,
             stream_event::{Event as ChatEvent, *},
             BanUserRequest, ChannelKind, Content as HarmonyContent, CreateChannelRequest, CreateGuildRequest,
-            CreateInviteRequest, DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Event, EventSource,
-            FormattedText, GetChannelMessagesRequest, GetGuildChannelsRequest, GetGuildInvitesRequest,
-            GetGuildListRequest, GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest,
-            GetPinnedMessagesRequest, GetUserRolesRequest, Invite, JoinGuildRequest, KickUserRequest,
-            LeaveGuildRequest, Message as HarmonyMessage, Permission, PinMessageRequest, QueryHasPermissionRequest,
-            Role, TypingRequest, UnbanUserRequest, UnpinMessageRequest, UpdateMessageTextRequest,
+            CreateInviteRequest, DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Event, FormattedText,
+            GetChannelMessagesRequest, GetGuildChannelsRequest, GetGuildInvitesRequest, GetGuildListRequest,
+            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetPinnedMessagesRequest,
+            GetUserRolesRequest, Invite, JoinGuildRequest, KickUserRequest, LeaveGuildRequest,
+            Message as HarmonyMessage, Permission, PinMessageRequest, QueryHasPermissionRequest, Role, TypingRequest,
+            UnbanUserRequest, UnpinMessageRequest, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -37,11 +37,7 @@ use harmony_rust_sdk::{
     },
     client::{
         api::{
-            chat::{
-                channel::{GetChannelMessages, UpdateChannelInformation},
-                guild::UpdateGuildInformation,
-                message::SendMessage,
-            },
+            chat::{channel::UpdateChannelInformation, guild::UpdateGuildInformation, message::SendMessage},
             profile::UpdateProfile,
             rest::{DownloadedFile, FileId},
         },
@@ -651,8 +647,8 @@ impl Cache {
                     new_username,
                     new_avatar,
                     new_status,
-                    new_is_bot,
                     new_account_kind,
+                    ..
                 }) => {
                     let parsed_avatar = new_avatar.and_then(|new_avatar| FileId::from_str(&new_avatar).ok());
                     if let Some(id) = parsed_avatar.clone() {
@@ -669,11 +665,11 @@ impl Cache {
                     if let Some(new_status) = new_status {
                         user.status = UserStatus::from_i32(new_status).unwrap_or(UserStatus::OfflineUnspecified);
                     }
-                    if let Some(is_bot) = new_is_bot {
-                        user.is_bot = is_bot;
-                    }
                     if let Some(new_avatar) = parsed_avatar {
                         user.avatar_url = Some(new_avatar);
+                    }
+                    if let Some(new_kind) = new_account_kind {
+                        user.kind = AccountKind::from_i32(new_kind).unwrap_or_default();
                     }
                     user.fetched = true;
                 }
@@ -1197,8 +1193,8 @@ impl Client {
                         new_avatar: profile.user_avatar,
                         new_username: Some(profile.user_name),
                         new_status: Some(profile.user_status),
-                        new_is_bot: Some(profile.is_bot),
                         new_account_kind: Some(profile.account_kind),
+                        ..Default::default()
                     },
                 ))))
             });
@@ -1287,12 +1283,12 @@ impl Client {
 
         let _ = event_sender.send(FetchEvent::Harmony(Event::Profile(ProfileEvent::ProfileUpdated(
             ProfileUpdated {
-                new_is_bot: Some(self_profile.is_bot),
                 new_avatar: self_profile.user_avatar,
                 new_status: Some(UserStatus::Online.into()),
                 new_username: Some(self_profile.user_name),
                 user_id: self_id,
                 new_account_kind: None,
+                ..Default::default()
             },
         ))));
 
@@ -1400,8 +1396,8 @@ impl Client {
                         new_avatar: profile.user_avatar,
                         new_status: Some(profile.user_status),
                         new_username: Some(profile.user_name),
-                        new_is_bot: Some(profile.is_bot),
                         new_account_kind: Some(profile.account_kind),
+                        ..Default::default()
                     })))
                 })?);
 
