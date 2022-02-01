@@ -418,8 +418,9 @@ impl Attachment {
         self.is_raster_image() && (self.size as u64) < MAX_THUMB_SIZE
     }
 
+    #[inline(always)]
     pub fn is_raster_image(&self) -> bool {
-        self.kind.starts_with("image") && self.kind.ends_with("svg+xml").not()
+        is_raster_image(&self.kind)
     }
 
     pub fn from_harmony_attachment(attachment: chat::Attachment) -> Option<Self> {
@@ -443,6 +444,10 @@ impl Attachment {
             minithumbnail: photo.minithumbnail,
         })
     }
+}
+
+pub fn is_raster_image(mimetype: &str) -> bool {
+    mimetype.starts_with("image") && mimetype.ends_with("svg+xml").not()
 }
 
 #[derive(Debug, Default, Clone)]

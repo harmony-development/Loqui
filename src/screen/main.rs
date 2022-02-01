@@ -421,51 +421,54 @@ impl Screen {
         channel_id: u64,
         text: &str,
         is_failed: bool,
+        has_only_image: bool,
+        urls: &[(&str, Uri)],
     ) {
-        ui.scope(|ui| {
-            let weak_text = ui.visuals().weak_text_color();
-            let strong_text = ui.visuals().strong_text_color().linear_multiply(0.35);
-            let color = is_failed
-                .then(|| Color32::RED)
-                .or_else(|| id.is_ack().then(|| strong_text))
-                .unwrap_or(weak_text);
-            ui.style_mut().visuals.override_text_color = Some(color);
+        if has_only_image.not() {
+            ui.scope(|ui| {
+                let weak_text = ui.visuals().weak_text_color();
+                let strong_text = ui.visuals().strong_text_color().linear_multiply(0.35);
+                let color = is_failed
+                    .then(|| Color32::RED)
+                    .or_else(|| id.is_ack().then(|| strong_text))
+                    .unwrap_or(weak_text);
+                ui.style_mut().visuals.override_text_color = Some(color);
 
-            let highlight_message = self.dont_highlight_message.contains(&(guild_id, channel_id, *id)).not();
+                let highlight_message = self.dont_highlight_message.contains(&(guild_id, channel_id, *id)).not();
 
-            if id.is_ack() && id.id() == self.editing_message {
-                let trimmed_edit_msg = self.edit_message_composer.text().trim().to_string();
-                let edit = self
-                    .edit_message_composer
-                    .highlight(highlight_message)
-                    .editor_ui(ui, utils::id((guild_id, channel_id, id)));
-                let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
-                if self.prev_editing_message.is_none() {
-                    edit.request_focus();
+                if id.is_ack() && id.id() == self.editing_message {
+                    let trimmed_edit_msg = self.edit_message_composer.text().trim().to_string();
+                    let edit = self
+                        .edit_message_composer
+                        .highlight(highlight_message)
+                        .editor_ui(ui, utils::id((guild_id, channel_id, id)));
+                    let is_pressed = ui.input().key_pressed(egui::Key::Enter) && !ui.input().modifiers.shift;
+                    if self.prev_editing_message.is_none() {
+                        edit.request_focus();
+                    }
+                    if trimmed_edit_msg.is_empty().not() && edit.has_focus() && is_pressed {
+                        let text = trimmed_edit_msg;
+                        let message_id = id.id().unwrap();
+                        self.editing_message = None;
+                        spawn_client_fut!(state, |client| {
+                            client.edit_message(guild_id, channel_id, message_id, text).await
+                        });
+                    }
+                } else if highlight_message {
+                    let mut text = text.to_string();
+                    for (source, _) in urls {
+                        text = text.replace(source, &format!("<{}>", source));
+                    }
+                    easy_mark::easy_mark(ui, &text);
+                } else {
+                    ui.label(text);
                 }
-                if trimmed_edit_msg.is_empty().not() && edit.has_focus() && is_pressed {
-                    let text = trimmed_edit_msg;
-                    let message_id = id.id().unwrap();
-                    self.editing_message = None;
-                    spawn_client_fut!(state, |client| {
-                        client.edit_message(guild_id, channel_id, message_id, text).await
-                    });
-                }
-            } else if highlight_message {
-                let urls = parse_urls(text);
-                let mut text = text.to_string();
-                for (source, _) in urls {
-                    text = text.replace(source, &format!("<{}>", source));
-                }
-                easy_mark::easy_mark(ui, &text);
-            } else {
-                ui.label(text);
-            }
-        });
+            });
+        }
     }
 
-    fn view_message_url_embeds(&mut self, state: &State, ui: &mut Ui, text: &str) {
-        let urls = parse_urls(text).filter_map(|(og, url)| Some((state.cache.get_link_data(&url)?, url, og)));
+    fn view_message_url_embeds<'a>(&mut self, state: &State, ui: &mut Ui, urls: impl Iterator<Item = (&'a str, Uri)>) {
+        let urls = urls.filter_map(|(og, url)| Some((state.cache.get_link_data(&url)?, url, og)));
         for (data, url, raw_url) in urls {
             match data {
                 client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
@@ -721,7 +724,7 @@ impl Screen {
                                 ui.vertical(|ui| {
                                     ui.label(RichText::new(display_name).color(color).strong());
                                     if override_name.is_some() {
-                                        ui.label(RichText::new(format!("({})", sender_name)).italics().small());
+                                        ui.label(RichText::new(format!("({})", sender_name)).small());
                                     }
                                 });
                             });
@@ -733,20 +736,25 @@ impl Screen {
                             view_member_context_menu_items(ui, state, guild_id, message.sender, guild, user);
                         });
                     }
+
+                    ui.add_space(ui.style().spacing.item_spacing.y);
                 }
 
                 match &message.content {
                     client::message::Content::Text(text) => {
+                        let (urls, has_only_image) = parse_urls(text, state);
                         self.view_message_text_content(
                             state,
                             ui,
                             id,
                             guild_id,
                             channel_id,
-                            text,
+                            text.trim(),
                             message.failed_to_send,
+                            has_only_image,
+                            &urls,
                         );
-                        self.view_message_url_embeds(state, ui, text);
+                        self.view_message_url_embeds(state, ui, urls.into_iter());
                     }
                     client::message::Content::Files(attachments) => {
                         for attachment in attachments {

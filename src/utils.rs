@@ -2,14 +2,15 @@ use std::{
     borrow::Cow,
     cmp::Ordering,
     future::Future,
-    ops::Deref,
+    ops::{Deref, Not},
     sync::{atomic::AtomicBool, Arc},
 };
 
 use client::{
     guild::Guild,
-    harmony_rust_sdk::api::{profile::UserStatus, rest::FileId},
+    harmony_rust_sdk::api::{mediaproxy::fetch_link_metadata_response, profile::UserStatus, rest::FileId},
     member::Member,
+    message::is_raster_image,
     tracing, Cache, Client, Uri,
 };
 use eframe::egui::{
@@ -332,11 +333,30 @@ pub fn open_url(url: impl Deref<Target = str> + Send + 'static) {
 }
 
 /// Parse URLs from some text. Treats whitespace as seperators.
-pub fn parse_urls(text: &str) -> impl Iterator<Item = (&str, Uri)> {
+pub fn parse_urls<'a>(text: &'a str, state: &State) -> (Vec<(&'a str, Uri)>, bool) {
     text.split_whitespace()
-        .filter(|s| s.starts_with("http://") || s.starts_with("https://"))
-        .filter_map(|maybe_url| Some((maybe_url, maybe_url.parse::<Uri>().ok()?)))
-        .filter(|(_, url)| matches!(url.scheme_str(), Some("http" | "https")))
+        .fold((Vec::new(), true), |(mut tot, mut has_only_image), maybe_url| {
+            let parsed = maybe_url
+                .parse::<Uri>()
+                .ok()
+                .filter(|u| matches!(u.scheme_str(), Some("http" | "https")));
+            if let Some(url) = parsed {
+                let is_image = state.cache.get_link_data(&url).map_or(false, |d| {
+                    if let fetch_link_metadata_response::Data::IsMedia(media) = d {
+                        is_raster_image(&media.mimetype)
+                    } else {
+                        false
+                    }
+                });
+                if is_image.not() {
+                    has_only_image = false;
+                }
+                tot.push((maybe_url, url));
+            } else {
+                has_only_image = false;
+            }
+            (tot, has_only_image)
+        })
 }
 
 pub fn load_harmony_lotus(ctx: &egui::Context) -> (TextureHandle, Vec2) {
