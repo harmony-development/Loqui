@@ -165,8 +165,6 @@ impl State {
 
         let local_config = LocalConfig::load();
 
-        futures.spawn(local_config.bg_image.clone().load());
-
         Self {
             socket_rx_tx,
             reset_socket,
@@ -212,6 +210,7 @@ impl State {
 
         // load harmony lotus
         self.harmony_lotus.replace(load_harmony_lotus(ctx));
+        self.futures.spawn(self.local_config.bg_image.clone().load());
     }
 
     /// Saves the current config in memory to disk.
