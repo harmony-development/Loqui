@@ -1,3 +1,4 @@
+#![feature(let_else)]
 #![allow(clippy::field_reassign_with_default)]
 
 pub mod channel;

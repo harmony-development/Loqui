@@ -14,7 +14,7 @@ use client::{
     tracing, Cache, Client, Uri,
 };
 use eframe::egui::{
-    self, Color32, Context, Frame, Key, Pos2, Response, RichText, TextureHandle, Ui, Vec2, Widget, WidgetText,
+    self, Color32, Context, Frame, Galley, Key, Pos2, Response, RichText, TextureHandle, Ui, Vec2, Widget, WidgetText,
 };
 
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs};

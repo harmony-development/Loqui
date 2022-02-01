@@ -2,9 +2,10 @@ use std::{fmt::Write, ops::Not};
 
 use client::{
     channel::Channel, content, get_random_u64, guild::Guild, harmony_rust_sdk::api::chat::all_permissions,
-    member::Member,
+    member::Member, role::Role,
 };
 use eframe::egui::{CollapsingHeader, Color32, RichText};
+use itertools::Itertools;
 
 use crate::widgets::{view_channel_context_menu_items, view_member_context_menu_items, Avatar};
 
@@ -215,15 +216,16 @@ impl Screen {
         let Some(guild) = state.cache.get_guild(guild_id) else { return };
 
         let sorted_members = sort_members(state, guild);
-        let chunk_size = (ui.available_width() / 300.0).ceil() as usize;
 
-        for chunk in sorted_members.chunks(chunk_size) {
-            ui.columns(chunk_size, |ui| {
-                for ((id, member), ui) in chunk.iter().zip(ui) {
-                    self.view_member(state, ui, guild_id, **id, member, guild);
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.y = 6.0;
+            for (id, member) in sorted_members {
+                self.view_member(state, ui, guild_id, *id, member, guild);
+                if ui.available_size_before_wrap().x <= 200.0 {
+                    ui.end_row();
                 }
-            });
-        }
+            }
+        });
     }
 
     fn view_member(&mut self, state: &State, ui: &mut Ui, guild_id: u64, user_id: u64, member: &Member, guild: &Guild) {
@@ -245,8 +247,47 @@ impl Screen {
         });
     }
 
-    #[allow(unused_variables)]
-    fn view_roles(&mut self, state: &mut State, ui: &mut Ui) {}
+    fn view_roles(&mut self, state: &mut State, ui: &mut Ui) {
+        let guild_id = self.guild_id;
+        let Some(guild) = state.cache.get_guild(guild_id) else { return };
+
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.y = 6.0;
+            for (role_id, role) in &guild.roles {
+                self.view_role(ui, guild, role, *role_id);
+                if ui.available_size_before_wrap().x <= 200.0 {
+                    ui.end_row();
+                }
+            }
+        });
+    }
+
+    fn view_role(&mut self, ui: &mut Ui, guild: &Guild, role: &Role, role_id: u64) {
+        let id_string = role_id.to_string();
+        let resp = ui
+            .group(|ui| {
+                ui.horizontal(|ui| {
+                    let color = rgb_color(role.color);
+                    ui.label(RichText::new(&id_string).small());
+                    ui.colored_label(color, role.name.as_str());
+                });
+            })
+            .response;
+        resp.on_hover_text("right click to manage").context_menu_styled(|ui| {
+            if ui.button("copy id").clicked() {
+                ui.output().copied_text = id_string;
+                ui.close_menu();
+            }
+            if ui.button("copy name").clicked() {
+                ui.output().copied_text.push_str(role.name.as_str());
+                ui.close_menu();
+            }
+            if guild.has_perm(all_permissions::ROLES_MANAGE) && ui.button("manage permissions").clicked() {
+                // TODO
+                ui.close_menu();
+            }
+        });
+    }
 }
 
 impl AppScreen for Screen {
