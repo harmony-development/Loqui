@@ -571,6 +571,7 @@ impl Cache {
                     new_picture,
                     new_metadata: _,
                 }) => {
+                    let fetched = new_name.is_some() && new_picture.is_some();
                     let parsed_pic = new_picture.and_then(|new_picture| FileId::from_str(&new_picture).ok());
                     if let Some(id) = parsed_pic.clone() {
                         let _ = self.post_sender.send(PostProcessEvent::FetchThumbnail(Attachment {
@@ -580,6 +581,10 @@ impl Cache {
                         }));
                     }
                     let mut guild = self.get_guild_mut(guild_id);
+
+                    if fetched {
+                        guild.fetched = true;
+                    }
 
                     if let Some(name) = new_name {
                         guild.name = name.into();
