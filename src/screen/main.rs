@@ -4,7 +4,7 @@ use client::{
     channel::Channel,
     content,
     guild::Guild,
-    harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, rest::FileId},
+    harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, profile::UserStatus, rest::FileId},
     member::Member,
     message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override, ReadMessagesView},
     smol_str::SmolStr,
@@ -1059,25 +1059,42 @@ impl Screen {
         overrides: Option<&Override>,
         fill_bg: Color32,
     ) {
+        const SIZE: Vec2 = egui::vec2(28.0, 28.0);
+
         let maybe_tex = overrides
             .and_then(|ov| ov.avatar_url.as_ref())
             .or_else(|| user.and_then(|u| u.avatar_url.as_ref()))
             .as_ref()
             .and_then(|id| state.image_cache.get_avatar(id));
 
-        if let Some((texid, _)) = maybe_tex {
-            ui.image(texid.id(), [32.0, 32.0]);
-        } else {
-            ui.add_enabled_ui(false, |ui| {
-                let username = overrides
-                    .and_then(|ov| ov.name.as_deref())
-                    .or_else(|| user.map(|u| u.username.as_str()))
-                    .unwrap_or("");
-                let letter = username.get(0..1).unwrap_or("u").to_ascii_uppercase();
+        let status = user.map_or(UserStatus::OfflineUnspecified, |m| m.status);
+        let status_color = match status {
+            UserStatus::OfflineUnspecified => Color32::GRAY,
+            UserStatus::Online | UserStatus::Mobile => Color32::GREEN,
+            UserStatus::Streaming => Color32::from_rgb(160, 0, 160),
+            UserStatus::DoNotDisturb => Color32::RED,
+            UserStatus::Idle => Color32::GOLD,
+        };
 
-                ui.add_sized([32.0, 32.0], egui::Button::new(letter).fill(fill_bg));
+        egui::Frame::group(ui.style())
+            .margin(Vec2::ZERO)
+            .corner_radius(0.0)
+            .stroke(egui::Stroke::new(4.0, status_color))
+            .show(ui, |ui| {
+                if let Some((texid, _)) = maybe_tex {
+                    ui.image(texid.id(), SIZE);
+                } else {
+                    ui.add_enabled_ui(false, |ui| {
+                        let username = overrides
+                            .and_then(|ov| ov.name.as_deref())
+                            .or_else(|| user.map(|u| u.username.as_str()))
+                            .unwrap_or("");
+                        let letter = username.get(0..1).unwrap_or("u").to_ascii_uppercase();
+
+                        ui.add_sized(SIZE, egui::Button::new(letter).fill(fill_bg));
+                    });
+                }
             });
-        }
     }
 
     fn view_members(&mut self, state: &State, ui: &mut Ui) {
