@@ -311,10 +311,10 @@ impl Screen {
                 });
             }
 
-            ui.collapsing("latch in", |ui| {
+            ui.collapsing("guild profiles", |ui| {
                 for (id, guild) in state.cache.get_guilds() {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(guild.name.as_str());
+                        ui.label(truncate_string(guild.name.as_str(), 10).into_owned());
 
                         let latching_to_channel = state.config.latch_to_channel_guilds.contains(&id);
                         let last_used_text = latching_to_channel
@@ -325,7 +325,7 @@ impl Screen {
                             .default_profiles_for_guilds
                             .get(&id)
                             .map_or(last_used_text, |s| s.as_str());
-                        let text = format!("▼ profile: {}", text);
+                        let text = format!("▼ {}", text);
                         ui.menu_button(text, |ui| {
                             if ui.button("clear").clicked() {
                                 state.config.latch_to_channel_guilds.remove(&id);
