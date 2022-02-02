@@ -3,18 +3,24 @@ use std::{
     cmp::Ordering,
     future::Future,
     ops::{Deref, Not},
+    str::FromStr,
     sync::{atomic::AtomicBool, Arc},
 };
 
 use client::{
     guild::Guild,
-    harmony_rust_sdk::api::{mediaproxy::fetch_link_metadata_response, profile::UserStatus, rest::FileId},
+    harmony_rust_sdk::api::{
+        chat::overrides::Reason,
+        mediaproxy::fetch_link_metadata_response,
+        profile::{profile_override, ProfileOverride, UserStatus},
+        rest::FileId,
+    },
     member::Member,
-    message::is_raster_image,
+    message::{is_raster_image, Override},
     tracing, Cache, Client, Uri,
 };
 use eframe::egui::{
-    self, Color32, Context, Frame, Galley, Key, Pos2, Response, RichText, TextureHandle, Ui, Vec2, Widget, WidgetText,
+    self, Color32, Context, Frame, Key, Pos2, Response, RichText, TextureHandle, Ui, Vec2, Widget, WidgetText,
 };
 
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs};
@@ -57,6 +63,16 @@ impl AtomBool {
         let res = fut.await;
         self.set(false);
         res
+    }
+}
+
+pub trait VecExt<T> {
+    fn remove_item(&mut self, item: &T) -> Option<T>;
+}
+
+impl<T: PartialEq> VecExt<T> for Vec<T> {
+    fn remove_item(&mut self, item: &T) -> Option<T> {
+        self.iter().position(|i| i == item).map(|pos| self.remove(pos))
     }
 }
 
@@ -400,5 +416,16 @@ pub fn show_notification(summary: impl AsRef<str>, body: impl AsRef<str>) {
         let mut options = web_sys::NotificationOptions::new();
         options.body(body.as_ref()).icon("loqui").require_interaction(false);
         let _ = web_sys::Notification::new_with_options(summary.as_ref(), &options);
+    }
+}
+
+pub fn override_from_profile(p: &ProfileOverride) -> Override {
+    Override {
+        name: p.username.clone(),
+        avatar_url: p.avatar.as_ref().and_then(|s| FileId::from_str(s).ok()),
+        reason: p.reason.clone().map(|reason| match reason {
+            profile_override::Reason::UserDefined(custom) => Reason::UserDefined(custom),
+            profile_override::Reason::SystemPlurality(empty) => Reason::SystemPlurality(empty),
+        }),
     }
 }

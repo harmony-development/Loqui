@@ -452,7 +452,7 @@ pub fn is_raster_image(mimetype: &str) -> bool {
 
 #[derive(Debug, Default, Clone)]
 pub struct Override {
-    pub name: Option<SmolStr>,
+    pub name: Option<String>,
     pub avatar_url: Option<FileId>,
     pub reason: Option<Reason>,
 }
@@ -460,8 +460,8 @@ pub struct Override {
 impl From<Override> for chat::Overrides {
     fn from(o: Override) -> Self {
         Self {
-            avatar: o.avatar_url.map(|id| id.to_string()),
-            username: o.name.map(|n| n.into()),
+            avatar: o.avatar_url.map(|id| id.into()),
+            username: o.name,
             reason: o.reason,
         }
     }

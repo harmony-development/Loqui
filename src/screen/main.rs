@@ -117,6 +117,8 @@ impl Default for PanelStack {
 
 #[derive(Default)]
 pub struct Screen {
+    last_override_for_guild: AHashMap<u64, SmolStr>,
+    last_override_for_channel: AHashMap<(u64, u64), SmolStr>,
     /// guild id -> channel id
     last_channel_id: AHashMap<u64, u64>,
     /// (guild id, channel id, message id)
@@ -165,6 +167,37 @@ pub struct Screen {
 }
 
 impl Screen {
+    fn get_override(&self, state: &State) -> Option<Override> {
+        let Some(guild_id) = self.current.guild() else { return None };
+        state
+            .config
+            .default_profiles_for_guilds
+            .get(&guild_id)
+            .map(String::as_str)
+            .or_else(|| {
+                state
+                    .config
+                    .latch_to_channel_guilds
+                    .contains(&guild_id)
+                    .then(|| {
+                        self.current
+                            .channel()
+                            .and_then(|ids| self.last_override_for_channel.get(&ids))
+                    })
+                    .unwrap_or_else(|| self.last_override_for_guild.get(&guild_id))
+                    .map(SmolStr::as_str)
+            })
+            .and_then(|name| {
+                state
+                    .config
+                    .overrides
+                    .overrides
+                    .iter()
+                    .find(|p| p.username.as_deref() == Some(name))
+            })
+            .map(override_from_profile)
+    }
+
     fn main_composer_id(&self) -> egui::Id {
         *self.main_composer_id.get_or_init(|| utils::id("main_composer"))
     }
@@ -708,7 +741,7 @@ impl Screen {
 
                 if display_user {
                     let overrides = message.overrides.as_ref();
-                    let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
+                    let override_name = overrides.and_then(|ov| ov.name.as_deref());
                     let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
                     let display_name = override_name.unwrap_or(sender_name);
 
@@ -977,15 +1010,42 @@ impl Screen {
             text_edit.request_focus();
         }
 
+        let (text_string, (overrides, clear_override)) = text_string.strip_prefix("\\\\").map_or_else(
+            || {
+                state
+                    .override_profile_for_text(&text_string)
+                    .map(|(p, text)| (text.to_string(), (Some(override_from_profile(p)), false)))
+                    .unwrap_or((text_string.clone(), (self.get_override(state), false)))
+            },
+            |text| (text.to_string(), (None, true)),
+        );
+        let is_latching_channel = state.config.latch_to_channel_guilds.contains(&guild_id);
+        if clear_override {
+            if is_latching_channel {
+                self.last_override_for_channel.remove(&(guild_id, channel_id));
+            } else {
+                self.last_override_for_guild.remove(&guild_id);
+            }
+        } else if let Some(name) = overrides.as_ref().and_then(|ov| ov.name.as_deref()) {
+            let name = SmolStr::new(name);
+            if is_latching_channel {
+                self.last_override_for_channel.insert((guild_id, channel_id), name);
+            } else {
+                self.last_override_for_guild.insert(guild_id, name);
+            }
+        }
+
         let did_submit_enter = {
             let input = ui.input();
             input.key_pressed(egui::Key::Enter) && !input.modifiers.shift
         };
+
         if text_string.is_empty().not() && text_edit.has_focus() && did_submit_enter {
             self.composer.text_mut().clear();
             let message = Message {
                 content: Content::Text(text_string),
                 sender: state.client().user_id(),
+                overrides,
                 ..Default::default()
             };
             let echo_id = state.cache.prepare_send_message(guild_id, channel_id, message.clone());

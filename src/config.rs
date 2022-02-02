@@ -1,11 +1,15 @@
-use std::path::PathBuf;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Not,
+    path::PathBuf,
+};
 
 use client::{
     content,
     error::{ClientError, ClientResult},
     harmony_rust_sdk::api::{
-        exports::prost::bytes::Bytes,
-        profile::{GetAppDataRequest, SetAppDataRequest},
+        exports::prost::{bytes::Bytes, Message},
+        profile::{AppDataOverrides, GetAppDataRequest, SetAppDataRequest},
         rest::FileId,
     },
     Client,
@@ -87,19 +91,45 @@ pub struct Config {
     /// Keywords that will trigger a mention
     #[serde(default)]
     pub mention_keywords: Vec<String>,
+    /// Overrides
+    #[serde(skip)]
+    pub overrides: AppDataOverrides,
+    /// guild ids to latch to channels in
+    #[serde(default)]
+    pub latch_to_channel_guilds: HashSet<u64>,
+    /// default profiles to use when not latched
+    #[serde(default)]
+    pub default_profiles_for_guilds: HashMap<u64, String>,
 }
 
 impl Config {
     pub async fn load(client: &Client) -> ClientResult<Config> {
-        let req = GetAppDataRequest::new("loqui".to_string());
-        let raw = client.inner().call(req).await?.app_data;
+        // First get our own app data
+        let raw = client
+            .inner()
+            .call(GetAppDataRequest::new("loqui".to_string()))
+            .await?
+            .app_data;
 
         if raw.is_empty() {
             return Ok(Config::default());
         }
 
-        let structured: Self = serde_json::from_slice(&raw)
+        let mut structured: Self = serde_json::from_slice(&raw)
             .map_err(|err| ClientError::Custom(format!("failed to deserialize config: {}", err)))?;
+
+        // Afterwards get overrides data
+        let raw = client
+            .inner()
+            .call(GetAppDataRequest::new("h.overrides".to_string()))
+            .await?
+            .app_data;
+
+        if raw.is_empty().not() {
+            let overrides = AppDataOverrides::decode(raw.as_ref()).unwrap_or_default();
+            structured.overrides = overrides;
+        }
+
         Ok(structured)
     }
 
@@ -107,6 +137,11 @@ impl Config {
         let serialized = serde_json::to_vec(self).expect("must be valid config");
         let req = SetAppDataRequest::new("loqui".to_string(), serialized);
         client.inner().call(req).await?;
+        let mut serialized = Vec::new();
+        if self.overrides.encode(&mut serialized).is_ok() {
+            let req = SetAppDataRequest::new("h.overrides".to_string(), serialized);
+            client.inner().call(req).await?;
+        }
         Ok(())
     }
 }

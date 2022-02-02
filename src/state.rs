@@ -11,12 +11,12 @@ use client::{
     harmony_rust_sdk::{
         api::{
             chat::{stream_event::Event as ChatEvent, Event},
+            profile::ProfileOverride,
             rest::{About, FileId},
         },
         client::{EventsReadSocket, EventsSocket},
     },
     message::{Content, Message},
-    smol_str::SmolStr,
     tracing, Cache, Client, EventSender, FetchEvent,
 };
 use eframe::{
@@ -319,9 +319,20 @@ impl State {
     pub fn get_member_display_name<'a>(&'a self, msg: &'a Message) -> &'a str {
         let user = self.cache.get_user(msg.sender);
         let overrides = msg.overrides.as_ref();
-        let override_name = overrides.and_then(|ov| ov.name.as_ref().map(SmolStr::as_str));
+        let override_name = overrides.and_then(|ov| ov.name.as_deref());
         let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
         override_name.unwrap_or(sender_name)
+    }
+
+    pub fn override_profile_for_text<'a, 'b>(&'a self, text: &'b str) -> Option<(&'a ProfileOverride, &'b str)> {
+        let text = text.trim();
+        self.config.overrides.overrides.iter().find_map(|profile| {
+            profile.tags.iter().find_map(|tag| {
+                text.strip_prefix(&tag.before)
+                    .and_then(|text| text.strip_suffix(&tag.after))
+                    .map(|text| (profile, text))
+            })
+        })
     }
 
     #[inline(always)]

@@ -115,7 +115,7 @@ impl App {
             }
 
             ui.vertical_centered_justified(|ui| {
-                ui.menu_button("menu ▼", |ui| {
+                ui.menu_button("▼ menu", |ui| {
                     if ui.button("about server").clicked() {
                         self.show_about_window = true;
                         ui.close_menu();

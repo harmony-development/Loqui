@@ -5,7 +5,6 @@ use client::{
     member::Member, role::Role,
 };
 use eframe::egui::{CollapsingHeader, Color32, RichText};
-use itertools::Itertools;
 
 use crate::widgets::{view_channel_context_menu_items, view_member_context_menu_items, Avatar};
 
