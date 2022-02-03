@@ -32,6 +32,12 @@ checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
 
 [[package]]
 name = "ahash"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
+
+[[package]]
+name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
@@ -385,7 +391,7 @@ dependencies = [
 name = "client"
 version = "0.1.0"
 dependencies = [
- "ahash",
+ "ahash 0.7.6",
  "chrono",
  "directories-next",
  "getrandom 0.2.4",
@@ -647,6 +653,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
+name = "dark-light"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a76de8354e3935082b341ac29aeff1d05dd14eab64d67ffce4c2f6af06cdb2b"
+dependencies = [
+ "dconf_rs",
+ "detect-desktop-environment",
+ "dirs 4.0.0",
+ "objc",
+ "rust-ini",
+ "winreg 0.8.0",
+ "zbus 2.0.1",
+ "zvariant 3.1.2",
+]
+
+[[package]]
 name = "darling"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -680,6 +702,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "dconf_rs"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7046468a81e6a002061c01e6a7c83139daf91b11c30e66795b13217c2d885c8b"
 
 [[package]]
 name = "deflate"
@@ -735,6 +763,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "detect-desktop-environment"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21d8ad60dd5b13a4ee6bd8fa2d5d88965c597c67bce32b5fc49c94f55cb50810"
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -765,6 +799,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "dirs"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03d86534ed367a67548dc68113a0f5db55432fdfbb6e6f9d77704397d95d5780"
+dependencies = [
+ "libc",
+ "redox_users 0.4.0",
+ "winapi",
+]
+
+[[package]]
 name = "dirs-sys-next"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -791,6 +845,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dlv-list"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68df3f2b690c1b86e65ef7830956aededf3cb0a16f898f79b9a6f421a7b6211b"
+dependencies = [
+ "rand",
+]
+
+[[package]]
 name = "downcast-rs"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -805,7 +868,7 @@ checksum = "6907e25393cdcc1f4f3f513d9aac1e840eb1cc341a0fccb01171f7d14d10b946"
 [[package]]
 name = "eframe"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1f03f53dc041002bba52c7a5d11a3205b96176c9"
+source = "git+https://github.com/emilk/egui.git?branch=master#c3be5665740fb0100ee7d6d74282e933110a7141"
 dependencies = [
  "egui",
  "egui-winit",
@@ -817,22 +880,25 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.16.1"
-source = "git+https://github.com/emilk/egui.git?branch=master#1f03f53dc041002bba52c7a5d11a3205b96176c9"
+source = "git+https://github.com/emilk/egui.git?branch=master#c3be5665740fb0100ee7d6d74282e933110a7141"
 dependencies = [
- "ahash",
+ "ahash 0.7.6",
  "epaint",
  "nohash-hasher",
+ "tracing",
 ]
 
 [[package]]
 name = "egui-winit"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1f03f53dc041002bba52c7a5d11a3205b96176c9"
+source = "git+https://github.com/emilk/egui.git?branch=master#c3be5665740fb0100ee7d6d74282e933110a7141"
 dependencies = [
  "copypasta",
+ "dark-light",
  "egui",
  "epi",
  "instant",
+ "tracing",
  "webbrowser",
  "winit",
 ]
@@ -840,7 +906,7 @@ dependencies = [
 [[package]]
 name = "egui_glow"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1f03f53dc041002bba52c7a5d11a3205b96176c9"
+source = "git+https://github.com/emilk/egui.git?branch=master#c3be5665740fb0100ee7d6d74282e933110a7141"
 dependencies = [
  "bytemuck",
  "egui",
@@ -849,6 +915,7 @@ dependencies = [
  "glow",
  "glutin",
  "memoffset",
+ "tracing",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -856,7 +923,7 @@ dependencies = [
 [[package]]
 name = "egui_web"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1f03f53dc041002bba52c7a5d11a3205b96176c9"
+source = "git+https://github.com/emilk/egui.git?branch=master#c3be5665740fb0100ee7d6d74282e933110a7141"
 dependencies = [
  "bytemuck",
  "console_error_panic_hook",
@@ -864,6 +931,8 @@ dependencies = [
  "egui_glow",
  "epi",
  "js-sys",
+ "tracing",
+ "tracing-wasm",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -878,7 +947,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1f03f53dc041002bba52c7a5d11a3205b96176c9"
+source = "git+https://github.com/emilk/egui.git?branch=master#c3be5665740fb0100ee7d6d74282e933110a7141"
 dependencies = [
  "bytemuck",
 ]
@@ -1001,10 +1070,10 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1f03f53dc041002bba52c7a5d11a3205b96176c9"
+source = "git+https://github.com/emilk/egui.git?branch=master#c3be5665740fb0100ee7d6d74282e933110a7141"
 dependencies = [
  "ab_glyph",
- "ahash",
+ "ahash 0.7.6",
  "atomic_refcell",
  "bytemuck",
  "emath",
@@ -1014,9 +1083,10 @@ dependencies = [
 [[package]]
 name = "epi"
 version = "0.16.0"
-source = "git+https://github.com/emilk/egui.git?branch=master#1f03f53dc041002bba52c7a5d11a3205b96176c9"
+source = "git+https://github.com/emilk/egui.git?branch=master#c3be5665740fb0100ee7d6d74282e933110a7141"
 dependencies = [
  "egui",
+ "tracing",
 ]
 
 [[package]]
@@ -1460,11 +1530,20 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
+dependencies = [
+ "ahash 0.4.7",
+]
+
+[[package]]
+name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 dependencies = [
- "ahash",
+ "ahash 0.7.6",
 ]
 
 [[package]]
@@ -1658,7 +1737,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282a6247722caba404c065016bbfa522806e51714c34f5dfc3e4a3a46fcb4223"
 dependencies = [
  "autocfg",
- "hashbrown",
+ "hashbrown 0.11.2",
 ]
 
 [[package]]
@@ -1845,7 +1924,7 @@ checksum = "3dfb6b71a9a89cd38b395d994214297447e8e63b1ba5708a9a2b0b1048ceda76"
 dependencies = [
  "cc",
  "chrono",
- "dirs",
+ "dirs 1.0.5",
  "objc-foundation",
 ]
 
@@ -2251,6 +2330,16 @@ name = "openssl-probe"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
+
+[[package]]
+name = "ordered-multimap"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c672c7ad9ec066e428c00eb917124a06f08db19e2584de982cc34b1f4c12485"
+dependencies = [
+ "dlv-list",
+ "hashbrown 0.9.1",
+]
 
 [[package]]
 name = "ordered-stream"
@@ -2742,7 +2831,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "winreg",
+ "winreg 0.7.0",
 ]
 
 [[package]]
@@ -2789,7 +2878,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439655b8d657bcb28264da8e5380d55549e34ffc4149bea9e3521890a122a7bd"
 dependencies = [
  "bytecheck",
- "hashbrown",
+ "hashbrown 0.11.2",
  "ptr_meta",
  "rend",
  "rkyv_derive",
@@ -2817,6 +2906,16 @@ dependencies = [
  "blake2b_simd",
  "constant_time_eq",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "rust-ini"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63471c4aa97a1cf8332a5f97709a79a4234698de6a1f5087faf66f2dae810e22"
+dependencies = [
+ "cfg-if 1.0.0",
+ "ordered-multimap",
 ]
 
 [[package]]
@@ -4007,6 +4106,15 @@ name = "winreg"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0120db82e8a1e0b9fb3345a539c478767c0048d842860994d96113d5b667bd69"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
+name = "winreg"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d107f8c6e916235c4c01cabb3e8acf7bea8ef6a63ca2e7fa0527c049badfc48c"
 dependencies = [
  "winapi",
 ]
