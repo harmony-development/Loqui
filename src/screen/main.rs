@@ -806,7 +806,7 @@ impl Screen {
         msg.context_menu_styled(|ui| {
             if let Some(message_id) = id.id() {
                 if let client::message::Content::Text(text) = &message.content {
-                    if channel.has_perm(all_permissions::MESSAGES_SEND)
+                    if client::has_perm(guild, channel, all_permissions::MESSAGES_SEND)
                         && message.sender == user_id
                         && ui.button("edit").clicked()
                     {
@@ -837,13 +837,17 @@ impl Screen {
                     ui.close_menu();
                 }
                 if channel.pinned_messages.contains(&message_id) {
-                    if channel.has_perm(all_permissions::MESSAGES_PINS_REMOVE) && ui.button("unpin").clicked() {
+                    if client::has_perm(guild, channel, all_permissions::MESSAGES_PINS_REMOVE)
+                        && ui.button("unpin").clicked()
+                    {
                         spawn_client_fut!(state, |client| {
                             client.unpin_message(guild_id, channel_id, message_id).await
                         });
                         ui.close_menu();
                     }
-                } else if channel.has_perm(all_permissions::MESSAGES_PINS_ADD) && ui.button("pin").clicked() {
+                } else if client::has_perm(guild, channel, all_permissions::MESSAGES_PINS_ADD)
+                    && ui.button("pin").clicked()
+                {
                     spawn_client_fut!(state, |client| {
                         client.pin_message(guild_id, channel_id, message_id).await
                     });
@@ -1416,13 +1420,20 @@ impl Screen {
 
     #[inline(always)]
     fn show_main_area(&mut self, ui: &mut Ui, state: &mut State, ctx: &egui::Context) {
-        let typing_members = {
-            let Some(guild_id) = self.current.guild() else { return };
-            let Some(guild) = state.cache.get_guild(guild_id) else { return };
-            let current_user_id = state.client().user_id();
+        let Some((guild_id, channel_id)) = self.current.channel() else { return };
 
-            self.get_typing_members(state, guild)
-                .any(|(id, _)| current_user_id.ne(&id))
+        let (typing_members, can_send_message) = {
+            let Some(guild) = state.cache.get_guild(guild_id) else { return };
+            let Some(channel) = state.cache.get_channel(guild_id, channel_id) else { return };
+
+            let current_user_id = state.client().user_id();
+            let typing_members = self
+                .get_typing_members(state, guild)
+                .any(|(id, _)| current_user_id.ne(&id));
+
+            let can_send_message = client::has_perm(guild, channel, all_permissions::MESSAGES_SEND);
+
+            (typing_members, can_send_message)
         };
 
         ui.with_layout(
@@ -1452,9 +1463,15 @@ impl Screen {
 
                     ui.group_filled().show(ui, |ui| {
                         self.view_typing_members(state, ui);
+
                         ui.horizontal(|ui| {
-                            self.view_composer(state, ui, ctx, desired_lines);
-                            self.view_upload_button(state, ui);
+                            if can_send_message {
+                                self.view_composer(state, ui, ctx, desired_lines);
+                                self.view_upload_button(state, ui);
+                            } else {
+                                ui.label(RichText::new("can't send messages").underline());
+                                ui.add_space(ui.available_width() - 8.0);
+                            }
                         });
                     });
                 });

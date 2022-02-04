@@ -288,6 +288,13 @@ impl Cache {
         self.link_embeds.get(url)
     }
 
+    pub fn has_perm(&self, guild_id: u64, channel_id: Option<u64>, query: &str) -> bool {
+        channel_id
+            .and_then(|channel_id| self.get_channel(guild_id, channel_id))
+            .map_or(false, |c| c.has_perm(query))
+            || self.get_guild(guild_id).map_or(false, |g| g.has_perm(query))
+    }
+
     pub fn process_event(&mut self, event: FetchEvent) {
         match event {
             FetchEvent::FetchedGuild {
@@ -1360,6 +1367,7 @@ impl Client {
             "roles.user.get",
             "permissions.manage.set",
             "permissions.manage.get",
+            all_permissions::MESSAGES_SEND,
         ];
         let queries = perm_queries
             .into_iter()
@@ -1539,4 +1547,8 @@ pub fn get_random_u64() -> u64 {
     let mut bytes = [0; 8];
     getrandom::getrandom(&mut bytes).expect("cant get random");
     u64::from_ne_bytes(bytes)
+}
+
+pub fn has_perm(guild: &Guild, channel: &Channel, query: &str) -> bool {
+    channel.has_perm(query) || guild.has_perm(query)
 }
