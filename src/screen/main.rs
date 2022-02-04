@@ -747,7 +747,7 @@ impl Screen {
 
                     let color = guild
                         .highest_role_for_member(message.sender)
-                        .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
+                        .map_or(Color32::WHITE, |(_, role)| ui.role_color(role));
 
                     let user_resp = ui
                         .scope(|ui| {
@@ -1180,7 +1180,7 @@ impl Screen {
                                 if user.fetched {
                                     let role_color = guild
                                         .highest_role_for_member(*id)
-                                        .map_or(Color32::WHITE, |(_, role)| rgb_color(role.color));
+                                        .map_or(Color32::WHITE, |(_, role)| ui.role_color(role));
                                     self.view_user_avatar(state, ui, Some(user), None, loqui_style::BG_LIGHT);
                                     ui.vertical(|ui| {
                                         ui.colored_label(role_color, user.username.as_str());

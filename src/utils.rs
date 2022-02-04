@@ -17,10 +17,11 @@ use client::{
     },
     member::Member,
     message::{is_raster_image, Override},
+    role::Role,
     tracing, Cache, Client, Uri,
 };
 use eframe::egui::{
-    self, Color32, Context, Frame, Key, Pos2, Response, RichText, TextureHandle, Ui, Vec2, Widget, WidgetText,
+    self, Color32, Context, Frame, Key, Pos2, Response, Rgba, RichText, TextureHandle, Ui, Vec2, Widget, WidgetText,
 };
 
 pub(crate) use crate::futures::{handle_future, spawn_client_fut, spawn_evs};
@@ -63,6 +64,17 @@ impl AtomBool {
         let res = fut.await;
         self.set(false);
         res
+    }
+}
+
+pub trait RoleExt {
+    fn color(&self) -> Color32;
+}
+
+impl RoleExt for Role {
+    #[inline(always)]
+    fn color(&self) -> Color32 {
+        rgb_color(self.color)
     }
 }
 
@@ -140,9 +152,26 @@ pub trait UiExt {
     fn downscale_to(&self, size: [f32; 2], factor: f32) -> [f32; 2];
     /// Add an image button without a frame
     fn frameless_image_button(&mut self, texture_id: egui::TextureId, size: impl Into<Vec2>) -> Response;
+    fn role_color(&self, role: &Role) -> Color32;
 }
 
 impl UiExt for Ui {
+    fn role_color(&self, role: &Role) -> Color32 {
+        let color = Rgba::from(role.color());
+        let bg_color = Rgba::from(self.visuals().window_fill());
+
+        let colorb = color.intensity();
+        let bg_colorb = bg_color.intensity();
+
+        let new_color = if colorb < bg_colorb {
+            Rgba::from_rgb(1.0 - color.r(), 1.0 - color.g(), 1.0 - color.b())
+        } else {
+            color
+        };
+
+        Color32::from(new_color)
+    }
+
     #[inline(always)]
     fn text_button(&mut self, text: impl Into<WidgetText>) -> Response {
         self.add(TextButton::text(text))

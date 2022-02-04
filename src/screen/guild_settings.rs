@@ -266,7 +266,7 @@ impl Screen {
         let resp = ui
             .group(|ui| {
                 ui.horizontal(|ui| {
-                    let color = rgb_color(role.color);
+                    let color = ui.role_color(role);
                     ui.label(RichText::new(&id_string).small());
                     ui.colored_label(color, role.name.as_str());
                 });

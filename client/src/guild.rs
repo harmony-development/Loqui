@@ -85,6 +85,6 @@ impl Guild {
     pub fn highest_role_for_member(&self, user_id: u64) -> Option<(&u64, &Role)> {
         self.members
             .get(&user_id)
-            .and_then(|role_ids| self.roles.iter().find(|(id, role)| role.hoist && role_ids.contains(id)))
+            .and_then(|role_ids| self.roles.iter().find(|(id, _)| role_ids.contains(id)))
     }
 }
