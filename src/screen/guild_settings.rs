@@ -1,12 +1,16 @@
 use std::{fmt::Write, ops::Not};
 
 use client::{
-    channel::Channel, content, get_random_u64, guild::Guild, harmony_rust_sdk::api::chat::all_permissions,
-    member::Member, role::Role,
+    channel::Channel,
+    content, get_random_u64,
+    guild::Guild,
+    harmony_rust_sdk::api::chat::{all_permissions, Permission},
+    member::Member,
+    role::Role,
 };
 use eframe::egui::{CollapsingHeader, Color32, RichText};
 
-use crate::widgets::{view_channel_context_menu_items, view_member_context_menu_items, Avatar};
+use crate::widgets::{view_channel_context_menu_items, view_member_context_menu_items, Avatar, Toggle};
 
 use super::prelude::*;
 
@@ -18,6 +22,8 @@ pub struct Screen {
     guild_name_edit_text: String,
     fetching_invites: AtomBool,
     uploading_guild_pic: AtomBool,
+    managing_perms: bool,
+    managing_perms_role: u64,
 }
 
 impl Screen {
@@ -34,6 +40,8 @@ impl Screen {
                 .map_or_else(String::new, |g| g.name.to_string()),
             fetching_invites: AtomBool::default(),
             uploading_guild_pic: AtomBool::default(),
+            managing_perms: false,
+            managing_perms_role: 0,
         }
     }
 
@@ -253,7 +261,7 @@ impl Screen {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.y = 6.0;
             for (role_id, role) in &guild.roles {
-                self.view_role(ui, guild, role, *role_id);
+                self.view_role(state, ui, guild, role, *role_id);
                 if ui.available_size_before_wrap().x <= 200.0 {
                     ui.end_row();
                 }
@@ -261,7 +269,7 @@ impl Screen {
         });
     }
 
-    fn view_role(&mut self, ui: &mut Ui, guild: &Guild, role: &Role, role_id: u64) {
+    fn view_role(&mut self, state: &State, ui: &mut Ui, guild: &Guild, role: &Role, role_id: u64) {
         let id_string = role_id.to_string();
         let resp = ui
             .group(|ui| {
@@ -282,8 +290,92 @@ impl Screen {
                 ui.close_menu();
             }
             if guild.has_perm(all_permissions::ROLES_MANAGE) && ui.button("manage permissions").clicked() {
-                // TODO
+                self.managing_perms = true;
+                self.managing_perms_role = role_id;
+                if guild.role_perms.is_empty() {
+                    let guild_id = self.guild_id;
+                    let channels = guild.channels.clone();
+                    spawn_evs!(state, |events, client| {
+                        client.fetch_role_perms(guild_id, channels, role_id, events).await?;
+                    });
+                }
                 ui.close_menu();
+            }
+        });
+    }
+
+    fn view_manage_role_perms(&mut self, state: &State, ctx: &egui::Context) {
+        let Some(guild) = state.cache.get_guild(self.guild_id) else { return };
+        let Some(role) = guild.roles.get(&self.managing_perms_role) else { return };
+        let Some(role_perms) = guild.role_perms.get(&self.managing_perms_role) else {
+            egui::Window::new(role.name.as_str())
+            .open(&mut self.managing_perms)
+            .show(ctx, |ui| {
+                ui.add(egui::Spinner::new().size(32.0));
+            });
+            return;
+        };
+
+        let mut managing_perms = self.managing_perms;
+
+        egui::Window::new(role.name.as_str())
+            .open(&mut managing_perms)
+            .show(ctx, |ui| {
+                ui.label("guild");
+                ui.separator();
+                for perm in role_perms {
+                    self.view_perm(state, ui, self.guild_id, None, self.managing_perms_role, perm);
+                }
+
+                for (channel_id, channel) in guild
+                    .channels
+                    .iter()
+                    .filter_map(|id| state.cache.get_channel(self.guild_id, *id).map(|c| (id, c)))
+                {
+                    let Some(role_perms) = channel.role_perms.get(&self.managing_perms_role) else { continue };
+
+                    ui.label(format!("#{}", channel.name));
+                    ui.separator();
+                    for perm in role_perms {
+                        self.view_perm(
+                            state,
+                            ui,
+                            self.guild_id,
+                            Some(*channel_id),
+                            self.managing_perms_role,
+                            perm,
+                        );
+                    }
+                }
+            });
+
+        self.managing_perms = managing_perms;
+    }
+
+    fn view_perm(
+        &self,
+        state: &State,
+        ui: &mut Ui,
+        guild_id: u64,
+        channel_id: Option<u64>,
+        role_id: u64,
+        perm: &Permission,
+    ) {
+        let mut new_ok = perm.ok;
+
+        ui.horizontal(|ui| {
+            ui.label(&perm.matches);
+            ui.add_space(ui.available_width() - ui.spacing().interact_size.y * 2.0);
+            ui.add(Toggle::new(&mut new_ok));
+
+            if ui.ui_contains_pointer() && ui.input().pointer.any_click() && new_ok != perm.ok {
+                let perm = Permission {
+                    matches: perm.matches.clone(),
+                    ok: new_ok,
+                };
+                spawn_client_fut!(state, |client| {
+                    client.set_role_perms(guild_id, channel_id, role_id, vec![perm]).await
+                });
             }
         });
     }
@@ -291,6 +383,8 @@ impl Screen {
 
 impl AppScreen for Screen {
     fn update(&mut self, ctx: &egui::Context, _: &epi::Frame, state: &mut State) {
+        self.view_manage_role_perms(state, ctx);
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.group(|ui| {
                 egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {

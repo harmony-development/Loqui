@@ -26,10 +26,11 @@ use harmony_rust_sdk::{
             BanUserRequest, ChannelKind, Content as HarmonyContent, CreateChannelRequest, CreateGuildRequest,
             CreateInviteRequest, DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Event, FormattedText,
             GetChannelMessagesRequest, GetGuildChannelsRequest, GetGuildInvitesRequest, GetGuildListRequest,
-            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetPinnedMessagesRequest,
-            GetUserRolesRequest, Invite, JoinGuildRequest, KickUserRequest, LeaveGuildRequest,
-            Message as HarmonyMessage, Permission, PinMessageRequest, QueryHasPermissionRequest, Role, TypingRequest,
-            UnbanUserRequest, UnpinMessageRequest, UpdateMessageTextRequest,
+            GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetPermissionsRequest,
+            GetPinnedMessagesRequest, GetUserRolesRequest, Invite, JoinGuildRequest, KickUserRequest,
+            LeaveGuildRequest, Message as HarmonyMessage, Permission, PinMessageRequest, QueryHasPermissionRequest,
+            Role, SetPermissionsRequest, TypingRequest, UnbanUserRequest, UnpinMessageRequest,
+            UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -48,6 +49,7 @@ use harmony_rust_sdk::{
 
 use error::ClientResult;
 use instant::Instant;
+use itertools::Itertools;
 use member::Member;
 use message::{Attachment, Content, Embed, MessageId, ReadMessagesView, WriteMessagesView};
 use serde::{Deserialize, Serialize};
@@ -1167,6 +1169,58 @@ impl Client {
             reached_top: resp.reached_top,
         });
 
+        Ok(())
+    }
+
+    pub async fn set_role_perms(
+        &self,
+        guild_id: u64,
+        channel_id: Option<u64>,
+        role_id: u64,
+        perms_to_give: Vec<Permission>,
+    ) -> ClientResult<()> {
+        self.inner
+            .call(SetPermissionsRequest::new(guild_id, channel_id, role_id, perms_to_give))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn fetch_role_perms(
+        &self,
+        guild_id: u64,
+        channel_ids: Vec<u64>,
+        role_id: u64,
+        event_sender: &EventSender,
+    ) -> ClientResult<()> {
+        let chunked_reqs = std::iter::once(GetPermissionsRequest::new(guild_id, None, role_id))
+            .chain(
+                channel_ids
+                    .iter()
+                    .map(|channel_id| GetPermissionsRequest::new(guild_id, Some(*channel_id), role_id)),
+            )
+            .chunks(64)
+            .into_iter()
+            .map(|chunk| chunk.collect_vec())
+            .collect_vec();
+        let chunked_ids = std::iter::once(None)
+            .chain(channel_ids.iter().map(|id| Some(*id)))
+            .chunks(64)
+            .into_iter()
+            .map(|chunk| chunk.collect_vec())
+            .collect_vec();
+        for (reqs, ids) in chunked_reqs.into_iter().zip(chunked_ids.into_iter()) {
+            let resps = self.inner.batch_call(reqs).await?;
+            for (resp, channel_id) in resps.into_iter().zip(ids.into_iter()) {
+                let _ = event_sender.send(FetchEvent::Harmony(Event::Chat(ChatEvent::RolePermsUpdated(
+                    RolePermissionsUpdated {
+                        guild_id,
+                        channel_id,
+                        new_perms: resp.perms,
+                        role_id,
+                    },
+                ))));
+            }
+        }
         Ok(())
     }
 
