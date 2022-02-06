@@ -289,7 +289,7 @@ impl Screen {
                 ui.output().copied_text.push_str(role.name.as_str());
                 ui.close_menu();
             }
-            if guild.has_perm(all_permissions::ROLES_MANAGE) && ui.button("manage permissions").clicked() {
+            if guild.has_perm(all_permissions::PERMISSIONS_MANAGE_GET) && ui.button("manage permissions").clicked() {
                 self.managing_perms = true;
                 self.managing_perms_role = role_id;
                 if guild.role_perms.is_empty() {
@@ -324,7 +324,7 @@ impl Screen {
                 ui.label("guild");
                 ui.separator();
                 for perm in role_perms {
-                    self.view_perm(state, ui, self.guild_id, None, self.managing_perms_role, perm);
+                    self.view_perm(state, ui, self.guild_id, None, self.managing_perms_role, perm, guild);
                 }
 
                 for (channel_id, channel) in guild
@@ -344,6 +344,7 @@ impl Screen {
                             Some(*channel_id),
                             self.managing_perms_role,
                             perm,
+                            guild,
                         );
                     }
                 }
@@ -360,14 +361,17 @@ impl Screen {
         channel_id: Option<u64>,
         role_id: u64,
         perm: &Permission,
+        guild: &Guild,
     ) {
         let mut new_ok = perm.ok;
 
         ui.horizontal(|ui| {
             ui.label(&perm.matches);
             ui.add_space(ui.available_width() - ui.spacing().interact_size.y * 2.0);
-            ui.add(Toggle::new(&mut new_ok));
-
+            ui.add_enabled(
+                guild.has_perm(all_permissions::PERMISSIONS_MANAGE_SET),
+                Toggle::new(&mut new_ok),
+            );
             if ui.ui_contains_pointer() && ui.input().pointer.any_click() && new_ok != perm.ok {
                 let perm = Permission {
                     matches: perm.matches.clone(),
