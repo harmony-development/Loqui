@@ -1,6 +1,6 @@
 use std::ops::Not;
 
-use client::Client;
+use client::{content, Client};
 use eframe::{
     egui::{self, vec2, Color32, FontData, FontDefinitions, Style, Ui, Vec2},
     epi,
@@ -245,16 +245,21 @@ impl epi::App for App {
 
         ctx.set_fonts(font_defs);
 
-        let mut style = Style {
-            visuals: egui::Visuals::dark(),
-            ..Style::default()
-        };
-        style.visuals.widgets.hovered.bg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;
-        style.visuals.widgets.hovered.bg_fill = loqui_style::HARMONY_LOTUS_ORANGE;
-        style.visuals.selection.bg_fill = loqui_style::HARMONY_LOTUS_GREEN;
-        style.visuals.widgets.noninteractive.bg_fill = loqui_style::BG_NORMAL;
-        style.visuals.extreme_bg_color = loqui_style::BG_EXTREME;
-        ctx.set_style(style);
+        if let Some(style) = content::get_local_config::<Style>("style") {
+            ctx.set_style(style);
+        } else {
+            let mut style = Style {
+                visuals: egui::Visuals::dark(),
+                ..Style::default()
+            };
+            style.visuals.widgets.hovered.bg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;
+            style.visuals.widgets.hovered.bg_fill = loqui_style::HARMONY_LOTUS_ORANGE;
+            style.visuals.selection.bg_fill = loqui_style::HARMONY_LOTUS_GREEN;
+            style.visuals.widgets.noninteractive.bg_fill = loqui_style::BG_NORMAL;
+            style.visuals.extreme_bg_color = loqui_style::BG_EXTREME;
+            content::set_local_config("style", &style);
+            ctx.set_style(style);
+        }
     }
 
     fn max_size_points(&self) -> egui::Vec2 {

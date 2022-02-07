@@ -871,11 +871,7 @@ impl Client {
 
     #[inline(always)]
     pub fn user_id(&self) -> u64 {
-        if let AuthStatus::Complete(session) = self.inner.auth_status() {
-            session.user_id
-        } else {
-            panic!()
-        }
+        self.inner.user_id().unwrap()
     }
 
     #[inline(always)]
@@ -1318,11 +1314,7 @@ impl Client {
     }
 
     pub async fn initial_sync(&self, event_sender: &EventSender) -> ClientResult<()> {
-        let self_id = if let AuthStatus::Complete(session) = self.inner.auth_status() {
-            session.user_id
-        } else {
-            todo!("return err")
-        };
+        let self_id = self.user_id();
         let self_profile = self
             .inner
             .call(GetProfileRequest::new(self_id))

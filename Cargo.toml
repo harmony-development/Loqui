@@ -44,6 +44,13 @@ egui = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default
     "serde",
     "single_threaded",
 ] }
+epaint = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default-features = false, features = [
+    "serde",
+] }
+emath = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default-features = false, features = [
+    "serde",
+] }
+ahash = { version = "0.7", default-features = false, features = ["serde"] }
 client = { path = "./client" }
 image_worker = { path = "./image_worker" }
 

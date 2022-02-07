@@ -38,6 +38,7 @@ checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
 dependencies = [
  "getrandom 0.2.4",
  "once_cell",
+ "serde",
  "version_check",
 ]
 
@@ -887,6 +888,7 @@ version = "0.16.0"
 source = "git+https://github.com/yusdacra/egui.git?branch=loqui#c842a55ba959eff3c0351003562c70d17704325c"
 dependencies = [
  "bytemuck",
+ "serde",
 ]
 
 [[package]]
@@ -994,6 +996,7 @@ dependencies = [
  "bytemuck",
  "emath",
  "nohash-hasher",
+ "serde",
 ]
 
 [[package]]
@@ -1796,11 +1799,14 @@ dependencies = [
 name = "loqui"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "anyhow",
  "client",
  "console_error_panic_hook",
  "eframe",
  "egui",
+ "emath",
+ "epaint",
  "image",
  "image_worker",
  "instant",

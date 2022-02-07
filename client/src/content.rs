@@ -61,7 +61,7 @@ pub mod native {
 
     pub fn set_local_config<T: Serialize>(name: &str, val: &T) {
         let config_path = STORE.config_dir().join(name);
-        let raw = serde_json::to_vec(val).expect("must be valid serde struct");
+        let raw = serde_json::to_vec_pretty(val).expect("must be valid serde struct");
         std::fs::write(config_path, raw).expect("failed to write");
     }
 
@@ -80,7 +80,7 @@ pub mod native {
     }
 
     pub fn put_session(session: Session) {
-        let serialized = serde_json::to_string(&session).expect("failed to serialize");
+        let serialized = serde_json::to_string_pretty(&session).expect("failed to serialize");
         let _ = std::fs::write(STORE.latest_session_file(), serialized.into_bytes());
     }
 
