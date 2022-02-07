@@ -1,8 +1,8 @@
 use instant::Instant;
 
-use harmony_rust_sdk::{
-    api::profile::{AccountKind, UserStatus},
-    client::api::rest::FileId,
+use harmony_rust_sdk::api::{
+    profile::{AccountKind, UserStatus},
+    rest::FileId,
 };
 use smol_str::SmolStr;
 

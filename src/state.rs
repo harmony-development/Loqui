@@ -241,7 +241,7 @@ impl State {
         self.cache.maintain(|ev| match ev {
             FetchEvent::Attachment { attachment, file } => {
                 if attachment.is_raster_image() {
-                    crate::image_cache::op::decode_image(file.data().clone(), attachment.id, attachment.name);
+                    crate::image_cache::op::decode_image(file.data, attachment.id, attachment.name);
                 }
                 None
             }

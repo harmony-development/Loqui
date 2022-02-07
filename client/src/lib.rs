@@ -15,10 +15,11 @@ use guild::Guild;
 pub use harmony_rust_sdk::{
     self,
     api::exports::hrpc::exports::http::Uri,
-    client::{api::auth::Session as InnerSession, AuthStatus, Client as InnerClient},
+    client::{AuthStatus, Client as InnerClient},
 };
 use harmony_rust_sdk::{
     api::{
+        auth::Session as InnerSession,
         chat::{
             all_permissions, color,
             get_channel_messages_request::Direction,
@@ -29,22 +30,15 @@ use harmony_rust_sdk::{
             GetGuildMembersRequest, GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetPermissionsRequest,
             GetPinnedMessagesRequest, GetUserRolesRequest, Invite, JoinGuildRequest, KickUserRequest,
             LeaveGuildRequest, Message as HarmonyMessage, Permission, PinMessageRequest, QueryHasPermissionRequest,
-            Role, SetPermissionsRequest, TypingRequest, UnbanUserRequest, UnpinMessageRequest,
-            UpdateMessageTextRequest,
+            Role, SendMessageRequest, SetPermissionsRequest, TypingRequest, UnbanUserRequest, UnpinMessageRequest,
+            UpdateChannelInformationRequest, UpdateGuildInformationRequest, UpdateMessageTextRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::Data as FetchLinkData, FetchLinkMetadataRequest},
         profile::{stream_event::Event as ProfileEvent, UserStatus, *},
-        rest::About,
+        rest::{About, FileId},
     },
-    client::{
-        api::{
-            chat::{channel::UpdateChannelInformation, guild::UpdateGuildInformation, message::SendMessage},
-            profile::UpdateProfile,
-            rest::{DownloadedFile, FileId},
-        },
-        EventsSocket,
-    },
+    client::{rest::DownloadedFile, EventsSocket},
 };
 
 use error::ClientResult;
@@ -846,7 +840,7 @@ impl Client {
 
     pub async fn logout(self) -> ClientResult<()> {
         self.inner
-            .call(UpdateProfile::default().with_new_status(UserStatus::OfflineUnspecified))
+            .call(UpdateProfileRequest::default().with_new_user_status(UserStatus::OfflineUnspecified))
             .await?;
         self.remove_session().await
     }
@@ -933,7 +927,12 @@ impl Client {
 
     pub async fn edit_channel(&self, guild_id: u64, channel_id: u64, new_name: impl Into<String>) -> ClientResult<()> {
         self.inner
-            .call(UpdateChannelInformation::new(guild_id, channel_id).with_new_name(Some(new_name.into())))
+            .call(
+                UpdateChannelInformationRequest::default()
+                    .with_guild_id(guild_id)
+                    .with_channel_id(channel_id)
+                    .with_new_name(Some(new_name.into())),
+            )
             .await?;
         Ok(())
     }
@@ -946,9 +945,10 @@ impl Client {
     ) -> ClientResult<()> {
         self.inner
             .call(
-                UpdateGuildInformation::new(guild_id)
-                    .with_new_guild_name(new_name)
-                    .with_new_guild_picture(new_picture),
+                UpdateGuildInformationRequest::default()
+                    .with_guild_id(guild_id)
+                    .with_new_name(new_name)
+                    .with_new_picture(new_picture.map(Into::into)),
             )
             .await?;
         Ok(())
@@ -983,7 +983,7 @@ impl Client {
     }
 
     pub async fn fetch_about(&self) -> ClientResult<About> {
-        let about = harmony_rust_sdk::client::api::rest::about(&self.inner).await?;
+        let about = self.inner.about().await?;
         Ok(about)
     }
 
@@ -1057,7 +1057,9 @@ impl Client {
         let res = self
             .inner
             .call(
-                SendMessage::new(guild_id, channel_id)
+                SendMessageRequest::default()
+                    .with_guild_id(guild_id)
+                    .with_channel_id(channel_id)
                     .with_content(HarmonyContent::new(Some(message.content.into())))
                     .with_echo_id(echo_id)
                     .with_in_reply_to(message.reply_to)
@@ -1124,12 +1126,12 @@ impl Client {
     }
 
     pub async fn upload_file(&self, name: String, mimetype: String, data: Vec<u8>) -> ClientResult<FileId> {
-        let id = harmony_rust_sdk::client::api::rest::upload_extract_id(&self.inner, name, mimetype, data).await?;
+        let id = self.inner.upload_extract_id(name, mimetype, data).await?;
         Ok(FileId::Id(id))
     }
 
     pub async fn fetch_attachment(&self, id: FileId) -> ClientResult<(FileId, DownloadedFile)> {
-        let resp = harmony_rust_sdk::client::api::rest::download_extract_file(&self.inner, id.clone()).await?;
+        let resp = self.inner.download_extract_file(id.clone()).await?;
         Ok((id, resp))
     }
 
@@ -1384,7 +1386,7 @@ impl Client {
         }
 
         self.inner
-            .call(UpdateProfile::default().with_new_status(UserStatus::Online))
+            .call(UpdateProfileRequest::default().with_new_user_status(UserStatus::Online))
             .await?;
 
         let _ = event_sender.send(FetchEvent::Harmony(Event::Profile(ProfileEvent::ProfileUpdated(
@@ -1483,12 +1485,12 @@ impl Client {
             }
             PostProcessEvent::FetchThumbnail(attachment) => {
                 let (id, resp) = self.fetch_attachment(attachment.id.clone()).await?;
-                tracing::debug!("fetched attachment: {} {}", id, resp.mimetype());
+                tracing::debug!("fetched attachment: {} {}", id, resp.mimetype);
                 let _ = event_sender.send(FetchEvent::Attachment {
                     attachment: Attachment {
                         id,
-                        kind: resp.mimetype().to_string(),
-                        size: resp.data().len() as u32,
+                        kind: resp.mimetype.clone(),
+                        size: resp.data.len() as u32,
                         ..attachment
                     },
                     file: resp,

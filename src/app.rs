@@ -2,7 +2,7 @@ use std::ops::Not;
 
 use client::Client;
 use eframe::{
-    egui::{self, vec2, Color32, FontData, FontDefinitions, Ui, Vec2},
+    egui::{self, vec2, Color32, FontData, FontDefinitions, Style, Ui, Vec2},
     epi,
 };
 
@@ -21,7 +21,6 @@ pub struct App {
     show_errors_window: bool,
     show_about_window: bool,
     show_egui_debug: bool,
-    did_set_scale_factor: bool,
 }
 
 impl App {
@@ -35,7 +34,6 @@ impl App {
             show_errors_window: false,
             show_about_window: false,
             show_egui_debug: false,
-            did_set_scale_factor: false,
         }
     }
 
@@ -213,6 +211,7 @@ impl epi::App for App {
 
     fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         self.state.init(ctx, frame);
+        ctx.set_pixels_per_point(self.state.local_config.scale_factor);
 
         self.state.futures.spawn(async move {
             let Some(session) = Client::read_latest_session().await else { return Ok(None) };
@@ -246,7 +245,10 @@ impl epi::App for App {
 
         ctx.set_fonts(font_defs);
 
-        let mut style = ctx.style().as_ref().clone();
+        let mut style = Style {
+            visuals: egui::Visuals::dark(),
+            ..Style::default()
+        };
         style.visuals.widgets.hovered.bg_stroke.color = loqui_style::HARMONY_LOTUS_ORANGE;
         style.visuals.widgets.hovered.bg_fill = loqui_style::HARMONY_LOTUS_ORANGE;
         style.visuals.selection.bg_fill = loqui_style::HARMONY_LOTUS_GREEN;
@@ -263,12 +265,6 @@ impl epi::App for App {
         self.state.maintain(ctx);
 
         // ui drawing starts here
-
-        // HACK: remove this when `set_pixels_per_point` works in setup
-        if self.did_set_scale_factor.not() {
-            ctx.set_pixels_per_point(self.state.local_config.scale_factor);
-            self.did_set_scale_factor = true;
-        }
 
         let is_main_screen = self.screens.current().id() == "main";
         if self.state.is_connected.not() || is_main_screen.not() || ctx.is_mobile().not() {

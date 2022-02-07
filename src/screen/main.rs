@@ -10,7 +10,7 @@ use client::{
     smol_str::SmolStr,
     AHashMap, AHashSet, FetchEvent, Uri,
 };
-use eframe::egui::{vec2, Color32, Event, RichText, Vec2};
+use eframe::egui::{vec2, Color32, Event, RichText, Rounding, Vec2};
 
 use crate::{
     config::BgImage,
@@ -1150,7 +1150,7 @@ impl Screen {
 
         egui::Frame::group(ui.style())
             .margin(Vec2::ZERO)
-            .corner_radius(0.0)
+            .rounding(0.0)
             .stroke(egui::Stroke::new(4.0, status_color))
             .show(ui, |ui| {
                 if let Some((texid, _)) = maybe_tex {
@@ -1268,7 +1268,7 @@ impl Screen {
             margin: Vec2::new(8.0, 5.0),
             fill: ui.style().visuals.extreme_bg_color,
             stroke: ui.style().visuals.window_stroke(),
-            corner_radius: 4.0,
+            rounding: Rounding::same(4.0),
             ..Default::default()
         };
 
@@ -1286,7 +1286,7 @@ impl Screen {
             margin: Vec2::new(8.0, 5.0),
             fill: ui.style().visuals.window_fill(),
             stroke: ui.style().visuals.window_stroke(),
-            corner_radius: 4.0,
+            rounding: Rounding::same(4.0),
             ..Default::default()
         };
 
@@ -1313,7 +1313,7 @@ impl Screen {
             margin: Vec2::new(8.0, 5.0),
             fill: ui.style().visuals.extreme_bg_color,
             stroke: ui.style().visuals.window_stroke(),
-            corner_radius: 4.0,
+            rounding: Rounding::same(4.0),
             ..Default::default()
         };
 
@@ -1348,7 +1348,7 @@ impl Screen {
                 margin: [4.0, 2.0].into(),
                 fill: ui.style().visuals.window_fill(),
                 stroke: ui.style().visuals.window_stroke(),
-                corner_radius: 2.0,
+                rounding: Rounding::same(2.0),
                 ..Default::default()
             };
             frame.show(ui, |ui| {

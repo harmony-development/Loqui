@@ -1,10 +1,8 @@
 use ahash::AHashMap;
-use harmony_rust_sdk::{
-    api::{
-        chat::{permission::has_permission, Invite, Permission},
-        harmonytypes::{item_position::Position, ItemPosition},
-    },
-    client::api::rest::FileId,
+use harmony_rust_sdk::api::{
+    chat::{permission::has_permission, Invite, Permission},
+    harmonytypes::{item_position::Position, ItemPosition},
+    rest::FileId,
 };
 use smol_str::SmolStr;
 

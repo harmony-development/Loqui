@@ -1,14 +1,12 @@
 use ahash::AHashMap;
 use chrono::NaiveDateTime;
-use harmony_rust_sdk::{
-    api::{
-        chat::{
-            self, color, content, embed, get_channel_messages_request::Direction, overrides::Reason, FormattedText,
-            Message as HarmonyMessage, Minithumbnail, Photo,
-        },
-        exports::hrpc::exports::http::Uri,
+use harmony_rust_sdk::api::{
+    chat::{
+        self, color, content, embed, get_channel_messages_request::Direction, overrides::Reason, FormattedText,
+        Message as HarmonyMessage, Minithumbnail, Photo,
     },
-    client::api::rest::FileId,
+    exports::hrpc::exports::http::Uri,
+    rest::FileId,
 };
 use instant::Duration;
 use smol_str::SmolStr;

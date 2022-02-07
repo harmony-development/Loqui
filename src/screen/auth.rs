@@ -1,12 +1,9 @@
 use std::ops::Not;
 
 use client::{
-    harmony_rust_sdk::{
-        api::{
-            auth::{auth_step::Step, AuthStep},
-            exports::hrpc::exports::futures_util::TryFutureExt,
-        },
-        client::api::auth::{next_step_request::form_fields::Field, AuthStepResponse},
+    harmony_rust_sdk::api::{
+        auth::{auth_step::Step, next_step_request::form_fields::Field, AuthStep, AuthStepResponse},
+        exports::hrpc::exports::futures_util::TryFutureExt,
     },
     smol_str::SmolStr,
     Client, IndexMap, Uri,

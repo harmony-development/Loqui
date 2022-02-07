@@ -51,7 +51,7 @@ pub mod web {
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native {
     use crate::{error::ClientError, Session};
-    use harmony_rust_sdk::client::api::rest::FileId;
+    use harmony_rust_sdk::api::rest::FileId;
     use serde::{de::DeserializeOwned, Serialize};
     use std::path::{Path, PathBuf};
 

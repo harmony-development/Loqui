@@ -30,6 +30,7 @@ directories-next = "2.0.0"
 harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = [
     "client_native",
     "client_backoff",
+    "client_recommended",
     "all_permissions",
 ] }
 getrandom = "0.2"
@@ -38,6 +39,7 @@ getrandom = "0.2"
 harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = [
     "client_web",
     "client_backoff",
+    "client_recommended",
     "all_permissions",
 ] }
 gloo-storage = "0.2"

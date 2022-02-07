@@ -37,8 +37,12 @@ codegen-units = 1
 panic = 'abort'
 
 [dependencies]
-eframe = { git = "https://github.com/emilk/egui.git", branch = "master", default-features = false, features = [
+eframe = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default-features = false, features = [
     "egui_glow",
+] }
+egui = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default-features = false, features = [
+    "serde",
+    "single_threaded",
 ] }
 client = { path = "./client" }
 image_worker = { path = "./image_worker" }
