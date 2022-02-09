@@ -85,15 +85,8 @@ image = { git = "https://github.com/image-rs/image.git", branch = "master", defa
     "jpeg",
     "ico",
     "png",
-    "pnm",
-    "tga",
     "tiff",
     "webp",
-    "bmp",
-    "hdr",
-    "dxt",
-    "dds",
-    "farbfeld",
 ] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -101,7 +94,15 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 tokio = { version = "1.9", features = ["sync", "rt-multi-thread", "macros"] }
 open = "2.0"
-image = { git = "https://github.com/image-rs/image.git", branch = "master" }
+image = { git = "https://github.com/image-rs/image.git", branch = "master", default-features = false, features = [
+    "gif",
+    "jpeg",
+    "ico",
+    "png",
+    "tiff",
+    "webp",
+    "jpeg_rayon",
+] }
 notify-rust = "4"
 
 [package.metadata.nix]
