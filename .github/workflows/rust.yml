@@ -39,6 +39,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     needs: tagref
     steps:
     - name: Checkout repo
@@ -119,6 +120,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
     needs: check
     if: github.event_name == 'push'
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
@@ -186,11 +188,11 @@ jobs:
 
     - name: Rename artifacts
       run: |
-          mv build-windows/loqui.exe build-windows/loqui-windows.exe
+          #mv build-windows/loqui.exe build-windows/loqui-windows.exe
           mv build-linux/loqui build-linux/loqui-linux
           mv build-macos/loqui build-macos/loqui-macos
           mv build-web/dist.zip build-web/web-dist.zip
-          chmod +x build-{windows,linux,macos}/*
+          chmod +x build-{linux,macos}/*
 
     - name: Upload release
       env:
@@ -198,7 +200,7 @@ jobs:
       run: |
           wget -q https://github.com/TheAssassin/pyuploadtool/releases/download/continuous/pyuploadtool-x86_64.AppImage
           chmod +x pyuploadtool-x86_64.AppImage
-          ./pyuploadtool-x86_64.AppImage build-linux/loqui-linux build-macos/loqui-macos build-web/web-dist.zip build-windows/loqui-windows.exe
+          ./pyuploadtool-x86_64.AppImage build-linux/loqui-linux build-macos/loqui-macos build-web/web-dist.zip
 
   deploy-web:
     if: github.event_name == 'push'
