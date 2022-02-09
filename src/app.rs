@@ -2,9 +2,10 @@ use std::ops::Not;
 
 use client::{content, Client};
 use eframe::{
-    egui::{self, vec2, Color32, FontData, FontDefinitions, Style, Ui, Vec2},
+    egui::{self, vec2, Color32, FontData, FontDefinitions, Style, Ui},
     epi,
 };
+use egui::Margin;
 
 use super::utils::*;
 
@@ -275,7 +276,7 @@ impl epi::App for App {
         if self.state.is_connected.not() || is_main_screen.not() || ctx.is_mobile().not() {
             let style = ctx.style();
             let frame_panel = egui::Frame {
-                margin: Vec2::ZERO,
+                margin: Margin::same(0.0),
                 fill: style.visuals.extreme_bg_color,
                 stroke: style.visuals.window_stroke(),
                 ..Default::default()

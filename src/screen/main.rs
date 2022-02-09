@@ -11,6 +11,7 @@ use client::{
     AHashMap, AHashSet, FetchEvent, Uri,
 };
 use eframe::egui::{vec2, Color32, Event, RichText, Rounding, Vec2};
+use egui::Margin;
 
 use crate::{
     config::BgImage,
@@ -384,7 +385,7 @@ impl Screen {
             .map_or_else(|| "unknown", |g| g.name.as_str());
 
         let menu_but_clicked = egui::Frame::group(ui.style())
-            .margin([2.0, 2.0])
+            .margin(Margin::same(2.0))
             .show(ui, |ui| {
                 let but = ui
                     .add(TextButton::text(guild_name).small())
@@ -900,7 +901,7 @@ impl Screen {
                             tot
                         });
                 for chunk in chunked_messages {
-                    egui::Frame::none().margin([5.0, 5.0]).show(ui, |ui| {
+                    egui::Frame::none().margin(Margin::same(5.0)).show(ui, |ui| {
                         for (index, (id, message)) in chunk.into_iter().enumerate() {
                             self.view_message(
                                 state,
@@ -1074,7 +1075,7 @@ impl Screen {
     fn view_uploading_attachments(&mut self, state: &State, ui: &mut Ui) {
         ui.label(RichText::new("Uploading:").strong());
         for name in state.uploading_files.read().expect("poisoned").iter() {
-            egui::Frame::group(ui.style()).margin([0.0; 2]).show(ui, |ui| {
+            egui::Frame::group(ui.style()).margin(Margin::same(0.0)).show(ui, |ui| {
                 ui.label(name);
             });
         }
@@ -1265,7 +1266,7 @@ impl Screen {
     #[inline(always)]
     fn show_guild_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Vec2::new(8.0, 5.0),
+            margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.extreme_bg_color,
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1283,7 +1284,7 @@ impl Screen {
     #[inline(always)]
     fn show_channel_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Vec2::new(8.0, 5.0),
+            margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.window_fill(),
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1310,7 +1311,7 @@ impl Screen {
     #[inline(always)]
     fn show_member_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Vec2::new(8.0, 5.0),
+            margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.extreme_bg_color,
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1345,7 +1346,7 @@ impl Screen {
 
         ui.allocate_ui([top_channel_bar_width, interact_size.y].into(), |ui| {
             let frame = egui::Frame {
-                margin: [4.0, 2.0].into(),
+                margin: Margin::symmetric(4.0, 2.0),
                 fill: ui.style().visuals.window_fill(),
                 stroke: ui.style().visuals.window_stroke(),
                 rounding: Rounding::same(2.0),
@@ -1567,7 +1568,7 @@ impl AppScreen for Screen {
         self.view_pinned_messages(state, ctx);
 
         let panel_frame = egui::Frame {
-            margin: Vec2::new(8.0, 8.0),
+            margin: Margin::same(8.0),
             fill: loqui_style::BG_LIGHT,
             ..Default::default()
         };
