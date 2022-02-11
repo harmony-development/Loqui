@@ -682,7 +682,7 @@ impl From<HarmonyMessage> for Message {
                 .map(|c| c.into())
                 .unwrap_or_default(),
             sender: message.author_id,
-            timestamp: { NaiveDateTime::from_timestamp(message.created_at as i64, 0) },
+            timestamp: { NaiveDateTime::from_timestamp((message.created_at / 1000) as i64, ((message.created_at % 1000) as u32) * 1000000) },
             overrides: message.overrides.map(From::from),
             failed_to_send: false,
         }
