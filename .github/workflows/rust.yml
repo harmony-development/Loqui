@@ -38,8 +38,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+        os: [ubuntu-latest, windows-2019, macOS-latest]
+    continue-on-error: ${{ matrix.os == 'windows-2019' }}
     needs: tagref
     steps:
     - name: Checkout repo
@@ -117,10 +117,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu-latest, windows-2019, macOS-latest]
     needs: check
     if: github.event_name == 'push'
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    continue-on-error: ${{ matrix.os == 'windows-2019' }}
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
@@ -148,7 +148,7 @@ jobs:
       run: cargo build --locked --release
 
     - name: UPX windows
-      if: ${{ matrix.os == 'windows-latest' }}
+      if: ${{ matrix.os == 'windows-2019' }}
       run: .github/upx.exe target/release/loqui.exe
 
     - name: UPX linux
@@ -170,7 +170,7 @@ jobs:
         path: target/release/loqui
 
     - name: Artifact Windows
-      if: ${{ matrix.os == 'windows-latest' }}
+      if: ${{ matrix.os == 'windows-2019' }}
       uses: actions/upload-artifact@v2.3.1
       with:
         name: build-windows
