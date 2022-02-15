@@ -8,7 +8,7 @@ repository = "https://github.com/harmony-development/loqui"
 homepage = "https://github.com/harmony-development/loqui"
 
 [dependencies]
-infer = "0.6.0"
+infer = "0.7.0"
 
 tokio = { version = "1.9", features = ["sync"] }
 ahash = "0.7"
