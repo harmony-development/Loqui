@@ -1559,8 +1559,8 @@ dependencies = [
 
 [[package]]
 name = "image"
-version = "0.24.0"
-source = "git+https://github.com/image-rs/image.git?branch=master#e4af9c8ba83788b55e5fe2a06c1cc305e06376a8"
+version = "0.24.1"
+source = "git+https://github.com/image-rs/image.git?branch=master#060a41c491a7b9cb7d1ebb3be5a100c8c3c73972"
 dependencies = [
  "bytemuck",
  "byteorder",
