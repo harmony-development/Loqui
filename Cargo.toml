@@ -93,7 +93,7 @@ image = { git = "https://github.com/image-rs/image.git", branch = "master", defa
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 tokio = { version = "1.9", features = ["sync", "rt-multi-thread", "macros"] }
-open = "2.0"
+open = "2.1"
 image = { git = "https://github.com/image-rs/image.git", branch = "master", default-features = false, features = [
     "gif",
     "jpeg",
