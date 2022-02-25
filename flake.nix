@@ -9,10 +9,10 @@
       url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    androidPkgs = {
+    /*androidPkgs = {
       url = "github:tadfisher/android-nixpkgs";
       inputs.nixpkgs.follows = "nixpkgs";
-    };
+    };*/
   };
 
   outputs = inputs:

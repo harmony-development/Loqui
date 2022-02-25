@@ -1,49 +1,19 @@
 {
   "nodes": {
-    "androidPkgs": {
+    "devshell": {
       "inputs": {
-        "devshell": "devshell",
         "flake-utils": "flake-utils",
         "nixpkgs": [
+          "nixCargoIntegration",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1642364480,
-        "narHash": "sha256-AZ+9q3IEmu9RzKJ47EAINilfO3S3qwG+YGukl00YyfA=",
-        "owner": "tadfisher",
-        "repo": "android-nixpkgs",
-        "rev": "7c1695c4b1a064973c584e52d6b2449489c64c76",
-        "type": "github"
-      },
-      "original": {
-        "owner": "tadfisher",
-        "repo": "android-nixpkgs",
-        "type": "github"
-      }
-    },
-    "devshell": {
-      "locked": {
-        "lastModified": 1637575296,
-        "narHash": "sha256-ZY8YR5u8aglZPe27+AJMnPTG6645WuavB+w0xmhTarw=",
+        "lastModified": 1644227066,
+        "narHash": "sha256-FHcFZtpZEWnUh62xlyY3jfXAXHzJNEDLDzLsJxn+ve0=",
         "owner": "numtide",
         "repo": "devshell",
-        "rev": "0e56ef21ba1a717169953122c7415fa6a8cd2618",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "devshell",
-        "type": "github"
-      }
-    },
-    "devshell_2": {
-      "locked": {
-        "lastModified": 1642188268,
-        "narHash": "sha256-DNz4xScpXIn7rSDohdayBpPR9H9OWCMDOgTYegX081k=",
-        "owner": "numtide",
-        "repo": "devshell",
-        "rev": "696acc29668b644df1740b69e1601119bf6da83b",
+        "rev": "7033f64dd9ef8d9d8644c5030c73913351d2b660",
         "type": "github"
       },
       "original": {
@@ -54,11 +24,11 @@
     },
     "flake-utils": {
       "locked": {
-        "lastModified": 1638122382,
-        "narHash": "sha256-sQzZzAbvKEqN9s0bzWuYmRaA03v40gaJ4+iL1LXjaeI=",
+        "lastModified": 1642700792,
+        "narHash": "sha256-XqHrk7hFb+zBvRg6Ghl+AZDq03ov6OshJLiSWOoX5es=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "74f7e4319258e287b0f9cb95426c9853b282730b",
+        "rev": "846b2ae0fc4cc943637d3d1def4454213e203cba",
         "type": "github"
       },
       "original": {
@@ -85,18 +55,18 @@
     },
     "nixCargoIntegration": {
       "inputs": {
-        "devshell": "devshell_2",
+        "devshell": "devshell",
         "nixpkgs": [
           "nixpkgs"
         ],
         "rustOverlay": "rustOverlay"
       },
       "locked": {
-        "lastModified": 1642399889,
-        "narHash": "sha256-OoVF3du27ZQtkNCm5eRQo1GnfBh1BBiCoFkw0AMbC8Q=",
+        "lastModified": 1645769477,
+        "narHash": "sha256-fha6sgL7qezlAWD7e9HpGH7oPphYvOQ4fhWxfSyryA0=",
         "owner": "yusdacra",
         "repo": "nix-cargo-integration",
-        "rev": "c12d0f9013085f41184e6df144dad5fbd76d7516",
+        "rev": "00e5378c73c0594304195882ab6eeb5118252484",
         "type": "github"
       },
       "original": {
@@ -107,11 +77,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1642104392,
-        "narHash": "sha256-m71b7MgMh9FDv4MnI5sg9MiBVW6DhE1zq+d/KlLWSC8=",
+        "lastModified": 1645433236,
+        "narHash": "sha256-4va4MvJ076XyPp5h8sm5eMQvCrJ6yZAbBmyw95dGyw4=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "5aaed40d22f0d9376330b6fa413223435ad6fee5",
+        "rev": "7f9b6e2babf232412682c09e57ed666d8f84ac2d",
         "type": "github"
       },
       "original": {
@@ -123,7 +93,6 @@
     },
     "root": {
       "inputs": {
-        "androidPkgs": "androidPkgs",
         "flakeCompat": "flakeCompat",
         "nixCargoIntegration": "nixCargoIntegration",
         "nixpkgs": "nixpkgs"
@@ -132,11 +101,11 @@
     "rustOverlay": {
       "flake": false,
       "locked": {
-        "lastModified": 1642387353,
-        "narHash": "sha256-CmpIo2whHN1ESXuKl9lL9CRJVK8YuEfV2JURFqmWNmw=",
+        "lastModified": 1645755566,
+        "narHash": "sha256-BwjpcywzB+4hHuStgYcOWRomI8I2PCtORUbNEL6qMBk=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "c76db6730b6bc150c49c9dcefc2323785516d1dc",
+        "rev": "46d8d20fce510c6a25fa66f36e31f207f6ea49e4",
         "type": "github"
       },
       "original": {
