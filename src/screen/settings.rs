@@ -131,7 +131,7 @@ impl Screen {
     fn view_general_profile(&mut self, state: &State, ui: &mut Ui, member: &Member) {
         ui.horizontal_top(|ui| {
             if self.uploading_user_pic.get().not() {
-                let avatar = Avatar::new(member.avatar_url.as_ref(), member.username.as_str(), state).size(64.0);
+                let avatar = Avatar::new(member.avatar_url.as_deref(), member.username.as_str(), state).size(64.0);
                 let avatar_but = ui.add(avatar).on_hover_text("set picture");
                 if avatar_but.clicked() {
                     let uploading_user_pic = self.uploading_user_pic.clone();

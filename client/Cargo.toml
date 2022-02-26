@@ -27,7 +27,7 @@ itertools = "0.10"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 directories-next = "2.0.0"
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = [
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "refactored", features = [
     "client_native",
     "client_backoff",
     "client_recommended",
@@ -36,7 +36,7 @@ harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_
 getrandom = "0.2"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "master", features = [
+harmony_rust_sdk = { git = "https://github.com/harmony-development/harmony_rust_sdk.git", branch = "refactored", features = [
     "client_web",
     "client_backoff",
     "client_recommended",

@@ -3,20 +3,18 @@ use std::{
     cmp::Ordering,
     future::Future,
     ops::{Deref, Not},
-    str::FromStr,
     sync::{atomic::AtomicBool, Arc},
 };
 
 use client::{
     guild::Guild,
     harmony_rust_sdk::api::{
-        chat::overrides::Reason,
+        chat::{overrides::Reason, Overrides},
         mediaproxy::fetch_link_metadata_response,
         profile::{profile_override, ProfileOverride, UserStatus},
-        rest::FileId,
     },
     member::Member,
-    message::{is_raster_image, Override},
+    message::is_raster_image,
     role::Role,
     tracing, Cache, Client, Uri,
 };
@@ -329,27 +327,9 @@ pub fn dangerous_text(text: impl Into<String>) -> RichText {
 }
 
 /// Construct a URL from a harmony file ID.
-pub fn make_url_from_file_id(client: &Client, id: &FileId) -> String {
-    match id {
-        FileId::Hmc(hmc) => format!(
-            "https://{}:{}/_harmony/media/download/{}",
-            hmc.server(),
-            hmc.port(),
-            hmc.id(),
-        ),
-        FileId::Id(id) => {
-            let homeserver = client.inner().homeserver_url();
-            format!("{}_harmony/media/download/{}", homeserver, id)
-        }
-        FileId::External(ext) => {
-            let homeserver = client.inner().homeserver_url();
-            format!(
-                "{}_harmony/media/download/{}",
-                homeserver,
-                urlencoding::encode(&ext.to_string())
-            )
-        }
-    }
+pub fn make_url_from_file_id(client: &Client, id: &str) -> String {
+    let homeserver = client.inner().homeserver_url();
+    format!("{}_harmony/media/download/{}", homeserver, urlencoding::encode(id))
 }
 
 // opens a URL in background
@@ -387,7 +367,7 @@ pub fn parse_urls<'a>(text: &'a str, state: &State) -> (Vec<(&'a str, Uri)>, boo
                 .filter(|u| matches!(u.scheme_str(), Some("http" | "https")));
             if let Some(url) = parsed {
                 let is_image = state.cache.get_link_data(&url).map_or(false, |d| {
-                    if let fetch_link_metadata_response::Data::IsMedia(media) = d {
+                    if let fetch_link_metadata_response::metadata::Data::IsMedia(media) = d {
                         is_raster_image(&media.mimetype)
                     } else {
                         false
@@ -448,10 +428,10 @@ pub fn show_notification(summary: impl AsRef<str>, body: impl AsRef<str>) {
     }
 }
 
-pub fn override_from_profile(p: &ProfileOverride) -> Override {
-    Override {
-        name: p.username.clone(),
-        avatar_url: p.avatar.as_ref().and_then(|s| FileId::from_str(s).ok()),
+pub fn override_from_profile(p: &ProfileOverride) -> Overrides {
+    Overrides {
+        username: p.username.clone(),
+        avatar: p.avatar.clone(),
         reason: p.reason.clone().map(|reason| match reason {
             profile_override::Reason::UserDefined(custom) => Reason::UserDefined(custom),
             profile_override::Reason::SystemPlurality(empty) => Reason::SystemPlurality(empty),

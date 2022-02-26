@@ -96,7 +96,7 @@ impl Screen {
                 let avatar_but = ui
                     .add_enabled(
                         guild.has_perm(all_permissions::GUILD_MANAGE_CHANGE_INFORMATION),
-                        Avatar::new(guild.picture.as_ref(), guild.name.as_str(), state).size(64.0),
+                        Avatar::new(guild.picture.as_deref(), guild.name.as_str(), state).size(64.0),
                     )
                     .on_hover_text("set picture");
                 if avatar_but.clicked() {

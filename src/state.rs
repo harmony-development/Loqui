@@ -10,13 +10,13 @@ use std::{
 use client::{
     harmony_rust_sdk::{
         api::{
-            chat::{stream_event::Event as ChatEvent, Event},
+            chat::{stream_event::Event as ChatEvent, Event, SendMessageRequest},
             profile::ProfileOverride,
-            rest::{About, FileId},
+            rest::About,
         },
         client::{EventsReadSocket, EventsSocket},
     },
-    message::{Content, Message},
+    message::{AttachmentExt, Message},
     tracing, Cache, Client, EventSender, FetchEvent,
 };
 use eframe::{
@@ -76,7 +76,7 @@ pub struct State {
     pub images_tx: SyncSender<LoadedImage>,
 
     /// Images we are currently loading.
-    pub loading_images: RefCell<Vec<FileId>>,
+    pub loading_images: RefCell<Vec<String>>,
     /// Files that are being uploaded.
     pub uploading_files: Arc<RwLock<Vec<String>>>,
     /// Screen to push to screen stack on next frame.
@@ -241,22 +241,21 @@ impl State {
         self.cache.maintain(|ev| match ev {
             FetchEvent::Attachment { attachment, file } => {
                 if attachment.is_raster_image() {
-                    crate::image_cache::op::decode_image(file.data, attachment.id, attachment.name);
+                    crate::image_cache::op::decode_image(file.data, attachment.id.parse().unwrap(), attachment.name);
                 }
                 None
             }
             ev => {
                 if let FetchEvent::Harmony(Event::Chat(ChatEvent::SentMessage(message_sent))) = &ev {
                     let Some(message) = message_sent.message.as_ref() else { return Some(ev) };
-                    if let Some(text) = message.get_text_content() {
+                    if let Some(text) = message.get_text() {
                         if message.author_id != self.client.as_ref().unwrap().user_id() {
                             let triggers_keyword = text
-                                .text
                                 .split_whitespace()
                                 .filter_map(|word| self.config.mention_keywords.iter().find(|keyword| *keyword == word))
                                 .next();
                             if let Some(keyword) = triggers_keyword {
-                                show_notification(format!("mention keyword '{}' triggered", keyword), &text.text);
+                                show_notification(format!("mention keyword '{}' triggered", keyword), text);
                             }
                         }
                     }
@@ -319,7 +318,7 @@ impl State {
     pub fn get_member_display_name<'a>(&'a self, msg: &'a Message) -> &'a str {
         let user = self.cache.get_user(msg.sender);
         let overrides = msg.overrides.as_ref();
-        let override_name = overrides.and_then(|ov| ov.name.as_deref());
+        let override_name = overrides.and_then(|ov| ov.username.as_deref());
         let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
         override_name.unwrap_or(sender_name)
     }
@@ -390,14 +389,14 @@ impl State {
                         }
                     }
 
-                    let message = Message {
-                        content: Content::Files(attachments),
-                        sender: self.client().user_id(),
-                        ..Default::default()
-                    };
-                    let echo_id = self.cache.prepare_send_message(guild_id, channel_id, message.clone());
+                    let user_id = self.client().user_id();
+                    let request = SendMessageRequest::default()
+                        .with_guild_id(guild_id)
+                        .with_channel_id(channel_id)
+                        .with_attachments(attachments);
+                    let echo_id = self.cache.prepare_send_message(user_id, request.clone());
                     spawn_evs!(self, |evs, client| {
-                        client.send_message(echo_id, guild_id, channel_id, message, evs).await?;
+                        client.send_message(request.with_echo_id(echo_id), evs).await?;
                     });
                 }
                 Err(err) => {

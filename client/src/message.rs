@@ -2,19 +2,43 @@ use ahash::AHashMap;
 use chrono::NaiveDateTime;
 use harmony_rust_sdk::api::{
     chat::{
-        self, color, content, embed, get_channel_messages_request::Direction, overrides::Reason, FormattedText,
-        Message as HarmonyMessage, Minithumbnail, Photo,
+        get_channel_messages_request::Direction, send_message_request, Attachment, Content, Message as HarmonyMessage,
+        Overrides, SendMessageRequest,
     },
     exports::hrpc::exports::http::Uri,
-    rest::FileId,
 };
 use instant::Duration;
-use smol_str::SmolStr;
-use std::{ops::Not, ptr::NonNull, str::FromStr};
+use std::{ops::Not, ptr::NonNull};
 
-use crate::{IndexMap, PostEventSender};
+use crate::{content::MAX_THUMB_SIZE, IndexMap, PostEventSender};
 
-use super::{content::MAX_THUMB_SIZE, post_heading, PostProcessEvent};
+use super::{post_heading, PostProcessEvent};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MessageId {
+    Ack(u64),
+    Unack(u64),
+}
+
+impl MessageId {
+    pub fn is_ack(&self) -> bool {
+        matches!(self, MessageId::Ack(_))
+    }
+
+    pub fn transaction_id(&self) -> Option<u64> {
+        match self {
+            MessageId::Unack(transaction) => Some(*transaction),
+            _ => None,
+        }
+    }
+
+    pub fn id(&self) -> Option<u64> {
+        match self {
+            MessageId::Ack(id) => Some(*id),
+            _ => None,
+        }
+    }
+}
 
 pub trait ReadMessagesView {
     fn get_message(&self, id: &MessageId) -> Option<&Message>;
@@ -312,135 +336,19 @@ impl Messages {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct EmbedField {
-    pub title: String,
-    pub subtitle: Option<String>,
-    pub body: Option<String>,
+pub trait AttachmentExt {
+    fn is_thumbnail(&self) -> bool;
+    fn is_raster_image(&self) -> bool;
 }
 
-impl From<EmbedField> for embed::EmbedField {
-    fn from(f: EmbedField) -> embed::EmbedField {
-        embed::EmbedField {
-            title: f.title,
-            subtitle: f.subtitle,
-            body: f.body.map(|text| FormattedText::default().with_text(text)),
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct EmbedHeading {
-    pub url: Option<SmolStr>,
-    pub icon: Option<FileId>,
-    pub text: String,
-    pub subtext: Option<String>,
-}
-
-impl From<EmbedHeading> for embed::EmbedHeading {
-    fn from(h: EmbedHeading) -> embed::EmbedHeading {
-        embed::EmbedHeading {
-            icon: h.icon.map(|id| id.to_string()),
-            subtext: h.subtext,
-            text: h.text,
-            url: h.url.map(Into::into),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Embed {
-    pub title: String,
-    pub body: Option<String>,
-    pub color: Option<[u8; 3]>,
-    pub footer: Option<EmbedHeading>,
-    pub header: Option<EmbedHeading>,
-    pub fields: Vec<EmbedField>,
-}
-
-impl From<Embed> for chat::Embed {
-    fn from(e: Embed) -> chat::Embed {
-        chat::Embed {
-            body: e.body.map(|text| FormattedText::default().with_text(text)),
-            color: e.color.map(color::encode_rgb),
-            fields: e.fields.into_iter().map(Into::into).collect(),
-            title: e.title,
-            footer: e.footer.map(Into::into),
-            header: e.header.map(Into::into),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Attachment {
-    pub kind: String,
-    pub name: String,
-    pub id: FileId,
-    pub size: u32,
-    pub resolution: Option<(u32, u32)>,
-    pub minithumbnail: Option<Minithumbnail>,
-}
-
-impl PartialEq for Attachment {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl From<Attachment> for chat::Attachment {
-    fn from(a: Attachment) -> chat::Attachment {
-        chat::Attachment {
-            id: a.id.to_string(),
-            name: a.name,
-            size: a.size,
-            mimetype: a.kind,
-            caption: Default::default(),
-        }
-    }
-}
-
-impl Attachment {
-    pub fn new_unknown(id: FileId) -> Self {
-        Self {
-            id,
-            kind: "application/octet-stream".into(),
-            name: "unknown".to_string(),
-            size: 0,
-            resolution: None,
-            minithumbnail: None,
-        }
-    }
-
-    pub fn is_thumbnail(&self) -> bool {
+impl AttachmentExt for Attachment {
+    fn is_thumbnail(&self) -> bool {
         self.is_raster_image() && (self.size as u64) < MAX_THUMB_SIZE
     }
 
     #[inline(always)]
-    pub fn is_raster_image(&self) -> bool {
-        is_raster_image(&self.kind)
-    }
-
-    pub fn from_harmony_attachment(attachment: chat::Attachment) -> Option<Self> {
-        Some(Attachment {
-            id: FileId::from_str(&attachment.id).ok()?,
-            kind: attachment.mimetype,
-            name: attachment.name,
-            size: attachment.size as u32,
-            resolution: None,
-            minithumbnail: None,
-        })
-    }
-
-    pub fn from_harmony_photo(photo: chat::Photo) -> Option<Self> {
-        Some(Attachment {
-            id: FileId::from_str(&photo.hmc).ok()?,
-            kind: "image/jpeg".into(),
-            name: photo.name,
-            size: photo.file_size,
-            resolution: Some((photo.width, photo.height)),
-            minithumbnail: photo.minithumbnail,
-        })
+    fn is_raster_image(&self) -> bool {
+        is_raster_image(&self.mimetype)
     }
 }
 
@@ -448,131 +356,27 @@ pub fn is_raster_image(mimetype: &str) -> bool {
     mimetype.starts_with("image") && mimetype.ends_with("svg+xml").not()
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct Override {
-    pub name: Option<String>,
-    pub avatar_url: Option<FileId>,
-    pub reason: Option<Reason>,
-}
-
-impl From<Override> for chat::Overrides {
-    fn from(o: Override) -> Self {
-        Self {
-            avatar: o.avatar_url.map(|id| id.into()),
-            username: o.name,
-            reason: o.reason,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum MessageId {
-    Ack(u64),
-    Unack(u64),
-}
-
-impl MessageId {
-    pub fn is_ack(&self) -> bool {
-        matches!(self, MessageId::Ack(_))
-    }
-
-    pub fn transaction_id(&self) -> Option<u64> {
-        match self {
-            MessageId::Unack(transaction) => Some(*transaction),
-            _ => None,
-        }
-    }
-
-    pub fn id(&self) -> Option<u64> {
-        match self {
-            MessageId::Ack(id) => Some(*id),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Content {
-    Text(String),
-    Files(Vec<Attachment>),
-    Embeds(Vec<Embed>),
-}
-
-impl From<Content> for content::Content {
-    fn from(c: Content) -> content::Content {
-        match c {
-            Content::Text(content) => content::Content::TextMessage(content::TextContent {
-                content: Some(FormattedText::default().with_text(content)),
-            }),
-            Content::Embeds(embeds) => content::Content::EmbedMessage(content::EmbedContent {
-                embeds: embeds.into_iter().map(Into::into).collect(),
-            }),
-            Content::Files(attachments) => {
-                if attachments.iter().all(Attachment::is_raster_image) {
-                    content::Content::PhotoMessage(content::PhotoContent {
-                        photos: attachments
-                            .into_iter()
-                            .map(|attachment| Photo {
-                                name: attachment.name,
-                                hmc: attachment.id.into(),
-                                file_size: attachment.size,
-                                ..Default::default()
-                            })
-                            .collect(),
-                    })
-                } else {
-                    content::Content::AttachmentMessage(content::AttachmentContent {
-                        files: attachments.into_iter().map(Into::into).collect(),
-                    })
-                }
-            }
-        }
-    }
-}
-
-impl From<content::Content> for Content {
-    fn from(content: content::Content) -> Self {
-        match content {
-            content::Content::TextMessage(text) => Self::Text(text.content.map_or_else(String::new, |f| f.text)),
-            content::Content::AttachmentMessage(files) => Self::Files(
-                files
-                    .files
-                    .into_iter()
-                    .flat_map(Attachment::from_harmony_attachment)
-                    .collect(),
-            ),
-            content::Content::EmbedMessage(embeds) => Self::Embeds(embeds.embeds.into_iter().map(Into::into).collect()),
-            content::Content::PhotoMessage(photos) => Self::Files(
-                photos
-                    .photos
-                    .into_iter()
-                    .flat_map(Attachment::from_harmony_photo)
-                    .collect(),
-            ),
-            content::Content::InviteRejected(_) => todo!(),
-            content::Content::InviteAccepted(_) => todo!(),
-            content::Content::RoomUpgradedToGuild(_) => todo!(),
-        }
-    }
-}
-
-impl Default for Content {
-    fn default() -> Self {
-        Content::Text(Default::default())
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Message {
     pub content: Content,
     pub sender: u64,
     pub timestamp: NaiveDateTime,
-    pub overrides: Option<Override>,
+    pub overrides: Option<Overrides>,
     pub reply_to: Option<u64>,
     pub failed_to_send: bool,
 }
 
 impl Message {
+    pub fn from_request(user_id: u64, request: SendMessageRequest) -> Self {
+        Message {
+            overrides: request.overrides,
+            sender: user_id,
+            reply_to: request.in_reply_to,
+            content: request.content.map(send_content_to_content).unwrap_or_default(),
+            ..Default::default()
+        }
+    }
+
     pub fn post_process(&self, post: &PostEventSender, urls: &mut Vec<Uri>, guild_id: u64, channel_id: u64) {
         if let Some(message_id) = self.reply_to.filter(|id| id != &0) {
             let _ = post.send(PostProcessEvent::FetchMessage {
@@ -581,34 +385,27 @@ impl Message {
                 message_id,
             });
         }
-        if let Some(id) = self.overrides.as_ref().and_then(|ov| ov.avatar_url.clone()) {
+        if let Some(id) = self.overrides.as_ref().and_then(|ov| ov.avatar.clone()) {
             let _ = post.send(PostProcessEvent::FetchThumbnail(Attachment {
-                kind: "image".into(),
+                mimetype: "image".into(),
                 name: "avatar".into(),
-                ..Attachment::new_unknown(id)
+                id,
+                ..Default::default()
             }));
         }
-        match &self.content {
-            Content::Files(attachments) => {
-                for attachment in attachments {
-                    if attachment.is_thumbnail() {
-                        let _ = post.send(PostProcessEvent::FetchThumbnail(attachment.clone()));
-                    }
-                }
-            }
-            Content::Embeds(embeds) => {
-                post_heading(post, embeds);
-            }
-            Content::Text(text) => {
-                let urlss = text
-                    .split_whitespace()
-                    .flat_map(|a| a.trim_end_matches('>').trim_start_matches('<').parse::<Uri>())
-                    .filter(|url| matches!(url.scheme_str(), Some("http" | "https")));
-                for url in urlss {
-                    urls.push(url);
-                }
+        for attachment in &self.content.attachments {
+            if attachment.is_thumbnail() {
+                let _ = post.send(PostProcessEvent::FetchThumbnail(attachment.clone()));
             }
         }
+        post_heading(post, &self.content.embeds);
+        let urlss = self
+            .content
+            .text
+            .split_whitespace()
+            .flat_map(|a| a.trim_end_matches('>').trim_start_matches('<').parse::<Uri>())
+            .filter(|url| matches!(url.scheme_str(), Some("http" | "https")));
+        urls.extend(urlss);
     }
 }
 
@@ -628,61 +425,45 @@ impl Default for Message {
     }
 }
 
-impl From<chat::Overrides> for Override {
-    fn from(overrides: chat::Overrides) -> Self {
-        Override {
-            name: overrides.username.map(Into::into),
-            avatar_url: overrides.avatar.and_then(|a| FileId::from_str(&a).ok()),
-            reason: overrides.reason,
-        }
-    }
-}
-
-impl From<embed::EmbedHeading> for EmbedHeading {
-    fn from(h: embed::EmbedHeading) -> Self {
-        EmbedHeading {
-            text: h.text,
-            subtext: h.subtext,
-            url: h.url.map(Into::into),
-            icon: h.icon.and_then(|i| FileId::from_str(&i).ok()),
-        }
-    }
-}
-
-impl From<chat::Embed> for Embed {
-    fn from(e: chat::Embed) -> Self {
-        Embed {
-            title: e.title,
-            body: e.body.map(|f| f.text),
-            footer: e.footer.map(From::from),
-            header: e.header.map(From::from),
-            fields: e
-                .fields
-                .into_iter()
-                .map(|f| EmbedField {
-                    title: f.title,
-                    subtitle: f.subtitle,
-                    body: f.body.map(|f| f.text),
-                })
-                .collect(),
-            color: e.color.map(color::decode_rgb),
-        }
-    }
-}
-
 impl From<HarmonyMessage> for Message {
     fn from(message: HarmonyMessage) -> Self {
         Message {
             reply_to: message.in_reply_to,
-            content: message
-                .content
-                .and_then(|c| c.content)
-                .map(|c| c.into())
-                .unwrap_or_default(),
+            content: message.content.unwrap_or_default(),
             sender: message.author_id,
-            timestamp: { NaiveDateTime::from_timestamp((message.created_at / 1000) as i64, ((message.created_at % 1000) as u32) * 1000000) },
-            overrides: message.overrides.map(From::from),
+            timestamp: {
+                NaiveDateTime::from_timestamp(
+                    (message.created_at / 1000) as i64,
+                    ((message.created_at % 1000) as u32) * 1000000,
+                )
+            },
+            overrides: message.overrides,
             failed_to_send: false,
         }
+    }
+}
+
+fn send_content_to_content(from: send_message_request::Content) -> Content {
+    Content {
+        text: from.text,
+        text_formats: from.text_formats,
+        embeds: from.embeds,
+        attachments: from
+            .attachments
+            .into_iter()
+            .map(send_attachment_to_attachment)
+            .collect(),
+        extra: None,
+    }
+}
+
+fn send_attachment_to_attachment(from: send_message_request::Attachment) -> Attachment {
+    Attachment {
+        id: from.id,
+        name: from.name,
+        mimetype: "application/octet-stream".to_string(),
+        size: 0,
+        // TODO: also convert this
+        info: None,
     }
 }

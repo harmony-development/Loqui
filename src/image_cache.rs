@@ -1,11 +1,11 @@
-use client::{harmony_rust_sdk::api::rest::FileId, AHashMap};
+use client::AHashMap;
 use eframe::egui::{self, ImageData as Image, TextureHandle};
 
 #[derive(Default)]
 pub struct ImageCache {
-    avatar: AHashMap<FileId, (TextureHandle, [f32; 2])>,
-    minithumbnail: AHashMap<FileId, (TextureHandle, [f32; 2])>,
-    image: AHashMap<FileId, (TextureHandle, [f32; 2])>,
+    avatar: AHashMap<String, (TextureHandle, [f32; 2])>,
+    minithumbnail: AHashMap<String, (TextureHandle, [f32; 2])>,
+    image: AHashMap<String, (TextureHandle, [f32; 2])>,
     bg_image: Option<(TextureHandle, [f32; 2])>,
 }
 
@@ -24,17 +24,17 @@ impl ImageCache {
     }
 
     /// Get an avatar image. Avatars are always 64 x 64
-    pub fn get_avatar(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+    pub fn get_avatar(&self, id: &str) -> Option<(&TextureHandle, [f32; 2])> {
         self.avatar.get(id).map(|(tex, size)| (tex, *size))
     }
 
     /// Get a minithumbnail image. Minithumbnails are always blurred
-    pub fn get_thumbnail(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+    pub fn get_thumbnail(&self, id: &str) -> Option<(&TextureHandle, [f32; 2])> {
         self.minithumbnail.get(id).map(|(tex, size)| (tex, *size))
     }
 
     /// Get some image.
-    pub fn get_image(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+    pub fn get_image(&self, id: &str) -> Option<(&TextureHandle, [f32; 2])> {
         self.image.get(id).map(|(tex, size)| (tex, *size))
     }
 
@@ -43,7 +43,7 @@ impl ImageCache {
     }
 }
 
-fn add_generic(map: &mut AHashMap<FileId, (TextureHandle, [f32; 2])>, ctx: &egui::Context, image: LoadedImage) {
+fn add_generic(map: &mut AHashMap<String, (TextureHandle, [f32; 2])>, ctx: &egui::Context, image: LoadedImage) {
     client::tracing::debug!("decoded image id {}, kind {}", image.id, image.kind);
     let dimensions = image.image.size();
     let texid = ctx.load_texture(image.id.to_string(), image.image);
@@ -52,13 +52,13 @@ fn add_generic(map: &mut AHashMap<FileId, (TextureHandle, [f32; 2])>, ctx: &egui
 
 pub struct LoadedImage {
     pub image: Image,
-    pub id: FileId,
+    pub id: String,
     pub kind: String,
 }
 
 impl LoadedImage {
     #[inline]
-    pub fn id(&self) -> &FileId {
+    pub fn id(&self) -> &str {
         &self.id
     }
 }
@@ -85,11 +85,11 @@ pub mod op {
 
             let dimensions = [data.dimensions[0] as usize, data.dimensions[1] as usize];
             let image = Image::Color(ColorImage::from_rgba_unmultiplied(dimensions, data.pixels.as_slice()));
-            let id = FileId::from_str(data.id.as_str());
+            let id = data.id.to_string();
 
             Self {
                 image,
-                id: id.unwrap(),
+                id,
                 kind: data.kind.as_str().into(),
             }
         }
@@ -178,14 +178,11 @@ pub mod op {
         sync::{mpsc::SyncSender as Sender, Arc},
     };
 
-    use client::{
-        harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
-        tracing,
-    };
+    use client::{harmony_rust_sdk::api::exports::prost::bytes::Bytes, tracing};
     use eframe::{egui::ColorImage, epi::backend::RepaintSignal};
 
     impl LoadedImage {
-        pub fn load(data: Bytes, id: FileId, kind: String) -> Option<Self> {
+        pub fn load(data: Bytes, id: String, kind: String) -> Option<Self> {
             let Some(loaded) = image_worker::load_image_logic(data.as_ref(), kind.as_str()) else {
                 tracing::error!(
                     "could not load an image (id {}); most likely unsupported format",
@@ -212,7 +209,7 @@ pub mod op {
     }
 
     /// Do not call this before calling `set_image_channel`.
-    pub fn decode_image(data: Bytes, id: FileId, kind: String) {
+    pub fn decode_image(data: Bytes, id: String, kind: String) {
         tokio::task::spawn_blocking(move || {
             let Some(loaded) = LoadedImage::load(data, id, kind) else { return };
             let chan = CHANNEL.get().expect("no image channel set -- this is a bug");

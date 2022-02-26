@@ -1,4 +1,4 @@
-use client::{message::Attachment, tracing};
+use client::{harmony_rust_sdk::api::chat::send_message_request::Attachment, tracing};
 use eframe::epi::backend::RepaintSignal;
 use std::{
     any::Any,
