@@ -108,7 +108,7 @@ jobs:
         args: zip -r dist.zip dist/
 
     - name: Artifact web
-      uses: actions/upload-artifact@v2.3.1
+      uses: actions/upload-artifact@v3
       with:
         name: build-web
         path: dist.zip
@@ -157,21 +157,21 @@ jobs:
 
     - name: Artifact macOS
       if: ${{ matrix.os == 'macOS-latest' }}
-      uses: actions/upload-artifact@v2.3.1
+      uses: actions/upload-artifact@v3
       with:
         name: build-macos
         path: target/release/loqui
 
     - name: Artifact Linux
       if: ${{ matrix.os == 'ubuntu-latest' }}
-      uses: actions/upload-artifact@v2.3.1
+      uses: actions/upload-artifact@v3
       with:
         name: build-linux
         path: target/release/loqui
 
     - name: Artifact Windows
       if: ${{ matrix.os == 'windows-2019' }}
-      uses: actions/upload-artifact@v2.3.1
+      uses: actions/upload-artifact@v3
       with:
         name: build-windows
         path: target/release/loqui.exe
