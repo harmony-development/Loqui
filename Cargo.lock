@@ -787,8 +787,8 @@ checksum = "6907e25393cdcc1f4f3f513d9aac1e840eb1cc341a0fccb01171f7d14d10b946"
 
 [[package]]
 name = "eframe"
-version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=loqui#60e407e74b3f95b5acf4b89dec36a964978a6b16"
+version = "0.17.0"
+source = "git+https://github.com/yusdacra/egui.git?branch=loqui#bdeace602a7e489383983b0bfe4e21e19bba95e8"
 dependencies = [
  "egui",
  "egui-winit",
@@ -799,8 +799,8 @@ dependencies = [
 
 [[package]]
 name = "egui"
-version = "0.16.1"
-source = "git+https://github.com/yusdacra/egui.git?branch=loqui#60e407e74b3f95b5acf4b89dec36a964978a6b16"
+version = "0.17.0"
+source = "git+https://github.com/yusdacra/egui.git?branch=loqui#bdeace602a7e489383983b0bfe4e21e19bba95e8"
 dependencies = [
  "ahash",
  "epaint",
@@ -811,22 +811,22 @@ dependencies = [
 
 [[package]]
 name = "egui-winit"
-version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=loqui#60e407e74b3f95b5acf4b89dec36a964978a6b16"
+version = "0.17.0"
+source = "git+https://github.com/yusdacra/egui.git?branch=loqui#bdeace602a7e489383983b0bfe4e21e19bba95e8"
 dependencies = [
  "copypasta",
  "egui",
  "epi",
  "instant",
  "tracing",
- "webbrowser 0.5.5",
+ "webbrowser",
  "winit",
 ]
 
 [[package]]
 name = "egui_glow"
-version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=loqui#60e407e74b3f95b5acf4b89dec36a964978a6b16"
+version = "0.17.0"
+source = "git+https://github.com/yusdacra/egui.git?branch=loqui#bdeace602a7e489383983b0bfe4e21e19bba95e8"
 dependencies = [
  "bytemuck",
  "egui",
@@ -842,14 +842,15 @@ dependencies = [
 
 [[package]]
 name = "egui_web"
-version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=loqui#60e407e74b3f95b5acf4b89dec36a964978a6b16"
+version = "0.17.0"
+source = "git+https://github.com/yusdacra/egui.git?branch=loqui#bdeace602a7e489383983b0bfe4e21e19bba95e8"
 dependencies = [
  "bytemuck",
  "egui",
  "egui_glow",
  "epi",
  "js-sys",
+ "percent-encoding",
  "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -864,8 +865,8 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "emath"
-version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=loqui#60e407e74b3f95b5acf4b89dec36a964978a6b16"
+version = "0.17.0"
+source = "git+https://github.com/yusdacra/egui.git?branch=loqui#bdeace602a7e489383983b0bfe4e21e19bba95e8"
 dependencies = [
  "bytemuck",
  "serde",
@@ -903,8 +904,8 @@ dependencies = [
 
 [[package]]
 name = "epaint"
-version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=loqui#60e407e74b3f95b5acf4b89dec36a964978a6b16"
+version = "0.17.0"
+source = "git+https://github.com/yusdacra/egui.git?branch=loqui#bdeace602a7e489383983b0bfe4e21e19bba95e8"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -917,8 +918,8 @@ dependencies = [
 
 [[package]]
 name = "epi"
-version = "0.16.0"
-source = "git+https://github.com/yusdacra/egui.git?branch=loqui#60e407e74b3f95b5acf4b89dec36a964978a6b16"
+version = "0.17.0"
+source = "git+https://github.com/yusdacra/egui.git?branch=loqui#bdeace602a7e489383983b0bfe4e21e19bba95e8"
 dependencies = [
  "egui",
  "tracing",
@@ -1702,7 +1703,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "webbrowser 0.6.0",
+ "webbrowser",
 ]
 
 [[package]]
@@ -3634,17 +3635,6 @@ dependencies = [
 
 [[package]]
 name = "webbrowser"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecad156490d6b620308ed411cfee90d280b3cbd13e189ea0d3fada8acc89158a"
-dependencies = [
- "web-sys",
- "widestring 0.4.3",
- "winapi",
-]
-
-[[package]]
-name = "webbrowser"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9c28b6b6a78440b02647358625e3febc90724126480b9da6a967b5f674b3554"
@@ -3653,7 +3643,7 @@ dependencies = [
  "ndk-glue 0.6.1",
  "url",
  "web-sys",
- "widestring 0.5.1",
+ "widestring",
  "winapi",
 ]
 
@@ -3692,12 +3682,6 @@ dependencies = [
  "lazy_static",
  "libc",
 ]
-
-[[package]]
-name = "widestring"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c168940144dd21fd8046987c16a46a33d5fc84eec29ef9dcddc2ac9e31526b7c"
 
 [[package]]
 name = "widestring"

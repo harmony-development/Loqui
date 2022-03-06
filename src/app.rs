@@ -5,7 +5,7 @@ use eframe::{
     egui::{self, vec2, Color32, FontData, FontDefinitions, Style, Ui},
     epi,
 };
-use egui::Margin;
+use egui::style::Margin;
 
 use super::utils::*;
 

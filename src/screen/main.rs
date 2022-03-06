@@ -19,7 +19,7 @@ use client::{
     AHashMap, AHashSet, FetchEvent, Uri,
 };
 use eframe::egui::{vec2, Color32, Event, RichText, Rounding, Vec2};
-use egui::Margin;
+use egui::style::Margin;
 
 use crate::{
     config::BgImage,
@@ -919,7 +919,7 @@ impl Screen {
                     });
                 }
                 if self.scroll_to_bottom {
-                    ui.scroll_to_cursor(egui::Align::Max);
+                    ui.scroll_to_cursor(Some(egui::Align::Max));
                     self.scroll_to_bottom = false;
                 }
             });
