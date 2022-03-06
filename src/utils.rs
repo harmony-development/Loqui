@@ -11,7 +11,7 @@ use client::{
     harmony_rust_sdk::api::{
         chat::{overrides::Reason, Overrides},
         mediaproxy::fetch_link_metadata_response,
-        profile::{profile_override, ProfileOverride, UserStatus},
+        profile::{profile_override, user_status, ProfileOverride},
     },
     member::Member,
     message::is_raster_image,
@@ -290,8 +290,8 @@ pub fn sort_members<'a, 'b>(state: &'a State, guild: &'b Guild) -> Vec<(&'b u64,
         .collect::<Vec<_>>();
     sorted_members.sort_unstable_by(|(_, member), (_, other_member)| {
         let name = member.username.as_str().cmp(other_member.username.as_str());
-        let offline = matches!(member.status, UserStatus::OfflineUnspecified);
-        let other_offline = matches!(other_member.status, UserStatus::OfflineUnspecified);
+        let offline = matches!(member.status.kind(), user_status::Kind::OfflineUnspecified);
+        let other_offline = matches!(other_member.status.kind(), user_status::Kind::OfflineUnspecified);
 
         match (offline, other_offline) {
             (false, true) => Ordering::Less,

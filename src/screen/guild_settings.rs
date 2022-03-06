@@ -353,6 +353,7 @@ impl Screen {
         self.managing_perms = managing_perms;
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn view_perm(
         &self,
         state: &State,

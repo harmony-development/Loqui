@@ -6,12 +6,12 @@ use client::{
     guild::Guild,
     harmony_rust_sdk::api::{
         chat::{
-            all_permissions, attachment::Info, embed::EmbedHeading, send_message_request, Attachment, Embed, Overrides,
+            all_permissions, attachment::Info, embed, send_message_request, Attachment, Embed, Overrides,
             SendMessageRequest,
         },
         exports::prost::bytes::Bytes,
         mediaproxy::fetch_link_metadata_response::metadata,
-        profile::UserStatus,
+        profile::user_status,
     },
     member::Member,
     message::{AttachmentExt, Message, MessageId, ReadMessagesView},
@@ -684,10 +684,8 @@ impl Screen {
         }
 
         ui.group(|ui| {
-            let do_render_heading = |heading: &&EmbedHeading| {
-                heading.text.is_empty().not() && filter_empty(heading.subtext.as_ref()).is_some()
-            };
-            let render_header = |header: &EmbedHeading, ui: &mut Ui| {
+            let do_render_heading = |heading: &&embed::Heading| heading.text.is_empty().not();
+            let render_header = |header: &embed::Heading, ui: &mut Ui| {
                 // TODO: render icon
                 ui.horizontal(|ui| {
                     let button = ui.add_enabled(
@@ -698,9 +696,6 @@ impl Screen {
                         if let Some(url) = header.url.clone() {
                             open_url(url);
                         }
-                    }
-                    if let Some(subtext) = filter_empty(header.subtext.as_ref()) {
-                        ui.label(RichText::new(subtext).small());
                     }
                 });
             };
@@ -723,12 +718,9 @@ impl Screen {
                     if field.title.is_empty().not() {
                         ui.label(RichText::new(&field.title).strong());
                     }
-                    if let Some(subtitle) = filter_empty(field.subtitle.as_ref()) {
-                        ui.label(RichText::new(subtitle).small());
-                    }
                     ui.add_space(4.0);
-                    if let Some(body) = filter_empty(field.body.as_ref().map(|f| &f.text)) {
-                        ui.label(body);
+                    if field.body.is_empty().not() {
+                        ui.label(&field.body);
                     }
                 });
             }
@@ -1146,13 +1138,12 @@ impl Screen {
             .as_ref()
             .and_then(|id| state.image_cache.get_avatar(id));
 
-        let status = user.map_or(UserStatus::OfflineUnspecified, |m| m.status);
+        let status = user.map_or(user_status::Kind::OfflineUnspecified, |m| m.status.kind());
         let status_color = match status {
-            UserStatus::OfflineUnspecified => Color32::GRAY,
-            UserStatus::Online | UserStatus::Mobile => Color32::GREEN,
-            UserStatus::Streaming => Color32::from_rgb(160, 0, 160),
-            UserStatus::DoNotDisturb => Color32::RED,
-            UserStatus::Idle => Color32::GOLD,
+            user_status::Kind::OfflineUnspecified => Color32::GRAY,
+            user_status::Kind::Online => Color32::GREEN,
+            user_status::Kind::DoNotDisturb => Color32::RED,
+            user_status::Kind::Idle => Color32::GOLD,
         };
 
         egui::Frame::group(ui.style())
@@ -1250,7 +1241,7 @@ impl Screen {
                     .into_iter()
                     .rev()
                     .filter_map(|(id, msg)| id.is_ack().then(|| (id.id().unwrap(), msg)))
-                    .filter_map(|(id, msg)| Some((id, &msg.content.text, msg.sender)))
+                    .map(|(id, msg)| (id, &msg.content.text, msg.sender))
                     .find(|(_, _, sender)| *sender == user_id);
 
                 if let Some((id, text, _)) = maybe_msg {

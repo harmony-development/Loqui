@@ -143,7 +143,7 @@ impl Screen {
                             let data = file.read().await;
                             let mimetype = content::infer_type_from_bytes(&data);
                             let id = client.upload_file(name, mimetype, data).await?;
-                            client.update_profile(None, Some(id), None).await?;
+                            client.update_profile(None, Some(id)).await?;
                             uploading_user_pic.set(false);
                         }
                         ClientResult::Ok(())
@@ -159,7 +159,7 @@ impl Screen {
                     ui.add(egui::TextEdit::singleline(&mut self.user_name_edit_text).desired_width(100.0));
                     if ui.add(egui::Button::new("edit").small()).clicked() {
                         let new_name = self.user_name_edit_text.clone();
-                        spawn_client_fut!(state, |client| client.update_profile(Some(new_name), None, None).await);
+                        spawn_client_fut!(state, |client| client.update_profile(Some(new_name), None).await);
                     }
                 });
             });

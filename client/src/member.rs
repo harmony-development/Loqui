@@ -21,7 +21,7 @@ impl Default for Member {
             username: SmolStr::default(),
             display_user: true,
             typing_in_channel: None,
-            status: UserStatus::OfflineUnspecified,
+            status: UserStatus::default(),
             fetched: false,
             kind: AccountKind::FullUnspecified,
         }

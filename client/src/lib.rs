@@ -21,9 +21,9 @@ use harmony_rust_sdk::{
     api::{
         auth::Session as InnerSession,
         chat::{
-            all_permissions, color,
-            embed::EmbedHeading,
+            all_permissions, color, embed,
             get_channel_messages_request::Direction,
+            send_message_request,
             stream_event::{Event as ChatEvent, *},
             Attachment, BanUserRequest, ChannelKind, CreateChannelRequest, CreateGuildRequest, CreateInviteRequest,
             DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Embed, Event, GetChannelMessagesRequest,
@@ -32,7 +32,7 @@ use harmony_rust_sdk::{
             GetUserRolesRequest, HasPermissionRequest, Invite, JoinGuildRequest, KickUserRequest, LeaveGuildRequest,
             Message as HarmonyMessage, Permission, PinMessageRequest, Role, SendMessageRequest, SetPermissionsRequest,
             TypingRequest, UnbanUserRequest, UnpinMessageRequest, UpdateChannelInformationRequest,
-            UpdateGuildInformationRequest, UpdateMessageTextRequest,
+            UpdateGuildInformationRequest, UpdateMessageContentRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::metadata::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -165,6 +165,13 @@ pub enum FetchEvent {
         name: String,
         picture: Option<String>,
         owners: Vec<u64>,
+    },
+    FetchedProfile {
+        id: u64,
+        name: String,
+        picture: Option<String>,
+        status: UserStatus,
+        kind: AccountKind,
     },
     InitialSyncComplete,
 }
@@ -398,6 +405,28 @@ impl Cache {
             FetchEvent::Attachment { .. } => {}
             FetchEvent::InitialSyncComplete => {
                 self.initial_sync_complete = true;
+            }
+            FetchEvent::FetchedProfile {
+                id,
+                name,
+                picture,
+                status,
+                kind,
+            } => {
+                if let Some(id) = picture.clone() {
+                    let _ = self.post_sender.send(PostProcessEvent::FetchThumbnail(Attachment {
+                        mimetype: "image".into(),
+                        name: "avatar".into(),
+                        id,
+                        ..Default::default()
+                    }));
+                }
+                let mut user = self.get_user_mut(id);
+                user.username = name.into();
+                user.avatar_url = picture;
+                user.kind = kind;
+                user.status = status;
+                user.fetched = true;
             }
         }
     }
@@ -689,12 +718,16 @@ impl Cache {
                 ev => tracing::error!("event not implemented: {:?}", ev),
             },
             Event::Profile(ev) => match ev {
+                ProfileEvent::StatusUpdated(StatusUpdated { user_id, new_status }) => {
+                    let mut user = self.get_user_mut(user_id);
+                    if let Some(new_status) = new_status {
+                        user.status = new_status;
+                    }
+                }
                 ProfileEvent::ProfileUpdated(ProfileUpdated {
                     user_id,
                     new_username,
                     new_avatar,
-                    new_status,
-                    new_account_kind,
                     ..
                 }) => {
                     if let Some(id) = new_avatar.clone() {
@@ -709,14 +742,8 @@ impl Cache {
                     if let Some(new_username) = new_username {
                         user.username = new_username.into();
                     }
-                    if let Some(new_status) = new_status {
-                        user.status = UserStatus::from_i32(new_status).unwrap_or(UserStatus::OfflineUnspecified);
-                    }
                     if let Some(new_avatar) = new_avatar {
                         user.avatar_url = Some(new_avatar);
-                    }
-                    if let Some(new_kind) = new_account_kind {
-                        user.kind = AccountKind::from_i32(new_kind).unwrap_or_default();
                     }
                     user.fetched = true;
                 }
@@ -844,7 +871,7 @@ impl Client {
 
     pub async fn logout(self) -> ClientResult<()> {
         self.inner
-            .call(UpdateProfileRequest::default().with_new_user_status(UserStatus::OfflineUnspecified))
+            .call(UpdateStatusRequest::update_kind(user_status::Kind::OfflineUnspecified))
             .await?;
         self.remove_session().await
     }
@@ -888,17 +915,11 @@ impl Client {
         self.inner.clone()
     }
 
-    pub async fn update_profile(
-        &self,
-        username: Option<String>,
-        avatar: Option<String>,
-        status: Option<UserStatus>,
-    ) -> ClientResult<()> {
+    pub async fn update_profile(&self, username: Option<String>, avatar: Option<String>) -> ClientResult<()> {
         self.inner
             .call(UpdateProfileRequest {
                 new_user_avatar: avatar.map(Into::into),
                 new_user_name: username,
-                new_user_status: status.map(Into::into),
             })
             .await?;
         Ok(())
@@ -1035,11 +1056,14 @@ impl Client {
         new_content: String,
     ) -> ClientResult<()> {
         self.inner
-            .call(UpdateMessageTextRequest {
+            .call(UpdateMessageContentRequest {
                 guild_id,
                 channel_id,
                 message_id,
-                new_content: Some(new_content.into()),
+                new_content: Some(send_message_request::Content {
+                    text: new_content,
+                    ..Default::default()
+                }),
             })
             .await?;
         Ok(())
@@ -1269,15 +1293,16 @@ impl Client {
             ))));
         }
         let resp_user_profiles = self.inner.call(GetProfileRequest::new(members.clone())).await?;
-        let evs = resp_user_profiles.profile.into_iter().map(|(user_id, profile)| {
-            FetchEvent::Harmony(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
-                user_id,
-                new_avatar: profile.user_avatar,
-                new_username: Some(profile.user_name),
-                new_status: Some(profile.user_status),
-                new_account_kind: Some(profile.account_kind),
-            })))
-        });
+        let evs = resp_user_profiles
+            .profile
+            .into_iter()
+            .map(|(user_id, profile)| FetchEvent::FetchedProfile {
+                id: user_id,
+                kind: profile.account_kind(),
+                name: profile.user_name,
+                picture: profile.user_avatar,
+                status: profile.user_status.unwrap_or_default(),
+            });
         let evs =
             evs.chain(members.into_iter().map(move |id| {
                 FetchEvent::Harmony(Event::Chat(ChatEvent::JoinedMember(MemberJoined::new(id, guild_id))))
@@ -1333,16 +1358,20 @@ impl Client {
         }
 
         self.inner
-            .call(UpdateProfileRequest::default().with_new_user_status(UserStatus::Online))
+            .call(UpdateStatusRequest::update_kind(user_status::Kind::Online))
             .await?;
 
         let _ = event_sender.send(FetchEvent::Harmony(Event::Profile(ProfileEvent::ProfileUpdated(
             ProfileUpdated {
                 new_avatar: self_profile.user_avatar,
-                new_status: Some(UserStatus::Online.into()),
                 new_username: Some(self_profile.user_name),
                 user_id: self_id,
-                new_account_kind: None,
+            },
+        ))));
+        let _ = event_sender.send(FetchEvent::Harmony(Event::Profile(ProfileEvent::StatusUpdated(
+            StatusUpdated {
+                user_id: self_id,
+                new_status: Some(UserStatus::default().with_kind(user_status::Kind::Online)),
             },
         ))));
 
@@ -1440,13 +1469,13 @@ impl Client {
             PostProcessEvent::FetchProfile(user_id) => {
                 let _ = event_sender.send(self.inner.call(GetProfileRequest::new_one(user_id)).await.map(|resp| {
                     let profile = resp.profile.one();
-                    FetchEvent::Harmony(Event::Profile(ProfileEvent::ProfileUpdated(ProfileUpdated {
-                        user_id,
-                        new_avatar: profile.user_avatar,
-                        new_status: Some(profile.user_status),
-                        new_username: Some(profile.user_name),
-                        new_account_kind: Some(profile.account_kind),
-                    })))
+                    FetchEvent::FetchedProfile {
+                        kind: profile.account_kind(),
+                        id: user_id,
+                        name: profile.user_name,
+                        picture: profile.user_avatar,
+                        status: profile.user_status.unwrap_or_default(),
+                    }
                 })?);
 
                 Ok(())
@@ -1523,7 +1552,7 @@ impl Client {
 
 fn post_heading(post: &PostEventSender, embeds: &[Embed]) {
     for embed in embeds {
-        let inner = |h: Option<&EmbedHeading>| {
+        let inner = |h: Option<&embed::Heading>| {
             if let Some(id) = h.and_then(|h| h.icon.clone()) {
                 let _ = post.send(PostProcessEvent::FetchThumbnail(Attachment {
                     mimetype: "image".into(),
