@@ -67,7 +67,7 @@ impl LoadedImage {
 pub mod op {
     use super::*;
 
-    use client::harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId};
+    use client::harmony_rust_sdk::api::exports::prost::bytes::Bytes;
     use eframe::epi::backend::RepaintSignal;
     use egui::ColorImage;
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
@@ -85,11 +85,10 @@ pub mod op {
 
             let dimensions = [data.dimensions[0] as usize, data.dimensions[1] as usize];
             let image = Image::Color(ColorImage::from_rgba_unmultiplied(dimensions, data.pixels.as_slice()));
-            let id = data.id.to_string();
 
             Self {
                 image,
-                id,
+                id: data.id.to_string(),
                 kind: data.kind.as_str().into(),
             }
         }
@@ -148,11 +147,11 @@ pub mod op {
         }
     }
 
-    pub fn decode_image(data: Bytes, id: FileId, kind: String) {
+    pub fn decode_image(data: Bytes, id: String, kind: String) {
         let val = rkyv::to_bytes::<_, 2048>(&ImageData {
             data: data.to_vec(),
             kind,
-            id: id.into(),
+            id,
         })
         .unwrap()
         .into_vec();

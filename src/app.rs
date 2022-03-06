@@ -212,7 +212,9 @@ impl epi::App for App {
 
     fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
         self.state.init(ctx, frame);
-        ctx.set_pixels_per_point(self.state.local_config.scale_factor);
+        if self.state.local_config.scale_factor != 0.0 {
+            ctx.set_pixels_per_point(self.state.local_config.scale_factor);
+        }
 
         self.state.futures.spawn(async move {
             let Some(session) = Client::read_latest_session().await else { return Ok(None) };

@@ -1320,8 +1320,7 @@ impl Client {
             .call(GetProfileRequest::new_one(self_id))
             .await?
             .profile
-            .remove(&0)
-            .unwrap();
+            .one();
 
         let guilds = self.inner.call(GetGuildListRequest::new()).await?.guilds;
 

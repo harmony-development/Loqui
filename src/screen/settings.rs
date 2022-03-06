@@ -80,7 +80,9 @@ impl Screen {
 
             if ui.ctx().is_using_pointer().not() {
                 state.local_config.scale_factor = self.scale_factor;
-                ui.ctx().set_pixels_per_point(state.local_config.scale_factor);
+                if state.local_config.scale_factor != 0.0 {
+                    ui.ctx().set_pixels_per_point(state.local_config.scale_factor);
+                }
             }
         });
 
