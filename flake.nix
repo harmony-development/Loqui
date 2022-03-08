@@ -36,9 +36,9 @@
               (_: prev: {
                 trunk = prev.nciUtils.buildCrate {
                   root = builtins.fetchGit {
-                    url = "https://github.com/kristoff3r/trunk.git";
-                    ref = "rust_worker";
-                    rev = "0ff1842640553dfefcf0e0b13aee619b17916844";
+                    url = "https://github.com/thedodd/trunk.git";
+                    ref = "master";
+                    rev = "b989bc9bfd568bc3b3bba7ac804f797a41f12a82";
                   };
                   release = true;
                 };
@@ -95,10 +95,10 @@
                 help = "Build for the web.";
                 package = trunk;
               }
-              {
+              /*{
                 help = "Profile binary size.";
                 package = twiggy;
-              }
+              }*/
               {
                 name = "cargo-mobile";
                 help = "Build for mobile.";
