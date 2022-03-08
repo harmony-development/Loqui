@@ -163,7 +163,8 @@
       "inputs": {
         "flakeCompat": "flakeCompat",
         "nixCargoIntegration": "nixCargoIntegration",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "trunk": "trunk"
       }
     },
     "rustOverlay": {
@@ -179,6 +180,22 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "trunk": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1645863428,
+        "narHash": "sha256-qInup3Yjemye9k1KET6HQCQYoY/mpL22Qi3vwCMgBz0=",
+        "owner": "thedodd",
+        "repo": "trunk",
+        "rev": "b989bc9bfd568bc3b3bba7ac804f797a41f12a82",
+        "type": "github"
+      },
+      "original": {
+        "owner": "thedodd",
+        "repo": "trunk",
         "type": "github"
       }
     }

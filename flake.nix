@@ -9,6 +9,10 @@
       url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    trunk = {
+      url = "github:thedodd/trunk";
+      flake = false;
+    };
     /*androidPkgs = {
       url = "github:tadfisher/android-nixpkgs";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -19,7 +23,6 @@
     let
       outputs = inputs.nixCargoIntegration.lib.makeOutputs {
         root = ./.;
-        buildPlatform = "crate2nix";
         overrides = {
           pkgs = common: prev: {
             overlays = prev.overlays ++ [
@@ -35,11 +38,7 @@
               })
               (_: prev: {
                 trunk = prev.nciUtils.buildCrate {
-                  root = builtins.fetchGit {
-                    url = "https://github.com/thedodd/trunk.git";
-                    ref = "master";
-                    rev = "b989bc9bfd568bc3b3bba7ac804f797a41f12a82";
-                  };
+                  root = inputs.trunk;
                   release = true;
                 };
                 twiggy = prev.nciUtils.buildCrate {
@@ -67,7 +66,7 @@
             };
           };
           shell = common: prev: with common.pkgs; {
-            #packages = [ android-sdk ];
+            packages = [ trunk ];
             env = prev.env ++ [
               {
                 name = "XDG_DATA_DIRS";
