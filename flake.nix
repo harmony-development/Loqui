@@ -9,19 +9,15 @@
       url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    trunk = {
-      url = "github:thedodd/trunk";
-      flake = false;
-    };
     /*androidPkgs = {
       url = "github:tadfisher/android-nixpkgs";
       inputs.nixpkgs.follows = "nixpkgs";
     };*/
   };
 
-  outputs = inputs:
+  outputs = { nixCargoIntegration, ... }@inputs:
     let
-      outputs = inputs.nixCargoIntegration.lib.makeOutputs {
+      outputs = nixCargoIntegration.lib.makeOutputs {
         root = ./.;
         overrides = {
           pkgs = common: prev: {
@@ -35,21 +31,6 @@
                   emulator
                   ndk-bundle
                 ]);
-              })
-              (_: prev: {
-                trunk = prev.nciUtils.buildCrate {
-                  root = inputs.trunk;
-                  release = true;
-                };
-                twiggy = prev.nciUtils.buildCrate {
-                  root = builtins.fetchGit {
-                    url = "https://github.com/rustwasm/twiggy.git";
-                    ref = "master";
-                    rev = "195feee4045f0b89d7cba7492900131ac89803dd";
-                  };
-                  memberName = "twiggy";
-                  release = true;
-                };
               })
             ];
           };
@@ -66,7 +47,6 @@
             };
           };
           shell = common: prev: with common.pkgs; {
-            packages = [ trunk ];
             env = prev.env ++ [
               {
                 name = "XDG_DATA_DIRS";
@@ -90,14 +70,6 @@
                 name = "local-dev";
                 command = "SSL_CERT_FILE=~/.local/share/mkcert/rootCA.pem cargo r";
               }
-              {
-                help = "Build for the web.";
-                package = trunk;
-              }
-              /*{
-                help = "Profile binary size.";
-                package = twiggy;
-              }*/
               {
                 name = "cargo-mobile";
                 help = "Build for mobile.";
