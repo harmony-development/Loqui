@@ -67,7 +67,7 @@ impl LoadedImage {
 pub mod op {
     use super::*;
 
-    use client::harmony_rust_sdk::api::exports::prost::bytes::Bytes;
+    use client::{harmony_rust_sdk::api::exports::prost::bytes::Bytes, tracing};
     use eframe::epi::backend::RepaintSignal;
     use egui::ColorImage;
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
@@ -77,7 +77,7 @@ pub mod op {
         sync::{mpsc::SyncSender as Sender, Arc},
     };
     use wasm_bindgen::{prelude::*, JsCast};
-    use web_sys::{MessageEvent, Worker as WebWorker};
+    use web_sys::{window, Blob, BlobPropertyBag, MessageEvent, Url, Worker as WebWorker};
 
     impl LoadedImage {
         pub fn from_archive(data: &ArchivedImageLoaded) -> Self {
@@ -118,7 +118,22 @@ pub mod op {
     static WORKER_POOL: SyncOnceCell<WorkerPool> = SyncOnceCell::new();
 
     fn spawn_worker(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) -> WebWorker {
-        let worker = WebWorker::new("./image_worker.js").expect("failed to start worker");
+        let origin = window()
+            .expect("window to be available")
+            .location()
+            .origin()
+            .expect("origin to be available");
+
+        let script = js_sys::Array::new();
+        let name = "image_worker";
+        script.push(&format!(r#"importScripts("{origin}/{name}.js");wasm_bindgen("{origin}/{name}_bg.wasm");"#).into());
+
+        let blob = Blob::new_with_str_sequence_and_options(&script, BlobPropertyBag::new().type_("text/javascript"))
+            .expect("blob creation succeeds");
+
+        let url = Url::create_object_url_with_blob(&blob).expect("url creation succeeds");
+
+        let worker = WebWorker::new(&url).expect("failed to spawn worker");
 
         let handler = Closure::wrap(Box::new(move |event: MessageEvent| {
             let data: Uint8Array = event.data().dyn_into().unwrap_throw();
@@ -148,6 +163,8 @@ pub mod op {
     }
 
     pub fn decode_image(data: Bytes, id: String, kind: String) {
+        tracing::debug!("sending image (id {id}) for decoding");
+
         let val = rkyv::to_bytes::<_, 2048>(&ImageData {
             data: data.to_vec(),
             kind,
@@ -161,7 +178,7 @@ pub mod op {
 
         WORKER_POOL
             .get()
-            .expect("must be initialized")
+            .expect_throw("must be initialized")
             .get_worker()
             .post_message(&data)
             .expect_throw("failed to decode image");
@@ -209,6 +226,8 @@ pub mod op {
 
     /// Do not call this before calling `set_image_channel`.
     pub fn decode_image(data: Bytes, id: String, kind: String) {
+        tracing::debug!("sending image (id {id}) for decoding");
+
         tokio::task::spawn_blocking(move || {
             let Some(loaded) = LoadedImage::load(data, id, kind) else { return };
             let chan = CHANNEL.get().expect("no image channel set -- this is a bug");

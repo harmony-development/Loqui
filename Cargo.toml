@@ -75,6 +75,9 @@ web-sys = { version = "0.3", features = [
     "MessageEvent",
     "Notification",
     "NotificationOptions",
+    "Blob",
+    "BlobPropertyBag",
+    "Url",
 ] }
 rkyv = "0.7"
 tokio = { version = "1.9", features = ["sync", "macros"] }
@@ -126,9 +129,11 @@ runtimeLibs = [
 
 [workspace.metadata.nix]
 buildInputs = ["libxkbcommon"]
-devshell.packages = ["cargo-deny", "wasm-bindgen-cli"]
-devshell.name = "loqui-shell"
-devshell.commands = [{ package = "tagref" }]
+
+[workspace.metadata.nix.devshell]
+packages = ["cargo-deny", "wasm-bindgen-cli"]
+name = "loqui-shell"
+commands = [{ package = "tagref" }]
 
 [package.metadata.nix.desktopFile]
 name = "Loqui"
