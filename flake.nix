@@ -5,7 +5,7 @@
       flake = false;
     };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixCargoIntegration = {
+    nci = {
       url = "github:yusdacra/nix-cargo-integration";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -15,25 +15,23 @@
     };*/
   };
 
-  outputs = { nixCargoIntegration, ... }@inputs:
+  outputs = { nci, ... }@inputs:
     let
-      outputs = nixCargoIntegration.lib.makeOutputs {
+      outputs = nci.lib.makeOutputs {
         root = ./.;
         overrides = {
-          pkgs = common: prev: {
-            overlays = prev.overlays ++ [
-              (_: prev: {
-                android-sdk = inputs.androidPkgs.sdk.${prev.system} (sdkPkgs: with sdkPkgs; [
-                  cmdline-tools-latest
-                  build-tools-32-0-0
-                  platform-tools
-                  platforms-android-32
-                  emulator
-                  ndk-bundle
-                ]);
-              })
-            ];
-          };
+          pkgsOverlays = [
+            (_: prev: {
+              android-sdk = inputs.androidPkgs.sdk.${prev.system} (sdkPkgs: with sdkPkgs; [
+                cmdline-tools-latest
+                build-tools-32-0-0
+                platform-tools
+                platforms-android-32
+                emulator
+                ndk-bundle
+              ]);
+            })
+          ];
           shell = common: prev: with common.pkgs; {
             env = prev.env ++ [
               {
