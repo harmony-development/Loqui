@@ -37,12 +37,9 @@ codegen-units = 1
 panic = 'abort'
 
 [dependencies]
-eframe = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default-features = false, features = [
-    "egui_glow",
-] }
+eframe = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default-features = false }
 egui = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default-features = false, features = [
     "serde",
-    "single_threaded",
 ] }
 epaint = { git = "https://github.com/yusdacra/egui.git", branch = "loqui", default-features = false, features = [
     "serde",
