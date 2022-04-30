@@ -21,7 +21,7 @@ use client::{
 };
 use eframe::{
     egui::{self, TextureHandle, Vec2},
-    epi::IntegrationInfo,
+    IntegrationInfo,
 };
 use instant::Instant;
 use tokio::sync::mpsc as tokio_mpsc;
@@ -193,10 +193,10 @@ impl State {
         }
     }
 
-    pub fn init(&mut self, ctx: &egui::Context, frame: &eframe::epi::Frame) {
-        crate::image_cache::op::set_image_channel(self.images_tx.clone(), frame.lock().repaint_signal.clone());
+    pub fn init(&mut self, ctx: &egui::Context, integration_info: eframe::IntegrationInfo) {
+        crate::image_cache::op::set_image_channel(self.images_tx.clone(), ctx.clone());
 
-        self.integration_info = Some(frame.info());
+        self.integration_info = Some(integration_info);
         #[cfg(not(target_arch = "wasm32"))]
         if self.local_config.scale_factor < 0.5 {
             self.local_config.scale_factor = self
@@ -206,7 +206,7 @@ impl State {
                 .unwrap_or(1.45);
         }
 
-        self.futures.init(frame);
+        self.futures.init(ctx.clone());
 
         // load harmony lotus
         self.harmony_lotus.replace(load_harmony_lotus(ctx));

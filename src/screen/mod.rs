@@ -3,10 +3,7 @@ use prelude::*;
 mod prelude {
     pub use super::Screen as AppScreen;
     pub use crate::{state::State, utils::*};
-    pub use eframe::{
-        egui::{self, Layout, Ui},
-        epi,
-    };
+    pub use eframe::egui::{self, Layout, Ui};
 }
 
 pub mod auth;
@@ -15,13 +12,13 @@ pub mod main;
 pub mod settings;
 
 pub trait Screen: 'static {
-    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame, state: &mut State);
+    fn update(&mut self, ctx: &egui::Context, frame: &eframe::Frame, state: &mut State);
     // ran before push
     #[allow(unused_variables)]
-    fn on_push(&mut self, ctx: &egui::Context, frame: &epi::Frame, state: &mut State) {}
+    fn on_push(&mut self, ctx: &egui::Context, frame: &eframe::Frame, state: &mut State) {}
     // ran before pop
     #[allow(unused_variables)]
-    fn on_pop(&mut self, ctx: &egui::Context, frame: &epi::Frame, state: &mut State) {}
+    fn on_pop(&mut self, ctx: &egui::Context, frame: &eframe::Frame, state: &mut State) {}
     fn id(&self) -> &'static str {
         ""
     }

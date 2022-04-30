@@ -16,7 +16,7 @@ pub struct Guild {
     pub roles: Roles,
     pub role_perms: RolePerms,
     pub members: AHashMap<u64, Vec<u64>>,
-    pub homeserver: SmolStr,
+    pub homeserver: Option<String>,
     pub perms: Vec<Permission>,
     pub invites: AHashMap<String, Invite>,
     pub fetched: bool,

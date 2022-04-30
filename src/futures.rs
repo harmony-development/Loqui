@@ -1,11 +1,5 @@
 use client::{harmony_rust_sdk::api::chat::send_message_request::Attachment, tracing};
-use eframe::epi::backend::RepaintSignal;
-use std::{
-    any::Any,
-    cell::RefCell,
-    future::Future,
-    sync::{mpsc, Arc},
-};
+use std::{any::Any, cell::RefCell, future::Future, sync::mpsc};
 
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::spawn;
@@ -24,7 +18,7 @@ pub struct Futures {
     queue: RefCell<Vec<AnyItem>>,
     rx: mpsc::Receiver<AnyItem>,
     tx: mpsc::Sender<AnyItem>,
-    rr: Option<Arc<dyn RepaintSignal>>,
+    rr: Option<egui::Context>,
 }
 
 impl Futures {
@@ -38,8 +32,8 @@ impl Futures {
         }
     }
 
-    pub fn init(&mut self, frame: &eframe::epi::Frame) {
-        self.rr = Some(frame.lock().repaint_signal.clone());
+    pub fn init(&mut self, ctx: egui::Context) {
+        self.rr = Some(ctx);
     }
 
     pub fn spawn<

@@ -29,10 +29,11 @@ use harmony_rust_sdk::{
             DeleteChannelRequest, DeleteInviteRequest, DeleteMessageRequest, Embed, Event, GetChannelMessagesRequest,
             GetGuildChannelsRequest, GetGuildInvitesRequest, GetGuildListRequest, GetGuildMembersRequest,
             GetGuildRequest, GetGuildRolesRequest, GetMessageRequest, GetPermissionsRequest, GetPinnedMessagesRequest,
-            GetUserRolesRequest, HasPermissionRequest, Invite, JoinGuildRequest, KickUserRequest, LeaveGuildRequest,
-            Message as HarmonyMessage, Permission, PinMessageRequest, Role, SendMessageRequest, SetPermissionsRequest,
-            TypingRequest, UnbanUserRequest, UnpinMessageRequest, UpdateChannelInformationRequest,
-            UpdateGuildInformationRequest, UpdateMessageContentRequest,
+            GetPrivateChannelListRequest, GetPrivateChannelRequest, GetUserRolesRequest, HasPermissionRequest, Invite,
+            JoinGuildRequest, KickUserRequest, LeaveGuildRequest, Message as HarmonyMessage, Permission,
+            PinMessageRequest, Role, SendMessageRequest, SetPermissionsRequest, TypingRequest, UnbanUserRequest,
+            UnpinMessageRequest, UpdateChannelInformationRequest, UpdateGuildInformationRequest,
+            UpdateMessageContentRequest,
         },
         emote::{stream_event::Event as EmoteEvent, *},
         mediaproxy::{fetch_link_metadata_response::metadata::Data as FetchLinkData, FetchLinkMetadataRequest},
@@ -45,7 +46,7 @@ use harmony_rust_sdk::{
 use error::ClientResult;
 use instant::Instant;
 use member::Member;
-use message::{AttachmentExt, MessageId, ReadMessagesView, WriteMessagesView};
+use message::{AttachmentExt, MessageId, Messages, ReadMessagesView, WriteMessagesView};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
@@ -113,10 +114,11 @@ impl From<Session> for InnerSession {
 pub enum PostProcessEvent {
     FetchProfile(u64),
     FetchGuildData(u64),
+    FetchPrivateChannel(u64),
     FetchThumbnail(Attachment),
     CheckPermsForChannel(u64, u64),
     FetchMessage {
-        guild_id: u64,
+        guild_id: Option<u64>,
         channel_id: u64,
         message_id: u64,
     },
@@ -142,18 +144,18 @@ pub enum FetchEvent {
         file: DownloadedFile,
     },
     FetchedReply {
-        guild_id: u64,
+        guild_id: Option<u64>,
         channel_id: u64,
         message_id: u64,
         message: HarmonyMessage,
     },
     FailedToSendMessage {
-        guild_id: u64,
+        guild_id: Option<u64>,
         channel_id: u64,
         echo_id: u64,
     },
     FetchedMessageHistory {
-        guild_id: u64,
+        guild_id: Option<u64>,
         channel_id: u64,
         messages: Vec<(u64, HarmonyMessage)>,
         anchor: Option<u64>,
@@ -166,6 +168,12 @@ pub enum FetchEvent {
         picture: Option<String>,
         owners: Vec<u64>,
     },
+    FetchedPrivateChannel {
+        id: u64,
+        name: Option<String>,
+        members: Vec<u64>,
+        is_dm: bool,
+    },
     FetchedProfile {
         id: u64,
         name: String,
@@ -174,6 +182,12 @@ pub enum FetchEvent {
         kind: AccountKind,
     },
     InitialSyncComplete,
+}
+
+impl FetchEvent {
+    fn new_chat(ev: ChatEvent) -> Self {
+        Self::Harmony(Event::Chat(ev))
+    }
 }
 
 pub struct Cache {
@@ -189,7 +203,7 @@ pub struct Cache {
 
 impl Cache {
     pub fn new(event_receiver: EventReceiver, post_sender: PostEventSender) -> Self {
-        Self {
+        let mut this = Self {
             event_receiver,
             post_sender,
             channels: Default::default(),
@@ -198,7 +212,15 @@ impl Cache {
             initial_sync_complete: false,
             link_embeds: Default::default(),
             users: Default::default(),
-        }
+        };
+
+        // setup dm guild
+        let dms = this.get_guild_mut(0);
+        dms.name = "DMs".into();
+        dms.fetched = true;
+        dms.fetched_invites = true;
+
+        this
     }
 
     pub fn maintain(&mut self, mut event_fn: impl FnMut(FetchEvent) -> Option<FetchEvent>) {
@@ -225,12 +247,20 @@ impl Cache {
         self.channels.entry((guild_id, channel_id)).or_default()
     }
 
+    fn get_priv_channel_mut(&mut self, channel_id: u64) -> &mut Channel {
+        self.get_channel_mut(0, channel_id)
+    }
+
     fn get_user_mut(&mut self, user_id: u64) -> &mut Member {
         self.users.entry(user_id).or_default()
     }
 
     fn get_emote_pack_mut(&mut self, pack_id: u64) -> &mut EmotePack {
         self.emote_packs.entry(pack_id).or_default()
+    }
+
+    fn get_messages(&mut self, guild_id: Option<u64>, channel_id: u64) -> &mut Messages {
+        &mut self.get_channel_mut(guild_id.unwrap_or(0), channel_id).messages
     }
 
     pub fn is_initial_sync_complete(&self) -> bool {
@@ -300,6 +330,26 @@ impl Cache {
 
     pub fn process_event(&mut self, event: FetchEvent) {
         match event {
+            FetchEvent::FetchedPrivateChannel {
+                id,
+                is_dm,
+                members,
+                name,
+            } => {
+                for member in &members {
+                    if self.users.contains_key(member).not() {
+                        let _ = self.post_sender.send(PostProcessEvent::FetchProfile(*member));
+                    }
+                }
+
+                let mut channel = self.get_channel_mut(0, id);
+                channel.name = name.map_or_else(|| SmolStr::new_inline(""), Into::into);
+                if let Some(data) = channel.private_channel_data.as_mut() {
+                    data.members = members.into_iter().collect();
+                    data.is_dm = is_dm;
+                }
+                channel.get_priv_mut().fetched = true;
+            }
             FetchEvent::FetchedGuild {
                 id,
                 name,
@@ -342,7 +392,8 @@ impl Cache {
                 channel_id,
                 echo_id,
             } => {
-                let mut view = self.get_channel_mut(guild_id, channel_id).messages.view_mut();
+                let messages = self.get_messages(guild_id, channel_id);
+                let mut view = messages.view_mut();
                 if let Some(msg) = view.get_message_mut(&MessageId::Unack(echo_id)) {
                     msg.failed_to_send = true;
                 }
@@ -398,9 +449,9 @@ impl Cache {
                     let _ = self.post_sender.send(PostProcessEvent::FetchLinkMetadata(urls));
                 }
 
-                let channel = self.get_channel_mut(guild_id, channel_id);
+                let messages = self.get_messages(guild_id, channel_id);
 
-                channel.messages.create_reply_view(id).insert_message(id, message);
+                messages.create_reply_view(id).insert_message(id, message);
             }
             FetchEvent::Attachment { .. } => {}
             FetchEvent::InitialSyncComplete => {
@@ -464,9 +515,9 @@ impl Cache {
                             let _ = self.post_sender.send(PostProcessEvent::FetchLinkMetadata(urls));
                         }
 
-                        let channel = self.get_channel_mut(guild_id, channel_id);
+                        let messages = self.get_messages(guild_id, channel_id);
 
-                        let message_view = channel.messages.continuous_view_mut();
+                        let message_view = messages.continuous_view_mut();
                         if let Some(echo_id) = echo_id {
                             message_view.ack_message(MessageId::Unack(echo_id), MessageId::Ack(message_id), message);
                         } else {
@@ -479,8 +530,9 @@ impl Cache {
                     channel_id,
                     message_id,
                 }) => {
-                    self.get_channel_mut(guild_id, channel_id)
-                        .messages
+                    let messages = self.get_messages(guild_id, channel_id);
+
+                    messages
                         .continuous_view_mut()
                         .remove_message(&MessageId::Ack(message_id));
                 }
@@ -489,16 +541,15 @@ impl Cache {
                     let channel_id = message_updated.channel_id;
                     let message_id = MessageId::Ack(message_updated.message_id);
 
-                    if let Some(msg) = self
-                        .get_channel_mut(guild_id, channel_id)
-                        .messages
-                        .view_mut()
-                        .get_message_mut(&message_id)
-                    {
+                    let messages = self.get_messages(guild_id, channel_id);
+
+                    if let Some(msg) = messages.view_mut().get_message_mut(&message_id) {
                         msg.content.text = message_updated.new_content.map_or_else(String::new, |f| f.text);
                     }
 
-                    let maybe_view = self.get_channel(guild_id, channel_id).map(|chan| chan.messages.view());
+                    let maybe_view = self
+                        .get_channel(guild_id.unwrap_or(0), channel_id)
+                        .map(|chan| chan.messages.view());
                     if let Some(msg) = maybe_view.as_ref().and_then(|view| view.get_message(&message_id)) {
                         let mut urls = Vec::new();
                         msg.post_process(&self.post_sender, &mut urls, guild_id, channel_id);
@@ -584,18 +635,15 @@ impl Cache {
                 }) => {
                     self.get_guild_mut(guild_id).members.remove(&member_id);
                 }
-                ChatEvent::GuildAddedToList(GuildAddedToList { guild_id, homeserver }) => {
+                ChatEvent::GuildAddedToList(GuildAddedToList { guild_id, server_id }) => {
                     let guild = self.get_guild_mut(guild_id);
-                    guild.homeserver = homeserver.into();
+                    guild.homeserver = server_id;
 
                     if guild.fetched.not() {
                         let _ = self.post_sender.send(PostProcessEvent::FetchGuildData(guild_id));
                     }
                 }
-                ChatEvent::GuildRemovedFromList(GuildRemovedFromList {
-                    guild_id,
-                    homeserver: _,
-                }) => {
+                ChatEvent::GuildRemovedFromList(GuildRemovedFromList { guild_id, server_id: _ }) => {
                     self.guilds.remove(&guild_id);
                 }
                 ChatEvent::DeletedGuild(GuildDeleted { guild_id }) => {
@@ -702,7 +750,7 @@ impl Cache {
                     channel_id,
                     message_id,
                 }) => {
-                    self.get_channel_mut(guild_id, channel_id)
+                    self.get_channel_mut(guild_id.unwrap_or(0), channel_id)
                         .pinned_messages
                         .insert(message_id);
                 }
@@ -711,9 +759,50 @@ impl Cache {
                     channel_id,
                     message_id,
                 }) => {
-                    self.get_channel_mut(guild_id, channel_id)
+                    self.get_channel_mut(guild_id.unwrap_or(0), channel_id)
                         .pinned_messages
                         .remove(&message_id);
+                }
+                ChatEvent::PrivateChannelAddedToList(PrivateChannelAddedToList { channel_id, server_id }) => {
+                    let c = self.get_priv_channel_mut(channel_id);
+                    c.get_priv_mut().server_id = server_id;
+
+                    if c.get_priv().fetched.not() {
+                        let _ = self.post_sender.send(PostProcessEvent::FetchPrivateChannel(channel_id));
+                    }
+                }
+                ChatEvent::PrivateChannelRemovedFromList(PrivateChannelRemovedFromList {
+                    channel_id,
+                    server_id: _,
+                }) => {
+                    self.channels.remove(&(0, channel_id));
+                    let g = self.get_guild_mut(0);
+                    if let Some(index) = g.channels.iter().position(|id| channel_id.eq(id)) {
+                        g.channels.remove(index);
+                    }
+                }
+                ChatEvent::PrivateChannelDeleted(PrivateChannelDeleted { channel_id }) => {
+                    self.channels.remove(&(0, channel_id));
+                    let g = self.get_guild_mut(0);
+                    if let Some(index) = g.channels.iter().position(|id| channel_id.eq(id)) {
+                        g.channels.remove(index);
+                    }
+                }
+                ChatEvent::UserLeftPrivateChannel(UserLeftPrivateChannel { channel_id, user_id }) => {
+                    self.get_priv_channel_mut(channel_id)
+                        .get_priv_mut()
+                        .members
+                        .remove(&user_id);
+                }
+                ChatEvent::UserJoinedPrivateChannel(UserJoinedPrivateChannel { channel_id, user_id }) => {
+                    self.get_priv_channel_mut(channel_id)
+                        .get_priv_mut()
+                        .members
+                        .insert(user_id);
+
+                    if !self.users.contains_key(&user_id) {
+                        let _ = self.post_sender.send(PostProcessEvent::FetchProfile(user_id));
+                    }
                 }
                 ev => tracing::error!("event not implemented: {:?}", ev),
             },
@@ -803,7 +892,7 @@ impl Cache {
 
     pub fn process_get_message_history_response(
         &mut self,
-        guild_id: u64,
+        guild_id: Option<u64>,
         channel_id: u64,
         message_id: Option<u64>,
         messages: Vec<(u64, HarmonyMessage)>,
@@ -824,17 +913,19 @@ impl Cache {
             let _ = self.post_sender.send(PostProcessEvent::FetchLinkMetadata(urls));
         }
 
-        let channel = self.get_channel_mut(guild_id, channel_id);
-        channel.reached_top = reached_top;
-        channel
-            .messages
+        let messages_view = {
+            let channel = self.get_channel_mut(guild_id.unwrap_or(0), channel_id);
+            channel.reached_top = reached_top;
+            &mut channel.messages
+        };
+        messages_view
             .continuous_view_mut()
             .append_messages(anchor_id.as_ref(), direction, messages);
     }
 
     pub fn prepare_send_message(&mut self, user_id: u64, request: SendMessageRequest) -> u64 {
         let echo_id = get_random_u64();
-        self.get_channel_mut(request.guild_id, request.channel_id)
+        self.get_channel_mut(request.guild_id.unwrap_or(0), request.channel_id)
             .messages
             .continuous_view_mut()
             .insert_message(MessageId::Unack(echo_id), Message::from_request(user_id, request));
@@ -1043,14 +1134,14 @@ impl Client {
         Ok(())
     }
 
-    pub async fn send_typing(&self, guild_id: u64, channel_id: u64) -> ClientResult<()> {
-        self.inner.call(TypingRequest::new(guild_id, channel_id)).await?;
+    pub async fn send_typing(&self, guild_id: Option<u64>, channel_id: u64) -> ClientResult<()> {
+        self.inner.call(TypingRequest { guild_id, channel_id }).await?;
         Ok(())
     }
 
     pub async fn edit_message(
         &self,
-        guild_id: u64,
+        guild_id: Option<u64>,
         channel_id: u64,
         message_id: u64,
         new_content: String,
@@ -1146,7 +1237,7 @@ impl Client {
 
     pub async fn fetch_messages(
         &self,
-        guild_id: u64,
+        guild_id: Option<u64>,
         channel_id: u64,
         anchor: Option<u64>,
         direction: Option<Direction>,
@@ -1235,21 +1326,45 @@ impl Client {
         Ok(())
     }
 
+    pub async fn fetch_private_channels(&self, event_sender: &EventSender) -> ClientResult<()> {
+        let channels = self.inner.call(GetPrivateChannelListRequest::new()).await?.channels;
+
+        let channel_ids = channels.iter().map(|c| c.channel_id).collect::<Vec<_>>();
+        let resp = self.inner.call(GetPrivateChannelRequest::new(channel_ids)).await?;
+        for (id, data) in resp.channels {
+            let _ = event_sender.send(FetchEvent::FetchedPrivateChannel {
+                id,
+                is_dm: data.is_dm,
+                members: data.members,
+                name: data.name,
+            });
+        }
+
+        for entry in channels {
+            let _ = event_sender.send(FetchEvent::new_chat(ChatEvent::PrivateChannelAddedToList(
+                PrivateChannelAddedToList {
+                    channel_id: entry.channel_id,
+                    server_id: entry.server_id,
+                },
+            )));
+        }
+
+        Ok(())
+    }
+
     pub async fn fetch_channels(&self, guild_id: u64, event_sender: &EventSender) -> ClientResult<()> {
         let resp = self.inner.call(GetGuildChannelsRequest::new(guild_id)).await?;
         let evs = resp.channels.into_iter().filter_map(move |channel| {
             let channel_id = channel.channel_id;
             let channel = channel.channel?;
-            Some(FetchEvent::Harmony(Event::Chat(ChatEvent::CreatedChannel(
-                ChannelCreated {
-                    guild_id,
-                    channel_id,
-                    name: channel.channel_name,
-                    kind: channel.kind,
-                    position: None,
-                    metadata: channel.metadata,
-                },
-            ))))
+            Some(FetchEvent::new_chat(ChatEvent::CreatedChannel(ChannelCreated {
+                guild_id,
+                channel_id,
+                name: channel.channel_name,
+                kind: channel.kind,
+                position: None,
+                metadata: channel.metadata,
+            })))
         });
         for ev in evs {
             let _ = event_sender.send(ev);
@@ -1263,14 +1378,14 @@ impl Client {
         let evs = resp.roles.into_iter().filter_map(|role| {
             let role_id = role.role_id;
             let role = role.role?;
-            Some(FetchEvent::Harmony(Event::Chat(ChatEvent::RoleCreated(RoleCreated {
+            Some(FetchEvent::new_chat(ChatEvent::RoleCreated(RoleCreated {
                 role_id,
                 guild_id,
                 name: role.name,
                 color: role.color,
                 pingable: role.pingable,
                 hoist: role.hoist,
-            }))))
+            })))
         });
         for ev in evs {
             let _ = event_sender.send(ev);
@@ -1284,13 +1399,11 @@ impl Client {
             })
             .await?;
         for (user_id, roles) in resp_user_roles.user_roles {
-            let _ = event_sender.send(FetchEvent::Harmony(Event::Chat(ChatEvent::UserRolesUpdated(
-                UserRolesUpdated {
-                    guild_id,
-                    user_id,
-                    new_role_ids: roles.roles,
-                },
-            ))));
+            let _ = event_sender.send(FetchEvent::new_chat(ChatEvent::UserRolesUpdated(UserRolesUpdated {
+                guild_id,
+                user_id,
+                new_role_ids: roles.roles,
+            })));
         }
         let resp_user_profiles = self.inner.call(GetProfileRequest::new(members.clone())).await?;
         let evs = resp_user_profiles
@@ -1344,7 +1457,7 @@ impl Client {
             let _ = event_sender.send(FetchEvent::Harmony(Event::Chat(ChatEvent::GuildAddedToList(
                 GuildAddedToList {
                     guild_id: guild.guild_id,
-                    homeserver: guild.server_id,
+                    server_id: guild.server_id,
                 },
             ))));
         }
@@ -1466,29 +1579,38 @@ impl Client {
                 Ok(())
             }
             PostProcessEvent::FetchProfile(user_id) => {
-                let _ = event_sender.send(self.inner.call(GetProfileRequest::new_one(user_id)).await.map(|resp| {
-                    let profile = resp.profile.one();
-                    FetchEvent::FetchedProfile {
-                        kind: profile.account_kind(),
-                        id: user_id,
-                        name: profile.user_name,
-                        picture: profile.user_avatar,
-                        status: profile.user_status.unwrap_or_default(),
-                    }
-                })?);
+                let resp = self.inner.call(GetProfileRequest::new_one(user_id)).await?;
+                let profile = resp.profile.one();
+                let _ = event_sender.send(FetchEvent::FetchedProfile {
+                    kind: profile.account_kind(),
+                    id: user_id,
+                    name: profile.user_name,
+                    picture: profile.user_avatar,
+                    status: profile.user_status.unwrap_or_default(),
+                });
 
                 Ok(())
             }
+            PostProcessEvent::FetchPrivateChannel(channel_id) => {
+                let resp = self.inner.call(GetPrivateChannelRequest::new_one(channel_id)).await?;
+                let channel = resp.channels.one();
+                let _ = event_sender.send(FetchEvent::FetchedPrivateChannel {
+                    id: channel_id,
+                    name: channel.name,
+                    members: channel.members,
+                    is_dm: channel.is_dm,
+                });
+                Ok(())
+            }
             PostProcessEvent::FetchGuildData(guild_id) => {
-                let _ = event_sender.send(self.inner.call(GetGuildRequest::new_one(guild_id)).await.map(|resp| {
-                    let guild = resp.guild.one();
-                    FetchEvent::Harmony(Event::Chat(ChatEvent::EditedGuild(GuildUpdated {
-                        guild_id,
-                        new_metadata: guild.metadata,
-                        new_name: Some(guild.name),
-                        new_picture: guild.picture,
-                    })))
-                })?);
+                let resp = self.inner.call(GetGuildRequest::new_one(guild_id)).await?;
+                let guild = resp.guild.one();
+                let _ = event_sender.send(FetchEvent::Harmony(Event::Chat(ChatEvent::EditedGuild(GuildUpdated {
+                    guild_id,
+                    new_metadata: guild.metadata,
+                    new_name: Some(guild.name),
+                    new_picture: guild.picture,
+                }))));
                 tracing::debug!("fetched guild data: {}", guild_id);
                 Ok(())
             }
@@ -1499,7 +1621,11 @@ impl Client {
             } => {
                 let message = self
                     .inner
-                    .call(GetMessageRequest::new(guild_id, channel_id, message_id))
+                    .call(GetMessageRequest {
+                        guild_id,
+                        channel_id,
+                        message_id,
+                    })
                     .await?
                     .message;
                 if let Some(message) = message {

@@ -7,12 +7,15 @@ use harmony_rust_sdk::api::{
     },
     exports::hrpc::exports::http::Uri,
 };
+use indexmap::IndexSet;
 use instant::Duration;
 use std::{ops::Not, ptr::NonNull};
 
 use crate::{content::MAX_THUMB_SIZE, IndexMap, PostEventSender};
 
 use super::{post_heading, PostProcessEvent};
+
+pub type PinnedMessages = IndexSet<u64, ahash::RandomState>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MessageId {
@@ -377,7 +380,7 @@ impl Message {
         }
     }
 
-    pub fn post_process(&self, post: &PostEventSender, urls: &mut Vec<Uri>, guild_id: u64, channel_id: u64) {
+    pub fn post_process(&self, post: &PostEventSender, urls: &mut Vec<Uri>, guild_id: Option<u64>, channel_id: u64) {
         if let Some(message_id) = self.reply_to.filter(|id| id != &0) {
             let _ = post.send(PostProcessEvent::FetchMessage {
                 guild_id,

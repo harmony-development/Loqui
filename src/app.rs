@@ -1,11 +1,7 @@
 use std::ops::Not;
 
 use client::{content, Client};
-use eframe::{
-    egui::{self, vec2, Color32, FontData, FontDefinitions, Style, Ui},
-    epi,
-};
-use egui::style::Margin;
+use eframe::egui::{self, vec2, Color32, FontData, FontDefinitions, Style, Ui};
 
 use super::utils::*;
 
@@ -73,7 +69,7 @@ impl App {
     }
 
     #[inline(always)]
-    fn view_bottom_panel(&mut self, ui: &mut Ui, _frame: &epi::Frame) {
+    fn view_bottom_panel(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         ui.horizontal_top(|ui| {
             ui.style_mut().spacing.item_spacing = vec2(2.0, 0.0);
 
@@ -203,15 +199,11 @@ impl App {
                 });
             });
     }
-}
 
-impl epi::App for App {
-    fn name(&self) -> &str {
-        "loqui"
-    }
+    pub fn setup(&mut self, cc: &eframe::CreationContext) {
+        let ctx = &cc.egui_ctx;
 
-    fn setup(&mut self, ctx: &egui::Context, frame: &epi::Frame, _storage: Option<&dyn epi::Storage>) {
-        self.state.init(ctx, frame);
+        self.state.init(ctx, cc.integration_info.clone());
         if self.state.local_config.scale_factor != 0.0 {
             ctx.set_pixels_per_point(self.state.local_config.scale_factor);
         }
@@ -264,12 +256,14 @@ impl epi::App for App {
             ctx.set_style(style);
         }
     }
+}
 
+impl eframe::App for App {
     fn max_size_points(&self) -> egui::Vec2 {
         [f32::INFINITY, f32::INFINITY].into()
     }
 
-    fn update(&mut self, ctx: &egui::Context, frame: &epi::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.state.maintain(ctx);
 
         // ui drawing starts here
@@ -278,7 +272,6 @@ impl epi::App for App {
         if self.state.is_connected.not() || is_main_screen.not() || ctx.is_mobile().not() {
             let style = ctx.style();
             let frame_panel = egui::Frame {
-                margin: Margin::same(0.0),
                 fill: style.visuals.extreme_bg_color,
                 stroke: style.visuals.window_stroke(),
                 ..Default::default()
@@ -312,7 +305,7 @@ impl epi::App for App {
         }
     }
 
-    fn on_exit(&mut self) {
+    fn on_exit(&mut self, _glow: &eframe::glow::Context) {
         self.state.save_config();
     }
 }

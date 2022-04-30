@@ -1285,7 +1285,7 @@ dependencies = [
 [[package]]
 name = "harmony_build"
 version = "0.1.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=refactored#f653c12cc9ba96283bfb0b8239e239c1a52d7f30"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=refactored#96b75d8f7b065b1269e186d8b43eb306843478e1"
 dependencies = [
  "hrpc-build",
  "prost-build",
@@ -1296,7 +1296,7 @@ dependencies = [
 [[package]]
 name = "harmony_derive"
 version = "0.1.3"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=refactored#f653c12cc9ba96283bfb0b8239e239c1a52d7f30"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=refactored#96b75d8f7b065b1269e186d8b43eb306843478e1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1306,7 +1306,7 @@ dependencies = [
 [[package]]
 name = "harmony_rust_sdk"
 version = "0.8.0"
-source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=refactored#f653c12cc9ba96283bfb0b8239e239c1a52d7f30"
+source = "git+https://github.com/harmony-development/harmony_rust_sdk.git?branch=refactored#96b75d8f7b065b1269e186d8b43eb306843478e1"
 dependencies = [
  "harmony_build",
  "harmony_derive",
@@ -1733,9 +1733,9 @@ checksum = "a3e378b66a060d48947b590737b30a1be76706c8dd7b8ba0f2fe3989c68a853f"
 
 [[package]]
 name = "memchr"
-version = "2.4.1"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
+checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memmap2"

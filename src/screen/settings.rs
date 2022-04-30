@@ -380,7 +380,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &eframe::Frame, state: &mut State) {
         self.handle_futures(state);
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -406,11 +406,11 @@ impl AppScreen for Screen {
         });
     }
 
-    fn on_pop(&mut self, _: &egui::Context, _: &epi::Frame, state: &mut State) {
+    fn on_pop(&mut self, _: &egui::Context, _: &eframe::Frame, state: &mut State) {
         state.save_config();
     }
 
-    fn on_push(&mut self, _: &egui::Context, _: &epi::Frame, state: &mut State) {
+    fn on_push(&mut self, _: &egui::Context, _: &eframe::Frame, state: &mut State) {
         state.save_config();
     }
 }

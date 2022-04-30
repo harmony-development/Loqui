@@ -68,14 +68,10 @@ pub mod op {
     use super::*;
 
     use client::{harmony_rust_sdk::api::exports::prost::bytes::Bytes, tracing};
-    use eframe::epi::backend::RepaintSignal;
     use egui::ColorImage;
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
     use js_sys::Uint8Array;
-    use std::{
-        lazy::SyncOnceCell,
-        sync::{mpsc::SyncSender as Sender, Arc},
-    };
+    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender};
     use wasm_bindgen::{prelude::*, JsCast};
     use web_sys::{window, Blob, BlobPropertyBag, MessageEvent, Url, Worker as WebWorker};
 
@@ -99,7 +95,7 @@ pub mod op {
     }
 
     impl WorkerPool {
-        fn new(chan: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) -> Self {
+        fn new(chan: Sender<LoadedImage>, rr: egui::Context) -> Self {
             Self {
                 inner: spawn_worker(chan, rr),
             }
@@ -117,7 +113,7 @@ pub mod op {
 
     static WORKER_POOL: SyncOnceCell<WorkerPool> = SyncOnceCell::new();
 
-    fn spawn_worker(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) -> WebWorker {
+    fn spawn_worker(tx: Sender<LoadedImage>, rr: egui::Context) -> WebWorker {
         let origin = window()
             .expect("window to be available")
             .location()
@@ -155,7 +151,7 @@ pub mod op {
         worker
     }
 
-    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) {
+    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: egui::Context) {
         let worker_pool = WorkerPool::new(tx, rr);
         if WORKER_POOL.set(worker_pool).is_err() {
             unreachable!("worker pool must only be init once -- this is a bug");
@@ -189,13 +185,10 @@ pub mod op {
 pub mod op {
     use super::*;
 
-    use std::{
-        lazy::SyncOnceCell,
-        sync::{mpsc::SyncSender as Sender, Arc},
-    };
+    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender};
 
     use client::{harmony_rust_sdk::api::exports::prost::bytes::Bytes, tracing};
-    use eframe::{egui::ColorImage, epi::backend::RepaintSignal};
+    use eframe::egui::ColorImage;
 
     impl LoadedImage {
         pub fn load(data: Bytes, id: String, kind: String) -> Option<Self> {
@@ -215,10 +208,10 @@ pub mod op {
         }
     }
 
-    static CHANNEL: SyncOnceCell<(Sender<LoadedImage>, Arc<dyn RepaintSignal>)> = SyncOnceCell::new();
+    static CHANNEL: SyncOnceCell<(Sender<LoadedImage>, egui::Context)> = SyncOnceCell::new();
 
     /// This should only be called once.
-    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) {
+    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: egui::Context) {
         if CHANNEL.set((tx, rr)).is_err() {
             unreachable!("image channel already set -- this is a bug");
         }

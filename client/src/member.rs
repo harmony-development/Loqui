@@ -8,7 +8,7 @@ pub struct Member {
     pub avatar_url: Option<String>,
     pub username: SmolStr,
     pub display_user: bool,
-    pub typing_in_channel: Option<(u64, u64, Instant)>,
+    pub typing_in_channel: Option<(Option<u64>, u64, Instant)>,
     pub status: UserStatus,
     pub fetched: bool,
     pub kind: AccountKind,

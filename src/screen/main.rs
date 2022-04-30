@@ -392,7 +392,7 @@ impl Screen {
             .map_or_else(|| "unknown", |g| g.name.as_str());
 
         let menu_but_clicked = egui::Frame::group(ui.style())
-            .margin(Margin::same(2.0))
+            .inner_margin(Margin::same(2.0))
             .show(ui, |ui| {
                 let but = ui
                     .add(TextButton::text(guild_name).small())
@@ -432,7 +432,7 @@ impl Screen {
                             && channel.messages.continuous_view().is_empty()
                         {
                             spawn_evs!(state, |events, c| {
-                                c.fetch_messages(guild_id, channel_id, None, None, events).await?;
+                                c.fetch_messages(Some(guild_id), channel_id, None, None, events).await?;
                                 let _ = events.send(FetchEvent::FetchedMsgsPins(guild_id, channel_id));
                             });
                         }
@@ -492,7 +492,7 @@ impl Screen {
                         let message_id = id.id().unwrap();
                         self.editing_message = None;
                         spawn_client_fut!(state, |client| {
-                            client.edit_message(guild_id, channel_id, message_id, text).await
+                            client.edit_message(Some(guild_id), channel_id, message_id, text).await
                         });
                     }
                 } else if highlight_message {
@@ -901,7 +901,7 @@ impl Screen {
                             tot
                         });
                 for chunk in chunked_messages {
-                    egui::Frame::none().margin(Margin::same(5.0)).show(ui, |ui| {
+                    egui::Frame::none().inner_margin(Margin::same(5.0)).show(ui, |ui| {
                         for (index, (id, message)) in chunk.into_iter().enumerate() {
                             self.view_message(
                                 state,
@@ -1049,7 +1049,7 @@ impl Screen {
             self.composer.text_mut().clear();
             let user_id = state.client().user_id();
             let request = SendMessageRequest {
-                guild_id,
+                guild_id: Some(guild_id),
                 channel_id,
                 overrides,
                 ..Default::default()
@@ -1069,7 +1069,7 @@ impl Screen {
                     .not()
             });
             if should_send_typing {
-                spawn_client_fut!(state, |client| client.send_typing(guild_id, channel_id).await);
+                spawn_client_fut!(state, |client| client.send_typing(Some(guild_id), channel_id).await);
             }
         }
     }
@@ -1077,9 +1077,11 @@ impl Screen {
     fn view_uploading_attachments(&mut self, state: &State, ui: &mut Ui) {
         ui.label(RichText::new("Uploading:").strong());
         for name in state.uploading_files.read().expect("poisoned").iter() {
-            egui::Frame::group(ui.style()).margin(Margin::same(0.0)).show(ui, |ui| {
-                ui.label(name);
-            });
+            egui::Frame::group(ui.style())
+                .inner_margin(Margin::same(0.0))
+                .show(ui, |ui| {
+                    ui.label(name);
+                });
         }
     }
 
@@ -1147,7 +1149,7 @@ impl Screen {
         };
 
         egui::Frame::group(ui.style())
-            .margin(Vec2::ZERO)
+            .inner_margin(Vec2::ZERO)
             .rounding(0.0)
             .stroke(egui::Stroke::new(4.0, status_color))
             .show(ui, |ui| {
@@ -1218,7 +1220,7 @@ impl Screen {
             .keys()
             .filter_map(move |uid| Some((*uid, state.cache.get_user(*uid)?)))
             .filter_map(|member| Some((member, member.1.typing_in_channel?)))
-            .filter_map(move |(member, (gid, cid, _))| self.current.is_channel(gid, cid).then(|| member))
+            .filter_map(move |(member, (gid, cid, _))| self.current.is_channel(gid.unwrap_or(0), cid).then(|| member))
     }
 
     #[inline(always)]
@@ -1257,7 +1259,7 @@ impl Screen {
     #[inline(always)]
     fn show_guild_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Margin::symmetric(8.0, 5.0),
+            inner_margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.extreme_bg_color,
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1275,7 +1277,7 @@ impl Screen {
     #[inline(always)]
     fn show_channel_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Margin::symmetric(8.0, 5.0),
+            inner_margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.window_fill(),
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1302,7 +1304,7 @@ impl Screen {
     #[inline(always)]
     fn show_member_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Margin::symmetric(8.0, 5.0),
+            inner_margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.extreme_bg_color,
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1337,7 +1339,7 @@ impl Screen {
 
         ui.allocate_ui([top_channel_bar_width, interact_size.y].into(), |ui| {
             let frame = egui::Frame {
-                margin: Margin::symmetric(4.0, 2.0),
+                inner_margin: Margin::symmetric(4.0, 2.0),
                 fill: ui.style().visuals.window_fill(),
                 stroke: ui.style().visuals.window_stroke(),
                 rounding: Rounding::same(2.0),
@@ -1546,7 +1548,7 @@ impl AppScreen for Screen {
         "main"
     }
 
-    fn update(&mut self, ctx: &egui::Context, _: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _: &eframe::Frame, state: &mut State) {
         if ctx.input().key_pressed(egui::Key::Escape) {
             self.editing_message = None;
         }
@@ -1559,7 +1561,7 @@ impl AppScreen for Screen {
         self.view_pinned_messages(state, ctx);
 
         let panel_frame = egui::Frame {
-            margin: Margin::same(8.0),
+            inner_margin: Margin::same(8.0),
             fill: loqui_style::BG_LIGHT,
             ..Default::default()
         };
