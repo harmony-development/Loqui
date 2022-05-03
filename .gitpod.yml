@@ -1,3 +1,3 @@
+image: yusdacra/gitpod-workspace-base-nix:latest
 tasks:
-  - init: echo "initializing dev env..."
-    command: nix develop
+  - command: nix develop
