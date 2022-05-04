@@ -24,6 +24,7 @@ pub struct ImageData {
 pub fn load_image(data: Vec<u8>) -> Vec<u8> {
     #[allow(unsafe_code)]
     let image_data = unsafe { rkyv::archived_root::<ImageData>(&data) };
+    tracing::debug!("received image (id {})", image_data.id);
     let Some(mut loaded) = load_image_logic(image_data.data.as_ref(), image_data.kind.as_str()) else {
         tracing::error!(
             "could not load an image (id {}); most likely unsupported format",

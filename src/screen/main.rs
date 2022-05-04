@@ -4,14 +4,22 @@ use client::{
     channel::Channel,
     content,
     guild::Guild,
-    harmony_rust_sdk::api::{chat::all_permissions, exports::prost::bytes::Bytes, profile::UserStatus, rest::FileId},
+    harmony_rust_sdk::api::{
+        chat::{
+            all_permissions, attachment::Info, embed, send_message_request, Attachment, Embed, Overrides,
+            SendMessageRequest,
+        },
+        exports::prost::bytes::Bytes,
+        mediaproxy::fetch_link_metadata_response::metadata,
+        profile::user_status,
+    },
     member::Member,
-    message::{Attachment, Content, Embed, EmbedHeading, Message, MessageId, Override, ReadMessagesView},
+    message::{AttachmentExt, Message, MessageId, ReadMessagesView},
     smol_str::SmolStr,
-    AHashMap, AHashSet, FetchEvent, Uri,
+    AHashMap, AHashSet, FetchEvent, U64Ext, Uri,
 };
 use eframe::egui::{vec2, Color32, Event, RichText, Rounding, Vec2};
-use egui::Margin;
+use egui::style::Margin;
 
 use crate::{
     config::BgImage,
@@ -127,7 +135,7 @@ pub struct Screen {
     dont_highlight_message: AHashSet<(u64, u64, MessageId)>,
     /// file id -> bool
     /// if `true`, then we are (down)loading this attachment
-    loading_attachment: AHashMap<FileId, AtomBool>,
+    loading_attachment: AHashMap<String, AtomBool>,
     /// current guild / channel
     current: CurrentIds,
     /// main message composer
@@ -165,10 +173,12 @@ pub struct Screen {
     /// panel stack keeping track of where we are / were
     panel_stack: PanelStack,
     main_composer_id: OnceCell<egui::Id>,
+
+    fetching_channels: AtomBool,
 }
 
 impl Screen {
-    fn get_override(&self, state: &State) -> Option<Override> {
+    fn get_override(&self, state: &State) -> Option<Overrides> {
         let Some(guild_id) = self.current.guild() else { return None };
         state
             .config
@@ -220,10 +230,9 @@ impl Screen {
             .insert(attachment.id.clone(), image_load_bool.clone());
 
         spawn_evs!(state, |sender, client| {
-            let res = image_load_bool
+            let file = image_load_bool
                 .scope(client.fetch_attachment(attachment.id.clone()))
-                .await;
-            let (_, file) = res?;
+                .await?;
             let _ = sender.send(FetchEvent::Attachment { attachment, file });
             ClientResult::Ok(())
         });
@@ -317,7 +326,7 @@ impl Screen {
                 let button = ui
                     .add_enabled_ui(is_enabled, |ui| {
                         if guild.fetched {
-                            let mut avatar = Avatar::new(guild.picture.as_ref(), guild.name.as_str(), state);
+                            let mut avatar = Avatar::new(guild.picture.as_deref(), guild.name.as_str(), state);
                             if !is_enabled {
                                 avatar = avatar.fill_bg(loqui_style::BG_LIGHT);
                             }
@@ -342,15 +351,23 @@ impl Screen {
                         self.current.set_channel(*channel_id);
                     }
                     if guild.channels.is_empty() && guild.members.is_empty() {
-                        spawn_evs!(state, |events, c| {
-                            c.fetch_channels(guild_id, events).await?;
-                        });
-                        spawn_evs!(state, |events, c| {
-                            c.fetch_guild_perms(guild_id, events).await?;
-                        });
-                        spawn_evs!(state, |events, c| {
-                            c.fetch_members(guild_id, events).await?;
-                        });
+                        if guild_id != 0 {
+                            let fetching_channels = self.fetching_channels.clone();
+                            spawn_evs!(state, |events, c| {
+                                fetching_channels.scope(c.fetch_channels(guild_id, events)).await?;
+                            });
+                            spawn_evs!(state, |events, c| {
+                                c.fetch_guild_perms(guild_id, events).await?;
+                            });
+                            spawn_evs!(state, |events, c| {
+                                c.fetch_members(guild_id, events).await?;
+                            });
+                        } else {
+                            let fetching_channels = self.fetching_channels.clone();
+                            spawn_evs!(state, |events, c| {
+                                fetching_channels.scope(c.fetch_private_channels(events)).await?;
+                            });
+                        }
                     }
                     self.scroll_to_bottom(ui);
                 }
@@ -385,10 +402,10 @@ impl Screen {
             .map_or_else(|| "unknown", |g| g.name.as_str());
 
         let menu_but_clicked = egui::Frame::group(ui.style())
-            .margin(Margin::same(2.0))
+            .inner_margin(Margin::same(2.0))
             .show(ui, |ui| {
                 let but = ui
-                    .add(TextButton::text(guild_name).small())
+                    .add_enabled(guild_id != 0, TextButton::text(guild_name).small())
                     .on_hover_text("open guild settings");
 
                 but.clicked()
@@ -425,7 +442,7 @@ impl Screen {
                             && channel.messages.continuous_view().is_empty()
                         {
                             spawn_evs!(state, |events, c| {
-                                c.fetch_messages(guild_id, channel_id, None, None, events).await?;
+                                c.fetch_messages(Some(guild_id), channel_id, None, None, events).await?;
                                 let _ = events.send(FetchEvent::FetchedMsgsPins(guild_id, channel_id));
                             });
                         }
@@ -438,9 +455,11 @@ impl Screen {
                         self.scroll_to_bottom(ui);
                     }
                 }
-            } else {
+            } else if self.fetching_channels.get() {
                 ui.add_sized(ui.available_size(), egui::Spinner::new().size(32.0))
                     .on_hover_text_at_pointer("loading channels");
+            } else {
+                ui.centered_and_justified(|ui| ui.label("no channels"));
             }
         });
     }
@@ -485,7 +504,9 @@ impl Screen {
                         let message_id = id.id().unwrap();
                         self.editing_message = None;
                         spawn_client_fut!(state, |client| {
-                            client.edit_message(guild_id, channel_id, message_id, text).await
+                            client
+                                .edit_message(guild_id.if_not_zero(), channel_id, message_id, text)
+                                .await
                         });
                     }
                 } else if highlight_message {
@@ -503,10 +524,14 @@ impl Screen {
 
     fn view_message_url_embeds<'a>(&mut self, state: &State, ui: &mut Ui, urls: impl Iterator<Item = (&'a str, Uri)>) {
         let urls = urls.filter_map(|(og, url)| Some((state.cache.get_link_data(&url)?, url, og)));
-        for (data, url, raw_url) in urls {
+        for (data, _, raw_url) in urls {
             match data {
-                client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsSite(data) => {
-                    let id = FileId::External(data.image.parse::<Uri>().unwrap_or(url));
+                metadata::Data::IsSite(data) => {
+                    let id = data
+                        .thumbnail
+                        .first()
+                        .map(|i| i.url.clone())
+                        .unwrap_or_else(|| raw_url.to_string());
                     let has_site_title = data.site_title.is_empty().not();
                     let has_page_title = data.page_title.is_empty().not();
                     let has_desc = data.description.is_empty().not();
@@ -550,14 +575,14 @@ impl Screen {
                         });
                     }
                 }
-                client::harmony_rust_sdk::api::mediaproxy::fetch_link_metadata_response::Data::IsMedia(data) => {
-                    let id = FileId::External(url);
+                metadata::Data::IsMedia(data) => {
                     let attachment = Attachment {
-                        name: data.filename.clone(),
-                        kind: data.mimetype.clone(),
+                        name: data.name.clone(),
+                        mimetype: data.mimetype.clone(),
                         // we dont want the attachment to count as thumbnail
                         size: u32::MAX,
-                        ..Attachment::new_unknown(id)
+                        id: raw_url.to_string(),
+                        ..Default::default()
                     };
 
                     let mut download = false;
@@ -571,14 +596,14 @@ impl Screen {
                                 let open_but = ui.frameless_image_button(tex.id(), size);
                                 open = open_but.clicked();
                             } else {
-                                download = ui.button(format!("download '{}'", data.filename)).clicked();
+                                download = ui.button(format!("download '{}'", data.name)).clicked();
                             }
                         } else {
-                            open = ui.button(format!("open '{}'", data.filename)).clicked();
+                            open = ui.button(format!("open '{}'", data.name)).clicked();
                         }
                     } else {
                         ui.add(egui::Spinner::new())
-                            .on_hover_text(format!("downloading '{}'", data.filename));
+                            .on_hover_text(format!("downloading '{}'", data.name));
                     }
 
                     if open {
@@ -597,12 +622,11 @@ impl Screen {
         let mut fetch = false;
         let mut open = false;
 
-        if attachment.is_raster_image() {
+        if let (Some(Info::Image(info)), true) = (&attachment.info, attachment.is_raster_image()) {
             let mut no_thumbnail = false;
 
-            let maybe_size = attachment
-                .resolution
-                .and_then(|(w, h)| (w == 0 || h == 0).not().then(|| ui.downscale([w as f32, h as f32])));
+            let (w, h) = (info.width, info.height);
+            let maybe_size = (w == 0 || h == 0).not().then(|| ui.downscale([w as f32, h as f32]));
 
             let is_fetching = self.is_fetching_attachment(attachment);
 
@@ -640,7 +664,14 @@ impl Screen {
             }
 
             let load_thumbnail = no_thumbnail && state.loading_images.borrow().iter().all(|id| id != &attachment.id);
-            if let (true, Some(minithumbnail)) = (load_thumbnail, &attachment.minithumbnail) {
+            let maybe_minithumb = attachment.info.as_ref().and_then(|a| {
+                if let Info::Image(info) = a {
+                    info.minithumbnail.as_ref()
+                } else {
+                    None
+                }
+            });
+            if let (true, Some(minithumbnail)) = (load_thumbnail, maybe_minithumb) {
                 state.loading_images.borrow_mut().push(attachment.id.clone());
                 let data = Bytes::copy_from_slice(minithumbnail.data.as_slice());
                 let id = attachment.id.clone();
@@ -662,14 +693,13 @@ impl Screen {
     }
 
     fn view_message_embed(&mut self, ui: &mut Ui, embed: &Embed) {
-        fn filter_empty(val: &Option<String>) -> Option<&str> {
-            val.as_deref().map(str::trim).filter(|s| s.is_empty().not())
+        fn filter_empty(val: Option<&String>) -> Option<&str> {
+            val.map(|s| s.trim()).filter(|s| s.is_empty().not())
         }
 
         ui.group(|ui| {
-            let do_render_heading =
-                |heading: &&EmbedHeading| heading.text.is_empty().not() && filter_empty(&heading.subtext).is_some();
-            let render_header = |header: &EmbedHeading, ui: &mut Ui| {
+            let do_render_heading = |heading: &&embed::Heading| heading.text.is_empty().not();
+            let render_header = |header: &embed::Heading, ui: &mut Ui| {
                 // TODO: render icon
                 ui.horizontal(|ui| {
                     let button = ui.add_enabled(
@@ -680,9 +710,6 @@ impl Screen {
                         if let Some(url) = header.url.clone() {
                             open_url(url);
                         }
-                    }
-                    if let Some(subtext) = filter_empty(&header.subtext) {
-                        ui.label(RichText::new(subtext).small());
                     }
                 });
             };
@@ -696,7 +723,7 @@ impl Screen {
                 ui.label(RichText::new(&embed.title).strong());
             }
 
-            if let Some(body) = filter_empty(&embed.body) {
+            if let Some(body) = filter_empty(embed.body.as_ref().map(|f| &f.text)) {
                 ui.label(body);
             }
 
@@ -705,12 +732,9 @@ impl Screen {
                     if field.title.is_empty().not() {
                         ui.label(RichText::new(&field.title).strong());
                     }
-                    if let Some(subtitle) = filter_empty(&field.subtitle) {
-                        ui.label(RichText::new(subtitle).small());
-                    }
                     ui.add_space(4.0);
-                    if let Some(body) = filter_empty(&field.body) {
-                        ui.label(body);
+                    if field.body.is_empty().not() {
+                        ui.label(&field.body);
                     }
                 });
             }
@@ -742,7 +766,7 @@ impl Screen {
 
                 if display_user {
                     let overrides = message.overrides.as_ref();
-                    let override_name = overrides.and_then(|ov| ov.name.as_deref());
+                    let override_name = overrides.and_then(|ov| ov.username.as_deref());
                     let sender_name = user.map_or_else(|| "unknown", |u| u.username.as_str());
                     let display_name = override_name.unwrap_or(sender_name);
 
@@ -774,62 +798,52 @@ impl Screen {
                     ui.add_space(ui.style().spacing.item_spacing.y);
                 }
 
-                match &message.content {
-                    client::message::Content::Text(text) => {
-                        let (urls, has_only_image) = parse_urls(text, state);
-                        self.view_message_text_content(
-                            state,
-                            ui,
-                            id,
-                            guild_id,
-                            channel_id,
-                            text.trim(),
-                            message.failed_to_send,
-                            has_only_image,
-                            &urls,
-                        );
-                        self.view_message_url_embeds(state, ui, urls.into_iter());
-                    }
-                    client::message::Content::Files(attachments) => {
-                        for attachment in attachments {
-                            self.view_message_attachment(state, ui, attachment);
-                        }
-                    }
-                    client::message::Content::Embeds(embeds) => {
-                        for embed in embeds {
-                            self.view_message_embed(ui, embed);
-                        }
-                    }
+                let (urls, has_only_image) = parse_urls(&message.content.text, state);
+                self.view_message_text_content(
+                    state,
+                    ui,
+                    id,
+                    guild_id,
+                    channel_id,
+                    message.content.text.trim(),
+                    message.failed_to_send,
+                    has_only_image,
+                    &urls,
+                );
+                self.view_message_url_embeds(state, ui, urls.into_iter());
+                for attachment in &message.content.attachments {
+                    self.view_message_attachment(state, ui, attachment);
+                }
+                for embed in &message.content.embeds {
+                    self.view_message_embed(ui, embed);
                 }
             })
             .response;
 
         msg.context_menu_styled(|ui| {
             if let Some(message_id) = id.id() {
-                if let client::message::Content::Text(text) = &message.content {
-                    if client::has_perm(guild, channel, all_permissions::MESSAGES_SEND)
-                        && message.sender == user_id
-                        && ui.button("edit").clicked()
-                    {
-                        self.editing_message = id.id();
-                        let edit_text = self.edit_message_composer.text_mut();
-                        edit_text.clear();
-                        edit_text.push_str(text);
-                        ui.close_menu();
-                    }
-                    if ui.button("quote reply").clicked() {
-                        let composer_text = self.composer.text_mut();
-                        composer_text.clear();
-                        composer_text.push_str("> ");
-                        composer_text.push_str(text);
-                        composer_text.push('\n');
-                        ui.memory().request_focus(self.main_composer_id());
-                        ui.close_menu();
-                    }
-                    if ui.button("copy").clicked() {
-                        ui.output().copied_text = text.clone();
-                        ui.close_menu();
-                    }
+                if client::has_perm(guild, channel, all_permissions::MESSAGES_SEND)
+                    && message.sender == user_id
+                    && ui.button("edit").clicked()
+                {
+                    self.editing_message = id.id();
+                    let edit_text = self.edit_message_composer.text_mut();
+                    edit_text.clear();
+                    edit_text.push_str(&message.content.text);
+                    ui.close_menu();
+                }
+                if ui.button("quote reply").clicked() {
+                    let composer_text = self.composer.text_mut();
+                    composer_text.clear();
+                    composer_text.push_str("> ");
+                    composer_text.push_str(&message.content.text);
+                    composer_text.push('\n');
+                    ui.memory().request_focus(self.main_composer_id());
+                    ui.close_menu();
+                }
+                if ui.button("copy").clicked() {
+                    ui.output().copied_text = message.content.text.clone();
+                    ui.close_menu();
                 }
                 if message.sender == state.client().user_id() && ui.button(dangerous_text("delete")).clicked() {
                     spawn_client_fut!(state, |client| {
@@ -901,7 +915,7 @@ impl Screen {
                             tot
                         });
                 for chunk in chunked_messages {
-                    egui::Frame::none().margin(Margin::same(5.0)).show(ui, |ui| {
+                    egui::Frame::none().inner_margin(Margin::same(5.0)).show(ui, |ui| {
                         for (index, (id, message)) in chunk.into_iter().enumerate() {
                             self.view_message(
                                 state,
@@ -919,7 +933,7 @@ impl Screen {
                     });
                 }
                 if self.scroll_to_bottom {
-                    ui.scroll_to_cursor(egui::Align::Max);
+                    ui.scroll_to_cursor(Some(egui::Align::Max));
                     self.scroll_to_bottom = false;
                 }
             });
@@ -1031,7 +1045,7 @@ impl Screen {
             } else {
                 self.last_override_for_guild.remove(&guild_id);
             }
-        } else if let Some(name) = overrides.as_ref().and_then(|ov| ov.name.as_deref()) {
+        } else if let Some(name) = overrides.as_ref().and_then(|ov| ov.username.as_deref()) {
             let name = SmolStr::new(name);
             if is_latching_channel {
                 self.last_override_for_channel.insert((guild_id, channel_id), name);
@@ -1047,15 +1061,17 @@ impl Screen {
 
         if text_string.is_empty().not() && text_edit.has_focus() && did_submit_enter {
             self.composer.text_mut().clear();
-            let message = Message {
-                content: Content::Text(text_string),
-                sender: state.client().user_id(),
+            let user_id = state.client().user_id();
+            let request = SendMessageRequest {
+                guild_id: guild_id.if_not_zero(),
+                channel_id,
                 overrides,
                 ..Default::default()
-            };
-            let echo_id = state.cache.prepare_send_message(guild_id, channel_id, message.clone());
+            }
+            .with_text(text_string);
+            let echo_id = state.cache.prepare_send_message(user_id, request.clone());
             spawn_evs!(state, |evs, client| {
-                client.send_message(echo_id, guild_id, channel_id, message, evs).await?;
+                client.send_message(request.with_echo_id(echo_id), evs).await?;
             });
             self.scroll_to_bottom(ui);
             text_edit.surrender_focus();
@@ -1067,7 +1083,7 @@ impl Screen {
                     .not()
             });
             if should_send_typing {
-                spawn_client_fut!(state, |client| client.send_typing(guild_id, channel_id).await);
+                spawn_client_fut!(state, |client| client.send_typing(Some(guild_id), channel_id).await);
             }
         }
     }
@@ -1075,9 +1091,11 @@ impl Screen {
     fn view_uploading_attachments(&mut self, state: &State, ui: &mut Ui) {
         ui.label(RichText::new("Uploading:").strong());
         for name in state.uploading_files.read().expect("poisoned").iter() {
-            egui::Frame::group(ui.style()).margin(Margin::same(0.0)).show(ui, |ui| {
-                ui.label(name);
-            });
+            egui::Frame::group(ui.style())
+                .inner_margin(Margin::same(0.0))
+                .show(ui, |ui| {
+                    ui.label(name);
+                });
         }
     }
 
@@ -1100,16 +1118,12 @@ impl Screen {
                     for file in files {
                         let data = file.read().await;
                         let mimetype = content::infer_type_from_bytes(&data);
-                        let size = data.len() as u32;
                         // TODO: return errors for files that failed to upload
                         let id = client.upload_file(file.file_name(), mimetype.clone(), data).await?;
-                        attachments.push(Attachment {
+                        attachments.push(send_message_request::Attachment {
                             id,
-                            kind: mimetype,
-                            size,
                             name: file.file_name(),
-                            minithumbnail: None,
-                            resolution: None,
+                            ..Default::default()
                         });
                     }
                     ClientResult::Ok(Some(UploadMessageResult {
@@ -1129,28 +1143,27 @@ impl Screen {
         state: &State,
         ui: &mut Ui,
         user: Option<&Member>,
-        overrides: Option<&Override>,
+        overrides: Option<&Overrides>,
         fill_bg: Color32,
     ) {
         const SIZE: Vec2 = egui::vec2(28.0, 28.0);
 
         let maybe_tex = overrides
-            .and_then(|ov| ov.avatar_url.as_ref())
+            .and_then(|ov| ov.avatar.as_ref())
             .or_else(|| user.and_then(|u| u.avatar_url.as_ref()))
             .as_ref()
             .and_then(|id| state.image_cache.get_avatar(id));
 
-        let status = user.map_or(UserStatus::OfflineUnspecified, |m| m.status);
+        let status = user.map_or(user_status::Kind::OfflineUnspecified, |m| m.status.kind());
         let status_color = match status {
-            UserStatus::OfflineUnspecified => Color32::GRAY,
-            UserStatus::Online | UserStatus::Mobile => Color32::GREEN,
-            UserStatus::Streaming => Color32::from_rgb(160, 0, 160),
-            UserStatus::DoNotDisturb => Color32::RED,
-            UserStatus::Idle => Color32::GOLD,
+            user_status::Kind::OfflineUnspecified => Color32::GRAY,
+            user_status::Kind::Online => Color32::GREEN,
+            user_status::Kind::DoNotDisturb => Color32::RED,
+            user_status::Kind::Idle => Color32::GOLD,
         };
 
         egui::Frame::group(ui.style())
-            .margin(Vec2::ZERO)
+            .inner_margin(Vec2::ZERO)
             .rounding(0.0)
             .stroke(egui::Stroke::new(4.0, status_color))
             .show(ui, |ui| {
@@ -1159,7 +1172,7 @@ impl Screen {
                 } else {
                     ui.add_enabled_ui(false, |ui| {
                         let username = overrides
-                            .and_then(|ov| ov.name.as_deref())
+                            .and_then(|ov| ov.username.as_deref())
                             .or_else(|| user.map(|u| u.username.as_str()))
                             .unwrap_or("");
                         let letter = username.get(0..1).unwrap_or("u").to_ascii_uppercase();
@@ -1221,7 +1234,7 @@ impl Screen {
             .keys()
             .filter_map(move |uid| Some((*uid, state.cache.get_user(*uid)?)))
             .filter_map(|member| Some((member, member.1.typing_in_channel?)))
-            .filter_map(move |(member, (gid, cid, _))| self.current.is_channel(gid, cid).then(|| member))
+            .filter_map(move |(member, (gid, cid, _))| self.current.is_channel(gid.unwrap_or(0), cid).then(|| member))
     }
 
     #[inline(always)]
@@ -1244,13 +1257,7 @@ impl Screen {
                     .into_iter()
                     .rev()
                     .filter_map(|(id, msg)| id.is_ack().then(|| (id.id().unwrap(), msg)))
-                    .filter_map(|(id, msg)| {
-                        if let Content::Text(text) = &msg.content {
-                            Some((id, text, msg.sender))
-                        } else {
-                            None
-                        }
-                    })
+                    .map(|(id, msg)| (id, &msg.content.text, msg.sender))
                     .find(|(_, _, sender)| *sender == user_id);
 
                 if let Some((id, text, _)) = maybe_msg {
@@ -1266,7 +1273,7 @@ impl Screen {
     #[inline(always)]
     fn show_guild_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Margin::symmetric(8.0, 5.0),
+            inner_margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.extreme_bg_color,
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1284,7 +1291,7 @@ impl Screen {
     #[inline(always)]
     fn show_channel_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Margin::symmetric(8.0, 5.0),
+            inner_margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.window_fill(),
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1311,7 +1318,7 @@ impl Screen {
     #[inline(always)]
     fn show_member_panel(&mut self, ui: &mut Ui, state: &mut State) {
         let panel_frame = egui::Frame {
-            margin: Margin::symmetric(8.0, 5.0),
+            inner_margin: Margin::symmetric(8.0, 5.0),
             fill: ui.style().visuals.extreme_bg_color,
             stroke: ui.style().visuals.window_stroke(),
             rounding: Rounding::same(4.0),
@@ -1346,7 +1353,7 @@ impl Screen {
 
         ui.allocate_ui([top_channel_bar_width, interact_size.y].into(), |ui| {
             let frame = egui::Frame {
-                margin: Margin::symmetric(4.0, 2.0),
+                inner_margin: Margin::symmetric(4.0, 2.0),
                 fill: ui.style().visuals.window_fill(),
                 stroke: ui.style().visuals.window_stroke(),
                 rounding: Rounding::same(2.0),
@@ -1387,10 +1394,15 @@ impl Screen {
                     }
                     ui.offsetw(offset);
 
-                    if self.current.has_guild() {
-                        let show_members_but = ui
-                            .add_sized([12.0, interact_size.y], TextButton::text("👤"))
-                            .on_hover_text("toggle member list");
+                    if let Some(guild_id) = self.current.guild() {
+                        let show_members_but = {
+                            let layout = Layout::centered_and_justified(ui.layout().main_dir());
+                            ui.allocate_ui_with_layout([12.0, interact_size.y].into(), layout, |ui| {
+                                ui.add_enabled(guild_id != 0, TextButton::text("👤"))
+                                    .on_hover_text("toggle member list")
+                            })
+                            .inner
+                        };
                         if show_members_but.clicked() {
                             self.toggle_panel(Panel::Members);
                             self.disable_users_bar = !self.disable_users_bar;
@@ -1538,10 +1550,10 @@ impl Screen {
                     ClientResult::Ok(Some(UploadMessageResult {
                         guild_id,
                         channel_id,
-                        attachments: vec![Attachment {
+                        attachments: vec![send_message_request::Attachment {
+                            id,
                             name,
-                            kind: mimetype,
-                            ..Attachment::new_unknown(id)
+                            ..Default::default()
                         }],
                     }))
                 });
@@ -1555,7 +1567,7 @@ impl AppScreen for Screen {
         "main"
     }
 
-    fn update(&mut self, ctx: &egui::Context, _: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _: &eframe::Frame, state: &mut State) {
         if ctx.input().key_pressed(egui::Key::Escape) {
             self.editing_message = None;
         }
@@ -1568,7 +1580,7 @@ impl AppScreen for Screen {
         self.view_pinned_messages(state, ctx);
 
         let panel_frame = egui::Frame {
-            margin: Margin::same(8.0),
+            inner_margin: Margin::same(8.0),
             fill: loqui_style::BG_LIGHT,
             ..Default::default()
         };
@@ -1599,10 +1611,10 @@ impl AppScreen for Screen {
             let mut show_main = |state: &mut State, ui: &mut Ui| {
                 self.show_guild_panel(ui, state);
 
-                if self.current.has_guild() {
+                if let Some(guild_id) = self.current.guild() {
                     self.show_channel_panel(ui, state);
 
-                    if !self.disable_users_bar {
+                    if !self.disable_users_bar && guild_id != 0 {
                         self.show_member_panel(ui, state);
                     }
 

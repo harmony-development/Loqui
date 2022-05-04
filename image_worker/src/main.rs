@@ -7,8 +7,7 @@ mod op {
     use image_worker::load_image;
 
     pub fn main() {
-        let worker_scope: DedicatedWorkerGlobalScope =
-            js_sys::eval("self").expect_throw("cant get self").unchecked_into();
+        let worker_scope = DedicatedWorkerGlobalScope::from(JsValue::from(js_sys::global()));
 
         let handler = {
             let worker_scope = worker_scope.clone();

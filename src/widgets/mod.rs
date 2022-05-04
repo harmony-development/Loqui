@@ -3,10 +3,7 @@ use std::ops::Not;
 use client::{
     channel::Channel,
     guild::Guild,
-    harmony_rust_sdk::api::{
-        chat::all_permissions,
-        rest::{About as AboutServer, FileId},
-    },
+    harmony_rust_sdk::api::{chat::all_permissions, rest::About as AboutServer},
     member::Member,
 };
 use eframe::egui::{self, Button, CollapsingHeader, Color32, Response, RichText, Ui, Widget, WidgetText};
@@ -90,14 +87,14 @@ impl Widget for About {
 /// View an avatar
 pub struct Avatar<'a> {
     state: &'a State,
-    maybe_id: Option<&'a FileId>,
+    maybe_id: Option<&'a str>,
     text: &'a str,
     size: f32,
     fill_bg: Option<Color32>,
 }
 
 impl<'a> Avatar<'a> {
-    pub fn new(maybe_id: Option<&'a FileId>, text: &'a str, state: &'a State) -> Self {
+    pub fn new(maybe_id: Option<&'a str>, text: &'a str, state: &'a State) -> Self {
         Self {
             state,
             maybe_id,

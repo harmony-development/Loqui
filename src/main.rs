@@ -37,21 +37,28 @@ fn main() {
         let icon_raw = include_bytes!("../data/loqui.ico");
         let image = image::load_from_memory(icon_raw).expect("icon must be valid");
         let image = image.to_rgba8();
-        eframe::epi::IconData {
+        eframe::IconData {
             width: image.width(),
             height: image.height(),
             rgba: image.into_vec(),
         }
     };
 
-    let app = loqui::App::new();
     let native_options = eframe::NativeOptions {
         initial_window_size: Some([1280.0, 720.0].into()),
         drag_and_drop_support: true,
         icon_data: Some(icon_data),
         ..Default::default()
     };
-    eframe::run_native(Box::new(app), native_options);
+    eframe::run_native(
+        "loqui",
+        native_options,
+        Box::new(|cc| {
+            let mut app = loqui::App::new();
+            app.setup(cc);
+            Box::new(app)
+        }),
+    );
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -59,6 +66,12 @@ fn main() -> Result<(), eframe::wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();
     tracing_wasm::set_as_global_default();
 
-    let app = loqui::App::new();
-    eframe::start_web("egui_canvas", Box::new(app))
+    eframe::start_web(
+        "egui_canvas",
+        Box::new(|cc| {
+            let mut app = loqui::App::new();
+            app.setup(cc);
+            Box::new(app)
+        }),
+    )
 }

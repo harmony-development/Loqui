@@ -80,7 +80,9 @@ impl Screen {
 
             if ui.ctx().is_using_pointer().not() {
                 state.local_config.scale_factor = self.scale_factor;
-                ui.ctx().set_pixels_per_point(state.local_config.scale_factor);
+                if state.local_config.scale_factor != 0.0 {
+                    ui.ctx().set_pixels_per_point(state.local_config.scale_factor);
+                }
             }
         });
 
@@ -131,7 +133,7 @@ impl Screen {
     fn view_general_profile(&mut self, state: &State, ui: &mut Ui, member: &Member) {
         ui.horizontal_top(|ui| {
             if self.uploading_user_pic.get().not() {
-                let avatar = Avatar::new(member.avatar_url.as_ref(), member.username.as_str(), state).size(64.0);
+                let avatar = Avatar::new(member.avatar_url.as_deref(), member.username.as_str(), state).size(64.0);
                 let avatar_but = ui.add(avatar).on_hover_text("set picture");
                 if avatar_but.clicked() {
                     let uploading_user_pic = self.uploading_user_pic.clone();
@@ -143,7 +145,7 @@ impl Screen {
                             let data = file.read().await;
                             let mimetype = content::infer_type_from_bytes(&data);
                             let id = client.upload_file(name, mimetype, data).await?;
-                            client.update_profile(None, Some(id), None).await?;
+                            client.update_profile(None, Some(id)).await?;
                             uploading_user_pic.set(false);
                         }
                         ClientResult::Ok(())
@@ -159,7 +161,7 @@ impl Screen {
                     ui.add(egui::TextEdit::singleline(&mut self.user_name_edit_text).desired_width(100.0));
                     if ui.add(egui::Button::new("edit").small()).clicked() {
                         let new_name = self.user_name_edit_text.clone();
-                        spawn_client_fut!(state, |client| client.update_profile(Some(new_name), None, None).await);
+                        spawn_client_fut!(state, |client| client.update_profile(Some(new_name), None).await);
                     }
                 });
             });
@@ -378,7 +380,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::Context, _frame: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &eframe::Frame, state: &mut State) {
         self.handle_futures(state);
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -404,11 +406,11 @@ impl AppScreen for Screen {
         });
     }
 
-    fn on_pop(&mut self, _: &egui::Context, _: &epi::Frame, state: &mut State) {
+    fn on_pop(&mut self, _: &egui::Context, _: &eframe::Frame, state: &mut State) {
         state.save_config();
     }
 
-    fn on_push(&mut self, _: &egui::Context, _: &epi::Frame, state: &mut State) {
+    fn on_push(&mut self, _: &egui::Context, _: &eframe::Frame, state: &mut State) {
         state.save_config();
     }
 }

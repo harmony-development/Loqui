@@ -10,7 +10,6 @@ use client::{
     harmony_rust_sdk::api::{
         exports::prost::{bytes::Bytes, Message},
         profile::{AppDataOverrides, GetAppDataRequest, SetAppDataRequest},
-        rest::FileId,
     },
     Client,
 };
@@ -71,7 +70,7 @@ impl BgImage {
 
         match res {
             Ok(data) => {
-                crate::image_cache::op::decode_image(data, FileId::Id(String::new()), "bg_image".to_string());
+                crate::image_cache::op::decode_image(data, String::new(), "bg_image".to_string());
                 Ok(())
             }
             Err(err) => Err(ClientError::Custom(err)),

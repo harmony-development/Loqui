@@ -2,7 +2,6 @@ use ahash::AHashMap;
 use harmony_rust_sdk::api::{
     chat::{permission::has_permission, Invite, Permission},
     harmonytypes::{item_position::Position, ItemPosition},
-    rest::FileId,
 };
 use smol_str::SmolStr;
 
@@ -12,12 +11,12 @@ use crate::role::{Role, RolePerms, Roles};
 pub struct Guild {
     pub name: SmolStr,
     pub owners: Vec<u64>,
-    pub picture: Option<FileId>,
+    pub picture: Option<String>,
     pub channels: Vec<u64>,
     pub roles: Roles,
     pub role_perms: RolePerms,
     pub members: AHashMap<u64, Vec<u64>>,
-    pub homeserver: SmolStr,
+    pub homeserver: Option<String>,
     pub perms: Vec<Permission>,
     pub invites: AHashMap<String, Invite>,
     pub fetched: bool,

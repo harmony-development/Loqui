@@ -1,11 +1,11 @@
-use client::{harmony_rust_sdk::api::rest::FileId, AHashMap};
+use client::AHashMap;
 use eframe::egui::{self, ImageData as Image, TextureHandle};
 
 #[derive(Default)]
 pub struct ImageCache {
-    avatar: AHashMap<FileId, (TextureHandle, [f32; 2])>,
-    minithumbnail: AHashMap<FileId, (TextureHandle, [f32; 2])>,
-    image: AHashMap<FileId, (TextureHandle, [f32; 2])>,
+    avatar: AHashMap<String, (TextureHandle, [f32; 2])>,
+    minithumbnail: AHashMap<String, (TextureHandle, [f32; 2])>,
+    image: AHashMap<String, (TextureHandle, [f32; 2])>,
     bg_image: Option<(TextureHandle, [f32; 2])>,
 }
 
@@ -24,17 +24,17 @@ impl ImageCache {
     }
 
     /// Get an avatar image. Avatars are always 64 x 64
-    pub fn get_avatar(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+    pub fn get_avatar(&self, id: &str) -> Option<(&TextureHandle, [f32; 2])> {
         self.avatar.get(id).map(|(tex, size)| (tex, *size))
     }
 
     /// Get a minithumbnail image. Minithumbnails are always blurred
-    pub fn get_thumbnail(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+    pub fn get_thumbnail(&self, id: &str) -> Option<(&TextureHandle, [f32; 2])> {
         self.minithumbnail.get(id).map(|(tex, size)| (tex, *size))
     }
 
     /// Get some image.
-    pub fn get_image(&self, id: &FileId) -> Option<(&TextureHandle, [f32; 2])> {
+    pub fn get_image(&self, id: &str) -> Option<(&TextureHandle, [f32; 2])> {
         self.image.get(id).map(|(tex, size)| (tex, *size))
     }
 
@@ -43,7 +43,7 @@ impl ImageCache {
     }
 }
 
-fn add_generic(map: &mut AHashMap<FileId, (TextureHandle, [f32; 2])>, ctx: &egui::Context, image: LoadedImage) {
+fn add_generic(map: &mut AHashMap<String, (TextureHandle, [f32; 2])>, ctx: &egui::Context, image: LoadedImage) {
     client::tracing::debug!("decoded image id {}, kind {}", image.id, image.kind);
     let dimensions = image.image.size();
     let texid = ctx.load_texture(image.id.to_string(), image.image);
@@ -52,13 +52,13 @@ fn add_generic(map: &mut AHashMap<FileId, (TextureHandle, [f32; 2])>, ctx: &egui
 
 pub struct LoadedImage {
     pub image: Image,
-    pub id: FileId,
+    pub id: String,
     pub kind: String,
 }
 
 impl LoadedImage {
     #[inline]
-    pub fn id(&self) -> &FileId {
+    pub fn id(&self) -> &str {
         &self.id
     }
 }
@@ -67,17 +67,13 @@ impl LoadedImage {
 pub mod op {
     use super::*;
 
-    use client::harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId};
-    use eframe::epi::backend::RepaintSignal;
+    use client::{harmony_rust_sdk::api::exports::prost::bytes::Bytes, tracing};
     use egui::ColorImage;
     use image_worker::{ArchivedImageLoaded, ImageData, ImageLoaded};
     use js_sys::Uint8Array;
-    use std::{
-        lazy::SyncOnceCell,
-        sync::{mpsc::SyncSender as Sender, Arc},
-    };
+    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender};
     use wasm_bindgen::{prelude::*, JsCast};
-    use web_sys::{MessageEvent, Worker as WebWorker};
+    use web_sys::{window, Blob, BlobPropertyBag, MessageEvent, Url, Worker as WebWorker};
 
     impl LoadedImage {
         pub fn from_archive(data: &ArchivedImageLoaded) -> Self {
@@ -85,11 +81,10 @@ pub mod op {
 
             let dimensions = [data.dimensions[0] as usize, data.dimensions[1] as usize];
             let image = Image::Color(ColorImage::from_rgba_unmultiplied(dimensions, data.pixels.as_slice()));
-            let id = FileId::from_str(data.id.as_str());
 
             Self {
                 image,
-                id: id.unwrap(),
+                id: data.id.to_string(),
                 kind: data.kind.as_str().into(),
             }
         }
@@ -100,7 +95,7 @@ pub mod op {
     }
 
     impl WorkerPool {
-        fn new(chan: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) -> Self {
+        fn new(chan: Sender<LoadedImage>, rr: egui::Context) -> Self {
             Self {
                 inner: spawn_worker(chan, rr),
             }
@@ -118,8 +113,23 @@ pub mod op {
 
     static WORKER_POOL: SyncOnceCell<WorkerPool> = SyncOnceCell::new();
 
-    fn spawn_worker(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) -> WebWorker {
-        let worker = WebWorker::new("./image_worker.js").expect("failed to start worker");
+    fn spawn_worker(tx: Sender<LoadedImage>, rr: egui::Context) -> WebWorker {
+        let origin = window()
+            .expect("window to be available")
+            .location()
+            .origin()
+            .expect("origin to be available");
+
+        let script = js_sys::Array::new();
+        let name = "image_worker";
+        script.push(&format!(r#"importScripts("{origin}/{name}.js");wasm_bindgen("{origin}/{name}_bg.wasm");"#).into());
+
+        let blob = Blob::new_with_str_sequence_and_options(&script, BlobPropertyBag::new().type_("text/javascript"))
+            .expect("blob creation succeeds");
+
+        let url = Url::create_object_url_with_blob(&blob).expect("url creation succeeds");
+
+        let worker = WebWorker::new(&url).expect("failed to spawn worker");
 
         let handler = Closure::wrap(Box::new(move |event: MessageEvent| {
             let data: Uint8Array = event.data().dyn_into().unwrap_throw();
@@ -141,18 +151,20 @@ pub mod op {
         worker
     }
 
-    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) {
+    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: egui::Context) {
         let worker_pool = WorkerPool::new(tx, rr);
         if WORKER_POOL.set(worker_pool).is_err() {
             unreachable!("worker pool must only be init once -- this is a bug");
         }
     }
 
-    pub fn decode_image(data: Bytes, id: FileId, kind: String) {
+    pub fn decode_image(data: Bytes, id: String, kind: String) {
+        tracing::debug!("sending image (id {id}) for decoding");
+
         let val = rkyv::to_bytes::<_, 2048>(&ImageData {
             data: data.to_vec(),
             kind,
-            id: id.into(),
+            id,
         })
         .unwrap()
         .into_vec();
@@ -162,7 +174,7 @@ pub mod op {
 
         WORKER_POOL
             .get()
-            .expect("must be initialized")
+            .expect_throw("must be initialized")
             .get_worker()
             .post_message(&data)
             .expect_throw("failed to decode image");
@@ -173,19 +185,13 @@ pub mod op {
 pub mod op {
     use super::*;
 
-    use std::{
-        lazy::SyncOnceCell,
-        sync::{mpsc::SyncSender as Sender, Arc},
-    };
+    use std::{lazy::SyncOnceCell, sync::mpsc::SyncSender as Sender};
 
-    use client::{
-        harmony_rust_sdk::api::{exports::prost::bytes::Bytes, rest::FileId},
-        tracing,
-    };
-    use eframe::{egui::ColorImage, epi::backend::RepaintSignal};
+    use client::{harmony_rust_sdk::api::exports::prost::bytes::Bytes, tracing};
+    use eframe::egui::ColorImage;
 
     impl LoadedImage {
-        pub fn load(data: Bytes, id: FileId, kind: String) -> Option<Self> {
+        pub fn load(data: Bytes, id: String, kind: String) -> Option<Self> {
             let Some(loaded) = image_worker::load_image_logic(data.as_ref(), kind.as_str()) else {
                 tracing::error!(
                     "could not load an image (id {}); most likely unsupported format",
@@ -202,17 +208,19 @@ pub mod op {
         }
     }
 
-    static CHANNEL: SyncOnceCell<(Sender<LoadedImage>, Arc<dyn RepaintSignal>)> = SyncOnceCell::new();
+    static CHANNEL: SyncOnceCell<(Sender<LoadedImage>, egui::Context)> = SyncOnceCell::new();
 
     /// This should only be called once.
-    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: Arc<dyn RepaintSignal>) {
+    pub fn set_image_channel(tx: Sender<LoadedImage>, rr: egui::Context) {
         if CHANNEL.set((tx, rr)).is_err() {
             unreachable!("image channel already set -- this is a bug");
         }
     }
 
     /// Do not call this before calling `set_image_channel`.
-    pub fn decode_image(data: Bytes, id: FileId, kind: String) {
+    pub fn decode_image(data: Bytes, id: String, kind: String) {
+        tracing::debug!("sending image (id {id}) for decoding");
+
         tokio::task::spawn_blocking(move || {
             let Some(loaded) = LoadedImage::load(data, id, kind) else { return };
             let chan = CHANNEL.get().expect("no image channel set -- this is a bug");

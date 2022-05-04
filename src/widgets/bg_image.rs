@@ -1,8 +1,7 @@
 //! Frame container
 
-use eframe::egui::{self, epaint};
+use eframe::egui;
 use egui::{layers::ShapeIdx, *};
-use epaint::*;
 
 /// Put an image background behind some UI.
 #[derive(Clone, Copy, Debug)]

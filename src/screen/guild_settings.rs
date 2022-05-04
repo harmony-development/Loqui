@@ -96,7 +96,7 @@ impl Screen {
                 let avatar_but = ui
                     .add_enabled(
                         guild.has_perm(all_permissions::GUILD_MANAGE_CHANGE_INFORMATION),
-                        Avatar::new(guild.picture.as_ref(), guild.name.as_str(), state).size(64.0),
+                        Avatar::new(guild.picture.as_deref(), guild.name.as_str(), state).size(64.0),
                     )
                     .on_hover_text("set picture");
                 if avatar_but.clicked() {
@@ -187,11 +187,9 @@ impl Screen {
                         .response;
                     resp.on_hover_text("right click to manage").context_menu_styled(|ui| {
                         if ui.button("copy invite").clicked() {
-                            let homeserver = guild
-                                .homeserver
-                                .is_empty()
-                                .then(|| state.client().inner().homeserver_url().authority().unwrap().as_str())
-                                .unwrap_or_else(|| guild.homeserver.as_str());
+                            let homeserver = guild.homeserver.as_deref().unwrap_or_else(|| {
+                                state.client().inner().homeserver_url().authority().unwrap().as_str()
+                            });
                             ui.output().copied_text = format!("hmc://{}/{}", homeserver, id);
                             ui.close_menu();
                         }
@@ -353,6 +351,7 @@ impl Screen {
         self.managing_perms = managing_perms;
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn view_perm(
         &self,
         state: &State,
@@ -386,7 +385,7 @@ impl Screen {
 }
 
 impl AppScreen for Screen {
-    fn update(&mut self, ctx: &egui::Context, _: &epi::Frame, state: &mut State) {
+    fn update(&mut self, ctx: &egui::Context, _: &eframe::Frame, state: &mut State) {
         self.view_manage_role_perms(state, ctx);
 
         egui::CentralPanel::default().show(ctx, |ui| {
