@@ -1717,6 +1717,6 @@ pub trait U64Ext {
 
 impl U64Ext for u64 {
     fn if_not_zero(self) -> Option<u64> {
-        self.eq(&0).then(|| self)
+        self.eq(&0).not().then(|| self)
     }
 }
