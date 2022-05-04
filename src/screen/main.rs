@@ -16,7 +16,7 @@ use client::{
     member::Member,
     message::{AttachmentExt, Message, MessageId, ReadMessagesView},
     smol_str::SmolStr,
-    AHashMap, AHashSet, FetchEvent, Uri,
+    AHashMap, AHashSet, FetchEvent, U64Ext, Uri,
 };
 use eframe::egui::{vec2, Color32, Event, RichText, Rounding, Vec2};
 use egui::style::Margin;
@@ -173,6 +173,8 @@ pub struct Screen {
     /// panel stack keeping track of where we are / were
     panel_stack: PanelStack,
     main_composer_id: OnceCell<egui::Id>,
+
+    fetching_channels: AtomBool,
 }
 
 impl Screen {
@@ -349,15 +351,23 @@ impl Screen {
                         self.current.set_channel(*channel_id);
                     }
                     if guild.channels.is_empty() && guild.members.is_empty() {
-                        spawn_evs!(state, |events, c| {
-                            c.fetch_channels(guild_id, events).await?;
-                        });
-                        spawn_evs!(state, |events, c| {
-                            c.fetch_guild_perms(guild_id, events).await?;
-                        });
-                        spawn_evs!(state, |events, c| {
-                            c.fetch_members(guild_id, events).await?;
-                        });
+                        if guild_id != 0 {
+                            let fetching_channels = self.fetching_channels.clone();
+                            spawn_evs!(state, |events, c| {
+                                fetching_channels.scope(c.fetch_channels(guild_id, events)).await?;
+                            });
+                            spawn_evs!(state, |events, c| {
+                                c.fetch_guild_perms(guild_id, events).await?;
+                            });
+                            spawn_evs!(state, |events, c| {
+                                c.fetch_members(guild_id, events).await?;
+                            });
+                        } else {
+                            let fetching_channels = self.fetching_channels.clone();
+                            spawn_evs!(state, |events, c| {
+                                fetching_channels.scope(c.fetch_private_channels(events)).await?;
+                            });
+                        }
                     }
                     self.scroll_to_bottom(ui);
                 }
@@ -395,7 +405,7 @@ impl Screen {
             .inner_margin(Margin::same(2.0))
             .show(ui, |ui| {
                 let but = ui
-                    .add(TextButton::text(guild_name).small())
+                    .add_enabled(guild_id != 0, TextButton::text(guild_name).small())
                     .on_hover_text("open guild settings");
 
                 but.clicked()
@@ -445,9 +455,11 @@ impl Screen {
                         self.scroll_to_bottom(ui);
                     }
                 }
-            } else {
+            } else if self.fetching_channels.get() {
                 ui.add_sized(ui.available_size(), egui::Spinner::new().size(32.0))
                     .on_hover_text_at_pointer("loading channels");
+            } else {
+                ui.centered_and_justified(|ui| ui.label("no channels"));
             }
         });
     }
@@ -492,7 +504,9 @@ impl Screen {
                         let message_id = id.id().unwrap();
                         self.editing_message = None;
                         spawn_client_fut!(state, |client| {
-                            client.edit_message(Some(guild_id), channel_id, message_id, text).await
+                            client
+                                .edit_message(guild_id.if_not_zero(), channel_id, message_id, text)
+                                .await
                         });
                     }
                 } else if highlight_message {
@@ -1049,7 +1063,7 @@ impl Screen {
             self.composer.text_mut().clear();
             let user_id = state.client().user_id();
             let request = SendMessageRequest {
-                guild_id: Some(guild_id),
+                guild_id: guild_id.if_not_zero(),
                 channel_id,
                 overrides,
                 ..Default::default()
@@ -1380,10 +1394,15 @@ impl Screen {
                     }
                     ui.offsetw(offset);
 
-                    if self.current.has_guild() {
-                        let show_members_but = ui
-                            .add_sized([12.0, interact_size.y], TextButton::text("👤"))
-                            .on_hover_text("toggle member list");
+                    if let Some(guild_id) = self.current.guild() {
+                        let show_members_but = {
+                            let layout = Layout::centered_and_justified(ui.layout().main_dir());
+                            ui.allocate_ui_with_layout([12.0, interact_size.y].into(), layout, |ui| {
+                                ui.add_enabled(guild_id != 0, TextButton::text("👤"))
+                                    .on_hover_text("toggle member list")
+                            })
+                            .inner
+                        };
                         if show_members_but.clicked() {
                             self.toggle_panel(Panel::Members);
                             self.disable_users_bar = !self.disable_users_bar;
@@ -1592,10 +1611,10 @@ impl AppScreen for Screen {
             let mut show_main = |state: &mut State, ui: &mut Ui| {
                 self.show_guild_panel(ui, state);
 
-                if self.current.has_guild() {
+                if let Some(guild_id) = self.current.guild() {
                     self.show_channel_panel(ui, state);
 
-                    if !self.disable_users_bar {
+                    if !self.disable_users_bar && guild_id != 0 {
                         self.show_member_panel(ui, state);
                     }
 

@@ -1710,3 +1710,13 @@ impl<K, V> HashMapExt<V> for HashMap<K, V> {
         self.into_values().next().expect("expected at least one item")
     }
 }
+
+pub trait U64Ext {
+    fn if_not_zero(self) -> Option<u64>;
+}
+
+impl U64Ext for u64 {
+    fn if_not_zero(self) -> Option<u64> {
+        self.eq(&0).then(|| self)
+    }
+}

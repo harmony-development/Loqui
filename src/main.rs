@@ -66,6 +66,12 @@ fn main() -> Result<(), eframe::wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();
     tracing_wasm::set_as_global_default();
 
-    let app = loqui::App::new();
-    eframe::start_web("egui_canvas", Box::new(app))
+    eframe::start_web(
+        "egui_canvas",
+        Box::new(|cc| {
+            let mut app = loqui::App::new();
+            app.setup(cc);
+            Box::new(app)
+        }),
+    )
 }
