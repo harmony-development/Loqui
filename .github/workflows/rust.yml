@@ -60,7 +60,7 @@ jobs:
         components: rustfmt, clippy
 
     - name: Cache rust
-      uses: Swatinem/rust-cache@v1
+      uses: Swatinem/rust-cache@v2
       with:
         key: cache-debug-3
 
@@ -90,7 +90,7 @@ jobs:
         components: rustfmt, clippy
 
     - name: Cache rust
-      uses: Swatinem/rust-cache@v1
+      uses: Swatinem/rust-cache@v2
       with:
         key: cache-release-web-2
 
@@ -140,7 +140,7 @@ jobs:
         components: rustfmt, clippy
 
     - name: Cache rust
-      uses: Swatinem/rust-cache@v1
+      uses: Swatinem/rust-cache@v2
       with:
         key: cache-release-3
 
